@@ -740,15 +740,15 @@ func (api InteractionAPI) GetAdmireByActorIDAndPostID(ctx context.Context, actor
 func (api InteractionAPI) GetAdmireByActorIDAndTokenID(ctx context.Context, actorID persist.DBID, tokenID persist.DBID) (*db.Admire, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"actorID":     validate.WithTag(actorID, "required"),
+		"actorID": validate.WithTag(actorID, "required"),
 		"tokenID": validate.WithTag(tokenID, "required"),
 	}); err != nil {
 		return nil, err
 	}
 
 	admire, err := api.loaders.AdmireByActorIDAndTokenID.Load(db.GetAdmireByActorIDAndTokenIDParams{
-		ActorID:     actorID,
-		TokenID: 	 tokenID,
+		ActorID: actorID,
+		TokenID: tokenID,
 	})
 
 	if err != nil {
@@ -991,6 +991,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
 	dbMentions, err := mentionInputsToMentions(ctx, mentions, api.queries)
+	if err != nil {
+		return "", err
+	}
 
 	commentID, resultMentions, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment, dbMentions)
 	if err != nil {
@@ -1076,7 +1079,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 					MentionID:      mention.ID,
 					Action:         persist.ActionMentionCommunity,
 				})
-
+				if err != nil {
+					return "", err
+				}
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
 			}

@@ -39,15 +39,6 @@ var uriToMerchType = map[string]int{
 	"ipfs://QmSPdA9Gg8xAdVxWvUyGkdFKQ8YMVYnGjYcr3cGMcBH1ae": merchTypeCard,
 }
 
-type merchAttribute struct {
-	TraitType string `json:"trait_type"`
-	Value     string `json:"value"`
-}
-
-type merchMetadata struct {
-	Attributes []merchAttribute `json:"attributes"`
-}
-
 type MerchAPI struct {
 	repos              *postgres.Repositories
 	queries            *db.Queries

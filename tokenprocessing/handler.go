@@ -7,7 +7,6 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -25,7 +24,7 @@ var contractSpecificRetries = map[persist.ContractIdentifiers]int{
 func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *cloudtasks.Client) *gin.Engine {
 	// Retry tokens that failed during syncs, but don't retry tokens that failed during manual refreshes
 	refreshManager := tokenmanage.New(ctx, taskClient)
-	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, syncMaxRetriesF(ctx, mc.Queries))
+	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, syncMaxRetries)
 
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/process", func(c *gin.Context) {
@@ -48,13 +47,10 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	return router
 }
 
-func syncMaxRetriesF(ctx context.Context, q *db.Queries) func(id persist.DBID) int {
-	return func(id persist.DBID) int {
-		td, _ := q.GetTokenDefinitionById(ctx, id)
-		cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
-		if retries, ok := contractSpecificRetries[cID]; ok {
-			return retries
-		}
-		return defaultSyncMaxRetries
+func syncMaxRetries(tID persist.TokenIdentifiers) int {
+	cID := persist.NewContractIdentifiers(tID.ContractAddress, tID.Chain)
+	if retries, ok := contractSpecificRetries[cID]; ok {
+		return retries
 	}
+	return defaultSyncMaxRetries
 }

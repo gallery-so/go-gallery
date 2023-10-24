@@ -364,7 +364,6 @@ type TokenRepository interface {
 	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
-	UpdateByID(context.Context, DBID, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	TokenExistsByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (bool, error)
 }

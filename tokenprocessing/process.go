@@ -755,12 +755,12 @@ func processFromTokenDefinitionManaged(ctx context.Context, tp *tokenProcessor, 
 		"contractAddress":     td.ContractAddress,
 		"chain":               td.Chain,
 	})
-	closing, err := tm.StartProcessing(ctx, td.ID, attempts)
+	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
+	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
+	closing, err := tm.StartProcessing(ctx, td.ID, tID, attempts)
 	if err != nil {
 		return coredb.TokenMedia{}, err
 	}
-	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
-	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
 	runOpts = append(runOpts, addContextRunOptions(cause)...)
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))

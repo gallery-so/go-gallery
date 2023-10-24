@@ -195,7 +195,9 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 					Action:         persist.ActionMentionCommunity,
 					MentionID:      mention.ID,
 				})
-
+				if err != nil {
+					return "", err
+				}
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
 			}

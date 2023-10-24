@@ -487,9 +487,6 @@ func newTokenMetadataCache() *tokenMetadataCache {
 
 func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitTokensF {
 	return func(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
-		if len(tokenDefinitionIDs) == 0 {
-			return nil
-		}
 		return tm.SubmitBatch(ctx, tokenDefinitionIDs)
 	}
 }

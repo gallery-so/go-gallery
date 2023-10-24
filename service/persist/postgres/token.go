@@ -382,32 +382,6 @@ func (t *TokenRepository) Upsert(pCtx context.Context, pToken persist.Token) err
 	return err
 }
 
-// UpdateByID updates a token by its ID
-func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
-
-	var res sql.Result
-	var err error
-	switch update := pUpdate.(type) {
-	case persist.TokenUpdateOwnerInput:
-		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, update.BlockNumber, pID)
-	case persist.TokenUpdateBalanceInput:
-		res, err = t.updateBalanceUnsafeStmt.ExecContext(pCtx, update.Quantity, update.BlockNumber, pID)
-	default:
-		return fmt.Errorf("unsupported update type: %T", pUpdate)
-	}
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return persist.ErrTokenNotFoundByID{ID: pID}
-	}
-	return nil
-}
-
 // MostRecentBlock returns the most recent block number of any token
 func (t *TokenRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNumber, error) {
 	var blockNumber persist.BlockNumber

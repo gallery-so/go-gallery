@@ -14,6 +14,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/throttle"
 )
 
+type MaxRetryF func(tID persist.TokenIdentifiers) int
+
 type Manager struct {
 	cache           *redis.Cache
 	processRegistry *registry
@@ -22,7 +24,7 @@ type Manager struct {
 	// delayer sets the linear delay for retrying tokens up to MaxRetries
 	delayer *limiters.KeyRateLimiter
 	// maxRetryF is a function that defines the maximum number of times a token can be reenqueued before it is not retried again
-	maxRetryF func(id persist.DBID) int
+	maxRetryF MaxRetryF
 }
 
 func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
@@ -35,7 +37,7 @@ func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetryF func(persist.DBID) int) *Manager {
+func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetryF MaxRetryF) *Manager {
 	m := New(ctx, taskClient)
 	m.maxRetryF = maxRetryF
 	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
@@ -51,7 +53,7 @@ func (m Manager) Processing(ctx context.Context, tDefID persist.DBID) bool {
 // StartProcessing marks a token as processing. It returns a callback that must be called when work on the token is finished in order to mark
 // it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attemps is ignored when MaxRetries
 // is set to the default value of 0.
-func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, attempts int) (func(err error) error, error) {
+func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, attempts int) (func(err error) error, error) {
 	err := m.throttle.Lock(ctx, "lock:"+tDefID.String())
 	if err != nil {
 		return nil, err
@@ -78,7 +80,7 @@ func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, attem
 	callback := func(err error) error {
 		close(stop)
 		<-done
-		m.tryRetry(ctx, tDefID, err, attempts)
+		m.tryRetry(ctx, tDefID, tID, err, attempts)
 		m.throttle.Unlock(ctx, "lock:"+tDefID.String())
 		return nil
 	}
@@ -88,14 +90,17 @@ func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, attem
 
 // SubmitBatch enqueues tokens for processing.
 func (m Manager) SubmitBatch(ctx context.Context, tDefIDs []persist.DBID) error {
+	if len(tDefIDs) == 0 {
+		return nil
+	}
 	m.processRegistry.setManyEnqueue(ctx, tDefIDs)
 	message := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
 	logger.For(ctx).WithField("batchID", message.BatchID).Infof("enqueued batch: %s (size=%d)", message.BatchID, len(tDefIDs))
 	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
 }
 
-func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, err error, attempts int) error {
-	if err == nil || m.maxRetryF == nil || attempts >= m.maxRetryF(tDefID) {
+func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, err error, attempts int) error {
+	if err == nil || m.maxRetryF == nil || attempts >= m.maxRetryF(tID) {
 		m.processRegistry.finish(ctx, tDefID)
 		return nil
 	}

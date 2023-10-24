@@ -505,6 +505,9 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		OwnerUserID:    userID,
 		CollectorsNote: util.ToNullString(collectorsNote, true),
 	})
+	if err != nil {
+		return err
+	}
 
 	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
 	if err != nil {

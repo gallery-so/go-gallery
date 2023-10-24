@@ -2,30 +2,10 @@ package persist
 
 import (
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/lib/pq"
 )
-
-type AddressAtBlockList []AddressAtBlock
-
-func (l AddressAtBlockList) Value() (driver.Value, error) {
-	return pq.Array(l).Value()
-}
-
-// Scan implements the Scanner interface for the DBIDList type
-func (l *AddressAtBlockList) Scan(value interface{}) error {
-	return pq.Array(l).Scan(value)
-}
-
-// AddressAtBlock represents an address at a specific block
-type AddressAtBlock struct {
-	Address Address     `json:"address"`
-	Block   BlockNumber `json:"block"`
-}
 
 // TokenIdentifiers represents a unique identifier for a token
 type TokenIdentifiers struct {
@@ -114,18 +94,4 @@ func NewContractIdentifiers(pContractAddress Address, pChain Chain) ContractIden
 		ContractAddress: pContractAddress,
 		Chain:           pChain,
 	}
-}
-
-// Scan implements the database/sql Scanner interface for the AddressAtBlock type
-func (a *AddressAtBlock) Scan(src interface{}) error {
-	if src == nil {
-		*a = AddressAtBlock{}
-		return nil
-	}
-	return json.Unmarshal(src.([]uint8), a)
-}
-
-// Value implements the database/sql/driver Valuer interface for the AddressAtBlock type
-func (a AddressAtBlock) Value() (driver.Value, error) {
-	return json.Marshal(a)
 }
