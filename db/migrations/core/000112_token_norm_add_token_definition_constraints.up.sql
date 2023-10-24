@@ -4,7 +4,7 @@ begin;
 -- Temporarily increase work_mem to speed up the migration so prevent data spilling to disk
 set local work_mem = '5500 MB';
 
--- Only allow reads to the table
+-- Lock access to table
 lock table tokens in access exclusive mode;
 
 -- Create a copy of the tokens table with the new column

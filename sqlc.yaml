@@ -86,8 +86,6 @@ sql:
           # Tokens
           - column: 'tokens.owned_by_wallets'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.DBIDList'
-          - column: 'tokens.ownership_history'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList'
           - column: 'tokens.quantity'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.HexString'
 
