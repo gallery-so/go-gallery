@@ -26,8 +26,10 @@ where
   and ($3 is null or t.owner_user_id = $3)
   and (cardinality($4) = 0 or td.contract_id = any($4))
   and (cardinality($5::int[]) = 0 or td.chain = any($5))
-  and t.deleted = false
   and (($1 and t.is_holder_token) or ($2 and t.is_creator_token))
+  and t.token_definition_id = td.id
+  and t.deleted = false
+  and td.deleted = false
   and t.last_synced < $6
 `
 

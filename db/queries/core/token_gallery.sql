@@ -125,6 +125,8 @@ where
   and (sqlc.narg('only_from_user_id') is null or t.owner_user_id = @only_from_user_id)
   and (cardinality(@only_from_contract_ids) = 0 or td.contract_id = any(@only_from_contract_ids))
   and (cardinality(@only_from_chains::int[]) = 0 or td.chain = any(@only_from_chains))
-  and t.deleted = false
   and ((@remove_holder_status and t.is_holder_token) or (@remove_creator_status and t.is_creator_token))
+  and t.token_definition_id = td.id
+  and t.deleted = false
+  and td.deleted = false
   and t.last_synced < @timestamp;
