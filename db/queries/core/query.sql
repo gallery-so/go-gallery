@@ -52,8 +52,6 @@ SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;
 -- name: GetUsersWithTraitBatch :batchmany
 SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;
 
--- name: 
-
 -- name: GetGalleryById :one
 SELECT * FROM galleries WHERE id = $1 AND deleted = false;
 
