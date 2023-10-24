@@ -177,7 +177,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
 	defer traceCallback()
 
-	if len(tpj.defaultMetadata) > 0 || !tpj.refreshMetadata {
+	if len(tpj.defaultMetadata) > 0 && !tpj.refreshMetadata {
 		return tpj.defaultMetadata
 	}
 

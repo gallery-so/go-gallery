@@ -891,7 +891,7 @@ func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	h := handlerWithProviders(t, tokenRecorder.Send, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	// Ideally this compares against expected values, but mocks seems to behave weirdly with slices
-	tokenRecorder.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Times(1).Return(nil)
+	tokenRecorder.On("Send", mock.Anything, mock.Anything).Times(1).Return(nil)
 
 	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
@@ -906,10 +906,18 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 	h := handlerWithProviders(t, tokenRecorder.Send, defaultStubProvider(userF.Wallet.Address))
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
+	// First sync is to get the tokens into the DB with token_media_ids
 	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
-
 	require.NoError(t, err)
-	tokenRecorder.AssertNotCalled(t, "Send", mock.Anything, mock.Anything)
+
+	// This sync should not submit any tokens
+	_, err = syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
+	require.NoError(t, err)
+
+	tokenRecorder.AssertNotCalled(t, "Send")
+	tokenRecorder.AssertNumberOfCalls(t, "Send", 1)
+
+	// require.Truef(t, called, "expected Send to not be called")
 }
 
 func testSyncDeletesOldTokens(t *testing.T) {
@@ -925,6 +933,7 @@ func testSyncDeletesOldTokens(t *testing.T) {
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
+	require.NoError(t, err)
 	assertSyncedTokens(t, response, err, 4)
 }
 
@@ -990,9 +999,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	startTokenID := 0
 
 	patchMetadata := func(t *testing.T, ctx context.Context, address, endpoint string) http.Handler {
-		contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Name: "testContract",
-		}}
+		contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "testContract"}}
 		clients := server.ClientInit(ctx)
 		provider := newStubProvider(
 			withContractToken(contract, address, startTokenID),

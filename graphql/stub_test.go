@@ -186,7 +186,7 @@ func submitUserTokensNoop(ctx context.Context, tDefIDs []persist.DBID) error {
 // sendTokensToHTTPHandler makes an HTTP request to the passed handler
 func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitTokensF {
 	return func(ctx context.Context, tDefIDs []persist.DBID) error {
-		m := task.TokenProcessingBatchMessage{TokenDefinitionIDs: tDefIDs}
+		m := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
 		byt, _ := json.Marshal(m)
 		r := bytes.NewReader(byt)
 		req := httptest.NewRequest(method, endpoint, r)
