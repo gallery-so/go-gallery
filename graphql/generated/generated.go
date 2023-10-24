@@ -10376,6 +10376,7 @@ input FarcasterAuth {
 
 input LensAuth {
   address: Address!
+  signature: String @scrub
   # lens only supports ETH addresses currently so no need to specify a chain
 }
 
@@ -61424,7 +61425,7 @@ func (ec *executionContext) unmarshalInputLensAuth(ctx context.Context, obj inte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address"}
+	fieldsInOrder := [...]string{"address", "signature"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -61440,6 +61441,15 @@ func (ec *executionContext) unmarshalInputLensAuth(ctx context.Context, obj inte
 				return it, err
 			}
 			it.Address = data
+		case "signature":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Signature = data
 		}
 	}
 

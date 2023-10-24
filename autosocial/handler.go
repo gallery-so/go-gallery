@@ -65,6 +65,49 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 	}
 }
 
+func checkFarcasterApproval(q *coredb.Queries, n *farcaster.NeynarAPI) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var in task.AutosocialPollFarcasterMessage
+		if err := c.ShouldBindQuery(&in); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		s, err := n.GetSignerByUUID(c, in.SignerUUID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		if s.Status != "approved" {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		user, err := q.GetSocialsByUserID(c, in.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		far, ok := user[persist.SocialProviderFarcaster]
+		if !ok {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		far.Metadata["signer_status"] = s.Status
+
+		err = q.AddSocialToUser(c, coredb.AddSocialToUserParams{
+			UserID: in.UserID,
+			Socials: persist.Socials{
+				persist.SocialProviderFarcaster: far,
+			},
+		})
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
 func addLensProfileToUser(ctx context.Context, l *lens.LensAPI, address []persist.ChainAddress, q *coredb.Queries, userID persist.DBID) error {
 	for _, a := range address {
 		if a.Address() == "" {

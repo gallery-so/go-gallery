@@ -1584,7 +1584,8 @@ func (JSONMedia) IsMediaSubtype() {}
 func (JSONMedia) IsMedia()        {}
 
 type LensAuth struct {
-	Address persist.Address `json:"address"`
+	Address   persist.Address `json:"address"`
+	Signature *string         `json:"signature"`
 }
 
 type LensSocialAccount struct {

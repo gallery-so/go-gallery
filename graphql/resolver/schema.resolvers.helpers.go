@@ -9,9 +9,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"golang.org/x/net/html"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -216,7 +217,11 @@ func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m mod
 	}
 
 	if m.Lens != nil {
-		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address), nil
+		sig := ""
+		if m.Lens.Signature != nil {
+			sig = *m.Lens.Signature
+		}
+		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address, sig), nil
 	}
 
 	return nil, errNoAuthMechanismFound

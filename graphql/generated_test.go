@@ -310,11 +310,15 @@ func (v *IntervalInput) GetStart() int { return v.Start }
 func (v *IntervalInput) GetLength() int { return v.Length }
 
 type LensAuth struct {
-	Address string `json:"address"`
+	Address   string  `json:"address"`
+	Signature *string `json:"signature"`
 }
 
 // GetAddress returns LensAuth.Address, and is useful for accessing the field via an interface.
 func (v *LensAuth) GetAddress() string { return v.Address }
+
+// GetSignature returns LensAuth.Signature, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetSignature() *string { return v.Signature }
 
 type MagicLinkAuth struct {
 	Token string `json:"token"`

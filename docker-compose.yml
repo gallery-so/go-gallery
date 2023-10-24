@@ -69,6 +69,8 @@ services:
         'projects/gallery-local/locations/here/queues/email',
         '-queue',
         'projects/gallery-local/locations/here/queues/autosocial',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/autosocial-poll',
       ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators

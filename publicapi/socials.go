@@ -46,12 +46,13 @@ func (s SocialAPI) NewFarcasterAuthenticator(userID persist.DBID, address persis
 	}
 }
 
-func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Address) *socialauth.LensAuthenticator {
+func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Address, sig string) *socialauth.LensAuthenticator {
 	return &socialauth.LensAuthenticator{
 		HTTPClient: s.httpClient,
 		UserID:     userID,
 		Queries:    s.queries,
 		Address:    address,
+		Signature:  sig,
 	}
 }
 

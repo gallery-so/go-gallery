@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/lens"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -65,9 +67,11 @@ func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResu
 type FarcasterAuthenticator struct {
 	Queries    *coredb.Queries
 	HTTPClient *http.Client
+	TaskClient *cloudtasks.Client
 
-	UserID  persist.DBID
-	Address persist.Address
+	UserID     persist.DBID
+	Address    persist.Address
+	WithSigner bool
 }
 
 func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
@@ -92,7 +96,7 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 		return nil, fmt.Errorf("get user by address: %w", err)
 	}
 
-	return &SocialAuthResult{
+	res := &SocialAuthResult{
 		Provider: persist.SocialProviderFarcaster,
 		ID:       fu.Fid.String(),
 		Metadata: map[string]interface{}{
@@ -101,7 +105,26 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 			"profile_image_url": fu.Pfp.URL,
 			"bio":               fu.Profile.Bio.Text,
 		},
-	}, nil
+	}
+
+	if a.WithSigner {
+		signer, err := api.CreateSignerForUser(ctx, fu.Fid)
+		if err != nil {
+			return nil, fmt.Errorf("get signer by address: %w", err)
+		}
+
+		res.Metadata["signer_uuid"] = signer.SignerUUID
+		res.Metadata["signer_status"] = signer.Status
+		err = task.CreateTaskForAutosocialPollFarcaster(ctx, task.AutosocialPollFarcasterMessage{
+			SignerUUID: signer.SignerUUID,
+			UserID:     a.UserID,
+		}, a.TaskClient)
+		if err != nil {
+			return nil, fmt.Errorf("create task for autosocial poll farcaster: %w", err)
+		}
+	}
+
+	return res, nil
 
 }
 
@@ -109,8 +132,9 @@ type LensAuthenticator struct {
 	Queries    *coredb.Queries
 	HTTPClient *http.Client
 
-	UserID  persist.DBID
-	Address persist.Address
+	UserID    persist.DBID
+	Address   persist.Address
+	Signature string
 }
 
 func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
@@ -133,6 +157,23 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 	lu, err := api.DefaultProfileByAddress(ctx, a.Address)
 	if err != nil {
 		return nil, err
+	}
+
+	if a.Signature != "" {
+		access, refresh, err := api.AuthenticateWithSignature(ctx, a.Address, a.Signature)
+		if err != nil {
+			return nil, err
+		}
+		err = a.Queries.UpsertSocialOAuth(ctx, coredb.UpsertSocialOAuthParams{
+			ID:           persist.GenerateID(),
+			UserID:       a.UserID,
+			Provider:     persist.SocialProviderLens,
+			AccessToken:  util.ToNullString(access, false),
+			RefreshToken: util.ToNullString(refresh, false),
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &SocialAuthResult{

@@ -1790,6 +1790,7 @@ input FarcasterAuth {
 
 input LensAuth {
   address: Address!
+  signature: String @scrub
   # lens only supports ETH addresses currently so no need to specify a chain
 }
 
