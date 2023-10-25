@@ -585,7 +585,6 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	})
 	if err != nil {
 		logger.For(ctx).Errorf("failed to dispatch event: %s", err)
-		return userID, galleryID, err
 	}
 
 	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{

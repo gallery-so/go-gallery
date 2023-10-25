@@ -720,6 +720,9 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 -- name: CreateContractNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
 
+-- name: CreateUserPostedYourWorkNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
+
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
@@ -1589,7 +1592,7 @@ from users u, contracts c, wallets w
 where u.id = @user_id
   and c.chain = any(@chains::int[])
   and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
-  and w.chain = any(@l1_chains::int[])
+  and w.l1_chain = c.l1_chain
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false

@@ -115,6 +115,7 @@ func addFarcasterProfileToUser(ctx context.Context, n *farcaster.NeynarAPI, addr
 		}
 		u, err := n.UserByAddress(ctx, a.Address())
 		if err != nil {
+			logrus.Error(err)
 			continue
 		}
 		if u.Fid.String() == "" {

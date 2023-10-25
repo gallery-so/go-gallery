@@ -1,13 +1,13 @@
-version: "3.9"
+version: '3.9'
 services:
   redis:
-    image: "redis:6"
+    image: 'redis:6'
     ports:
-      - "6379:6379"
+      - '6379:6379'
   postgres:
     build:
-      context: "docker/postgres"
-      dockerfile: "DOCKERFILE"
+      context: 'docker/postgres'
+      dockerfile: 'DOCKERFILE'
       args:
         - PGHOST=${PGHOST}
         - PGPORT=${PGPORT}
@@ -16,18 +16,18 @@ services:
         - PGDATABASE=${PGDATABASE}
         - PGTESTUSER=${PGTESTUSER}
     ports:
-      - "5432:5432"
+      - '5432:5432'
     environment:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
     volumes:
-      - "${PWD}/docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf"
-    command: ["-c", "config-file=/etc/postgresql/postgresql.conf"]
+      - '${PWD}/docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf'
+    command: ['-c', 'config-file=/etc/postgresql/postgresql.conf']
   postgres_indexer:
     build:
-      context: "."
-      dockerfile: "docker/postgres_indexer/DOCKERFILE"
+      context: '.'
+      dockerfile: 'docker/postgres_indexer/DOCKERFILE'
       args:
         - PGHOST=${PGHOST}
         - PGPORT=${PGPORT}
@@ -36,7 +36,7 @@ services:
         - PGDATABASE=${PGDATABASE}
         - PGTESTUSER=${PGTESTUSER}
     ports:
-      - "5433:5432"
+      - '5433:5432'
     environment:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
@@ -44,31 +44,44 @@ services:
   task-emulator:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
     ports:
-      - "8123:8123"
+      - '8123:8123'
     expose:
-      - "8123"
-    command: [
-      "-host", "0.0.0.0",
-      "-port", "8123",
-      "-queue", "projects/gallery-local/locations/here/queues/feedbot",
-      "-queue", "projects/gallery-local/locations/here/queues/feed-event",
-      "-queue", "projects/gallery-local/locations/here/queues/token-processing",
-      "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes",
-      "-queue", "projects/gallery-local/locations/here/queues/wallet-validate",
-      "-queue", "projects/gallery-local/locations/here/queues/push-notifications",
-      "-queue", "projects/gallery-local/locations/here/queues/email",
-    ]
+      - '8123'
+    command:
+      [
+        '-host',
+        '0.0.0.0',
+        '-port',
+        '8123',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/feedbot',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/feed-event',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/token-processing',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/indexer-refreshes',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/wallet-validate',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/push-notifications',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/email',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/autosocial',
+      ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     expose:
-      - "8085"
+      - '8085'
     ports:
-      - "8085:8085"
-    command: [
-      "/bin/bash",
-      "-c",
-      "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local"
-    ]
+      - '8085:8085'
+    command:
+      [
+        '/bin/bash',
+        '-c',
+        'gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local',
+      ]
 
   # Uncomment if you want to run tokenprocessing locally as a container
   # tokenprocessing:

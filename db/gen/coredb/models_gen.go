@@ -81,6 +81,7 @@ type Contract struct {
 	IsProviderMarkedSpam  bool            `json:"is_provider_marked_spam"`
 	ParentID              persist.DBID    `json:"parent_id"`
 	OverrideCreatorUserID persist.DBID    `json:"override_creator_user_id"`
+	L1Chain               persist.L1Chain `json:"l1_chain"`
 }
 
 type ContractCreator struct {

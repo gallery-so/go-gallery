@@ -701,11 +701,8 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 
 	chainInts := util.MapWithoutError(chains, func(c persist.Chain) int32 { return int32(c) })
 	rows, err := p.Queries.GetCreatedContractsByUserID(ctx, db.GetCreatedContractsByUserIDParams{
-		UserID: userID,
-		Chains: chainInts,
-		L1Chains: util.MapWithoutError(chainInts, func(c int32) int32 {
-			return int32(persist.Chain(c).L1Chain())
-		}),
+		UserID:           userID,
+		Chains:           chainInts,
 		NewContractsOnly: true,
 	})
 
@@ -936,6 +933,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 				params.CreatorAddress = append(params.CreatorAddress, child.CreatorAddress.String())
 				params.OwnerAddress = append(params.OwnerAddress, child.OwnerAddress.String())
 				params.Chain = append(params.Chain, int32(result.Chain))
+				params.L1Chain = append(params.L1Chain, int32(result.Chain.L1Chain()))
 				params.Description = append(params.Description, child.Description)
 				params.ParentIds = append(params.ParentIds, contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)].String())
 			}
@@ -1463,8 +1461,9 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		return persist.ErrTokenNotFoundByTokenIdentifiers{Token: ti}
 	}
 
-	contractID, err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+	contractID, err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, persist.ContractGallery{
 		Chain:           ti.Chain,
+		L1Chain:         ti.Chain.L1Chain(),
 		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
 		Name:            persist.NullString(finalContractDescriptors.Name),
@@ -2139,6 +2138,7 @@ func contractsToNewDedupedContracts(contracts []chainContracts, existingContract
 	for address, meta := range contractMetadatas {
 		res = append(res, persist.ContractGallery{
 			Chain:                address.Chain(),
+			L1Chain:              address.Chain().L1Chain(),
 			Address:              address.Address(),
 			Symbol:               persist.NullString(meta.Symbol),
 			Name:                 persist.NullString(meta.Name),
