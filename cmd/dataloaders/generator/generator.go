@@ -198,7 +198,7 @@ func newSubscription(entry autoCacheEntry, target dataloaderDefinition, field st
 const notFoundImplementationStr = `
 type %s must implement getNotFoundError. Add this signature to notfound.go and have it return an appropriate error:
 
-func (*%s) getNotFoundError(%s) error {
+func (*%s) getNotFoundError(key %s) error {
     return pgx.ErrNoRows
 }
 `
