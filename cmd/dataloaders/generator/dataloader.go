@@ -34,16 +34,16 @@ type Dataloader[TKey any, TResult any] struct {
 }
 
 type batch[TKey any, TResult any] struct {
-	dataloader  *Dataloader[TKey, TResult]
-	id          int32
-	keys        []TKey
-	jsonKeys    []string
-	results     []TResult
-	errors      []error
-	status      batchStatus
-	done        chan struct{}
-	mu          sync.Mutex
-	numAssigned int32
+	dataloader *Dataloader[TKey, TResult]
+	id         int32
+	keys       []TKey
+	jsonKeys   []string
+	results    []TResult
+	errors     []error
+	status     batchStatus
+	done       chan struct{}
+	mu         sync.Mutex
+	numCallers int32
 }
 
 func NewDataloader[TKey comparable, TResult any](ctx context.Context, maxBatchSize int, batchTimeout time.Duration, cacheResults bool, publishResults bool,
@@ -256,7 +256,7 @@ func (d *Dataloader[TKey, TResult]) addKeyToBatch(key TKey, jsonKey string) (*ba
 
 		// Prevent lock contention within a batch by allowing only the first maxBatchSize callers
 		// to obtain the lock.
-		numAssigned := atomic.AddInt32(&b.numAssigned, 1)
+		numAssigned := atomic.AddInt32(&b.numCallers, 1)
 		if numAssigned > int32(d.maxBatchSize) {
 			atomic.CompareAndSwapInt32(&d.currentBatchID, currentID, currentID+1)
 			continue
