@@ -6,8 +6,9 @@ import (
 	"context"
 	"time"
 
-	// TODO: Add to ImportPaths
-	//"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/jackc/pgx/v4"
+
+	"github.com/mikeydub/go-gallery/service/persist"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
@@ -446,4 +447,1147 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	})
 
 	return loaders
+}
+
+func loadCountAdmiresByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *CountAdmiresByFeedEventIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountAdmiresByFeedEventIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountAdmiresByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountAdmiresByPostIDBatch(q *coredb.Queries) func(context.Context, *CountAdmiresByPostIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountAdmiresByPostIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountAdmiresByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountAdmiresByTokenIDBatch(q *coredb.Queries) func(context.Context, *CountAdmiresByTokenIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountAdmiresByTokenIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountAdmiresByTokenIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountCommentsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *CountCommentsByFeedEventIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountCommentsByFeedEventIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountCommentsByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountCommentsByPostIDBatch(q *coredb.Queries) func(context.Context, *CountCommentsByPostIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountCommentsByPostIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountCommentsByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountInteractionsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *CountInteractionsByFeedEventIDBatch, []coredb.CountInteractionsByFeedEventIDBatchParams) ([][]coredb.CountInteractionsByFeedEventIDBatchRow, []error) {
+	return func(ctx context.Context, d *CountInteractionsByFeedEventIDBatch, params []coredb.CountInteractionsByFeedEventIDBatchParams) ([][]coredb.CountInteractionsByFeedEventIDBatchRow, []error) {
+		results := make([][]coredb.CountInteractionsByFeedEventIDBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountInteractionsByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.CountInteractionsByFeedEventIDBatchRow, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountInteractionsByPostIDBatch(q *coredb.Queries) func(context.Context, *CountInteractionsByPostIDBatch, []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
+	return func(ctx context.Context, d *CountInteractionsByPostIDBatch, params []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
+		results := make([][]coredb.CountInteractionsByPostIDBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountInteractionsByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.CountInteractionsByPostIDBatchRow, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context, *CountRepliesByCommentIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountRepliesByCommentIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountRepliesByCommentIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetAdmireByActorIDAndFeedEventID(q *coredb.Queries) func(context.Context, *GetAdmireByActorIDAndFeedEventID, []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error) {
+	return func(ctx context.Context, d *GetAdmireByActorIDAndFeedEventID, params []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error) {
+		results := make([]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetAdmireByActorIDAndFeedEventID(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetAdmireByActorIDAndPostID(q *coredb.Queries) func(context.Context, *GetAdmireByActorIDAndPostID, []coredb.GetAdmireByActorIDAndPostIDParams) ([]coredb.Admire, []error) {
+	return func(ctx context.Context, d *GetAdmireByActorIDAndPostID, params []coredb.GetAdmireByActorIDAndPostIDParams) ([]coredb.Admire, []error) {
+		results := make([]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetAdmireByActorIDAndPostID(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetAdmireByActorIDAndTokenID(q *coredb.Queries) func(context.Context, *GetAdmireByActorIDAndTokenID, []coredb.GetAdmireByActorIDAndTokenIDParams) ([]coredb.Admire, []error) {
+	return func(ctx context.Context, d *GetAdmireByActorIDAndTokenID, params []coredb.GetAdmireByActorIDAndTokenIDParams) ([]coredb.Admire, []error) {
+		results := make([]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetAdmireByActorIDAndTokenID(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetAdmireByAdmireIDBatch(q *coredb.Queries) func(context.Context, *GetAdmireByAdmireIDBatch, []persist.DBID) ([]coredb.Admire, []error) {
+	return func(ctx context.Context, d *GetAdmireByAdmireIDBatch, params []persist.DBID) ([]coredb.Admire, []error) {
+		results := make([]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetAdmireByAdmireIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetAdmiresByActorIDBatch(q *coredb.Queries) func(context.Context, *GetAdmiresByActorIDBatch, []persist.DBID) ([][]coredb.Admire, []error) {
+	return func(ctx context.Context, d *GetAdmiresByActorIDBatch, params []persist.DBID) ([][]coredb.Admire, []error) {
+		results := make([][]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetAdmiresByActorIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetChildContractsByParentIDBatchPaginate(q *coredb.Queries) func(context.Context, *GetChildContractsByParentIDBatchPaginate, []coredb.GetChildContractsByParentIDBatchPaginateParams) ([][]coredb.Contract, []error) {
+	return func(ctx context.Context, d *GetChildContractsByParentIDBatchPaginate, params []coredb.GetChildContractsByParentIDBatchPaginateParams) ([][]coredb.Contract, []error) {
+		results := make([][]coredb.Contract, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetChildContractsByParentIDBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Contract, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCollectionByIdBatch(q *coredb.Queries) func(context.Context, *GetCollectionByIdBatch, []persist.DBID) ([]coredb.Collection, []error) {
+	return func(ctx context.Context, d *GetCollectionByIdBatch, params []persist.DBID) ([]coredb.Collection, []error) {
+		results := make([]coredb.Collection, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCollectionByIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Collection, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCollectionsByGalleryIdBatch(q *coredb.Queries) func(context.Context, *GetCollectionsByGalleryIdBatch, []persist.DBID) ([][]coredb.Collection, []error) {
+	return func(ctx context.Context, d *GetCollectionsByGalleryIdBatch, params []persist.DBID) ([][]coredb.Collection, []error) {
+		results := make([][]coredb.Collection, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCollectionsByGalleryIdBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Collection, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCommentByCommentIDBatch(q *coredb.Queries) func(context.Context, *GetCommentByCommentIDBatch, []persist.DBID) ([]coredb.Comment, []error) {
+	return func(ctx context.Context, d *GetCommentByCommentIDBatch, params []persist.DBID) ([]coredb.Comment, []error) {
+		results := make([]coredb.Comment, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCommentByCommentIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Comment, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetContractByChainAddressBatch(q *coredb.Queries) func(context.Context, *GetContractByChainAddressBatch, []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error) {
+	return func(ctx context.Context, d *GetContractByChainAddressBatch, params []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error) {
+		results := make([]coredb.Contract, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetContractByChainAddressBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Contract, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetContractsDisplayedByUserIDBatch(q *coredb.Queries) func(context.Context, *GetContractsDisplayedByUserIDBatch, []persist.DBID) ([][]coredb.Contract, []error) {
+	return func(ctx context.Context, d *GetContractsDisplayedByUserIDBatch, params []persist.DBID) ([][]coredb.Contract, []error) {
+		results := make([][]coredb.Contract, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetContractsDisplayedByUserIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Contract, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCreatedContractsBatchPaginate(q *coredb.Queries) func(context.Context, *GetCreatedContractsBatchPaginate, []coredb.GetCreatedContractsBatchPaginateParams) ([][]coredb.Contract, []error) {
+	return func(ctx context.Context, d *GetCreatedContractsBatchPaginate, params []coredb.GetCreatedContractsBatchPaginateParams) ([][]coredb.Contract, []error) {
+		results := make([][]coredb.Contract, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCreatedContractsBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Contract, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetEventByIdBatch(q *coredb.Queries) func(context.Context, *GetEventByIdBatch, []persist.DBID) ([]coredb.FeedEvent, []error) {
+	return func(ctx context.Context, d *GetEventByIdBatch, params []persist.DBID) ([]coredb.FeedEvent, []error) {
+		results := make([]coredb.FeedEvent, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetEventByIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.FeedEvent, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetFollowersByUserIdBatch(q *coredb.Queries) func(context.Context, *GetFollowersByUserIdBatch, []persist.DBID) ([][]coredb.User, []error) {
+	return func(ctx context.Context, d *GetFollowersByUserIdBatch, params []persist.DBID) ([][]coredb.User, []error) {
+		results := make([][]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetFollowersByUserIdBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetFollowingByUserIdBatch(q *coredb.Queries) func(context.Context, *GetFollowingByUserIdBatch, []persist.DBID) ([][]coredb.User, []error) {
+	return func(ctx context.Context, d *GetFollowingByUserIdBatch, params []persist.DBID) ([][]coredb.User, []error) {
+		results := make([][]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetFollowingByUserIdBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetGalleriesByUserIdBatch(q *coredb.Queries) func(context.Context, *GetGalleriesByUserIdBatch, []persist.DBID) ([][]coredb.Gallery, []error) {
+	return func(ctx context.Context, d *GetGalleriesByUserIdBatch, params []persist.DBID) ([][]coredb.Gallery, []error) {
+		results := make([][]coredb.Gallery, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetGalleriesByUserIdBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Gallery, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetGalleryByCollectionIdBatch(q *coredb.Queries) func(context.Context, *GetGalleryByCollectionIdBatch, []persist.DBID) ([]coredb.Gallery, []error) {
+	return func(ctx context.Context, d *GetGalleryByCollectionIdBatch, params []persist.DBID) ([]coredb.Gallery, []error) {
+		results := make([]coredb.Gallery, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetGalleryByCollectionIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Gallery, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetGalleryByIdBatch(q *coredb.Queries) func(context.Context, *GetGalleryByIdBatch, []persist.DBID) ([]coredb.Gallery, []error) {
+	return func(ctx context.Context, d *GetGalleryByIdBatch, params []persist.DBID) ([]coredb.Gallery, []error) {
+		results := make([]coredb.Gallery, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetGalleryByIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Gallery, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetGalleryTokenMediasByGalleryIDBatch(q *coredb.Queries) func(context.Context, *GetGalleryTokenMediasByGalleryIDBatch, []persist.DBID) ([][]coredb.TokenMedia, []error) {
+	return func(ctx context.Context, d *GetGalleryTokenMediasByGalleryIDBatch, params []persist.DBID) ([][]coredb.TokenMedia, []error) {
+		results := make([][]coredb.TokenMedia, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetGalleryTokenMediasByGalleryIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.TokenMedia, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetMediaByMediaIDIgnoringStatus(q *coredb.Queries) func(context.Context, *GetMediaByMediaIDIgnoringStatus, []persist.DBID) ([]coredb.TokenMedia, []error) {
+	return func(ctx context.Context, d *GetMediaByMediaIDIgnoringStatus, params []persist.DBID) ([]coredb.TokenMedia, []error) {
+		results := make([]coredb.TokenMedia, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetMediaByMediaIDIgnoringStatus(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.TokenMedia, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetMembershipByMembershipIdBatch(q *coredb.Queries) func(context.Context, *GetMembershipByMembershipIdBatch, []persist.DBID) ([]coredb.Membership, []error) {
+	return func(ctx context.Context, d *GetMembershipByMembershipIdBatch, params []persist.DBID) ([]coredb.Membership, []error) {
+		results := make([]coredb.Membership, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetMembershipByMembershipIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Membership, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetMentionsByCommentID(q *coredb.Queries) func(context.Context, *GetMentionsByCommentID, []persist.DBID) ([][]coredb.Mention, []error) {
+	return func(ctx context.Context, d *GetMentionsByCommentID, params []persist.DBID) ([][]coredb.Mention, []error) {
+		results := make([][]coredb.Mention, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetMentionsByCommentID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Mention, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetMentionsByPostID(q *coredb.Queries) func(context.Context, *GetMentionsByPostID, []persist.DBID) ([][]coredb.Mention, []error) {
+	return func(ctx context.Context, d *GetMentionsByPostID, params []persist.DBID) ([][]coredb.Mention, []error) {
+		results := make([][]coredb.Mention, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetMentionsByPostID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Mention, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetNewTokensByFeedEventIdBatch(q *coredb.Queries) func(context.Context, *GetNewTokensByFeedEventIdBatch, []persist.DBID) ([][]coredb.Token, []error) {
+	return func(ctx context.Context, d *GetNewTokensByFeedEventIdBatch, params []persist.DBID) ([][]coredb.Token, []error) {
+		results := make([][]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetNewTokensByFeedEventIdBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Token, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetNotificationByIDBatch(q *coredb.Queries) func(context.Context, *GetNotificationByIDBatch, []persist.DBID) ([]coredb.Notification, []error) {
+	return func(ctx context.Context, d *GetNotificationByIDBatch, params []persist.DBID) ([]coredb.Notification, []error) {
+		results := make([]coredb.Notification, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetNotificationByIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Notification, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetOwnersByContractIdBatchPaginate(q *coredb.Queries) func(context.Context, *GetOwnersByContractIdBatchPaginate, []coredb.GetOwnersByContractIdBatchPaginateParams) ([][]coredb.User, []error) {
+	return func(ctx context.Context, d *GetOwnersByContractIdBatchPaginate, params []coredb.GetOwnersByContractIdBatchPaginateParams) ([][]coredb.User, []error) {
+		results := make([][]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetOwnersByContractIdBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetPostByIdBatch(q *coredb.Queries) func(context.Context, *GetPostByIdBatch, []persist.DBID) ([]coredb.Post, []error) {
+	return func(ctx context.Context, d *GetPostByIdBatch, params []persist.DBID) ([]coredb.Post, []error) {
+		results := make([]coredb.Post, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetPostByIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Post, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetProfileImageByID(q *coredb.Queries) func(context.Context, *GetProfileImageByID, []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
+	return func(ctx context.Context, d *GetProfileImageByID, params []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
+		results := make([]coredb.ProfileImage, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetProfileImageByID(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.ProfileImage, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetSharedContractsBatchPaginate(q *coredb.Queries) func(context.Context, *GetSharedContractsBatchPaginate, []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
+	return func(ctx context.Context, d *GetSharedContractsBatchPaginate, params []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
+		results := make([][]coredb.GetSharedContractsBatchPaginateRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetSharedContractsBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.GetSharedContractsBatchPaginateRow, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetSharedFollowersBatchPaginate(q *coredb.Queries) func(context.Context, *GetSharedFollowersBatchPaginate, []coredb.GetSharedFollowersBatchPaginateParams) ([][]coredb.GetSharedFollowersBatchPaginateRow, []error) {
+	return func(ctx context.Context, d *GetSharedFollowersBatchPaginate, params []coredb.GetSharedFollowersBatchPaginateParams) ([][]coredb.GetSharedFollowersBatchPaginateRow, []error) {
+		results := make([][]coredb.GetSharedFollowersBatchPaginateRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetSharedFollowersBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.GetSharedFollowersBatchPaginateRow, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokenByIdBatch(q *coredb.Queries) func(context.Context, *GetTokenByIdBatch, []persist.DBID) ([]coredb.Token, []error) {
+	return func(ctx context.Context, d *GetTokenByIdBatch, params []persist.DBID) ([]coredb.Token, []error) {
+		results := make([]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokenByIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Token, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokenByIdIgnoreDisplayableBatch(q *coredb.Queries) func(context.Context, *GetTokenByIdIgnoreDisplayableBatch, []persist.DBID) ([]coredb.Token, []error) {
+	return func(ctx context.Context, d *GetTokenByIdIgnoreDisplayableBatch, params []persist.DBID) ([]coredb.Token, []error) {
+		results := make([]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokenByIdIgnoreDisplayableBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Token, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokenByUserTokenIdentifiersBatch(q *coredb.Queries) func(context.Context, *GetTokenByUserTokenIdentifiersBatch, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
+	return func(ctx context.Context, d *GetTokenByUserTokenIdentifiersBatch, params []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
+		results := make([]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokenByUserTokenIdentifiersBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Token, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokenOwnerByIDBatch(q *coredb.Queries) func(context.Context, *GetTokenOwnerByIDBatch, []persist.DBID) ([]coredb.User, []error) {
+	return func(ctx context.Context, d *GetTokenOwnerByIDBatch, params []persist.DBID) ([]coredb.User, []error) {
+		results := make([]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokenOwnerByIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.User, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokensByCollectionIdBatch(q *coredb.Queries) func(context.Context, *GetTokensByCollectionIdBatch, []coredb.GetTokensByCollectionIdBatchParams) ([][]coredb.Token, []error) {
+	return func(ctx context.Context, d *GetTokensByCollectionIdBatch, params []coredb.GetTokensByCollectionIdBatchParams) ([][]coredb.Token, []error) {
+		results := make([][]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokensByCollectionIdBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Token, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokensByUserIdAndChainBatch(q *coredb.Queries) func(context.Context, *GetTokensByUserIdAndChainBatch, []coredb.GetTokensByUserIdAndChainBatchParams) ([][]coredb.Token, []error) {
+	return func(ctx context.Context, d *GetTokensByUserIdAndChainBatch, params []coredb.GetTokensByUserIdAndChainBatchParams) ([][]coredb.Token, []error) {
+		results := make([][]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokensByUserIdAndChainBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Token, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokensByUserIdBatch(q *coredb.Queries) func(context.Context, *GetTokensByUserIdBatch, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
+	return func(ctx context.Context, d *GetTokensByUserIdBatch, params []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
+		results := make([][]coredb.GetTokensByUserIdBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokensByUserIdBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.GetTokensByUserIdBatchRow, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokensByWalletIdsBatch(q *coredb.Queries) func(context.Context, *GetTokensByWalletIdsBatch, []persist.DBIDList) ([][]coredb.Token, []error) {
+	return func(ctx context.Context, d *GetTokensByWalletIdsBatch, params []persist.DBIDList) ([][]coredb.Token, []error) {
+		results := make([][]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokensByWalletIdsBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Token, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetUserByAddressAndL1Batch(q *coredb.Queries) func(context.Context, *GetUserByAddressAndL1Batch, []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error) {
+	return func(ctx context.Context, d *GetUserByAddressAndL1Batch, params []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error) {
+		results := make([]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserByAddressAndL1Batch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.User, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetUserByIdBatch(q *coredb.Queries) func(context.Context, *GetUserByIdBatch, []persist.DBID) ([]coredb.User, []error) {
+	return func(ctx context.Context, d *GetUserByIdBatch, params []persist.DBID) ([]coredb.User, []error) {
+		results := make([]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserByIdBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.User, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetUserByUsernameBatch(q *coredb.Queries) func(context.Context, *GetUserByUsernameBatch, []string) ([]coredb.User, []error) {
+	return func(ctx context.Context, d *GetUserByUsernameBatch, params []string) ([]coredb.User, []error) {
+		results := make([]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserByUsernameBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.User, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetUserNotificationsBatch(q *coredb.Queries) func(context.Context, *GetUserNotificationsBatch, []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error) {
+	return func(ctx context.Context, d *GetUserNotificationsBatch, params []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error) {
+		results := make([][]coredb.Notification, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserNotificationsBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Notification, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetUsersWithTraitBatch(q *coredb.Queries) func(context.Context, *GetUsersWithTraitBatch, []string) ([][]coredb.User, []error) {
+	return func(ctx context.Context, d *GetUsersWithTraitBatch, params []string) ([][]coredb.User, []error) {
+		results := make([][]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUsersWithTraitBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetWalletByIDBatch(q *coredb.Queries) func(context.Context, *GetWalletByIDBatch, []persist.DBID) ([]coredb.Wallet, []error) {
+	return func(ctx context.Context, d *GetWalletByIDBatch, params []persist.DBID) ([]coredb.Wallet, []error) {
+		results := make([]coredb.Wallet, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetWalletByIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Wallet, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetWalletsByUserIDBatch(q *coredb.Queries) func(context.Context, *GetWalletsByUserIDBatch, []persist.DBID) ([][]coredb.Wallet, []error) {
+	return func(ctx context.Context, d *GetWalletsByUserIDBatch, params []persist.DBID) ([][]coredb.Wallet, []error) {
+		results := make([][]coredb.Wallet, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetWalletsByUserIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Wallet, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateAdmiresByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *PaginateAdmiresByFeedEventIDBatch, []coredb.PaginateAdmiresByFeedEventIDBatchParams) ([][]coredb.Admire, []error) {
+	return func(ctx context.Context, d *PaginateAdmiresByFeedEventIDBatch, params []coredb.PaginateAdmiresByFeedEventIDBatchParams) ([][]coredb.Admire, []error) {
+		results := make([][]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateAdmiresByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateAdmiresByPostIDBatch(q *coredb.Queries) func(context.Context, *PaginateAdmiresByPostIDBatch, []coredb.PaginateAdmiresByPostIDBatchParams) ([][]coredb.Admire, []error) {
+	return func(ctx context.Context, d *PaginateAdmiresByPostIDBatch, params []coredb.PaginateAdmiresByPostIDBatchParams) ([][]coredb.Admire, []error) {
+		results := make([][]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateAdmiresByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateAdmiresByTokenIDBatch(q *coredb.Queries) func(context.Context, *PaginateAdmiresByTokenIDBatch, []coredb.PaginateAdmiresByTokenIDBatchParams) ([][]coredb.Admire, []error) {
+	return func(ctx context.Context, d *PaginateAdmiresByTokenIDBatch, params []coredb.PaginateAdmiresByTokenIDBatchParams) ([][]coredb.Admire, []error) {
+		results := make([][]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateAdmiresByTokenIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Admire, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateCommentsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *PaginateCommentsByFeedEventIDBatch, []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error) {
+	return func(ctx context.Context, d *PaginateCommentsByFeedEventIDBatch, params []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error) {
+		results := make([][]coredb.Comment, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateCommentsByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Comment, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateCommentsByPostIDBatch(q *coredb.Queries) func(context.Context, *PaginateCommentsByPostIDBatch, []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error) {
+	return func(ctx context.Context, d *PaginateCommentsByPostIDBatch, params []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error) {
+		results := make([][]coredb.Comment, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateCommentsByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Comment, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateInteractionsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *PaginateInteractionsByFeedEventIDBatch, []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error) {
+	return func(ctx context.Context, d *PaginateInteractionsByFeedEventIDBatch, params []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error) {
+		results := make([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateInteractionsByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.PaginateInteractionsByFeedEventIDBatchRow, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateInteractionsByPostIDBatch(q *coredb.Queries) func(context.Context, *PaginateInteractionsByPostIDBatch, []coredb.PaginateInteractionsByPostIDBatchParams) ([][]coredb.PaginateInteractionsByPostIDBatchRow, []error) {
+	return func(ctx context.Context, d *PaginateInteractionsByPostIDBatch, params []coredb.PaginateInteractionsByPostIDBatchParams) ([][]coredb.PaginateInteractionsByPostIDBatchRow, []error) {
+		results := make([][]coredb.PaginateInteractionsByPostIDBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateInteractionsByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.PaginateInteractionsByPostIDBatchRow, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginatePostsByContractID(q *coredb.Queries) func(context.Context, *PaginatePostsByContractID, []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error) {
+	return func(ctx context.Context, d *PaginatePostsByContractID, params []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error) {
+		results := make([][]coredb.Post, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginatePostsByContractID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Post, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context, *PaginateRepliesByCommentIDBatch, []coredb.PaginateRepliesByCommentIDBatchParams) ([][]coredb.Comment, []error) {
+	return func(ctx context.Context, d *PaginateRepliesByCommentIDBatch, params []coredb.PaginateRepliesByCommentIDBatchParams) ([][]coredb.Comment, []error) {
+		results := make([][]coredb.Comment, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateRepliesByCommentIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Comment, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetContractCreatorsByIds(q *coredb.Queries) func(context.Context, *GetContractCreatorsByIds, []string) ([]coredb.ContractCreator, []error) {
+	return func(ctx context.Context, d *GetContractCreatorsByIds, params []string) ([]coredb.ContractCreator, []error) {
+		queryResults, err := q.GetContractCreatorsByIds(ctx, params)
+
+		results := make([]coredb.ContractCreator, len(params))
+		errors := make([]error, len(params))
+
+		if err != nil {
+			for i := range errors {
+				errors[i] = err
+			}
+
+			return results, errors
+		}
+
+		hasResults := make([]bool, len(params))
+
+		for _, result := range queryResults {
+			results[result.BatchKeyIndex-1] = result.ContractCreator
+			hasResults[result.BatchKeyIndex-1] = true
+		}
+
+		for i, hasResult := range hasResults {
+			if !hasResult {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		}
+
+		return results, errors
+	}
+}
+
+func loadGetContractsByIDs(q *coredb.Queries) func(context.Context, *GetContractsByIDs, []string) ([]coredb.Contract, []error) {
+	return func(ctx context.Context, d *GetContractsByIDs, params []string) ([]coredb.Contract, []error) {
+		queryResults, err := q.GetContractsByIDs(ctx, params)
+
+		results := make([]coredb.Contract, len(params))
+		errors := make([]error, len(params))
+
+		if err != nil {
+			for i := range errors {
+				errors[i] = err
+			}
+
+			return results, errors
+		}
+
+		hasResults := make([]bool, len(params))
+
+		for _, result := range queryResults {
+			results[result.BatchKeyIndex-1] = result.Contract
+			hasResults[result.BatchKeyIndex-1] = true
+		}
+
+		for i, hasResult := range hasResults {
+			if !hasResult {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		}
+
+		return results, errors
+	}
 }

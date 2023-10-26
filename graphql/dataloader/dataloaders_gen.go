@@ -4,10 +4,8 @@ package dataloader
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/cmd/dataloaders/generator"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -23,16 +21,12 @@ type autoCacheWithKeys[TKey any, TResult any] interface {
 	getKeysForResult(TResult) []TKey
 }
 
+type notFoundErrorProvider[TKey any] interface {
+	getNotFoundError(TKey) error
+}
+
 type PreFetchHook func(context.Context, string) context.Context
 type PostFetchHook func(context.Context, string)
-
-type NotFound[TKey any] struct {
-	Key TKey
-}
-
-func (e NotFound[TKey]) Error() string {
-	return fmt.Sprintf("result not found with key: %v", e.Key)
-}
 
 // CountAdmiresByFeedEventIDBatch batches and caches requests
 type CountAdmiresByFeedEventIDBatch struct {
@@ -46,17 +40,19 @@ func newCountAdmiresByFeedEventIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]int64, []error),
+	fetch func(context.Context, *CountAdmiresByFeedEventIDBatch, []persist.DBID) ([]int64, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountAdmiresByFeedEventIDBatch {
+	d := &CountAdmiresByFeedEventIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountAdmiresByFeedEventIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountAdmiresByFeedEventIDBatch")
@@ -67,30 +63,8 @@ func newCountAdmiresByFeedEventIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountAdmiresByFeedEventIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountAdmiresByFeedEventIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]int64, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]int64, []error) {
-		results := make([]int64, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountAdmiresByFeedEventIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r int64, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // CountAdmiresByPostIDBatch batches and caches requests
@@ -105,17 +79,19 @@ func newCountAdmiresByPostIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]int64, []error),
+	fetch func(context.Context, *CountAdmiresByPostIDBatch, []persist.DBID) ([]int64, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountAdmiresByPostIDBatch {
+	d := &CountAdmiresByPostIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountAdmiresByPostIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountAdmiresByPostIDBatch")
@@ -126,30 +102,8 @@ func newCountAdmiresByPostIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountAdmiresByPostIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountAdmiresByPostIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]int64, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]int64, []error) {
-		results := make([]int64, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountAdmiresByPostIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r int64, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // CountAdmiresByTokenIDBatch batches and caches requests
@@ -164,17 +118,19 @@ func newCountAdmiresByTokenIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]int64, []error),
+	fetch func(context.Context, *CountAdmiresByTokenIDBatch, []persist.DBID) ([]int64, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountAdmiresByTokenIDBatch {
+	d := &CountAdmiresByTokenIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountAdmiresByTokenIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountAdmiresByTokenIDBatch")
@@ -185,30 +141,8 @@ func newCountAdmiresByTokenIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountAdmiresByTokenIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountAdmiresByTokenIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]int64, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]int64, []error) {
-		results := make([]int64, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountAdmiresByTokenIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r int64, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // CountCommentsByFeedEventIDBatch batches and caches requests
@@ -223,17 +157,19 @@ func newCountCommentsByFeedEventIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]int64, []error),
+	fetch func(context.Context, *CountCommentsByFeedEventIDBatch, []persist.DBID) ([]int64, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountCommentsByFeedEventIDBatch {
+	d := &CountCommentsByFeedEventIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountCommentsByFeedEventIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountCommentsByFeedEventIDBatch")
@@ -244,30 +180,8 @@ func newCountCommentsByFeedEventIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountCommentsByFeedEventIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountCommentsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]int64, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]int64, []error) {
-		results := make([]int64, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountCommentsByFeedEventIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r int64, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // CountCommentsByPostIDBatch batches and caches requests
@@ -282,17 +196,19 @@ func newCountCommentsByPostIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]int64, []error),
+	fetch func(context.Context, *CountCommentsByPostIDBatch, []persist.DBID) ([]int64, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountCommentsByPostIDBatch {
+	d := &CountCommentsByPostIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountCommentsByPostIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountCommentsByPostIDBatch")
@@ -303,30 +219,8 @@ func newCountCommentsByPostIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountCommentsByPostIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountCommentsByPostIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]int64, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]int64, []error) {
-		results := make([]int64, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountCommentsByPostIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r int64, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // CountInteractionsByFeedEventIDBatch batches and caches requests
@@ -341,17 +235,19 @@ func newCountInteractionsByFeedEventIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.CountInteractionsByFeedEventIDBatchParams) ([][]coredb.CountInteractionsByFeedEventIDBatchRow, []error),
+	fetch func(context.Context, *CountInteractionsByFeedEventIDBatch, []coredb.CountInteractionsByFeedEventIDBatchParams) ([][]coredb.CountInteractionsByFeedEventIDBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountInteractionsByFeedEventIDBatch {
+	d := &CountInteractionsByFeedEventIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.CountInteractionsByFeedEventIDBatchParams) ([][]coredb.CountInteractionsByFeedEventIDBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountInteractionsByFeedEventIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountInteractionsByFeedEventIDBatch")
@@ -362,30 +258,8 @@ func newCountInteractionsByFeedEventIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountInteractionsByFeedEventIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountInteractionsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, []coredb.CountInteractionsByFeedEventIDBatchParams) ([][]coredb.CountInteractionsByFeedEventIDBatchRow, []error) {
-	return func(ctx context.Context, params []coredb.CountInteractionsByFeedEventIDBatchParams) ([][]coredb.CountInteractionsByFeedEventIDBatchRow, []error) {
-		results := make([][]coredb.CountInteractionsByFeedEventIDBatchRow, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountInteractionsByFeedEventIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.CountInteractionsByFeedEventIDBatchRow, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.CountInteractionsByFeedEventIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // CountInteractionsByPostIDBatch batches and caches requests
@@ -400,17 +274,19 @@ func newCountInteractionsByPostIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error),
+	fetch func(context.Context, *CountInteractionsByPostIDBatch, []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountInteractionsByPostIDBatch {
+	d := &CountInteractionsByPostIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountInteractionsByPostIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountInteractionsByPostIDBatch")
@@ -421,30 +297,8 @@ func newCountInteractionsByPostIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountInteractionsByPostIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountInteractionsByPostIDBatch(q *coredb.Queries) func(context.Context, []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
-	return func(ctx context.Context, params []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
-		results := make([][]coredb.CountInteractionsByPostIDBatchRow, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountInteractionsByPostIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.CountInteractionsByPostIDBatchRow, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.CountInteractionsByPostIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // CountRepliesByCommentIDBatch batches and caches requests
@@ -459,17 +313,19 @@ func newCountRepliesByCommentIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]int64, []error),
+	fetch func(context.Context, *CountRepliesByCommentIDBatch, []persist.DBID) ([]int64, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *CountRepliesByCommentIDBatch {
+	d := &CountRepliesByCommentIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "CountRepliesByCommentIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountRepliesByCommentIDBatch")
@@ -480,30 +336,8 @@ func newCountRepliesByCommentIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &CountRepliesByCommentIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadCountRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]int64, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]int64, []error) {
-		results := make([]int64, len(params))
-		errors := make([]error, len(params))
-
-		b := q.CountRepliesByCommentIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r int64, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetAdmireByActorIDAndFeedEventID batches and caches requests
@@ -518,17 +352,19 @@ func newGetAdmireByActorIDAndFeedEventID(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error),
+	fetch func(context.Context, *GetAdmireByActorIDAndFeedEventID, []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetAdmireByActorIDAndFeedEventID {
+	d := &GetAdmireByActorIDAndFeedEventID{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetAdmireByActorIDAndFeedEventID")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetAdmireByActorIDAndFeedEventID")
@@ -539,30 +375,8 @@ func newGetAdmireByActorIDAndFeedEventID(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetAdmireByActorIDAndFeedEventID{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetAdmireByActorIDAndFeedEventID(q *coredb.Queries) func(context.Context, []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error) {
-	return func(ctx context.Context, params []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error) {
-		results := make([]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetAdmireByActorIDAndFeedEventID(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetAdmireByActorIDAndFeedEventIDParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetAdmireByActorIDAndPostID batches and caches requests
@@ -577,17 +391,19 @@ func newGetAdmireByActorIDAndPostID(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetAdmireByActorIDAndPostIDParams) ([]coredb.Admire, []error),
+	fetch func(context.Context, *GetAdmireByActorIDAndPostID, []coredb.GetAdmireByActorIDAndPostIDParams) ([]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetAdmireByActorIDAndPostID {
+	d := &GetAdmireByActorIDAndPostID{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetAdmireByActorIDAndPostIDParams) ([]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetAdmireByActorIDAndPostID")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetAdmireByActorIDAndPostID")
@@ -598,30 +414,8 @@ func newGetAdmireByActorIDAndPostID(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetAdmireByActorIDAndPostID{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetAdmireByActorIDAndPostID(q *coredb.Queries) func(context.Context, []coredb.GetAdmireByActorIDAndPostIDParams) ([]coredb.Admire, []error) {
-	return func(ctx context.Context, params []coredb.GetAdmireByActorIDAndPostIDParams) ([]coredb.Admire, []error) {
-		results := make([]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetAdmireByActorIDAndPostID(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetAdmireByActorIDAndPostIDParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetAdmireByActorIDAndTokenID batches and caches requests
@@ -636,17 +430,19 @@ func newGetAdmireByActorIDAndTokenID(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetAdmireByActorIDAndTokenIDParams) ([]coredb.Admire, []error),
+	fetch func(context.Context, *GetAdmireByActorIDAndTokenID, []coredb.GetAdmireByActorIDAndTokenIDParams) ([]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetAdmireByActorIDAndTokenID {
+	d := &GetAdmireByActorIDAndTokenID{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetAdmireByActorIDAndTokenIDParams) ([]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetAdmireByActorIDAndTokenID")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetAdmireByActorIDAndTokenID")
@@ -657,30 +453,8 @@ func newGetAdmireByActorIDAndTokenID(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetAdmireByActorIDAndTokenID{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetAdmireByActorIDAndTokenID(q *coredb.Queries) func(context.Context, []coredb.GetAdmireByActorIDAndTokenIDParams) ([]coredb.Admire, []error) {
-	return func(ctx context.Context, params []coredb.GetAdmireByActorIDAndTokenIDParams) ([]coredb.Admire, []error) {
-		results := make([]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetAdmireByActorIDAndTokenID(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetAdmireByActorIDAndTokenIDParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetAdmireByAdmireIDBatch batches and caches requests
@@ -695,17 +469,19 @@ func newGetAdmireByAdmireIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Admire, []error),
+	fetch func(context.Context, *GetAdmireByAdmireIDBatch, []persist.DBID) ([]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetAdmireByAdmireIDBatch {
+	d := &GetAdmireByAdmireIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetAdmireByAdmireIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetAdmireByAdmireIDBatch")
@@ -716,34 +492,12 @@ func newGetAdmireByAdmireIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetAdmireByAdmireIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetAdmireByAdmireIDBatch) getKeyForResult(result coredb.Admire) persist.DBID {
 	return result.ID
-}
-
-func loadGetAdmireByAdmireIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Admire, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Admire, []error) {
-		results := make([]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetAdmireByAdmireIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetAdmiresByActorIDBatch batches and caches requests
@@ -758,17 +512,19 @@ func newGetAdmiresByActorIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Admire, []error),
+	fetch func(context.Context, *GetAdmiresByActorIDBatch, []persist.DBID) ([][]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetAdmiresByActorIDBatch {
+	d := &GetAdmiresByActorIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetAdmiresByActorIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetAdmiresByActorIDBatch")
@@ -779,30 +535,8 @@ func newGetAdmiresByActorIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetAdmiresByActorIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetAdmiresByActorIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Admire, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Admire, []error) {
-		results := make([][]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetAdmiresByActorIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetChildContractsByParentIDBatchPaginate batches and caches requests
@@ -817,17 +551,19 @@ func newGetChildContractsByParentIDBatchPaginate(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetChildContractsByParentIDBatchPaginateParams) ([][]coredb.Contract, []error),
+	fetch func(context.Context, *GetChildContractsByParentIDBatchPaginate, []coredb.GetChildContractsByParentIDBatchPaginateParams) ([][]coredb.Contract, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetChildContractsByParentIDBatchPaginate {
+	d := &GetChildContractsByParentIDBatchPaginate{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetChildContractsByParentIDBatchPaginateParams) ([][]coredb.Contract, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetChildContractsByParentIDBatchPaginate")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetChildContractsByParentIDBatchPaginate")
@@ -838,30 +574,8 @@ func newGetChildContractsByParentIDBatchPaginate(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetChildContractsByParentIDBatchPaginate{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetChildContractsByParentIDBatchPaginate(q *coredb.Queries) func(context.Context, []coredb.GetChildContractsByParentIDBatchPaginateParams) ([][]coredb.Contract, []error) {
-	return func(ctx context.Context, params []coredb.GetChildContractsByParentIDBatchPaginateParams) ([][]coredb.Contract, []error) {
-		results := make([][]coredb.Contract, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetChildContractsByParentIDBatchPaginate(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Contract, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetChildContractsByParentIDBatchPaginateParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetCollectionByIdBatch batches and caches requests
@@ -876,17 +590,19 @@ func newGetCollectionByIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Collection, []error),
+	fetch func(context.Context, *GetCollectionByIdBatch, []persist.DBID) ([]coredb.Collection, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetCollectionByIdBatch {
+	d := &GetCollectionByIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Collection, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetCollectionByIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetCollectionByIdBatch")
@@ -897,34 +613,12 @@ func newGetCollectionByIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetCollectionByIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetCollectionByIdBatch) getKeyForResult(result coredb.Collection) persist.DBID {
 	return result.ID
-}
-
-func loadGetCollectionByIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Collection, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Collection, []error) {
-		results := make([]coredb.Collection, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetCollectionByIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Collection, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetCollectionsByGalleryIdBatch batches and caches requests
@@ -939,17 +633,19 @@ func newGetCollectionsByGalleryIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Collection, []error),
+	fetch func(context.Context, *GetCollectionsByGalleryIdBatch, []persist.DBID) ([][]coredb.Collection, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetCollectionsByGalleryIdBatch {
+	d := &GetCollectionsByGalleryIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Collection, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetCollectionsByGalleryIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetCollectionsByGalleryIdBatch")
@@ -960,30 +656,8 @@ func newGetCollectionsByGalleryIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetCollectionsByGalleryIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetCollectionsByGalleryIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Collection, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Collection, []error) {
-		results := make([][]coredb.Collection, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetCollectionsByGalleryIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Collection, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetCommentByCommentIDBatch batches and caches requests
@@ -998,17 +672,19 @@ func newGetCommentByCommentIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Comment, []error),
+	fetch func(context.Context, *GetCommentByCommentIDBatch, []persist.DBID) ([]coredb.Comment, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetCommentByCommentIDBatch {
+	d := &GetCommentByCommentIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Comment, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetCommentByCommentIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetCommentByCommentIDBatch")
@@ -1019,34 +695,12 @@ func newGetCommentByCommentIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetCommentByCommentIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetCommentByCommentIDBatch) getKeyForResult(result coredb.Comment) persist.DBID {
 	return result.ID
-}
-
-func loadGetCommentByCommentIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Comment, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Comment, []error) {
-		results := make([]coredb.Comment, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetCommentByCommentIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Comment, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetContractByChainAddressBatch batches and caches requests
@@ -1061,17 +715,19 @@ func newGetContractByChainAddressBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error),
+	fetch func(context.Context, *GetContractByChainAddressBatch, []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetContractByChainAddressBatch {
+	d := &GetContractByChainAddressBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetContractByChainAddressBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetContractByChainAddressBatch")
@@ -1082,30 +738,8 @@ func newGetContractByChainAddressBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetContractByChainAddressBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetContractByChainAddressBatch(q *coredb.Queries) func(context.Context, []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error) {
-	return func(ctx context.Context, params []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error) {
-		results := make([]coredb.Contract, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetContractByChainAddressBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Contract, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetContractByChainAddressBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetContractsDisplayedByUserIDBatch batches and caches requests
@@ -1120,17 +754,19 @@ func newGetContractsDisplayedByUserIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Contract, []error),
+	fetch func(context.Context, *GetContractsDisplayedByUserIDBatch, []persist.DBID) ([][]coredb.Contract, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetContractsDisplayedByUserIDBatch {
+	d := &GetContractsDisplayedByUserIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Contract, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetContractsDisplayedByUserIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetContractsDisplayedByUserIDBatch")
@@ -1141,30 +777,8 @@ func newGetContractsDisplayedByUserIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetContractsDisplayedByUserIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetContractsDisplayedByUserIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Contract, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Contract, []error) {
-		results := make([][]coredb.Contract, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetContractsDisplayedByUserIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Contract, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetCreatedContractsBatchPaginate batches and caches requests
@@ -1179,17 +793,19 @@ func newGetCreatedContractsBatchPaginate(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetCreatedContractsBatchPaginateParams) ([][]coredb.Contract, []error),
+	fetch func(context.Context, *GetCreatedContractsBatchPaginate, []coredb.GetCreatedContractsBatchPaginateParams) ([][]coredb.Contract, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetCreatedContractsBatchPaginate {
+	d := &GetCreatedContractsBatchPaginate{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetCreatedContractsBatchPaginateParams) ([][]coredb.Contract, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetCreatedContractsBatchPaginate")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetCreatedContractsBatchPaginate")
@@ -1200,30 +816,8 @@ func newGetCreatedContractsBatchPaginate(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetCreatedContractsBatchPaginate{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetCreatedContractsBatchPaginate(q *coredb.Queries) func(context.Context, []coredb.GetCreatedContractsBatchPaginateParams) ([][]coredb.Contract, []error) {
-	return func(ctx context.Context, params []coredb.GetCreatedContractsBatchPaginateParams) ([][]coredb.Contract, []error) {
-		results := make([][]coredb.Contract, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetCreatedContractsBatchPaginate(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Contract, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetCreatedContractsBatchPaginateParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetEventByIdBatch batches and caches requests
@@ -1238,17 +832,19 @@ func newGetEventByIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.FeedEvent, []error),
+	fetch func(context.Context, *GetEventByIdBatch, []persist.DBID) ([]coredb.FeedEvent, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetEventByIdBatch {
+	d := &GetEventByIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.FeedEvent, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetEventByIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetEventByIdBatch")
@@ -1259,34 +855,12 @@ func newGetEventByIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetEventByIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetEventByIdBatch) getKeyForResult(result coredb.FeedEvent) persist.DBID {
 	return result.ID
-}
-
-func loadGetEventByIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.FeedEvent, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.FeedEvent, []error) {
-		results := make([]coredb.FeedEvent, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetEventByIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.FeedEvent, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetFollowersByUserIdBatch batches and caches requests
@@ -1301,17 +875,19 @@ func newGetFollowersByUserIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.User, []error),
+	fetch func(context.Context, *GetFollowersByUserIdBatch, []persist.DBID) ([][]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetFollowersByUserIdBatch {
+	d := &GetFollowersByUserIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetFollowersByUserIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetFollowersByUserIdBatch")
@@ -1322,30 +898,8 @@ func newGetFollowersByUserIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetFollowersByUserIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetFollowersByUserIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.User, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.User, []error) {
-		results := make([][]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetFollowersByUserIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetFollowingByUserIdBatch batches and caches requests
@@ -1360,17 +914,19 @@ func newGetFollowingByUserIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.User, []error),
+	fetch func(context.Context, *GetFollowingByUserIdBatch, []persist.DBID) ([][]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetFollowingByUserIdBatch {
+	d := &GetFollowingByUserIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetFollowingByUserIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetFollowingByUserIdBatch")
@@ -1381,30 +937,8 @@ func newGetFollowingByUserIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetFollowingByUserIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetFollowingByUserIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.User, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.User, []error) {
-		results := make([][]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetFollowingByUserIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetGalleriesByUserIdBatch batches and caches requests
@@ -1419,17 +953,19 @@ func newGetGalleriesByUserIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Gallery, []error),
+	fetch func(context.Context, *GetGalleriesByUserIdBatch, []persist.DBID) ([][]coredb.Gallery, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetGalleriesByUserIdBatch {
+	d := &GetGalleriesByUserIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Gallery, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetGalleriesByUserIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetGalleriesByUserIdBatch")
@@ -1440,30 +976,8 @@ func newGetGalleriesByUserIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetGalleriesByUserIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetGalleriesByUserIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Gallery, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Gallery, []error) {
-		results := make([][]coredb.Gallery, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetGalleriesByUserIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Gallery, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetGalleryByCollectionIdBatch batches and caches requests
@@ -1478,17 +992,19 @@ func newGetGalleryByCollectionIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Gallery, []error),
+	fetch func(context.Context, *GetGalleryByCollectionIdBatch, []persist.DBID) ([]coredb.Gallery, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetGalleryByCollectionIdBatch {
+	d := &GetGalleryByCollectionIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Gallery, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetGalleryByCollectionIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetGalleryByCollectionIdBatch")
@@ -1499,34 +1015,12 @@ func newGetGalleryByCollectionIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetGalleryByCollectionIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetGalleryByCollectionIdBatch) getKeyForResult(result coredb.Gallery) persist.DBID {
 	return result.ID
-}
-
-func loadGetGalleryByCollectionIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Gallery, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Gallery, []error) {
-		results := make([]coredb.Gallery, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetGalleryByCollectionIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Gallery, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetGalleryByIdBatch batches and caches requests
@@ -1541,17 +1035,19 @@ func newGetGalleryByIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Gallery, []error),
+	fetch func(context.Context, *GetGalleryByIdBatch, []persist.DBID) ([]coredb.Gallery, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetGalleryByIdBatch {
+	d := &GetGalleryByIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Gallery, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetGalleryByIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetGalleryByIdBatch")
@@ -1562,34 +1058,12 @@ func newGetGalleryByIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetGalleryByIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetGalleryByIdBatch) getKeyForResult(result coredb.Gallery) persist.DBID {
 	return result.ID
-}
-
-func loadGetGalleryByIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Gallery, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Gallery, []error) {
-		results := make([]coredb.Gallery, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetGalleryByIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Gallery, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetGalleryTokenMediasByGalleryIDBatch batches and caches requests
@@ -1604,17 +1078,19 @@ func newGetGalleryTokenMediasByGalleryIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.TokenMedia, []error),
+	fetch func(context.Context, *GetGalleryTokenMediasByGalleryIDBatch, []persist.DBID) ([][]coredb.TokenMedia, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetGalleryTokenMediasByGalleryIDBatch {
+	d := &GetGalleryTokenMediasByGalleryIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.TokenMedia, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetGalleryTokenMediasByGalleryIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetGalleryTokenMediasByGalleryIDBatch")
@@ -1625,30 +1101,8 @@ func newGetGalleryTokenMediasByGalleryIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetGalleryTokenMediasByGalleryIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetGalleryTokenMediasByGalleryIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.TokenMedia, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.TokenMedia, []error) {
-		results := make([][]coredb.TokenMedia, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetGalleryTokenMediasByGalleryIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.TokenMedia, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetMediaByMediaIDIgnoringStatus batches and caches requests
@@ -1663,17 +1117,19 @@ func newGetMediaByMediaIDIgnoringStatus(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.TokenMedia, []error),
+	fetch func(context.Context, *GetMediaByMediaIDIgnoringStatus, []persist.DBID) ([]coredb.TokenMedia, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetMediaByMediaIDIgnoringStatus {
+	d := &GetMediaByMediaIDIgnoringStatus{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenMedia, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetMediaByMediaIDIgnoringStatus")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetMediaByMediaIDIgnoringStatus")
@@ -1684,34 +1140,12 @@ func newGetMediaByMediaIDIgnoringStatus(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetMediaByMediaIDIgnoringStatus{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetMediaByMediaIDIgnoringStatus) getKeyForResult(result coredb.TokenMedia) persist.DBID {
 	return result.ID
-}
-
-func loadGetMediaByMediaIDIgnoringStatus(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.TokenMedia, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.TokenMedia, []error) {
-		results := make([]coredb.TokenMedia, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetMediaByMediaIDIgnoringStatus(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.TokenMedia, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetMembershipByMembershipIdBatch batches and caches requests
@@ -1726,17 +1160,19 @@ func newGetMembershipByMembershipIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Membership, []error),
+	fetch func(context.Context, *GetMembershipByMembershipIdBatch, []persist.DBID) ([]coredb.Membership, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetMembershipByMembershipIdBatch {
+	d := &GetMembershipByMembershipIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Membership, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetMembershipByMembershipIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetMembershipByMembershipIdBatch")
@@ -1747,34 +1183,12 @@ func newGetMembershipByMembershipIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetMembershipByMembershipIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetMembershipByMembershipIdBatch) getKeyForResult(result coredb.Membership) persist.DBID {
 	return result.ID
-}
-
-func loadGetMembershipByMembershipIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Membership, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Membership, []error) {
-		results := make([]coredb.Membership, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetMembershipByMembershipIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Membership, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetMentionsByCommentID batches and caches requests
@@ -1789,17 +1203,19 @@ func newGetMentionsByCommentID(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Mention, []error),
+	fetch func(context.Context, *GetMentionsByCommentID, []persist.DBID) ([][]coredb.Mention, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetMentionsByCommentID {
+	d := &GetMentionsByCommentID{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Mention, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetMentionsByCommentID")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetMentionsByCommentID")
@@ -1810,30 +1226,8 @@ func newGetMentionsByCommentID(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetMentionsByCommentID{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetMentionsByCommentID(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Mention, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Mention, []error) {
-		results := make([][]coredb.Mention, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetMentionsByCommentID(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Mention, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetMentionsByPostID batches and caches requests
@@ -1848,17 +1242,19 @@ func newGetMentionsByPostID(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Mention, []error),
+	fetch func(context.Context, *GetMentionsByPostID, []persist.DBID) ([][]coredb.Mention, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetMentionsByPostID {
+	d := &GetMentionsByPostID{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Mention, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetMentionsByPostID")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetMentionsByPostID")
@@ -1869,30 +1265,8 @@ func newGetMentionsByPostID(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetMentionsByPostID{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetMentionsByPostID(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Mention, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Mention, []error) {
-		results := make([][]coredb.Mention, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetMentionsByPostID(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Mention, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetNewTokensByFeedEventIdBatch batches and caches requests
@@ -1907,17 +1281,19 @@ func newGetNewTokensByFeedEventIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Token, []error),
+	fetch func(context.Context, *GetNewTokensByFeedEventIdBatch, []persist.DBID) ([][]coredb.Token, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetNewTokensByFeedEventIdBatch {
+	d := &GetNewTokensByFeedEventIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Token, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetNewTokensByFeedEventIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetNewTokensByFeedEventIdBatch")
@@ -1928,30 +1304,8 @@ func newGetNewTokensByFeedEventIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetNewTokensByFeedEventIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetNewTokensByFeedEventIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Token, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Token, []error) {
-		results := make([][]coredb.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetNewTokensByFeedEventIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Token, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetNotificationByIDBatch batches and caches requests
@@ -1966,17 +1320,19 @@ func newGetNotificationByIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Notification, []error),
+	fetch func(context.Context, *GetNotificationByIDBatch, []persist.DBID) ([]coredb.Notification, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetNotificationByIDBatch {
+	d := &GetNotificationByIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Notification, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetNotificationByIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetNotificationByIDBatch")
@@ -1987,34 +1343,12 @@ func newGetNotificationByIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetNotificationByIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetNotificationByIDBatch) getKeyForResult(result coredb.Notification) persist.DBID {
 	return result.ID
-}
-
-func loadGetNotificationByIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Notification, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Notification, []error) {
-		results := make([]coredb.Notification, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetNotificationByIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Notification, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetOwnersByContractIdBatchPaginate batches and caches requests
@@ -2029,17 +1363,19 @@ func newGetOwnersByContractIdBatchPaginate(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetOwnersByContractIdBatchPaginateParams) ([][]coredb.User, []error),
+	fetch func(context.Context, *GetOwnersByContractIdBatchPaginate, []coredb.GetOwnersByContractIdBatchPaginateParams) ([][]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetOwnersByContractIdBatchPaginate {
+	d := &GetOwnersByContractIdBatchPaginate{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetOwnersByContractIdBatchPaginateParams) ([][]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetOwnersByContractIdBatchPaginate")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetOwnersByContractIdBatchPaginate")
@@ -2050,30 +1386,8 @@ func newGetOwnersByContractIdBatchPaginate(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetOwnersByContractIdBatchPaginate{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetOwnersByContractIdBatchPaginate(q *coredb.Queries) func(context.Context, []coredb.GetOwnersByContractIdBatchPaginateParams) ([][]coredb.User, []error) {
-	return func(ctx context.Context, params []coredb.GetOwnersByContractIdBatchPaginateParams) ([][]coredb.User, []error) {
-		results := make([][]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetOwnersByContractIdBatchPaginate(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetOwnersByContractIdBatchPaginateParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetPostByIdBatch batches and caches requests
@@ -2088,17 +1402,19 @@ func newGetPostByIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Post, []error),
+	fetch func(context.Context, *GetPostByIdBatch, []persist.DBID) ([]coredb.Post, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetPostByIdBatch {
+	d := &GetPostByIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Post, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetPostByIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetPostByIdBatch")
@@ -2109,34 +1425,12 @@ func newGetPostByIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetPostByIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetPostByIdBatch) getKeyForResult(result coredb.Post) persist.DBID {
 	return result.ID
-}
-
-func loadGetPostByIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Post, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Post, []error) {
-		results := make([]coredb.Post, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetPostByIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Post, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetProfileImageByID batches and caches requests
@@ -2151,17 +1445,19 @@ func newGetProfileImageByID(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error),
+	fetch func(context.Context, *GetProfileImageByID, []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetProfileImageByID {
+	d := &GetProfileImageByID{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetProfileImageByID")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetProfileImageByID")
@@ -2172,30 +1468,8 @@ func newGetProfileImageByID(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetProfileImageByID{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetProfileImageByID(q *coredb.Queries) func(context.Context, []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
-	return func(ctx context.Context, params []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
-		results := make([]coredb.ProfileImage, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetProfileImageByID(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.ProfileImage, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetProfileImageByIDParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetSharedContractsBatchPaginate batches and caches requests
@@ -2210,17 +1484,19 @@ func newGetSharedContractsBatchPaginate(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error),
+	fetch func(context.Context, *GetSharedContractsBatchPaginate, []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetSharedContractsBatchPaginate {
+	d := &GetSharedContractsBatchPaginate{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetSharedContractsBatchPaginate")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetSharedContractsBatchPaginate")
@@ -2231,30 +1507,8 @@ func newGetSharedContractsBatchPaginate(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetSharedContractsBatchPaginate{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetSharedContractsBatchPaginate(q *coredb.Queries) func(context.Context, []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
-	return func(ctx context.Context, params []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
-		results := make([][]coredb.GetSharedContractsBatchPaginateRow, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetSharedContractsBatchPaginate(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.GetSharedContractsBatchPaginateRow, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetSharedContractsBatchPaginateParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetSharedFollowersBatchPaginate batches and caches requests
@@ -2269,17 +1523,19 @@ func newGetSharedFollowersBatchPaginate(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetSharedFollowersBatchPaginateParams) ([][]coredb.GetSharedFollowersBatchPaginateRow, []error),
+	fetch func(context.Context, *GetSharedFollowersBatchPaginate, []coredb.GetSharedFollowersBatchPaginateParams) ([][]coredb.GetSharedFollowersBatchPaginateRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetSharedFollowersBatchPaginate {
+	d := &GetSharedFollowersBatchPaginate{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetSharedFollowersBatchPaginateParams) ([][]coredb.GetSharedFollowersBatchPaginateRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetSharedFollowersBatchPaginate")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetSharedFollowersBatchPaginate")
@@ -2290,30 +1546,8 @@ func newGetSharedFollowersBatchPaginate(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetSharedFollowersBatchPaginate{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetSharedFollowersBatchPaginate(q *coredb.Queries) func(context.Context, []coredb.GetSharedFollowersBatchPaginateParams) ([][]coredb.GetSharedFollowersBatchPaginateRow, []error) {
-	return func(ctx context.Context, params []coredb.GetSharedFollowersBatchPaginateParams) ([][]coredb.GetSharedFollowersBatchPaginateRow, []error) {
-		results := make([][]coredb.GetSharedFollowersBatchPaginateRow, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetSharedFollowersBatchPaginate(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.GetSharedFollowersBatchPaginateRow, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetSharedFollowersBatchPaginateParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokenByIdBatch batches and caches requests
@@ -2328,17 +1562,19 @@ func newGetTokenByIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Token, []error),
+	fetch func(context.Context, *GetTokenByIdBatch, []persist.DBID) ([]coredb.Token, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokenByIdBatch {
+	d := &GetTokenByIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Token, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokenByIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokenByIdBatch")
@@ -2349,34 +1585,12 @@ func newGetTokenByIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokenByIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetTokenByIdBatch) getKeyForResult(result coredb.Token) persist.DBID {
 	return result.ID
-}
-
-func loadGetTokenByIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Token, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Token, []error) {
-		results := make([]coredb.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokenByIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Token, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokenByIdIgnoreDisplayableBatch batches and caches requests
@@ -2391,17 +1605,19 @@ func newGetTokenByIdIgnoreDisplayableBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Token, []error),
+	fetch func(context.Context, *GetTokenByIdIgnoreDisplayableBatch, []persist.DBID) ([]coredb.Token, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokenByIdIgnoreDisplayableBatch {
+	d := &GetTokenByIdIgnoreDisplayableBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Token, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokenByIdIgnoreDisplayableBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokenByIdIgnoreDisplayableBatch")
@@ -2412,34 +1628,12 @@ func newGetTokenByIdIgnoreDisplayableBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokenByIdIgnoreDisplayableBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetTokenByIdIgnoreDisplayableBatch) getKeyForResult(result coredb.Token) persist.DBID {
 	return result.ID
-}
-
-func loadGetTokenByIdIgnoreDisplayableBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Token, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Token, []error) {
-		results := make([]coredb.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokenByIdIgnoreDisplayableBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Token, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokenByUserTokenIdentifiersBatch batches and caches requests
@@ -2454,17 +1648,19 @@ func newGetTokenByUserTokenIdentifiersBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error),
+	fetch func(context.Context, *GetTokenByUserTokenIdentifiersBatch, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokenByUserTokenIdentifiersBatch {
+	d := &GetTokenByUserTokenIdentifiersBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokenByUserTokenIdentifiersBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokenByUserTokenIdentifiersBatch")
@@ -2475,30 +1671,8 @@ func newGetTokenByUserTokenIdentifiersBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokenByUserTokenIdentifiersBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetTokenByUserTokenIdentifiersBatch(q *coredb.Queries) func(context.Context, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
-	return func(ctx context.Context, params []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
-		results := make([]coredb.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokenByUserTokenIdentifiersBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Token, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetTokenByUserTokenIdentifiersBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokenOwnerByIDBatch batches and caches requests
@@ -2513,17 +1687,19 @@ func newGetTokenOwnerByIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.User, []error),
+	fetch func(context.Context, *GetTokenOwnerByIDBatch, []persist.DBID) ([]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokenOwnerByIDBatch {
+	d := &GetTokenOwnerByIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokenOwnerByIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokenOwnerByIDBatch")
@@ -2534,34 +1710,12 @@ func newGetTokenOwnerByIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokenOwnerByIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetTokenOwnerByIDBatch) getKeyForResult(result coredb.User) persist.DBID {
 	return result.ID
-}
-
-func loadGetTokenOwnerByIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.User, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.User, []error) {
-		results := make([]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokenOwnerByIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokensByCollectionIdBatch batches and caches requests
@@ -2576,17 +1730,19 @@ func newGetTokensByCollectionIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetTokensByCollectionIdBatchParams) ([][]coredb.Token, []error),
+	fetch func(context.Context, *GetTokensByCollectionIdBatch, []coredb.GetTokensByCollectionIdBatchParams) ([][]coredb.Token, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokensByCollectionIdBatch {
+	d := &GetTokensByCollectionIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokensByCollectionIdBatchParams) ([][]coredb.Token, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokensByCollectionIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokensByCollectionIdBatch")
@@ -2597,30 +1753,8 @@ func newGetTokensByCollectionIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokensByCollectionIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetTokensByCollectionIdBatch(q *coredb.Queries) func(context.Context, []coredb.GetTokensByCollectionIdBatchParams) ([][]coredb.Token, []error) {
-	return func(ctx context.Context, params []coredb.GetTokensByCollectionIdBatchParams) ([][]coredb.Token, []error) {
-		results := make([][]coredb.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokensByCollectionIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Token, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetTokensByCollectionIdBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokensByUserIdAndChainBatch batches and caches requests
@@ -2635,17 +1769,19 @@ func newGetTokensByUserIdAndChainBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetTokensByUserIdAndChainBatchParams) ([][]coredb.Token, []error),
+	fetch func(context.Context, *GetTokensByUserIdAndChainBatch, []coredb.GetTokensByUserIdAndChainBatchParams) ([][]coredb.Token, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokensByUserIdAndChainBatch {
+	d := &GetTokensByUserIdAndChainBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokensByUserIdAndChainBatchParams) ([][]coredb.Token, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokensByUserIdAndChainBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokensByUserIdAndChainBatch")
@@ -2656,30 +1792,8 @@ func newGetTokensByUserIdAndChainBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokensByUserIdAndChainBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetTokensByUserIdAndChainBatch(q *coredb.Queries) func(context.Context, []coredb.GetTokensByUserIdAndChainBatchParams) ([][]coredb.Token, []error) {
-	return func(ctx context.Context, params []coredb.GetTokensByUserIdAndChainBatchParams) ([][]coredb.Token, []error) {
-		results := make([][]coredb.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokensByUserIdAndChainBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Token, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetTokensByUserIdAndChainBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokensByUserIdBatch batches and caches requests
@@ -2694,17 +1808,19 @@ func newGetTokensByUserIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error),
+	fetch func(context.Context, *GetTokensByUserIdBatch, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokensByUserIdBatch {
+	d := &GetTokensByUserIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokensByUserIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokensByUserIdBatch")
@@ -2715,30 +1831,8 @@ func newGetTokensByUserIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokensByUserIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetTokensByUserIdBatch(q *coredb.Queries) func(context.Context, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
-	return func(ctx context.Context, params []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
-		results := make([][]coredb.GetTokensByUserIdBatchRow, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokensByUserIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.GetTokensByUserIdBatchRow, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetTokensByUserIdBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetTokensByWalletIdsBatch batches and caches requests
@@ -2753,17 +1847,19 @@ func newGetTokensByWalletIdsBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBIDList) ([][]coredb.Token, []error),
+	fetch func(context.Context, *GetTokensByWalletIdsBatch, []persist.DBIDList) ([][]coredb.Token, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokensByWalletIdsBatch {
+	d := &GetTokensByWalletIdsBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBIDList) ([][]coredb.Token, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokensByWalletIdsBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokensByWalletIdsBatch")
@@ -2774,30 +1870,8 @@ func newGetTokensByWalletIdsBatch(
 
 	dataloader := generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetTokensByWalletIdsBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetTokensByWalletIdsBatch(q *coredb.Queries) func(context.Context, []persist.DBIDList) ([][]coredb.Token, []error) {
-	return func(ctx context.Context, params []persist.DBIDList) ([][]coredb.Token, []error) {
-		results := make([][]coredb.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokensByWalletIdsBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Token, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBIDList]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetUserByAddressAndL1Batch batches and caches requests
@@ -2812,17 +1886,19 @@ func newGetUserByAddressAndL1Batch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error),
+	fetch func(context.Context, *GetUserByAddressAndL1Batch, []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetUserByAddressAndL1Batch {
+	d := &GetUserByAddressAndL1Batch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetUserByAddressAndL1Batch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetUserByAddressAndL1Batch")
@@ -2833,30 +1909,8 @@ func newGetUserByAddressAndL1Batch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetUserByAddressAndL1Batch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetUserByAddressAndL1Batch(q *coredb.Queries) func(context.Context, []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error) {
-	return func(ctx context.Context, params []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error) {
-		results := make([]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetUserByAddressAndL1Batch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetUserByAddressAndL1BatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetUserByIdBatch batches and caches requests
@@ -2871,17 +1925,19 @@ func newGetUserByIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.User, []error),
+	fetch func(context.Context, *GetUserByIdBatch, []persist.DBID) ([]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetUserByIdBatch {
+	d := &GetUserByIdBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetUserByIdBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetUserByIdBatch")
@@ -2892,34 +1948,12 @@ func newGetUserByIdBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetUserByIdBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetUserByIdBatch) getKeyForResult(result coredb.User) persist.DBID {
 	return result.ID
-}
-
-func loadGetUserByIdBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.User, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.User, []error) {
-		results := make([]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetUserByIdBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetUserByUsernameBatch batches and caches requests
@@ -2934,17 +1968,19 @@ func newGetUserByUsernameBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []string) ([]coredb.User, []error),
+	fetch func(context.Context, *GetUserByUsernameBatch, []string) ([]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetUserByUsernameBatch {
+	d := &GetUserByUsernameBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []string) ([]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetUserByUsernameBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetUserByUsernameBatch")
@@ -2955,30 +1991,8 @@ func newGetUserByUsernameBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetUserByUsernameBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetUserByUsernameBatch(q *coredb.Queries) func(context.Context, []string) ([]coredb.User, []error) {
-	return func(ctx context.Context, params []string) ([]coredb.User, []error) {
-		results := make([]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetUserByUsernameBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[string]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetUserNotificationsBatch batches and caches requests
@@ -2993,17 +2007,19 @@ func newGetUserNotificationsBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error),
+	fetch func(context.Context, *GetUserNotificationsBatch, []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetUserNotificationsBatch {
+	d := &GetUserNotificationsBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetUserNotificationsBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetUserNotificationsBatch")
@@ -3014,30 +2030,8 @@ func newGetUserNotificationsBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetUserNotificationsBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetUserNotificationsBatch(q *coredb.Queries) func(context.Context, []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error) {
-	return func(ctx context.Context, params []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error) {
-		results := make([][]coredb.Notification, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetUserNotificationsBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Notification, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.GetUserNotificationsBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetUsersWithTraitBatch batches and caches requests
@@ -3052,17 +2046,19 @@ func newGetUsersWithTraitBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []string) ([][]coredb.User, []error),
+	fetch func(context.Context, *GetUsersWithTraitBatch, []string) ([][]coredb.User, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetUsersWithTraitBatch {
+	d := &GetUsersWithTraitBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []string) ([][]coredb.User, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetUsersWithTraitBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetUsersWithTraitBatch")
@@ -3073,30 +2069,8 @@ func newGetUsersWithTraitBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetUsersWithTraitBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetUsersWithTraitBatch(q *coredb.Queries) func(context.Context, []string) ([][]coredb.User, []error) {
-	return func(ctx context.Context, params []string) ([][]coredb.User, []error) {
-		results := make([][]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetUsersWithTraitBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.User, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[string]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetWalletByIDBatch batches and caches requests
@@ -3111,17 +2085,19 @@ func newGetWalletByIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([]coredb.Wallet, []error),
+	fetch func(context.Context, *GetWalletByIDBatch, []persist.DBID) ([]coredb.Wallet, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetWalletByIDBatch {
+	d := &GetWalletByIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Wallet, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetWalletByIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetWalletByIDBatch")
@@ -3132,34 +2108,12 @@ func newGetWalletByIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetWalletByIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
 }
 
 func (*GetWalletByIDBatch) getKeyForResult(result coredb.Wallet) persist.DBID {
 	return result.ID
-}
-
-func loadGetWalletByIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.Wallet, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([]coredb.Wallet, []error) {
-		results := make([]coredb.Wallet, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetWalletByIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.Wallet, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetWalletsByUserIDBatch batches and caches requests
@@ -3174,17 +2128,19 @@ func newGetWalletsByUserIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []persist.DBID) ([][]coredb.Wallet, []error),
+	fetch func(context.Context, *GetWalletsByUserIDBatch, []persist.DBID) ([][]coredb.Wallet, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetWalletsByUserIDBatch {
+	d := &GetWalletsByUserIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Wallet, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetWalletsByUserIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetWalletsByUserIDBatch")
@@ -3195,30 +2151,8 @@ func newGetWalletsByUserIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetWalletsByUserIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetWalletsByUserIDBatch(q *coredb.Queries) func(context.Context, []persist.DBID) ([][]coredb.Wallet, []error) {
-	return func(ctx context.Context, params []persist.DBID) ([][]coredb.Wallet, []error) {
-		results := make([][]coredb.Wallet, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetWalletsByUserIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Wallet, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[persist.DBID]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateAdmiresByFeedEventIDBatch batches and caches requests
@@ -3233,17 +2167,19 @@ func newPaginateAdmiresByFeedEventIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateAdmiresByFeedEventIDBatchParams) ([][]coredb.Admire, []error),
+	fetch func(context.Context, *PaginateAdmiresByFeedEventIDBatch, []coredb.PaginateAdmiresByFeedEventIDBatchParams) ([][]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateAdmiresByFeedEventIDBatch {
+	d := &PaginateAdmiresByFeedEventIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateAdmiresByFeedEventIDBatchParams) ([][]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateAdmiresByFeedEventIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateAdmiresByFeedEventIDBatch")
@@ -3254,30 +2190,8 @@ func newPaginateAdmiresByFeedEventIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateAdmiresByFeedEventIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateAdmiresByFeedEventIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateAdmiresByFeedEventIDBatchParams) ([][]coredb.Admire, []error) {
-	return func(ctx context.Context, params []coredb.PaginateAdmiresByFeedEventIDBatchParams) ([][]coredb.Admire, []error) {
-		results := make([][]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateAdmiresByFeedEventIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateAdmiresByFeedEventIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateAdmiresByPostIDBatch batches and caches requests
@@ -3292,17 +2206,19 @@ func newPaginateAdmiresByPostIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateAdmiresByPostIDBatchParams) ([][]coredb.Admire, []error),
+	fetch func(context.Context, *PaginateAdmiresByPostIDBatch, []coredb.PaginateAdmiresByPostIDBatchParams) ([][]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateAdmiresByPostIDBatch {
+	d := &PaginateAdmiresByPostIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateAdmiresByPostIDBatchParams) ([][]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateAdmiresByPostIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateAdmiresByPostIDBatch")
@@ -3313,30 +2229,8 @@ func newPaginateAdmiresByPostIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateAdmiresByPostIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateAdmiresByPostIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateAdmiresByPostIDBatchParams) ([][]coredb.Admire, []error) {
-	return func(ctx context.Context, params []coredb.PaginateAdmiresByPostIDBatchParams) ([][]coredb.Admire, []error) {
-		results := make([][]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateAdmiresByPostIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateAdmiresByPostIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateAdmiresByTokenIDBatch batches and caches requests
@@ -3351,17 +2245,19 @@ func newPaginateAdmiresByTokenIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateAdmiresByTokenIDBatchParams) ([][]coredb.Admire, []error),
+	fetch func(context.Context, *PaginateAdmiresByTokenIDBatch, []coredb.PaginateAdmiresByTokenIDBatchParams) ([][]coredb.Admire, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateAdmiresByTokenIDBatch {
+	d := &PaginateAdmiresByTokenIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateAdmiresByTokenIDBatchParams) ([][]coredb.Admire, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateAdmiresByTokenIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateAdmiresByTokenIDBatch")
@@ -3372,30 +2268,8 @@ func newPaginateAdmiresByTokenIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateAdmiresByTokenIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateAdmiresByTokenIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateAdmiresByTokenIDBatchParams) ([][]coredb.Admire, []error) {
-	return func(ctx context.Context, params []coredb.PaginateAdmiresByTokenIDBatchParams) ([][]coredb.Admire, []error) {
-		results := make([][]coredb.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateAdmiresByTokenIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Admire, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateAdmiresByTokenIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateCommentsByFeedEventIDBatch batches and caches requests
@@ -3410,17 +2284,19 @@ func newPaginateCommentsByFeedEventIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error),
+	fetch func(context.Context, *PaginateCommentsByFeedEventIDBatch, []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateCommentsByFeedEventIDBatch {
+	d := &PaginateCommentsByFeedEventIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateCommentsByFeedEventIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateCommentsByFeedEventIDBatch")
@@ -3431,30 +2307,8 @@ func newPaginateCommentsByFeedEventIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateCommentsByFeedEventIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateCommentsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error) {
-	return func(ctx context.Context, params []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error) {
-		results := make([][]coredb.Comment, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateCommentsByFeedEventIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Comment, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateCommentsByFeedEventIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateCommentsByPostIDBatch batches and caches requests
@@ -3469,17 +2323,19 @@ func newPaginateCommentsByPostIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error),
+	fetch func(context.Context, *PaginateCommentsByPostIDBatch, []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateCommentsByPostIDBatch {
+	d := &PaginateCommentsByPostIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateCommentsByPostIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateCommentsByPostIDBatch")
@@ -3490,30 +2346,8 @@ func newPaginateCommentsByPostIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateCommentsByPostIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateCommentsByPostIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error) {
-	return func(ctx context.Context, params []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error) {
-		results := make([][]coredb.Comment, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateCommentsByPostIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Comment, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateCommentsByPostIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateInteractionsByFeedEventIDBatch batches and caches requests
@@ -3528,17 +2362,19 @@ func newPaginateInteractionsByFeedEventIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error),
+	fetch func(context.Context, *PaginateInteractionsByFeedEventIDBatch, []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateInteractionsByFeedEventIDBatch {
+	d := &PaginateInteractionsByFeedEventIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateInteractionsByFeedEventIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateInteractionsByFeedEventIDBatch")
@@ -3549,30 +2385,8 @@ func newPaginateInteractionsByFeedEventIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateInteractionsByFeedEventIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateInteractionsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error) {
-	return func(ctx context.Context, params []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error) {
-		results := make([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateInteractionsByFeedEventIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.PaginateInteractionsByFeedEventIDBatchRow, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateInteractionsByFeedEventIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateInteractionsByPostIDBatch batches and caches requests
@@ -3587,17 +2401,19 @@ func newPaginateInteractionsByPostIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateInteractionsByPostIDBatchParams) ([][]coredb.PaginateInteractionsByPostIDBatchRow, []error),
+	fetch func(context.Context, *PaginateInteractionsByPostIDBatch, []coredb.PaginateInteractionsByPostIDBatchParams) ([][]coredb.PaginateInteractionsByPostIDBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateInteractionsByPostIDBatch {
+	d := &PaginateInteractionsByPostIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateInteractionsByPostIDBatchParams) ([][]coredb.PaginateInteractionsByPostIDBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateInteractionsByPostIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateInteractionsByPostIDBatch")
@@ -3608,30 +2424,8 @@ func newPaginateInteractionsByPostIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateInteractionsByPostIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateInteractionsByPostIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateInteractionsByPostIDBatchParams) ([][]coredb.PaginateInteractionsByPostIDBatchRow, []error) {
-	return func(ctx context.Context, params []coredb.PaginateInteractionsByPostIDBatchParams) ([][]coredb.PaginateInteractionsByPostIDBatchRow, []error) {
-		results := make([][]coredb.PaginateInteractionsByPostIDBatchRow, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateInteractionsByPostIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.PaginateInteractionsByPostIDBatchRow, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateInteractionsByPostIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginatePostsByContractID batches and caches requests
@@ -3646,17 +2440,19 @@ func newPaginatePostsByContractID(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error),
+	fetch func(context.Context, *PaginatePostsByContractID, []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginatePostsByContractID {
+	d := &PaginatePostsByContractID{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginatePostsByContractID")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginatePostsByContractID")
@@ -3667,30 +2463,8 @@ func newPaginatePostsByContractID(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginatePostsByContractID{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginatePostsByContractID(q *coredb.Queries) func(context.Context, []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error) {
-	return func(ctx context.Context, params []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error) {
-		results := make([][]coredb.Post, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginatePostsByContractID(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Post, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginatePostsByContractIDParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // PaginateRepliesByCommentIDBatch batches and caches requests
@@ -3705,17 +2479,19 @@ func newPaginateRepliesByCommentIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.PaginateRepliesByCommentIDBatchParams) ([][]coredb.Comment, []error),
+	fetch func(context.Context, *PaginateRepliesByCommentIDBatch, []coredb.PaginateRepliesByCommentIDBatchParams) ([][]coredb.Comment, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateRepliesByCommentIDBatch {
+	d := &PaginateRepliesByCommentIDBatch{}
+
 	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateRepliesByCommentIDBatchParams) ([][]coredb.Comment, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateRepliesByCommentIDBatch")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateRepliesByCommentIDBatch")
@@ -3726,30 +2502,8 @@ func newPaginateRepliesByCommentIDBatch(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &PaginateRepliesByCommentIDBatch{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadPaginateRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context, []coredb.PaginateRepliesByCommentIDBatchParams) ([][]coredb.Comment, []error) {
-	return func(ctx context.Context, params []coredb.PaginateRepliesByCommentIDBatchParams) ([][]coredb.Comment, []error) {
-		results := make([][]coredb.Comment, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateRepliesByCommentIDBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, r []coredb.Comment, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[coredb.PaginateRepliesByCommentIDBatchParams]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
 }
 
 // GetContractCreatorsByIds batches and caches requests
@@ -3764,17 +2518,19 @@ func newGetContractCreatorsByIds(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []string) ([]coredb.ContractCreator, []error),
+	fetch func(context.Context, *GetContractCreatorsByIds, []string) ([]coredb.ContractCreator, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetContractCreatorsByIds {
+	d := &GetContractCreatorsByIds{}
+
 	fetchWithHooks := func(ctx context.Context, keys []string) ([]coredb.ContractCreator, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetContractCreatorsByIds")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetContractCreatorsByIds")
@@ -3785,43 +2541,8 @@ func newGetContractCreatorsByIds(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetContractCreatorsByIds{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetContractCreatorsByIds(q *coredb.Queries) func(context.Context, []string) ([]coredb.ContractCreator, []error) {
-	return func(ctx context.Context, params []string) ([]coredb.ContractCreator, []error) {
-		queryResults, err := q.GetContractCreatorsByIds(ctx, params)
-
-		results := make([]coredb.ContractCreator, len(params))
-		errors := make([]error, len(params))
-
-		if err != nil {
-			for i := range errors {
-				errors[i] = err
-			}
-
-			return results, errors
-		}
-
-		hasResults := make([]bool, len(params))
-
-		for _, result := range queryResults {
-			results[result.BatchKeyIndex-1] = result.ContractCreator
-			hasResults[result.BatchKeyIndex-1] = true
-		}
-
-		for i, hasResult := range hasResults {
-			if !hasResult {
-				errors[i] = NotFound[string]{Key: params[i]}
-			}
-		}
-
-		return results, errors
-	}
 }
 
 // GetContractsByIDs batches and caches requests
@@ -3836,17 +2557,19 @@ func newGetContractsByIDs(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []string) ([]coredb.Contract, []error),
+	fetch func(context.Context, *GetContractsByIDs, []string) ([]coredb.Contract, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetContractsByIDs {
+	d := &GetContractsByIDs{}
+
 	fetchWithHooks := func(ctx context.Context, keys []string) ([]coredb.Contract, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetContractsByIDs")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetContractsByIDs")
@@ -3857,41 +2580,6 @@ func newGetContractsByIDs(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetContractsByIDs{
-		Dataloader: *dataloader,
-	}
-
+	d.Dataloader = *dataloader
 	return d
-}
-
-func loadGetContractsByIDs(q *coredb.Queries) func(context.Context, []string) ([]coredb.Contract, []error) {
-	return func(ctx context.Context, params []string) ([]coredb.Contract, []error) {
-		queryResults, err := q.GetContractsByIDs(ctx, params)
-
-		results := make([]coredb.Contract, len(params))
-		errors := make([]error, len(params))
-
-		if err != nil {
-			for i := range errors {
-				errors[i] = err
-			}
-
-			return results, errors
-		}
-
-		hasResults := make([]bool, len(params))
-
-		for _, result := range queryResults {
-			results[result.BatchKeyIndex-1] = result.Contract
-			hasResults[result.BatchKeyIndex-1] = true
-		}
-
-		for i, hasResult := range hasResults {
-			if !hasResult {
-				errors[i] = NotFound[string]{Key: params[i]}
-			}
-		}
-
-		return results, errors
-	}
 }

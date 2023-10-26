@@ -15,7 +15,6 @@ import (
     "sync"
     "time"
     "context"
-	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/cmd/dataloaders/generator"
 
     {{range .ImportPaths}}
@@ -31,16 +30,12 @@ type autoCacheWithKeys[TKey any, TResult any] interface {
 	getKeysForResult(TResult) []TKey
 }
 
+type notFoundErrorProvider[TKey any] interface {
+	getNotFoundError(TKey) error
+}
+
 type PreFetchHook func(context.Context, string) context.Context
 type PostFetchHook func(context.Context, string)
-
-type NotFound[TKey any] struct {
-	Key TKey
-}
-
-func (e NotFound[TKey]) Error() string {
-	return fmt.Sprintf("result not found with key: %v", e.Key)
-}
 
 {{range .Definitions}}
 // {{.Name}} batches and caches requests          
@@ -55,17 +50,19 @@ func new{{.Name}}(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []{{.KeyType.String}}) ([]{{.ResultType.String}}, []error),
+	fetch func(context.Context, *{{.Name}}, []{{.KeyType.String}}) ([]{{.ResultType.String}}, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 	) *{{.Name}} {
+	d := &{{.Name}}{}
+
 	fetchWithHooks := func(ctx context.Context, keys []{{.KeyType.String}}) ([]{{.ResultType.String}}, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "{{.Name}}")
 		}
 
-		results, errors := fetch(ctx, keys)
+		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "{{.Name}}")
@@ -79,10 +76,8 @@ func new{{.Name}}(
 	{{ else }}
 	dataloader := generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	{{ end }}
-	d := &{{.Name}}{
-		Dataloader: *dataloader,
-	}
-	
+
+	d.Dataloader = *dataloader
 	return d
 }
 
@@ -91,64 +86,6 @@ func (*{{.Name}}) getKeyForResult(result {{.ResultType.String}}) persist.DBID {
 	return result.ID
 }
 {{- end }}
-
-{{ if .IsCustomBatch }}
-func load{{.Name}}(q *coredb.Queries) func(context.Context, []{{.KeyType.String}}) ([]{{.CustomBatching.LoaderResultType.String}}, []error) {
-	return func(ctx context.Context, params []{{.KeyType.String}}) ([]{{.CustomBatching.LoaderResultType.String}}, []error) {
-		queryResults, err := q.{{.Name}}(ctx, params)
-
-		results := make([]{{.CustomBatching.LoaderResultType.String}}, len(params))
-		errors := make([]error, len(params))
-
-		if err != nil {
-			for i := range errors {
-				errors[i] = err
-			}
-
-			return results, errors
-		}
-
-
-		hasResults := make([]bool, len(params))
-
-		for _, result := range queryResults {
-			results[result.{{.CustomBatching.BatchKeyIndexFieldName}}-1] = result{{.CustomBatching.ResultFieldName}}
-			hasResults[result.{{.CustomBatching.BatchKeyIndexFieldName}}-1] = true
-		}
-
-		for i, hasResult := range hasResults {
-			if !hasResult {
-				errors[i] = NotFound[{{.KeyType.String}}]{Key: params[i]}
-			}
-		}
-
-		return results, errors
-	}
-}
-{{ else }}
-func load{{.Name}}(q *coredb.Queries) func(context.Context, []{{.KeyType.String}}) ([]{{.ResultType.String}}, []error) {
-	return func(ctx context.Context, params []{{.KeyType.String}}) ([]{{.ResultType.String}}, []error) {
-		results := make([]{{.ResultType.String}}, len(params))
-		errors := make([]error, len(params))
-
-		b := q.{{.Name}}(ctx, params)
-		defer b.Close()
-
-		{{ if .ResultType.IsSlice }}
-		b.Query(func(i int, r {{.ResultType.String}}, err error) {
-		{{- else }}
-		b.QueryRow(func(i int, r {{.ResultType.String}}, err error) {
-		{{- end }}
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = NotFound[{{.KeyType.String}}]{Key: params[i]}
-			}
-		})
-
-		return results, errors
-	}
-}
-{{end}}
 {{end}}
 `))
 
@@ -165,8 +102,7 @@ import (
     "time"
     "context"
 
-	// TODO: Add to ImportPaths
-	//"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/jackc/pgx/v4"
     
 	{{range .ImportPaths}}
     "{{.}}"
@@ -217,4 +153,65 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 
 	return loaders
 }
+
+{{range .Definitions}}
+{{ if .IsCustomBatch }}
+func load{{.Name}}(q *coredb.Queries) func(context.Context, *{{.Name}}, []{{.KeyType.String}}) ([]{{.CustomBatching.LoaderResultType.String}}, []error) {
+	return func(ctx context.Context, d *{{.Name}}, params []{{.KeyType.String}}) ([]{{.CustomBatching.LoaderResultType.String}}, []error) {
+		queryResults, err := q.{{.Name}}(ctx, params)
+
+		results := make([]{{.CustomBatching.LoaderResultType.String}}, len(params))
+		errors := make([]error, len(params))
+
+		if err != nil {
+			for i := range errors {
+				errors[i] = err
+			}
+
+			return results, errors
+		}
+
+
+		hasResults := make([]bool, len(params))
+
+		for _, result := range queryResults {
+			results[result.{{.CustomBatching.BatchKeyIndexFieldName}}-1] = result{{.CustomBatching.ResultFieldName}}
+			hasResults[result.{{.CustomBatching.BatchKeyIndexFieldName}}-1] = true
+		}
+
+		for i, hasResult := range hasResults {
+			if !hasResult {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		}
+
+		return results, errors
+	}
+}
+{{ else }}
+func load{{.Name}}(q *coredb.Queries) func(context.Context, *{{.Name}}, []{{.KeyType.String}}) ([]{{.ResultType.String}}, []error) {
+	return func(ctx context.Context, d *{{.Name}}, params []{{.KeyType.String}}) ([]{{.ResultType.String}}, []error) {
+		results := make([]{{.ResultType.String}}, len(params))
+		errors := make([]error, len(params))
+
+		b := q.{{.Name}}(ctx, params)
+		defer b.Close()
+
+		{{ if .ResultType.IsSlice }}
+		b.Query(func(i int, r {{.ResultType.String}}, err error) {
+			results[i], errors[i] = r, err
+		{{- else }}
+		b.QueryRow(func(i int, r {{.ResultType.String}}, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		{{- end }}
+		})
+
+		return results, errors
+	}
+}
+{{end}}
+{{- end}}
 `))

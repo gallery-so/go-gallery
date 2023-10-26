@@ -195,6 +195,14 @@ func newSubscription(entry autoCacheEntry, target dataloaderDefinition, field st
 	}
 }
 
+const notFoundImplementationStr = `
+type %s must implement getNotFoundError. Add this signature to notfound.go and have it return an appropriate error:
+
+func (*%s) getNotFoundError(%s) error {
+    return pgx.ErrNoRows
+}
+`
+
 func generateFiles(defs []dataloaderDefinition, outputDir string) error {
 	genPkg := getPackage(outputDir)
 	if genPkg == nil {
@@ -212,6 +220,25 @@ func generateFiles(defs []dataloaderDefinition, outputDir string) error {
 	dataloadersFile := filepath.Join(outputDir, "dataloaders_gen.go")
 	if err := writeTemplate(dataloadersFile, dataloadersTemplate, data); err != nil {
 		return err
+	}
+
+	generatedPkg := loadPackage(outputDir)
+
+	// Check for required getNotFoundError implementations
+	for _, def := range defs {
+		if def.IsCustomBatch || !def.ResultType.IsSlice() {
+			obj := generatedPkg.Types.Scope().Lookup(def.Name)
+			if obj == nil {
+				failWithErr(fmt.Errorf("%s not found in declared types of %s", def.Name, generatedPkg))
+			}
+			if namedType, ok := obj.Type().(*types.Named); ok {
+				if !implementsGetNotFoundError(namedType, def.KeyType) {
+					return fmt.Errorf(notFoundImplementationStr, def.Name, def.Name, def.KeyType.String())
+				}
+			} else {
+				return fmt.Errorf("type %s must be a named type", def.Name)
+			}
+		}
 	}
 
 	// Delete the old api_gen.go file to ensure that any compiler errors present in the old file
@@ -234,7 +261,7 @@ func generateFiles(defs []dataloaderDefinition, outputDir string) error {
 
 	// Find all dataloaders that implement the getKeyForResult or getKeysForResult functions with
 	// appropriate [TKey, TResult] values
-	autoCacheEntries := getAutoCacheEntries(outputDir, defs)
+	autoCacheEntries := getAutoCacheEntries(generatedPkg, defs)
 
 	// For every dataloader that can cache published results, loop through all other dataloaders
 	// to see which ones return results of the appropriate type. This includes checking for sqlc.embed
@@ -855,17 +882,14 @@ func loadQueriesType(sourceType string) *types.Named {
 	return queriesType
 }
 
-func getAutoCacheEntries(outputDir string, defs []dataloaderDefinition) []autoCacheEntry {
-	generatedPkg := outputDir
-
+func getAutoCacheEntries(generatedPkg *packages.Package, defs []dataloaderDefinition) []autoCacheEntry {
 	entries := make([]autoCacheEntry, 0)
-	pkg := loadPackage(generatedPkg)
 
 	for _, def := range defs {
 		// Lookup the given source type name in the package declarations
-		obj := pkg.Types.Scope().Lookup(def.Name)
+		obj := generatedPkg.Types.Scope().Lookup(def.Name)
 		if obj == nil {
-			failWithErr(fmt.Errorf("%s not found in declared types of %s", def.Name, pkg))
+			failWithErr(fmt.Errorf("%s not found in declared types of %s", def.Name, generatedPkg))
 		}
 
 		objType := obj.Type()
@@ -956,6 +980,50 @@ func getAutoCacheTypes(namedType *types.Named, funcName string) (*goType, *goTyp
 	}
 
 	return nil, nil, false
+}
+
+var errorType = types.Universe.Lookup("error").Type()
+
+func implementsGetNotFoundError(namedType *types.Named, expectedParamType *goType) bool {
+	const funcName = "getNotFoundError"
+	for i := 0; i < namedType.NumMethods(); i++ {
+		if namedType.Method(i).Name() != funcName {
+			continue
+		}
+
+		sig, ok := namedType.Method(i).Type().(*types.Signature)
+		if !ok {
+			failWithErr(fmt.Errorf("method %s on %v has no signature", funcName, namedType))
+		}
+
+		// The method should have one parameter: the key type for the dataloader
+		if sig.Params().Len() != 1 {
+			failWithErr(fmt.Errorf("method %s on %v has %d parameters (expected 1)", funcName, namedType, sig.Params().Len()))
+		}
+
+		// Get the type of the parameter
+		paramType := sig.Params().At(0).Type()
+
+		// The method should have one result: an error type
+		if sig.Results().Len() != 1 {
+			failWithErr(fmt.Errorf("method %s on %v has %d results (expected 1)", funcName, namedType, sig.Results().Len()))
+		}
+
+		resultType := sig.Results().At(0).Type()
+
+		paramGoType, err := typeToGoType(paramType)
+		if err != nil {
+			failWithErr(fmt.Errorf("error converting type to go type: %v", err))
+		}
+
+		if !types.Identical(resultType, errorType) || *paramGoType != *expectedParamType {
+			return false
+		}
+
+		return true
+	}
+
+	return false
 }
 
 func loadPackage(path string) *packages.Package {
