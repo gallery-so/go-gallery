@@ -45,7 +45,10 @@ var saveCmd = &cobra.Command{
 	Short: "create staging table for chunking tokens",
 	Run: func(cmd *cobra.Command, args []string) {
 		defer pq.Close()
-		saveStagingTable(pq)
+		tx, err := pq.Begin()
+		defer tx.Commit()
+		check(err)
+		saveStagingTable()
 	},
 }
 
@@ -54,7 +57,7 @@ var migrateCmd = &cobra.Command{
 	Short: "create token_definitions table",
 	Run: func(cmd *cobra.Command, args []string) {
 		defer pq.Close()
-		migrate(context.Background(), pq)
+		createTokenDefinitions(context.Background(), pq)
 	},
 }
 
@@ -226,7 +229,7 @@ type mergedData struct {
 	MediaMedia      []persist.Media
 }
 
-func mustBeEmpty(tx *sql.Tx) {
+func requireMustBeEmpty() {
 	var currentCount int
 	err := pq.QueryRow("select count(*) from token_definitions").Scan(&currentCount)
 	check(err)
@@ -235,9 +238,11 @@ func mustBeEmpty(tx *sql.Tx) {
 	}
 }
 
-func analyzeTokens(tx *sql.Tx) {
-	_, err := tx.Exec("analyze tokens;")
+func analyzeTokens() {
+	fmt.Print("analyzing tokens table")
+	_, err := pq.Exec("analyze tokens;")
 	check(err)
+	fmt.Println("...done")
 }
 
 func lockTables(tx *sql.Tx) {
@@ -247,38 +252,42 @@ func lockTables(tx *sql.Tx) {
 	check(err)
 }
 
-func prepareStatements(ctx context.Context) {
+func prepareStatements() {
+	fmt.Print("preparing statements")
 	var err error
-	batchTokensStmt, err = pq.PrepareContext(ctx, batchTokensQuery)
+	batchTokensStmt, err = pq.Prepare(batchTokensQuery)
 	check(err)
-	batchMediasStmt, err = pq.PrepareContext(ctx, batchMediasQuery)
+	batchMediasStmt, err = pq.Prepare(batchMediasQuery)
 	check(err)
-	batchInsertStmt, err = pq.PrepareContext(ctx, insertBatch)
+	batchInsertStmt, err = pq.Prepare(insertBatch)
 	check(err)
+	fmt.Println("...done")
 }
 
-func migrate(ctx context.Context, pq *sql.DB) {
+func dropTokenDefinitionConstraints() {
+	fmt.Print("dropping constraints")
+	_, err := pq.Exec(dropConstraints)
+	check(err)
+	fmt.Printf("...done")
+}
+
+func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 	globalStart := time.Now()
 
 	tx, err := pq.BeginTx(ctx, nil)
-
 	check(err)
-	mustBeEmpty(tx)
-	analyzeTokens(tx)
+
+	requireMustBeEmpty()
+	prepareStatements()
+	analyzeTokens()
+	totalTokens := saveStagingTable()
+	dropTokenDefinitionConstraints()
 	lockTables(tx)
-	prepareStatements(ctx)
-
-	fmt.Print("dropping constraints")
-	now := time.Now()
-	_, err = pq.Exec(dropConstraints)
-	check(err)
-	fmt.Printf("...done in %s\n", time.Since(now))
 
 	wp := workerpool.New(poolSize)
 
 	start := 0
 	end := start + batchSize
-	totalTokens := totalTokensToProcess()
 	totalBatches := totalTokens / batchSize
 
 	for chunkID := 0; start < totalTokens; chunkID++ {
@@ -458,7 +467,7 @@ func migrate(ctx context.Context, pq *sql.DB) {
 	wp.StopWait()
 
 	fmt.Println("adding back constraints")
-	now = time.Now()
+	now := time.Now()
 	_, err = tx.Exec(addConstraints)
 	check(err)
 
@@ -468,21 +477,16 @@ func migrate(ctx context.Context, pq *sql.DB) {
 	fmt.Printf("took %s to migrate tokens; adding constaints=%s\n", time.Since(globalStart), time.Since(now))
 }
 
-func saveStagingTable(pq *sql.DB) {
+func saveStagingTable() int {
+	fmt.Print("creating token_chunks table")
 	r, err := pq.Exec(createStagingTable)
 	check(err)
 	rows, err := r.RowsAffected()
 	check(err)
 	_, err = pq.Exec("analyze token_chunks")
 	check(err)
-	fmt.Printf("created staging table with %d rows\n", rows)
-}
-
-func totalTokensToProcess() (t int) {
-	err := pq.QueryRow("select count(*) from token_chunks;").Scan(&t)
-	check(err)
-	fmt.Printf("total tokens to process: %d\n", t)
-	return t
+	fmt.Printf("...created token_chunks table with %d rows\n", rows)
+	return int(rows)
 }
 
 func check(err error) {
