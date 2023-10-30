@@ -1,8 +1,13 @@
 /* Migrate to rebuild the tokens table with the token_definition_id column */
 begin;
 
+-- Disable WAL
+alter table token_definitions set unlogged;
+
 -- Temporarily increase work_mem to speed up the migration so prevent data spilling to disk
-set local work_mem = '5500 MB';
+set local work_mem = '4096 MB';
+set maintenance_work_mem = '4096 MB';
+set max_parallel_maintenance_workers = 8;
 
 -- Lock access to table
 lock table tokens in access exclusive mode;
@@ -59,6 +64,7 @@ create index on tokens_with_token_definition_fk(last_updated) where deleted = fa
 create index on tokens_with_token_definition_fk(contract, token_definition_id) where deleted = false;
 
 -- Rename the table, create a backup of the old table
+drop table if exists tokens_backup;
 alter table tokens rename to tokens_backup;
 alter table tokens_with_token_definition_fk rename to tokens;
 
@@ -77,5 +83,8 @@ alter table tokens rename column is_provider_marked_spam to is_provider_marked_s
 alter table tokens rename column token_uri to token_uri__deprecated;
 alter table tokens rename column fallback_media to fallback_media__deprecated;
 alter table tokens rename column token_media_id to token_media_id__deprecated;
+
+-- Enable WAL
+alter table token_definitions set logged;
 
 end;

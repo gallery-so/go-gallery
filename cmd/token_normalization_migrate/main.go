@@ -136,8 +136,6 @@ drop index if exists token_definitions_chain_contract_address_token_idx;
 drop index if exists token_definitions_contract_id_idx;`
 
 const addConstraints = `
-alter table token_definitions set (autovacuum_enabled = true);
-alter table token_definitions set logged;
 alter table token_definitions add primary key(id);
 alter table token_definitions add constraint token_definitions_contract_id_fkey foreign key(contract_id) references contracts(id);
 alter table token_definitions add constraint token_definitions_token_media_id_fkey foreign key(token_media_id) references token_medias(id);
@@ -145,6 +143,8 @@ alter table token_definitions add constraint token_definitions_contract_id_chain
 create unique index if not exists token_definitions_chain_contract_id_token_idx on token_definitions(chain, contract_id, token_id) where not deleted;
 create unique index token_definitions_chain_contract_address_token_idx on token_definitions(chain, contract_address, token_id) where not deleted;
 create index token_definitions_contract_id_idx on token_definitions(contract_id) where not deleted;
+alter table token_definitions set (autovacuum_enabled = true);
+alter table token_definitions set logged;
 analyze token_definitions;`
 
 const insertBatch = `
@@ -268,7 +268,7 @@ func dropTokenDefinitionConstraints() {
 	fmt.Print("dropping constraints")
 	_, err := pq.Exec(dropConstraints)
 	check(err)
-	fmt.Printf("...done")
+	fmt.Println("...done")
 }
 
 func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
@@ -280,9 +280,9 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 	requireMustBeEmpty()
 	prepareStatements()
 	analyzeTokens()
-	totalTokens := saveStagingTable()
 	dropTokenDefinitionConstraints()
 	lockTables(tx)
+	totalTokens := saveStagingTable()
 
 	wp := workerpool.New(poolSize)
 
@@ -296,7 +296,6 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 		e := end
 		wp.Submit(func() {
 			batchStart := time.Now()
-			fmt.Printf("handling chunk(id=%d) [%d, %d); %d/%d \n", chunkID, s, e, chunkID, totalBatches)
 
 			tokenCh := make(chan bool)
 			mediaCh := make(chan bool)
