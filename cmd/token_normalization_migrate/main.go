@@ -1,4 +1,4 @@
-// Script to populate token_definitions table from tokens and token_medias tables
+// Script to generate the token_definitions table from tokens and token_medias tables
 package main
 
 import (
