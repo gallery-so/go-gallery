@@ -67,6 +67,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionMentionUser, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
@@ -494,6 +495,8 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
 	case persist.ActionReplyToComment:
 		data.OriginalCommentID = event.SubjectID
+	case persist.ActionUserPostedYourWork:
+		data.YourContractID = event.Data.YourContractID
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
@@ -556,6 +559,7 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 			return "", nil
 		}
 		return u.CreatorUserID, nil
+
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)

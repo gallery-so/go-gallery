@@ -142,8 +142,8 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return "", err
 	}
 
-	contractIDs, _ := util.Map(contracts, func(c db.Contract) (persist.DBID, error) {
-		return c.ID, nil
+	contractIDs := util.MapWithoutError(contracts, func(c db.Contract) persist.DBID {
+		return c.ID
 	})
 
 	tx, err := api.repos.BeginTx(ctx)
@@ -205,6 +205,25 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 	err = tx.Commit(ctx)
 	if err != nil {
 		return "", err
+	}
+
+	creators, _ := api.loaders.ContractCreatorByContractID.LoadAll(contractIDs)
+	for _, creator := range creators {
+		if creator.CreatorUserID == "" {
+			continue
+		}
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(actorID),
+			Action:         persist.ActionUserPostedYourWork,
+			ResourceTypeID: persist.ResourceTypeContract,
+			UserID:         creator.CreatorUserID,
+			SubjectID:      creator.ContractID,
+			PostID:         postID,
+			ContractID:     creator.ContractID,
+		})
+		if err != nil {
+			logger.For(ctx).Errorf("error dispatching event: %v", err)
+		}
 	}
 
 	err = event.Dispatch(ctx, db.Event{
@@ -273,6 +292,22 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			return postID, err
 		}
 
+		creator, _ := api.loaders.ContractCreatorByContractID.Load(contract.ID)
+		if creator.CreatorUserID != "" {
+			err = event.Dispatch(ctx, db.Event{
+				ActorID:        persist.DBIDToNullStr(userID),
+				Action:         persist.ActionUserPostedYourWork,
+				ResourceTypeID: persist.ResourceTypeContract,
+				UserID:         creator.CreatorUserID,
+				SubjectID:      creator.ContractID,
+				PostID:         postID,
+				ContractID:     creator.ContractID,
+			})
+			if err != nil {
+				logger.For(ctx).Errorf("error dispatching event: %v", err)
+			}
+		}
+
 		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(user.ID),
 			Action:         persist.ActionUserPosted,
@@ -309,6 +344,22 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	})
 	if err != nil {
 		return postID, err
+	}
+
+	creator, _ := api.loaders.ContractCreatorByContractID.Load(synced.Contract)
+	if creator.CreatorUserID != "" {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionUserPostedYourWork,
+			ResourceTypeID: persist.ResourceTypeContract,
+			UserID:         creator.CreatorUserID,
+			SubjectID:      creator.ContractID,
+			PostID:         postID,
+			ContractID:     creator.ContractID,
+		})
+		if err != nil {
+			logger.For(ctx).Errorf("error dispatching event: %v", err)
+		}
 	}
 
 	err = event.Dispatch(ctx, db.Event{
