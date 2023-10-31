@@ -534,10 +534,12 @@ type ComplexityRoot struct {
 	}
 
 	FarcasterSocialAccount struct {
+		ApprovalURL     func(childComplexity int) int
 		Bio             func(childComplexity int) int
 		Display         func(childComplexity int) int
 		Name            func(childComplexity int) int
 		ProfileImageURL func(childComplexity int) int
+		SignerStatus    func(childComplexity int) int
 		SocialID        func(childComplexity int) int
 		Type            func(childComplexity int) int
 		Username        func(childComplexity int) int
@@ -3449,6 +3451,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FallbackMedia.MediaURL(childComplexity), true
 
+	case "FarcasterSocialAccount.approvalURL":
+		if e.complexity.FarcasterSocialAccount.ApprovalURL == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.ApprovalURL(childComplexity), true
+
 	case "FarcasterSocialAccount.bio":
 		if e.complexity.FarcasterSocialAccount.Bio == nil {
 			break
@@ -3476,6 +3485,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FarcasterSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "FarcasterSocialAccount.signerStatus":
+		if e.complexity.FarcasterSocialAccount.SignerStatus == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.SignerStatus(childComplexity), true
 
 	case "FarcasterSocialAccount.social_id":
 		if e.complexity.FarcasterSocialAccount.SocialID == nil {
@@ -9268,7 +9284,10 @@ type FarcasterSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  approvalURL: String
+  signerStatus: String
 }
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -10371,6 +10390,7 @@ input TwitterAuth {
 
 input FarcasterAuth {
   address: Address!
+  withSigner: Boolean
   # farcaster only supports ETH addresses currently so no need to specify a chain
 }
 
@@ -25175,6 +25195,88 @@ func (ec *executionContext) fieldContext_FarcasterSocialAccount_display(ctx cont
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_approvalURL(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_approvalURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ApprovalURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_approvalURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_signerStatus(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_signerStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SignerStatus, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_signerStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -45442,6 +45544,10 @@ func (ec *executionContext) fieldContext_SocialAccounts_farcaster(ctx context.Co
 				return ec.fieldContext_FarcasterSocialAccount_bio(ctx, field)
 			case "display":
 				return ec.fieldContext_FarcasterSocialAccount_display(ctx, field)
+			case "approvalURL":
+				return ec.fieldContext_FarcasterSocialAccount_approvalURL(ctx, field)
+			case "signerStatus":
+				return ec.fieldContext_FarcasterSocialAccount_signerStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FarcasterSocialAccount", field.Name)
 		},
@@ -61282,7 +61388,7 @@ func (ec *executionContext) unmarshalInputFarcasterAuth(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address"}
+	fieldsInOrder := [...]string{"address", "withSigner"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -61298,6 +61404,15 @@ func (ec *executionContext) unmarshalInputFarcasterAuth(ctx context.Context, obj
 				return it, err
 			}
 			it.Address = data
+		case "withSigner":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("withSigner"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WithSigner = data
 		}
 	}
 
@@ -70378,6 +70493,14 @@ func (ec *executionContext) _FarcasterSocialAccount(ctx context.Context, sel ast
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "approvalURL":
+
+			out.Values[i] = ec._FarcasterSocialAccount_approvalURL(ctx, field, obj)
+
+		case "signerStatus":
+
+			out.Values[i] = ec._FarcasterSocialAccount_signerStatus(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

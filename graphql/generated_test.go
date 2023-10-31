@@ -281,11 +281,15 @@ func (v *EoaAuth) GetNonce() string { return v.Nonce }
 func (v *EoaAuth) GetSignature() string { return v.Signature }
 
 type FarcasterAuth struct {
-	Address string `json:"address"`
+	Address    string `json:"address"`
+	WithSigner *bool  `json:"withSigner"`
 }
 
 // GetAddress returns FarcasterAuth.Address, and is useful for accessing the field via an interface.
 func (v *FarcasterAuth) GetAddress() string { return v.Address }
+
+// GetWithSigner returns FarcasterAuth.WithSigner, and is useful for accessing the field via an interface.
+func (v *FarcasterAuth) GetWithSigner() *bool { return v.WithSigner }
 
 type GnosisSafeAuth struct {
 	Address string `json:"address"`

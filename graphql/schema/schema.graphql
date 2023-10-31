@@ -682,7 +682,10 @@ type FarcasterSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  approvalURL: String
+  signerStatus: String
 }
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -1785,6 +1788,7 @@ input TwitterAuth {
 
 input FarcasterAuth {
   address: Address!
+  withSigner: Boolean
   # farcaster only supports ETH addresses currently so no need to specify a chain
 }
 

@@ -234,7 +234,8 @@ func SetDefaults() {
 	viper.SetDefault("AUTOSOCIAL_URL", "")
 	viper.SetDefault("AUTOSOCIAL_QUEUE", "")
 	viper.SetDefault("AUTOSOCIAL_POLL_QUEUE", "")
-	viper.SetDefault("FARCASTER_PRIVATE_KEY", "")
+
+	viper.SetDefault("FARCASTER_MNEMONIC", "")
 	viper.SetDefault("FARCASTER_APP_ID", "")
 
 	viper.AutomaticEnv()

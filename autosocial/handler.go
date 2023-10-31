@@ -2,6 +2,7 @@ package autosocial
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/lens"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
@@ -73,6 +75,8 @@ func checkFarcasterApproval(q *coredb.Queries, n *farcaster.NeynarAPI) gin.Handl
 			return
 		}
 
+		logger.For(c).Infof("checking farcaster approval for %s", in.SignerUUID)
+
 		s, err := n.GetSignerByUUID(c, in.SignerUUID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -80,7 +84,7 @@ func checkFarcasterApproval(q *coredb.Queries, n *farcaster.NeynarAPI) gin.Handl
 		}
 
 		if s.Status != "approved" {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("signer status is %s", s.Status))
 			return
 		}
 
@@ -91,7 +95,7 @@ func checkFarcasterApproval(q *coredb.Queries, n *farcaster.NeynarAPI) gin.Handl
 		}
 		far, ok := user[persist.SocialProviderFarcaster]
 		if !ok {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("user does not have farcaster social"))
 			return
 		}
 
@@ -103,6 +107,10 @@ func checkFarcasterApproval(q *coredb.Queries, n *farcaster.NeynarAPI) gin.Handl
 				persist.SocialProviderFarcaster: far,
 			},
 		})
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}

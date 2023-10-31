@@ -213,15 +213,11 @@ func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m mod
 	}
 
 	if m.Farcaster != nil {
-		return publicapi.For(ctx).Social.NewFarcasterAuthenticator(authedUserID, m.Farcaster.Address), nil
+		return publicapi.For(ctx).Social.NewFarcasterAuthenticator(authedUserID, m.Farcaster.Address, util.FromPointer(m.Farcaster.WithSigner)), nil
 	}
 
 	if m.Lens != nil {
-		sig := ""
-		if m.Lens.Signature != nil {
-			sig = *m.Lens.Signature
-		}
-		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address, sig), nil
+		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address, util.FromPointer(m.Lens.Signature)), nil
 	}
 
 	return nil, errNoAuthMechanismFound

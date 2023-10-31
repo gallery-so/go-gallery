@@ -227,7 +227,7 @@ func CreateTaskForAutosocialPollFarcaster(ctx context.Context, message Autosocia
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAutosocialPollFarcaster")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("AUTOSOCIAL_POLL_QUEUE")
-	url := fmt.Sprintf("%s/checkFarcasterApproval/signer_uuid=%s&user_id=%s", env.GetString("AUTOSOCIAL_URL"), message.SignerUUID, message.UserID)
+	url := fmt.Sprintf("%s/checkFarcasterApproval?signer_uuid=%s&user_id=%s", env.GetString("AUTOSOCIAL_URL"), message.SignerUUID, message.UserID)
 	return submitTask(ctx, client, queue, url, withTrace(span))
 }
 

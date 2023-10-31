@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -26,6 +27,7 @@ type SocialAPI struct {
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
 	httpClient *http.Client
+	taskClient *cloudtasks.Client
 }
 
 func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string) *socialauth.TwitterAuthenticator {
@@ -37,12 +39,14 @@ func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string)
 	}
 }
 
-func (s SocialAPI) NewFarcasterAuthenticator(userID persist.DBID, address persist.Address) *socialauth.FarcasterAuthenticator {
+func (s SocialAPI) NewFarcasterAuthenticator(userID persist.DBID, address persist.Address, withSigner bool) *socialauth.FarcasterAuthenticator {
 	return &socialauth.FarcasterAuthenticator{
 		HTTPClient: s.httpClient,
 		UserID:     userID,
 		Queries:    s.queries,
 		Address:    address,
+		WithSigner: withSigner,
+		TaskClient: s.taskClient,
 	}
 }
 

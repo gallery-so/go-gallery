@@ -1300,7 +1300,8 @@ type FallbackMedia struct {
 }
 
 type FarcasterAuth struct {
-	Address persist.Address `json:"address"`
+	Address    persist.Address `json:"address"`
+	WithSigner *bool           `json:"withSigner"`
 }
 
 type FarcasterSocialAccount struct {
@@ -1311,6 +1312,8 @@ type FarcasterSocialAccount struct {
 	ProfileImageURL string                 `json:"profileImageURL"`
 	Bio             string                 `json:"bio"`
 	Display         bool                   `json:"display"`
+	ApprovalURL     *string                `json:"approvalURL"`
+	SignerStatus    *string                `json:"signerStatus"`
 }
 
 func (FarcasterSocialAccount) IsSocialAccount() {}

@@ -113,8 +113,18 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 			return nil, fmt.Errorf("get signer by address: %w", err)
 		}
 
-		res.Metadata["signer_uuid"] = signer.SignerUUID
+		err = a.Queries.UpsertSocialOAuth(ctx, coredb.UpsertSocialOAuthParams{
+			ID:          persist.GenerateID(),
+			UserID:      a.UserID,
+			Provider:    persist.SocialProviderFarcaster,
+			AccessToken: util.ToNullString(signer.SignerUUID, false),
+		})
+		if err != nil {
+			return nil, err
+		}
+
 		res.Metadata["signer_status"] = signer.Status
+		res.Metadata["approval_url"] = signer.SignerApprovalURL
 		err = task.CreateTaskForAutosocialPollFarcaster(ctx, task.AutosocialPollFarcasterMessage{
 			SignerUUID: signer.SignerUUID,
 			UserID:     a.UserID,

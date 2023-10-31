@@ -1255,6 +1255,14 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		if ok {
 			f.Bio = bio
 		}
+		approvalURL, ok := social.Metadata["approval_url"].(string)
+		if ok {
+			f.ApprovalURL = &approvalURL
+		}
+		signerStatus, ok := social.Metadata["signer_status"].(string)
+		if ok {
+			f.SignerStatus = &signerStatus
+		}
 		result.Farcaster = f
 	case persist.SocialProviderLens:
 		logger.For(ctx).Infof("found lens social account: %+v", social)
