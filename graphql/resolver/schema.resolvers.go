@@ -2808,10 +2808,14 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		highDef = *settings.HighDefinition
 	}
 
-	tokenMedia, err := publicapi.For(ctx).Token.MediaByMediaID(ctx, obj.Token.TokenMediaID)
+	tokenMedia := coredb.TokenMedia{}
+	var err error
 
-	if util.ErrorAs[persist.ErrMediaNotFound](err) {
-		err = nil
+	if obj.Token.TokenMediaID != "" {
+		tokenMedia, err = publicapi.For(ctx).Token.MediaByMediaID(ctx, obj.Token.TokenMediaID)
+		if util.ErrorAs[persist.ErrMediaNotFound](err) {
+			err = nil
+		}
 	}
 
 	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), err
@@ -2842,6 +2846,9 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 
 // TokenMetadata is the resolver for the tokenMetadata field.
 func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*string, error) {
+	if obj.Token.TokenMediaID == "" {
+		return nil, persist.ErrMediaNotFound{ID: obj.Token.TokenMediaID}
+	}
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByMediaID(ctx, obj.Token.TokenMediaID)
 	if err != nil {
 		return nil, err
