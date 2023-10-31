@@ -80,7 +80,7 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 		return nil, err
 	}
 
-	user, err := api.loaders.UserByUserID.Load(userID)
+	user, err := api.loaders.GetUserByIdBatch.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.
 		return nil, err
 	}
 
-	user, err := api.loaders.UserByUsername.Load(username)
+	user, err := api.loaders.GetUserByUsernameBatch.Load(username)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.Ch
 	}
 
 	chain := chainAddress.Chain()
-	user, err := api.loaders.UserByAddress.Load(db.GetUserByAddressAndL1BatchParams{
+	user, err := api.loaders.GetUserByAddressAndL1Batch.Load(db.GetUserByAddressAndL1BatchParams{
 		L1Chain: chain.L1Chain(),
 		Address: persist.Address(chain.NormalizeAddress(chainAddress.Address())),
 	})
@@ -236,7 +236,7 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 		return nil, err
 	}
 
-	users, err := api.loaders.UsersWithTrait.Load(trait)
+	users, err := api.loaders.GetUsersWithTraitBatch.Load(trait)
 	if err != nil {
 		return nil, err
 	}
@@ -761,7 +761,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 		return nil, err
 	}
 
-	membership, err := api.loaders.MembershipByMembershipID.Load(membershipID)
+	membership, err := api.loaders.GetMembershipByMembershipIdBatch.Load(membershipID)
 	if err != nil {
 		return nil, err
 	}
@@ -781,7 +781,7 @@ func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID
 		return nil, err
 	}
 
-	followers, err := api.loaders.FollowersByUserID.Load(userID)
+	followers, err := api.loaders.GetFollowersByUserIdBatch.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -801,7 +801,7 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 		return nil, err
 	}
 
-	following, err := api.loaders.FollowingByUserID.Load(userID)
+	following, err := api.loaders.GetFollowingByUserIdBatch.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -828,7 +828,7 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]any, error) {
-		keys, err := api.loaders.SharedFollowersByUserIDs.Load(db.GetSharedFollowersBatchPaginateParams{
+		keys, err := api.loaders.GetSharedFollowersBatchPaginate.Load(db.GetSharedFollowersBatchPaginateParams{
 			Follower:      curUserID,
 			Followee:      userID,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -907,7 +907,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 	}
 
 	queryFunc := func(params sharedContractsPaginatorParams) ([]any, error) {
-		keys, err := api.loaders.SharedContractsByUserIDs.Load(db.GetSharedContractsBatchPaginateParams{
+		keys, err := api.loaders.GetSharedContractsBatchPaginate.Load(db.GetSharedContractsBatchPaginateParams{
 			UserAID:                   curUserID,
 			UserBID:                   userID,
 			CurBeforeDisplayedByUserA: params.CursorBeforeDisplayedByUserA,
@@ -984,7 +984,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		for i, c := range includeChains {
 			serializedChains[i] = strconv.Itoa(int(c))
 		}
-		keys, err := api.loaders.ContractsLoaderByCreatorID.Load(db.GetCreatedContractsBatchPaginateParams{
+		keys, err := api.loaders.GetCreatedContractsBatchPaginate.Load(db.GetCreatedContractsBatchPaginateParams{
 			UserID:           userID,
 			Chains:           strings.Join(serializedChains, ","),
 			CurBeforeTime:    params.CursorBeforeTime,
@@ -1564,7 +1564,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 			return err
 		}
 
-		wallets, err := api.loaders.WalletsByUserID.Load(userID)
+		wallets, err := api.loaders.GetWalletsByUserIDBatch.Load(userID)
 		if err != nil {
 			return err
 		}
@@ -1613,7 +1613,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 				}
 
 				// Manually prime the PFP loader
-				api.loaders.ProfileImageByID.Prime(db.GetProfileImageByIDParams{
+				api.loaders.GetProfileImageByID.Prime(db.GetProfileImageByIDParams{
 					ID:              pfp.ProfileImage.ID,
 					EnsSourceType:   persist.ProfileImageSourceENS,
 					TokenSourceType: persist.ProfileImageSourceToken,
@@ -1645,7 +1645,7 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 	if user.ProfileImageID == "" {
 		return db.ProfileImage{}, nil
 	}
-	return api.loaders.ProfileImageByID.Load(db.GetProfileImageByIDParams{
+	return api.loaders.GetProfileImageByID.Load(db.GetProfileImageByIDParams{
 		ID:              user.ProfileImageID,
 		EnsSourceType:   persist.ProfileImageSourceENS,
 		TokenSourceType: persist.ProfileImageSourceToken,

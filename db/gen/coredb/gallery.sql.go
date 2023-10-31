@@ -16,8 +16,8 @@ update galleries set last_updated = now(), collections = $1::text[] || collectio
 `
 
 type GalleryRepoAddCollectionsParams struct {
-	CollectionIds []string     `json:"collection_ids"`
-	GalleryID     persist.DBID `json:"gallery_id"`
+	CollectionIds []string     `db:"collection_ids" json:"collection_ids"`
+	GalleryID     persist.DBID `db:"gallery_id" json:"gallery_id"`
 }
 
 func (q *Queries) GalleryRepoAddCollections(ctx context.Context, arg GalleryRepoAddCollectionsParams) (int64, error) {
@@ -33,8 +33,8 @@ select count(*) from collections where id = any($2) and owner_user_id = $1
 `
 
 type GalleryRepoCheckOwnCollectionsParams struct {
-	OwnerUserID   persist.DBID     `json:"owner_user_id"`
-	CollectionIds persist.DBIDList `json:"collection_ids"`
+	OwnerUserID   persist.DBID     `db:"owner_user_id" json:"owner_user_id"`
+	CollectionIds persist.DBIDList `db:"collection_ids" json:"collection_ids"`
 }
 
 func (q *Queries) GalleryRepoCheckOwnCollections(ctx context.Context, arg GalleryRepoCheckOwnCollectionsParams) (int64, error) {
@@ -72,11 +72,11 @@ insert into galleries (id, owner_user_id, name, description, position) values ($
 `
 
 type GalleryRepoCreateParams struct {
-	GalleryID   persist.DBID `json:"gallery_id"`
-	OwnerUserID persist.DBID `json:"owner_user_id"`
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	Position    string       `json:"position"`
+	GalleryID   persist.DBID `db:"gallery_id" json:"gallery_id"`
+	OwnerUserID persist.DBID `db:"owner_user_id" json:"owner_user_id"`
+	Name        string       `db:"name" json:"name"`
+	Description string       `db:"description" json:"description"`
+	Position    string       `db:"position" json:"position"`
 }
 
 func (q *Queries) GalleryRepoCreate(ctx context.Context, arg GalleryRepoCreateParams) (Gallery, error) {
@@ -109,8 +109,8 @@ update galleries set deleted = true where galleries.id = $1 and (select count(*)
 `
 
 type GalleryRepoDeleteParams struct {
-	GalleryID   persist.DBID `json:"gallery_id"`
-	OwnerUserID persist.DBID `json:"owner_user_id"`
+	GalleryID   persist.DBID `db:"gallery_id" json:"gallery_id"`
+	OwnerUserID persist.DBID `db:"owner_user_id" json:"owner_user_id"`
 }
 
 func (q *Queries) GalleryRepoDelete(ctx context.Context, arg GalleryRepoDeleteParams) error {
@@ -190,8 +190,8 @@ select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media
 `
 
 type GalleryRepoGetPreviewsForUserIDParams struct {
-	OwnerUserID persist.DBID `json:"owner_user_id"`
-	Limit       int32        `json:"limit"`
+	OwnerUserID persist.DBID `db:"owner_user_id" json:"owner_user_id"`
+	Limit       int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GalleryRepoGetPreviewsForUserID(ctx context.Context, arg GalleryRepoGetPreviewsForUserIDParams) ([]string, error) {
@@ -219,8 +219,8 @@ update galleries set last_updated = now(), collections = $1 where galleries.id =
 `
 
 type GalleryRepoUpdateParams struct {
-	CollectionIds persist.DBIDList `json:"collection_ids"`
-	GalleryID     persist.DBID     `json:"gallery_id"`
+	CollectionIds persist.DBIDList `db:"collection_ids" json:"collection_ids"`
+	GalleryID     persist.DBID     `db:"gallery_id" json:"gallery_id"`
 }
 
 func (q *Queries) GalleryRepoUpdate(ctx context.Context, arg GalleryRepoUpdateParams) (int64, error) {

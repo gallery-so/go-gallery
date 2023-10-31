@@ -200,7 +200,7 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 			return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
 		}
 	} else if token.TokenMediaID != "" {
-		med, err := api.loaders.MediaByTokenID.Load(token.ID)
+		med, err := api.loaders.GetMediaByMediaIDIgnoringStatus.Load(token.TokenMediaID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load media for token %v: %w", token.TokenID, err)
 		}

@@ -21,9 +21,9 @@ where contract_id not in (
 `
 
 type GetContractLabelsRow struct {
-	UserID     persist.DBID `json:"user_id"`
-	ContractID persist.DBID `json:"contract_id"`
-	Displayed  bool         `json:"displayed"`
+	UserID     persist.DBID `db:"user_id" json:"user_id"`
+	ContractID persist.DBID `db:"contract_id" json:"contract_id"`
+	Displayed  bool         `db:"displayed" json:"displayed"`
 }
 
 func (q *Queries) GetContractLabels(ctx context.Context, excludedContracts []string) ([]GetContractLabelsRow, error) {
@@ -63,8 +63,8 @@ where
 `
 
 type GetExternalFollowGraphSourceRow struct {
-	FollowerID persist.DBID `json:"follower_id"`
-	FolloweeID persist.DBID `json:"followee_id"`
+	FollowerID persist.DBID `db:"follower_id" json:"follower_id"`
+	FolloweeID persist.DBID `db:"followee_id" json:"followee_id"`
 }
 
 func (q *Queries) GetExternalFollowGraphSource(ctx context.Context) ([]GetExternalFollowGraphSourceRow, error) {
@@ -103,8 +103,8 @@ where feed_entity_scores.created_at > (select last_updated from refreshed limit 
 `
 
 type GetFeedEntityScoresRow struct {
-	FeedEntityScore FeedEntityScore `json:"feedentityscore"`
-	Post            Post            `json:"post"`
+	FeedEntityScore FeedEntityScore `db:"feedentityscore" json:"feedentityscore"`
+	Post            Post            `db:"post" json:"post"`
 }
 
 func (q *Queries) GetFeedEntityScores(ctx context.Context, windowEnd time.Time) ([]GetFeedEntityScoresRow, error) {
@@ -193,8 +193,8 @@ where
 `
 
 type GetFollowGraphSourceRow struct {
-	Follower persist.DBID `json:"follower"`
-	Followee persist.DBID `json:"followee"`
+	Follower persist.DBID `db:"follower" json:"follower"`
+	Followee persist.DBID `db:"followee" json:"followee"`
 }
 
 func (q *Queries) GetFollowGraphSource(ctx context.Context) ([]GetFollowGraphSourceRow, error) {
@@ -294,10 +294,10 @@ do update set
 `
 
 type UpdatedRecommendationResultsParams struct {
-	ID                []string `json:"id"`
-	UserID            []string `json:"user_id"`
-	RecommendedUserID []string `json:"recommended_user_id"`
-	RecommendedCount  []int32  `json:"recommended_count"`
+	ID                []string `db:"id" json:"id"`
+	UserID            []string `db:"user_id" json:"user_id"`
+	RecommendedUserID []string `db:"recommended_user_id" json:"recommended_user_id"`
+	RecommendedCount  []int32  `db:"recommended_count" json:"recommended_count"`
 }
 
 func (q *Queries) UpdatedRecommendationResults(ctx context.Context, arg UpdatedRecommendationResultsParams) error {

@@ -20,11 +20,11 @@ RETURNING id
 `
 
 type CreateAdmireParams struct {
-	ID        persist.DBID   `json:"id"`
-	ActorID   persist.DBID   `json:"actor_id"`
-	FeedEvent sql.NullString `json:"feed_event"`
-	Post      sql.NullString `json:"post"`
-	Token     sql.NullString `json:"token"`
+	ID        persist.DBID   `db:"id" json:"id"`
+	ActorID   persist.DBID   `db:"actor_id" json:"actor_id"`
+	FeedEvent sql.NullString `db:"feed_event" json:"feed_event"`
+	Post      sql.NullString `db:"post" json:"post"`
+	Token     sql.NullString `db:"token" json:"token"`
 }
 
 func (q *Queries) CreateAdmire(ctx context.Context, arg CreateAdmireParams) (persist.DBID, error) {

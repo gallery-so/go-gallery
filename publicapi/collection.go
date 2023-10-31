@@ -43,7 +43,7 @@ func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID per
 		return nil, err
 	}
 
-	collection, err := api.loaders.CollectionByCollectionID.Load(collectionID)
+	collection, err := api.loaders.GetCollectionByIdBatch.Load(collectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs 
 			return func() (db.Collection, error) { return db.Collection{}, err }
 		}
 
-		return api.loaders.CollectionByCollectionID.LoadThunk(collectionID)
+		return api.loaders.GetCollectionByIdBatch.LoadThunk(collectionID)
 	}
 
 	// A "thunk" will add this request to a batch, and then return a function that will block to fetch
@@ -97,7 +97,7 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 		return nil, err
 	}
 
-	collections, err := api.loaders.CollectionsByGalleryID.Load(galleryID)
+	collections, err := api.loaders.GetCollectionsByGalleryIdBatch.Load(galleryID)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, nil, err
 	}
 
-	createdCollection, err := api.loaders.CollectionByCollectionID.Load(collectionID)
+	createdCollection, err := api.loaders.GetCollectionByIdBatch.Load(collectionID)
 	if err != nil {
 		return nil, nil, err
 	}
