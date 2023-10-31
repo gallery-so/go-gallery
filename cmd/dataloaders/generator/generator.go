@@ -204,6 +204,13 @@ func (*%s) getNotFoundError(key %s) error {
 `
 
 func generateFiles(defs []dataloaderDefinition, outputDir string) error {
+	// Delete the old api_gen.go file to ensure that any compiler errors present in the old file
+	// won't stop us from parsing the package and writing a new one
+	apiFile := filepath.Join(outputDir, "api_gen.go")
+	if err := os.Remove(apiFile); err != nil && !os.IsNotExist(err) {
+		failWithErr(fmt.Errorf("error deleting old api_gen.go file: %v", err))
+	}
+	
 	genPkg := getPackage(outputDir)
 	if genPkg == nil {
 		return fmt.Errorf("unable to find package info for " + outputDir)
@@ -239,13 +246,6 @@ func generateFiles(defs []dataloaderDefinition, outputDir string) error {
 				return fmt.Errorf("type %s must be a named type", def.Name)
 			}
 		}
-	}
-
-	// Delete the old api_gen.go file to ensure that any compiler errors present in the old file
-	// won't stop us from parsing the package and writing a new one
-	apiFile := filepath.Join(outputDir, "api_gen.go")
-	if err := os.Remove(apiFile); err != nil && !os.IsNotExist(err) {
-		failWithErr(fmt.Errorf("error deleting old api_gen.go file: %v", err))
 	}
 
 	// Map every dataloader to a list of its result types (both the top-level TResult and any sqlc.embed subfields)

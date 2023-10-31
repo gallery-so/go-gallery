@@ -306,8 +306,7 @@ select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media
     order by t.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
-select sqlc.embed(t), sqlc.embed(tm), sqlc.embed(c) from tokens t
-       join token_medias tm on tm.id = t.token_media_id
+select sqlc.embed(t), sqlc.embed(c) from tokens t
        join contracts c on c.id = t.contract
     where t.owner_user_id = @owner_user_id
       and t.deleted = false

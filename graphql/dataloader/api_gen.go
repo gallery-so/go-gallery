@@ -253,11 +253,6 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetMediaByMediaIDIgnoringStatus.Prime(loaders.GetMediaByMediaIDIgnoringStatus.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
-		for _, entry := range result {
-			loaders.GetMediaByMediaIDIgnoringStatus.Prime(loaders.GetMediaByMediaIDIgnoringStatus.getKeyForResult(entry.TokenMedia), entry.TokenMedia)
-		}
-	})
 	loaders.GetUserNotificationsBatch.RegisterResultSubscriber(func(result []coredb.Notification) {
 		for _, entry := range result {
 			loaders.GetNotificationByIDBatch.Prime(loaders.GetNotificationByIDBatch.getKeyForResult(entry), entry)

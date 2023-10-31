@@ -3249,8 +3249,7 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
 }
 
 const getTokensByUserIdBatch = `-- name: GetTokensByUserIdBatch :batchmany
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable, tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from tokens t
-       join token_medias tm on tm.id = t.token_media_id
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from tokens t
        join contracts c on c.id = t.contract
     where t.owner_user_id = $1
       and t.deleted = false
@@ -3272,9 +3271,8 @@ type GetTokensByUserIdBatchParams struct {
 }
 
 type GetTokensByUserIdBatchRow struct {
-	Token      Token      `db:"token" json:"token"`
-	TokenMedia TokenMedia `db:"tokenmedia" json:"tokenmedia"`
-	Contract   Contract   `db:"contract" json:"contract"`
+	Token    Token    `db:"token" json:"token"`
+	Contract Contract `db:"contract" json:"contract"`
 }
 
 func (q *Queries) GetTokensByUserIdBatch(ctx context.Context, arg []GetTokensByUserIdBatchParams) *GetTokensByUserIdBatchBatchResults {
@@ -3337,20 +3335,6 @@ func (b *GetTokensByUserIdBatchBatchResults) Query(f func(int, []GetTokensByUser
 					&i.Token.IsCreatorToken,
 					&i.Token.IsHolderToken,
 					&i.Token.Displayable,
-					&i.TokenMedia.ID,
-					&i.TokenMedia.CreatedAt,
-					&i.TokenMedia.LastUpdated,
-					&i.TokenMedia.Version,
-					&i.TokenMedia.ContractID,
-					&i.TokenMedia.TokenID,
-					&i.TokenMedia.Chain,
-					&i.TokenMedia.Active,
-					&i.TokenMedia.Metadata,
-					&i.TokenMedia.Media,
-					&i.TokenMedia.Name,
-					&i.TokenMedia.Description,
-					&i.TokenMedia.ProcessingJobID,
-					&i.TokenMedia.Deleted,
 					&i.Contract.ID,
 					&i.Contract.Deleted,
 					&i.Contract.Version,

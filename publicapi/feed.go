@@ -207,7 +207,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return "", err
 	}
 
-	creators, _ := api.loaders.ContractCreatorByContractID.LoadAll(contractIDs)
+	creators, _ := api.loaders.GetContractCreatorsByIds.LoadAll(util.StringersToStrings(contractIDs))
 	for _, creator := range creators {
 		if creator.CreatorUserID == "" {
 			continue
@@ -292,7 +292,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			return postID, err
 		}
 
-		creator, _ := api.loaders.ContractCreatorByContractID.Load(contract.ID)
+		creator, _ := api.loaders.GetContractCreatorsByIds.Load(contract.ID.String())
 		if creator.CreatorUserID != "" {
 			err = event.Dispatch(ctx, db.Event{
 				ActorID:        persist.DBIDToNullStr(userID),
@@ -346,7 +346,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		return postID, err
 	}
 
-	creator, _ := api.loaders.ContractCreatorByContractID.Load(synced.Contract)
+	creator, _ := api.loaders.GetContractCreatorsByIds.Load(synced.Contract.String())
 	if creator.CreatorUserID != "" {
 		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(userID),
