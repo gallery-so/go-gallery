@@ -108,9 +108,28 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 	}
 
 	if a.WithSigner {
-		signer, err := api.CreateSignerForUser(ctx, fu.Fid)
-		if err != nil {
-			return nil, fmt.Errorf("get signer by address: %w", err)
+
+		var signer farcaster.NeynarSigner
+
+		curSigner, err := a.Queries.GetSocialAuthByUserID(ctx, coredb.GetSocialAuthByUserIDParams{
+			UserID:   a.UserID,
+			Provider: persist.SocialProviderFarcaster,
+		})
+		if curSigner.AccessToken.String != "" {
+			maybeApprovedSigner, err := api.GetSignerByUUID(ctx, curSigner.AccessToken.String)
+			if err != nil {
+				return nil, fmt.Errorf("get signer by uuid: %w", err)
+			}
+			if signer.Status == "approved" {
+				signer = maybeApprovedSigner
+			}
+		}
+
+		if signer.Status != "approved" {
+			signer, err = api.CreateSignerForUser(ctx, fu.Fid)
+			if err != nil {
+				return nil, fmt.Errorf("get signer by address: %w", err)
+			}
 		}
 
 		err = a.Queries.UpsertSocialOAuth(ctx, coredb.UpsertSocialOAuthParams{
