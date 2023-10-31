@@ -33,6 +33,19 @@ Running `make sqlc-generate` creates three files: `dataloaders_gen.go` and `api_
 - `dataloaders_gen.go` contains definitions for all the generated dataloaders
 - `api_gen.go` contains a `Loaders` struct with fields for all the generated dataloaders, and sets up connections between them to cache results from one dataloader in another
 
+### "Not Found" Errors
+Some sqlc queries (e.g. a `:batchone` or a custom dataloader) can return the `pgx.ErrNoRows` error, which is an implementation detail that should *not* be returned to callers. Instead, this error should be remapped to something more domain-specific (`ErrUserNotFound`, etc). This can be done by implementing the `notFoundErrorProvider` interface on a dataloader type, returning the appropriate error for a given key. **The dataloader generator will tell you when this is required.** You'll get an error like this:
+
+```
+type GetUserByIdBatch must implement getNotFoundError. Add this signature to notfound.go and have it return an appropriate error:
+
+func (*GetUserByIdBatch) getNotFoundError(key persist.DBID) error {
+    // TODO: Return a specific error type, not pgx.ErrNoRows
+}
+```
+
+**Don't return pgx.ErrNoRows!** Some existing dataloaders do this, but going forward, all new dataloaders should implement error types that don't depend on the underlying database implementation. A caller to `GetUserByUsername` should expect something like `ErrUserNotFound`, not `pgx.ErrNoRows`.
+
 ### Caching Results
 Dataloaders will attempt to publish their results for other dataloaders to cache. A dataloader can opt in for caching by implementing one of these interfaces (where `TKey` and `TResult` are the key and result types of the dataloader itself):
 
