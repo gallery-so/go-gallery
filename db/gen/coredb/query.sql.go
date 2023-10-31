@@ -1219,13 +1219,13 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contr
 `
 
 type CreateUserPostedYourWorkNotificationParams struct {
-	ID         persist.DBID             `json:"id"`
-	OwnerID    persist.DBID             `json:"owner_id"`
-	Action     persist.Action           `json:"action"`
-	Data       persist.NotificationData `json:"data"`
-	EventIds   persist.DBIDList         `json:"event_ids"`
-	ContractID persist.DBID             `json:"contract_id"`
-	Post       sql.NullString           `json:"post"`
+	ID         persist.DBID             `db:"id" json:"id"`
+	OwnerID    persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action     persist.Action           `db:"action" json:"action"`
+	Data       persist.NotificationData `db:"data" json:"data"`
+	EventIds   persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	ContractID persist.DBID             `db:"contract_id" json:"contract_id"`
+	Post       sql.NullString           `db:"post" json:"post"`
 }
 
 func (q *Queries) CreateUserPostedYourWorkNotification(ctx context.Context, arg CreateUserPostedYourWorkNotificationParams) (Notification, error) {
