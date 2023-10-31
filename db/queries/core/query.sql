@@ -126,6 +126,16 @@ where (token_definitions.chain, token_definitions.contract_address, token_defini
     and not token_definitions.deleted
     and not token_medias.deleted;
 
+-- name: GetTokenDefinitionAndMediaByTokenDbid :one
+select sqlc.embed(token_definitions), sqlc.embed(token_medias)
+from tokens, token_definitions, token_medias
+where tokens.id = $1
+    and tokens.token_definition_id = token_definitions.id
+    and token_definitions.token_media_id = token_medias.id
+    and not tokens.deleted
+    and not token_definitions.deleted
+    and not token_medias.deleted;
+
 -- name: GetTokenFullDetailsByUserTokenIdentifiers :one
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
 from tokens

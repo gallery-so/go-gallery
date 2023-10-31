@@ -21,7 +21,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -2555,13 +2554,13 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 
 // PostComposerDraftDetails is the resolver for the postComposerDraftDetails field.
 func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error) {
-	tokenIdentifiers := persist.TokenIdentifiers{
+	tID := persist.TokenIdentifiers{
 		Chain:           input.Token.ChainAddress.Chain(),
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
 	}
 
-	tokenDefinition, tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, tokenIdentifiers)
+	td, media, err := publicapi.For(ctx).Token.GetTokenDefinitionAndMediaByTokenIdentifiers(ctx, tID)
 	if err != nil {
 		return nil, err
 	}
@@ -2569,13 +2568,13 @@ func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input mode
 	highDef := false
 
 	return model.PostComposerDraftDetailsPayload{
-		Media:            resolveTokenMedia(ctx, tokenDefinition, tokenMedia, highDef),
-		TokenName:        util.ToPointer(tokenDefinition.Name.String),
-		TokenDescription: util.ToPointer(tokenDefinition.Description.String),
+		Media:            resolveTokenMedia(ctx, td, media, highDef),
+		TokenName:        util.ToPointer(td.Name.String),
+		TokenDescription: util.ToPointer(td.Description.String),
 		Community:        nil, // handled by dedicated resolver
 		HelperPostComposerDraftDetailsPayloadData: model.HelperPostComposerDraftDetailsPayloadData{
-			Token:      tokenIdentifiers,
-			ContractID: tokenDefinition.ContractID,
+			Token:      tID,
+			ContractID: td.ContractID,
 		},
 	}, err
 }
@@ -2774,20 +2773,17 @@ func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.Gal
 
 // OwnedByWallets is the resolver for the ownedByWallets field.
 func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, obj.Dbid)
+	wallets, err := publicapi.For(ctx).Wallet.GetWalletsByIDs(ctx, obj.HelperTokenData.Token.OwnedByWallets)
 	if err != nil {
 		return nil, err
 	}
 
-	wallets := make([]*model.Wallet, len(token.OwnedByWallets))
-	for i, walletID := range token.OwnedByWallets {
-		wallets[i], err = resolveWalletByWalletID(ctx, walletID)
-		if err != nil {
-			sentryutil.ReportError(ctx, err)
-		}
+	ws := make([]*model.Wallet, len(wallets))
+	for i, w := range wallets {
+		ws[i] = walletToModelSqlc(ctx, w)
 	}
 
-	return wallets, nil
+	return ws, nil
 }
 
 // Definition is the resolver for the definition field.
@@ -2848,17 +2844,12 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		highDef = *settings.HighDefinition
 	}
 
-	tokenDef, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	td, media, err := publicapi.For(ctx).Token.GetTokenDefinitionAndMediaByTokenDBID(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
 
-	tokenMedia, err := publicapi.For(ctx).Token.GetMediaByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
-	if util.ErrorAs[persist.ErrMediaNotFound](err) {
-		err = nil
-	}
-
-	return resolveTokenMedia(ctx, tokenDef, tokenMedia, highDef), err
+	return resolveTokenMedia(ctx, td, media, highDef), err
 }
 
 // TokenType is the resolver for the tokenType field.
@@ -2922,15 +2913,18 @@ func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*s
 
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
-	if obj.HelperTokenData.Token.TokenDefinitionID == "" {
-		return resolveContractByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if contractID := obj.HelperTokenData.Token.ContractID; contractID != "" {
+		return resolveContractByContractID(ctx, contractID)
+	}
+	if tDefID := obj.HelperTokenData.Token.TokenDefinitionID; tDefID != "" {
+		return resolveContractByTokenDefinitionID(ctx, tDefID)
 	}
 	return resolveContractByTokenID(ctx, obj.Dbid)
 }
 
 // Community is the resolver for the community field.
 func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
-	return resolveCommunityByTokenID(ctx, obj.Dbid)
+	return resolveCommunityByID(ctx, obj.HelperTokenData.Token.ContractID)
 }
 
 // ExternalURL is the resolver for the externalUrl field.
@@ -2946,8 +2940,10 @@ func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*str
 func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
 	var c *model.Contract
 	var err error
-	if obj.HelperTokenData.Token.TokenDefinitionID == "" {
-		c, err = resolveContractByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if contractID := obj.HelperTokenData.Token.ContractID; contractID != "" {
+		c, err = resolveContractByContractID(ctx, contractID)
+	} else if tDefID := obj.HelperTokenData.Token.TokenDefinitionID; tDefID != "" {
+		c, err = resolveContractByTokenDefinitionID(ctx, tDefID)
 	} else {
 		c, err = resolveContractByTokenID(ctx, obj.Dbid)
 	}

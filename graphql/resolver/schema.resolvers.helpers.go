@@ -495,22 +495,6 @@ func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*mod
 	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
 }
 
-func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Community, error) {
-	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByTokenDBID(ctx, tokenID)
-	if err != nil {
-		return nil, err
-	}
-
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, td.ContractID)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: It's probably worth revisiting "forceRefresh" to see if it still makes sense as a
-	// parameter for every call to communityToModel.
-	return communityToModel(ctx, *contract, util.ToPointer(false)), nil
-}
-
 func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
 	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByTokenDBID(ctx, tokenID)
 	if err != nil {
@@ -2088,17 +2072,17 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 	}
 }
 
-func resolveTokenMedia(ctx context.Context, tokenDefinition db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
+func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
 	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := strings.ToLower(tokenDefinition.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
-		tokenDefinition.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
+	if fallback := strings.ToLower(td.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
+		td.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
 	} else if strings.HasPrefix(fallback, "ar://") {
-		tokenDefinition.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
+		td.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
 	}
 
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, tokenDefinition.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2107,22 +2091,22 @@ func resolveTokenMedia(ctx context.Context, tokenDefinition db.TokenDefinition, 
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
-		if inFlight, err := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, tokenDefinition.ID); !inFlight || err != nil {
-			if time.Since(tokenDefinition.CreatedAt) > time.Duration(1*time.Hour) {
+		if inFlight, err := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, td.ID); !inFlight || err != nil {
+			if time.Since(td.CreatedAt) > time.Duration(1*time.Hour) {
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, tokenDefinition.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
-		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, tokenDefinition.ID); inFlight {
+		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, td.ID); inFlight {
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, tokenDefinition.FallbackMedia, highDef)
+	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
@@ -2178,7 +2162,7 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
 	// Use the token's profile image if the token exists
 	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
-		if tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, token.ID); err == nil {
+		if tokenMedia, err := publicapi.For(ctx).Token.GetMediaByTokenID(ctx, token.ID); err == nil {
 			if tokenMedia.Media.ProfileImageURL != "" {
 				url = string(tokenMedia.Media.ProfileImageURL)
 			}

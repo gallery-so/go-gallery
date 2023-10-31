@@ -550,7 +550,7 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 	})
 }
 
-func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenMedia, error) {
+func (api TokenAPI) GetMediaByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": validate.WithTag(tokenID, "required"),
@@ -561,8 +561,17 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	return api.loaders.MediaByTokenID.Load(tokenID)
 }
 
-// MediaByTokenIdentifiers returns the token definitions and its media for a token
-func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
+func (api TokenAPI) GetTokenDefinitionAndMediaByTokenDBID(ctx context.Context, tokenDBID persist.DBID) (db.TokenDefinition, db.TokenMedia, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDBID": validate.WithTag(tokenDBID, "required"),
+	}); err != nil {
+		return db.TokenDefinition{}, db.TokenMedia{}, err
+	}
+	panic("not implemented")
+}
+
+func (api TokenAPI) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
@@ -576,6 +585,16 @@ func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifier
 		TokenID:         tokenIdentifiers.TokenID,
 	})
 	return tokenDefAndMedia.TokenDefinition, tokenDefAndMedia.TokenMedia, err
+}
+
+func (api TokenAPI) GetMediaByTokenDefinitionID(ctx context.Context, id persist.DBID) (db.TokenMedia, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDefinitionID": validate.WithTag(id, "required"),
+	}); err != nil {
+		return db.TokenMedia{}, err
+	}
+	return api.loaders.MediaByTokenDefinitionID.Load(id)
 }
 
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
@@ -648,14 +667,4 @@ func (api TokenAPI) GetTokenDefinitionByID(ctx context.Context, id persist.DBID)
 		return db.TokenDefinition{}, err
 	}
 	return api.loaders.TokenDefinitionByID.Load(id)
-}
-
-func (api TokenAPI) GetMediaByTokenDefinitionID(ctx context.Context, id persist.DBID) (db.TokenMedia, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenDefinitionID": validate.WithTag(id, "required"),
-	}); err != nil {
-		return db.TokenMedia{}, err
-	}
-	return api.loaders.MediaByTokenDefinitionID.Load(id)
 }

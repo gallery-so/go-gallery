@@ -62,7 +62,7 @@ type tokenProcessingJob struct {
 	refreshMetadata bool
 	// defaultMetadata is starting metadata to use to process media from. If empty or refreshMetadata is set, then the pipeline will try to get new metadata.
 	defaultMetadata persist.TokenMetadata
-	// isSpamJob is an optional flag that indicates that the token/contract is designated as spam. It's currently used to exclude events from Sentry.
+	// isSpamJob indicates that the job is processing a spam token. It's currently used to exclude events from Sentry.
 	isSpamJob bool
 }
 

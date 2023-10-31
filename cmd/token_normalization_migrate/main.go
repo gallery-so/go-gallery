@@ -18,7 +18,7 @@ import (
 
 const (
 	poolSize  = 12  // concurrent workers to use
-	batchSize = 100 // number of rows to process at a time
+	batchSize = 100 // number of tokens to process per worker
 )
 
 func init() {
@@ -28,7 +28,6 @@ func init() {
 	viper.SetDefault("POSTGRES_USER", "gallery_migrator")
 	pq = postgres.MustCreateClient()
 	pq.SetMaxIdleConns(2 * poolSize)
-
 }
 
 func main() {
@@ -42,7 +41,7 @@ var rootCmd = &cobra.Command{
 
 var saveCmd = &cobra.Command{
 	Use:   "stage",
-	Short: "create staging table for chunking tokens",
+	Short: "create token_chunks table for chunking tokens",
 	Run: func(cmd *cobra.Command, args []string) {
 		defer pq.Close()
 		tx, err := pq.Begin()
@@ -274,6 +273,10 @@ func dropTokenDefinitionConstraints() {
 func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 	globalStart := time.Now()
 
+	defer func() {
+		pq.Exec("drop table if exists token_chunks")
+	}()
+
 	tx, err := pq.BeginTx(ctx, nil)
 	check(err)
 
@@ -456,7 +459,7 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 			check(err)
 			insertEnd := time.Now()
 
-			fmt.Printf("chunk(id=%d) [%d, %d); tokenQuery %s; mediaQuery %s; insert %s; total %s\n", chunkID, s, e, tokenQueryEnd.Sub(tokenQueryStart), mediaQueryEnd.Sub(mediaQueryStart), insertEnd.Sub(insertStart), time.Since(batchStart))
+			fmt.Printf("chunk(id=%d) [%d, %d) %d/%d; tokenQuery %s; mediaQuery %s; insert %s; total %s\n", chunkID, s, e, chunkID, totalBatches, tokenQueryEnd.Sub(tokenQueryStart), mediaQueryEnd.Sub(mediaQueryStart), insertEnd.Sub(insertStart), time.Since(batchStart))
 		})
 
 		start = end

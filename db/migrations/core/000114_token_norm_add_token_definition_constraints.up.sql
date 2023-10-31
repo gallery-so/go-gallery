@@ -13,6 +13,7 @@ set max_parallel_maintenance_workers = 8;
 lock table tokens in access exclusive mode;
 
 -- Create a copy of the tokens table with the new column
+drop table if exists tokens_with_token_definition_fk;
 create table tokens_with_token_definition_fk as
 select
 	t.id,

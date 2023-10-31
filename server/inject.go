@@ -57,7 +57,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		postgres.NewRepositories,
 		dbConnSet,
 		tokenmanage.New,
-		newManagedTokens,
+		newSubmitBatch,
 		wire.Struct(new(multichain.Provider), "*"),
 		// Add additional chains here
 		newMultichainSet,
@@ -471,8 +471,6 @@ func newTokenMetadataCache() *tokenMetadataCache {
 	return util.ToPointer(tokenMetadataCache(*cache))
 }
 
-func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitTokensF {
-	return func(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
-		return tm.SubmitBatch(ctx, tokenDefinitionIDs)
-	}
+func newSubmitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
+	return tm.SubmitBatch
 }
