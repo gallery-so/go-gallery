@@ -31,12 +31,12 @@ where
 `
 
 type DeleteTokensBeforeTimestampParams struct {
-	RemoveHolderStatus  bool           `json:"remove_holder_status"`
-	RemoveCreatorStatus bool           `json:"remove_creator_status"`
-	OnlyFromUserID      sql.NullString `json:"only_from_user_id"`
-	OnlyFromContractIds []string       `json:"only_from_contract_ids"`
-	OnlyFromChains      []int32        `json:"only_from_chains"`
-	Timestamp           time.Time      `json:"timestamp"`
+	RemoveHolderStatus  bool           `db:"remove_holder_status" json:"remove_holder_status"`
+	RemoveCreatorStatus bool           `db:"remove_creator_status" json:"remove_creator_status"`
+	OnlyFromUserID      sql.NullString `db:"only_from_user_id" json:"only_from_user_id"`
+	OnlyFromContractIds []string       `db:"only_from_contract_ids" json:"only_from_contract_ids"`
+	OnlyFromChains      []int32        `db:"only_from_chains" json:"only_from_chains"`
+	Timestamp           time.Time      `db:"timestamp" json:"timestamp"`
 }
 
 func (q *Queries) DeleteTokensBeforeTimestamp(ctx context.Context, arg DeleteTokensBeforeTimestampParams) (int64, error) {
@@ -162,31 +162,31 @@ returning id, deleted, version, created_at, last_updated, name, description, col
 `
 
 type UpsertTokensParams struct {
-	SetHolderFields          bool           `json:"set_holder_fields"`
-	SetCreatorFields         bool           `json:"set_creator_fields"`
-	ID                       []string       `json:"id"`
-	Version                  []int32        `json:"version"`
-	Name                     []string       `json:"name"`
-	Description              []string       `json:"description"`
-	CollectorsNote           []string       `json:"collectors_note"`
-	TokenType                []string       `json:"token_type"`
-	Quantity                 []string       `json:"quantity"`
-	OwnershipHistory         []pgtype.JSONB `json:"ownership_history"`
-	OwnershipHistoryStartIdx []int32        `json:"ownership_history_start_idx"`
-	OwnershipHistoryEndIdx   []int32        `json:"ownership_history_end_idx"`
-	FallbackMedia            []pgtype.JSONB `json:"fallback_media"`
-	ExternalUrl              []string       `json:"external_url"`
-	BlockNumber              []int64        `json:"block_number"`
-	OwnerUserID              []string       `json:"owner_user_id"`
-	OwnedByWallets           []string       `json:"owned_by_wallets"`
-	OwnedByWalletsStartIdx   []int32        `json:"owned_by_wallets_start_idx"`
-	OwnedByWalletsEndIdx     []int32        `json:"owned_by_wallets_end_idx"`
-	IsCreatorToken           []bool         `json:"is_creator_token"`
-	IsProviderMarkedSpam     []bool         `json:"is_provider_marked_spam"`
-	TokenUri                 []string       `json:"token_uri"`
-	TokenID                  []string       `json:"token_id"`
-	Contract                 []string       `json:"contract"`
-	Chain                    []int32        `json:"chain"`
+	SetHolderFields          bool           `db:"set_holder_fields" json:"set_holder_fields"`
+	SetCreatorFields         bool           `db:"set_creator_fields" json:"set_creator_fields"`
+	ID                       []string       `db:"id" json:"id"`
+	Version                  []int32        `db:"version" json:"version"`
+	Name                     []string       `db:"name" json:"name"`
+	Description              []string       `db:"description" json:"description"`
+	CollectorsNote           []string       `db:"collectors_note" json:"collectors_note"`
+	TokenType                []string       `db:"token_type" json:"token_type"`
+	Quantity                 []string       `db:"quantity" json:"quantity"`
+	OwnershipHistory         []pgtype.JSONB `db:"ownership_history" json:"ownership_history"`
+	OwnershipHistoryStartIdx []int32        `db:"ownership_history_start_idx" json:"ownership_history_start_idx"`
+	OwnershipHistoryEndIdx   []int32        `db:"ownership_history_end_idx" json:"ownership_history_end_idx"`
+	FallbackMedia            []pgtype.JSONB `db:"fallback_media" json:"fallback_media"`
+	ExternalUrl              []string       `db:"external_url" json:"external_url"`
+	BlockNumber              []int64        `db:"block_number" json:"block_number"`
+	OwnerUserID              []string       `db:"owner_user_id" json:"owner_user_id"`
+	OwnedByWallets           []string       `db:"owned_by_wallets" json:"owned_by_wallets"`
+	OwnedByWalletsStartIdx   []int32        `db:"owned_by_wallets_start_idx" json:"owned_by_wallets_start_idx"`
+	OwnedByWalletsEndIdx     []int32        `db:"owned_by_wallets_end_idx" json:"owned_by_wallets_end_idx"`
+	IsCreatorToken           []bool         `db:"is_creator_token" json:"is_creator_token"`
+	IsProviderMarkedSpam     []bool         `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
+	TokenUri                 []string       `db:"token_uri" json:"token_uri"`
+	TokenID                  []string       `db:"token_id" json:"token_id"`
+	Contract                 []string       `db:"contract" json:"contract"`
+	Chain                    []int32        `db:"chain" json:"chain"`
 }
 
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]Token, error) {

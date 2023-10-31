@@ -77,7 +77,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	events := make([]db.Event, 0, len(update.CreatedCollections)+len(update.UpdatedCollections)+1)
 
-	curGal, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
+	curGal, err := api.loaders.GetGalleryByIdBatch.Load(update.GalleryID)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -217,7 +217,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
-	newGall, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
+	newGall, err := api.loaders.GetGalleryByIdBatch.Load(update.GalleryID)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -395,7 +395,7 @@ func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID
 		return nil, err
 	}
 
-	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	gallery, err := api.loaders.GetGalleryByIdBatch.Load(galleryID)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +417,7 @@ func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persis
 		return nil, persist.ErrGalleryNotFound{ID: galleryID}
 	}
 
-	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	gallery, err := api.loaders.GetGalleryByIdBatch.Load(galleryID)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +437,7 @@ func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID
 		return nil, err
 	}
 
-	gallery, err := api.loaders.GalleryByCollectionID.Load(collectionID)
+	gallery, err := api.loaders.GetGalleryByCollectionIdBatch.Load(collectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +453,7 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 		return nil, err
 	}
 
-	galleries, err := api.loaders.GalleriesByUserID.Load(userID)
+	galleries, err := api.loaders.GetGalleriesByUserIdBatch.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +469,7 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	medias, err := api.loaders.GalleryTokenPreviewsByID.Load(galleryID)
+	medias, err := api.loaders.GetGalleryTokenMediasByGalleryIDBatch.Load(galleryID)
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +611,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		return db.Gallery{}, err
 	}
 
-	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	gallery, err := api.loaders.GetGalleryByIdBatch.Load(galleryID)
 	if err != nil {
 		return db.Gallery{}, err
 	}

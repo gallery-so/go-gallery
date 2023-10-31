@@ -41,7 +41,7 @@ func coreInitServer() *gin.Engine {
 
 	queries := coredb.New(pgxClient)
 
-	loaders := dataloader.NewLoaders(context.Background(), queries, false)
+	loaders := dataloader.NewLoaders(context.Background(), queries, false, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 
 	sendgridClient := sendgrid.NewSendClient(env.GetString("SENDGRID_API_KEY"))
 

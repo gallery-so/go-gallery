@@ -36,7 +36,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		notifs, err := api.loaders.NotificationsByUserID.Load(db.GetUserNotificationsBatchParams{
+		notifs, err := api.loaders.GetUserNotificationsBatch.Load(db.GetUserNotificationsBatchParams{
 			OwnerID:       userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -100,7 +100,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 }
 
 func (api NotificationsAPI) GetByID(ctx context.Context, id persist.DBID) (db.Notification, error) {
-	return api.loaders.NotificationByID.Load(id)
+	return api.loaders.GetNotificationByIDBatch.Load(id)
 }
 
 func (api NotificationsAPI) ClearUserNotifications(ctx context.Context) ([]db.Notification, error) {
