@@ -1952,10 +1952,7 @@ func tokensToNewDedupedTokens(tokens []chainTokens, existingTokens []persist.Tok
 		}
 
 		if wallet, ok := addressToWallets[contract.Chain.NormalizeAddress(creatorAddress)]; ok {
-			// TODO: Figure out the implication for L2 chains here. Might want a function like
-			// Chain.IsCompatibleWith(Chain) to determine whether a wallet on one chain can claim
-			// ownership of a contract on a different chain.
-			createdContracts[contractAddress] = wallet.Chain == contract.Chain
+			createdContracts[contractAddress] = wallet.L1Chain == contract.L1Chain
 		} else {
 			createdContracts[contractAddress] = false
 		}

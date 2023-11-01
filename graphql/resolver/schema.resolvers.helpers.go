@@ -9,9 +9,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"golang.org/x/net/html"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -72,6 +73,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneMentionedYourCommunityNotification:   fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
 	OnSomeoneRepliedToYourCommentNotification:     fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
 	OnSomeoneAdmiredYourTokenNotification:         fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
+	OnSomeonePostedYourWorkNotification:           fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -1005,7 +1007,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		}
 		return model.SomeoneMentionedYouNotification{
 			HelperSomeoneMentionedYouNotificationData: model.HelperSomeoneMentionedYouNotificationData{
-				OwnerID:   notif.OwnerID,
+
 				PostID:    postID,
 				CommentID: commentID,
 			},
@@ -1028,7 +1030,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		}
 		return model.SomeoneMentionedYourCommunityNotification{
 			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
-				OwnerID:    notif.OwnerID,
+
 				ContractID: notif.ContractID,
 				PostID:     postID,
 				CommentID:  commentID,
@@ -1039,6 +1041,20 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			UpdatedTime:   &notif.LastUpdated,
 			Community:     nil, // handled by dedicated resolver
 			MentionSource: nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserPostedYourWork:
+		return model.SomeonePostedYourWorkNotification{
+			HelperSomeonePostedYourWorkNotificationData: model.HelperSomeonePostedYourWorkNotificationData{
+
+				ContractID: notif.ContractID,
+				PostID:     notif.PostID,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Community:    nil, // handled by dedicated resolver
+			Post:         nil, // handled by dedicated resolver
 		}, nil
 
 	default:

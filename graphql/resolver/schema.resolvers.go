@@ -2767,6 +2767,16 @@ func (r *someoneMentionedYourCommunityNotificationResolver) Community(ctx contex
 	return resolveCommunityByID(ctx, obj.ContractID)
 }
 
+// Post is the resolver for the post field.
+func (r *someonePostedYourWorkNotificationResolver) Post(ctx context.Context, obj *model.SomeonePostedYourWorkNotification) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.PostID)
+}
+
+// Community is the resolver for the community field.
+func (r *someonePostedYourWorkNotificationResolver) Community(ctx context.Context, obj *model.SomeonePostedYourWorkNotification) (*model.Community, error) {
+	return resolveCommunityByID(ctx, obj.ContractID)
+}
+
 // Comment is the resolver for the comment field.
 func (r *someoneRepliedToYourCommentNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneRepliedToYourCommentNotification) (*model.Comment, error) {
 	return resolveCommentByCommentID(ctx, obj.CommentID)
@@ -3302,6 +3312,11 @@ func (r *Resolver) SomeoneMentionedYourCommunityNotification() generated.Someone
 	return &someoneMentionedYourCommunityNotificationResolver{r}
 }
 
+// SomeonePostedYourWorkNotification returns generated.SomeonePostedYourWorkNotificationResolver implementation.
+func (r *Resolver) SomeonePostedYourWorkNotification() generated.SomeonePostedYourWorkNotificationResolver {
+	return &someonePostedYourWorkNotificationResolver{r}
+}
+
 // SomeoneRepliedToYourCommentNotification returns generated.SomeoneRepliedToYourCommentNotificationResolver implementation.
 func (r *Resolver) SomeoneRepliedToYourCommentNotification() generated.SomeoneRepliedToYourCommentNotificationResolver {
 	return &someoneRepliedToYourCommentNotificationResolver{r}
@@ -3407,6 +3422,7 @@ type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
 type someoneFollowedYouNotificationResolver struct{ *Resolver }
 type someoneMentionedYouNotificationResolver struct{ *Resolver }
 type someoneMentionedYourCommunityNotificationResolver struct{ *Resolver }
+type someonePostedYourWorkNotificationResolver struct{ *Resolver }
 type someoneRepliedToYourCommentNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
