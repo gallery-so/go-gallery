@@ -540,14 +540,20 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 	})
 }
 
-func (api TokenAPI) GetTokenDefinitionAndMediaByTokenDBID(ctx context.Context, tokenDBID persist.DBID) (db.TokenDefinition, db.TokenMedia, error) {
+func (api TokenAPI) GetTokenDefinitionAndMediaByTokenDefinitionID(ctx context.Context, id persist.DBID) (db.TokenDefinition, db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenDBID": validate.WithTag(tokenDBID, "required"),
+		"tokenDefinitionID": validate.WithTag(id, "required"),
 	}); err != nil {
 		return db.TokenDefinition{}, db.TokenMedia{}, err
 	}
-	panic("not implemented")
+
+	tDefWMedia, err := api.loaders.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch.Load(id)
+	if err != nil {
+		return db.TokenDefinition{}, db.TokenMedia{}, err
+	}
+
+	return tDefWMedia.TokenDefinition, tDefWMedia.TokenMedia, nil
 }
 
 func (api TokenAPI) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
@@ -558,7 +564,7 @@ func (api TokenAPI) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Con
 	}); err != nil {
 		return db.TokenDefinition{}, db.TokenMedia{}, err
 	}
-	tokenDefAndMedia, err := api.queries.GetTokenDefinitionAndMediaByTokenIdentifiers(ctx, db.GetTokenDefinitionAndMediaByTokenIdentifiersParams{
+	tokenDefAndMedia, err := api.queries.GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus(ctx, db.GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusParams{
 		Chain:           tokenIdentifiers.Chain,
 		ContractAddress: tokenIdentifiers.ContractAddress,
 		TokenID:         tokenIdentifiers.TokenID,

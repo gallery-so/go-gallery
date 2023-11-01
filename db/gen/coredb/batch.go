@@ -2998,6 +2998,91 @@ func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch = `-- name: GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch :batchone
+select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
+from token_definitions, token_medias
+where token_definitions.id = $1
+    and token_definitions.token_media_id = token_medias.id
+    and not token_definitions.deleted
+    and not token_medias.deleted
+`
+
+type GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow struct {
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
+}
+
+func (q *Queries) GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch(ctx context.Context, id []persist.DBID) *GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchBatchResults) QueryRow(f func(int, GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.TokenDefinition.ID,
+			&i.TokenDefinition.CreatedAt,
+			&i.TokenDefinition.LastUpdated,
+			&i.TokenDefinition.Deleted,
+			&i.TokenDefinition.Name,
+			&i.TokenDefinition.Description,
+			&i.TokenDefinition.TokenType,
+			&i.TokenDefinition.TokenID,
+			&i.TokenDefinition.ExternalUrl,
+			&i.TokenDefinition.Chain,
+			&i.TokenDefinition.Metadata,
+			&i.TokenDefinition.FallbackMedia,
+			&i.TokenDefinition.ContractAddress,
+			&i.TokenDefinition.ContractID,
+			&i.TokenDefinition.TokenMediaID,
+			&i.TokenMedia.ID,
+			&i.TokenMedia.CreatedAt,
+			&i.TokenMedia.LastUpdated,
+			&i.TokenMedia.Version,
+			&i.TokenMedia.ContractIDDeprecated,
+			&i.TokenMedia.TokenIDDeprecated,
+			&i.TokenMedia.ChainDeprecated,
+			&i.TokenMedia.Active,
+			&i.TokenMedia.MetadataDeprecated,
+			&i.TokenMedia.Media,
+			&i.TokenMedia.NameDeprecated,
+			&i.TokenMedia.DescriptionDeprecated,
+			&i.TokenMedia.ProcessingJobID,
+			&i.TokenMedia.Deleted,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getTokenDefinitionByIdBatch = `-- name: GetTokenDefinitionByIdBatch :batchone
 select id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id from token_definitions where id = $1 and not deleted
 `

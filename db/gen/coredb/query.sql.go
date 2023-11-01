@@ -3853,60 +3853,7 @@ func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTok
 	return i, err
 }
 
-const getTokenDefinitionAndMediaByTokenDbid = `-- name: GetTokenDefinitionAndMediaByTokenDbid :one
-select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
-from tokens, token_definitions, token_medias
-where tokens.id = $1
-    and tokens.token_definition_id = token_definitions.id
-    and token_definitions.token_media_id = token_medias.id
-    and not tokens.deleted
-    and not token_definitions.deleted
-    and not token_medias.deleted
-`
-
-type GetTokenDefinitionAndMediaByTokenDbidRow struct {
-	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
-	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
-}
-
-func (q *Queries) GetTokenDefinitionAndMediaByTokenDbid(ctx context.Context, id persist.DBID) (GetTokenDefinitionAndMediaByTokenDbidRow, error) {
-	row := q.db.QueryRow(ctx, getTokenDefinitionAndMediaByTokenDbid, id)
-	var i GetTokenDefinitionAndMediaByTokenDbidRow
-	err := row.Scan(
-		&i.TokenDefinition.ID,
-		&i.TokenDefinition.CreatedAt,
-		&i.TokenDefinition.LastUpdated,
-		&i.TokenDefinition.Deleted,
-		&i.TokenDefinition.Name,
-		&i.TokenDefinition.Description,
-		&i.TokenDefinition.TokenType,
-		&i.TokenDefinition.TokenID,
-		&i.TokenDefinition.ExternalUrl,
-		&i.TokenDefinition.Chain,
-		&i.TokenDefinition.Metadata,
-		&i.TokenDefinition.FallbackMedia,
-		&i.TokenDefinition.ContractAddress,
-		&i.TokenDefinition.ContractID,
-		&i.TokenDefinition.TokenMediaID,
-		&i.TokenMedia.ID,
-		&i.TokenMedia.CreatedAt,
-		&i.TokenMedia.LastUpdated,
-		&i.TokenMedia.Version,
-		&i.TokenMedia.ContractIDDeprecated,
-		&i.TokenMedia.TokenIDDeprecated,
-		&i.TokenMedia.ChainDeprecated,
-		&i.TokenMedia.Active,
-		&i.TokenMedia.MetadataDeprecated,
-		&i.TokenMedia.Media,
-		&i.TokenMedia.NameDeprecated,
-		&i.TokenMedia.DescriptionDeprecated,
-		&i.TokenMedia.ProcessingJobID,
-		&i.TokenMedia.Deleted,
-	)
-	return i, err
-}
-
-const getTokenDefinitionAndMediaByTokenIdentifiers = `-- name: GetTokenDefinitionAndMediaByTokenIdentifiers :one
+const getTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus = `-- name: GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus :one
 select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
 from token_definitions, token_medias
 where (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = ($1, $2, $3)
@@ -3915,20 +3862,20 @@ where (token_definitions.chain, token_definitions.contract_address, token_defini
     and not token_medias.deleted
 `
 
-type GetTokenDefinitionAndMediaByTokenIdentifiersParams struct {
+type GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusParams struct {
 	Chain           persist.Chain   `db:"chain" json:"chain"`
 	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
 	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
 }
 
-type GetTokenDefinitionAndMediaByTokenIdentifiersRow struct {
+type GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusRow struct {
 	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
 	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
 }
 
-func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionAndMediaByTokenIdentifiersParams) (GetTokenDefinitionAndMediaByTokenIdentifiersRow, error) {
-	row := q.db.QueryRow(ctx, getTokenDefinitionAndMediaByTokenIdentifiers, arg.Chain, arg.ContractAddress, arg.TokenID)
-	var i GetTokenDefinitionAndMediaByTokenIdentifiersRow
+func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus(ctx context.Context, arg GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusParams) (GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusRow, error) {
+	row := q.db.QueryRow(ctx, getTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus, arg.Chain, arg.ContractAddress, arg.TokenID)
+	var i GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusRow
 	err := row.Scan(
 		&i.TokenDefinition.ID,
 		&i.TokenDefinition.CreatedAt,

@@ -1675,6 +1675,45 @@ func newGetTokenByUserTokenIdentifiersBatch(
 	return d
 }
 
+// GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch batches and caches requests
+type GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch struct {
+	generator.Dataloader[persist.DBID, coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow]
+}
+
+// newGetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch creates a new GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch with the given settings, functions, and options
+func newGetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch, []persist.DBID) ([]coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch {
+	d := &GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch")
+		}
+
+		return results, errors
+	}
+
+	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+
+	d.Dataloader = *dataloader
+	return d
+}
+
 // GetTokenDefinitionByIdBatch batches and caches requests
 type GetTokenDefinitionByIdBatch struct {
 	generator.Dataloader[persist.DBID, coredb.TokenDefinition]
