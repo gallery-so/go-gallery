@@ -5962,14 +5962,20 @@ with insert_job(id) as (
     )
     returning id, created_at, last_updated, version, contract_id__deprecated, token_id__deprecated, chain__deprecated, active, metadata__deprecated, media, name__deprecated, description__deprecated, processing_job_id, deleted
 )
-, update_token_definition(token_media_id) as (
+, update_token_definition as (
     update token_definitions
     set metadata = $13,
         name = $14,
         description = $15,
-        token_media_id = case when $10 then (select id from insert_new_media) else token_definitions.token_media_id end
+        token_media_id = case
+            -- If there isn't any media, use the new media regardless of its status
+            when token_media_id is null then (select id from insert_new_media)
+            -- Otherwise, only replace reference to new media if it is active
+            when $10 then (select id from insert_new_media)
+            -- If it isn't, keep the existing media
+            else token_definitions.token_media_id
+        end
     where (chain, contract_address, token_id) = ($7, $8, $9) and not deleted
-    returning token_media_id
 )
 select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted from insert_new_media token_medias
 `
@@ -5996,6 +6002,7 @@ type InsertTokenPipelineResultsRow struct {
 	TokenMedia TokenMedia `db:"tokenmedia" json:"tokenmedia"`
 }
 
+// Always return the new media that was inserted, even if its inactive so the pipeline can report metrics accurately
 func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertTokenPipelineResultsParams) (InsertTokenPipelineResultsRow, error) {
 	row := q.db.QueryRow(ctx, insertTokenPipelineResults,
 		arg.ProcessingJobID,

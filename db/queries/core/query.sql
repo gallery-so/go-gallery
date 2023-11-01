@@ -1325,15 +1325,22 @@ with insert_job(id) as (
     )
     returning *
 )
-, update_token_definition(token_media_id) as (
+, update_token_definition as (
     update token_definitions
     set metadata = @new_metadata,
         name = @new_name,
         description = @new_description,
-        token_media_id = case when @new_media_is_active then (select id from insert_new_media) else token_definitions.token_media_id end
+        token_media_id = case
+            -- If there isn't any media, use the new media regardless of its status
+            when token_media_id is null then (select id from insert_new_media)
+            -- Otherwise, only replace reference to new media if it is active
+            when @new_media_is_active then (select id from insert_new_media)
+            -- If it isn't, keep the existing media
+            else token_definitions.token_media_id
+        end
     where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id) and not deleted
-    returning token_media_id
 )
+-- Always return the new media that was inserted, even if its inactive so the pipeline can report metrics accurately
 select sqlc.embed(token_medias) from insert_new_media token_medias;
 
 -- name: InsertSpamContracts :exec
