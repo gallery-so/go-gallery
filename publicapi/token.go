@@ -405,18 +405,12 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		return err
 	}
 
-	// XXX: TODO CHANGE THIS TO A LOADER
-	td, err := api.queries.GetTokenDefinitionByTokenDbid(ctx, tokenDBID)
+	td, err := api.loaders.GetTokenDefinitionByTokenDbidBatch.Load(tokenDBID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return persist.ErrTokenDefinitionNotFoundByTokenDBID{ID: tokenDBID}
-		}
-		return fmt.Errorf("failed to load token: %w", err)
+		return err
 	}
 
-	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
-
-	err = api.multichainProvider.RefreshToken(ctx, tID)
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain))
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}

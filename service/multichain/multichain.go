@@ -2175,15 +2175,12 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	})
 }
 
-// dedupeTokenDefinitions returns a slice of deduped token definitions. This is necessary because the upsert cannot handle duplicates in input.
-// Since the same set of providers are used for each user, we assume that the definitions for a token are the same so we can write them in any order.
 func dedupeTokenDefinitions(tokenDefs []db.TokenDefinition) (uniqueDefs []db.TokenDefinition) {
 	return util.DedupeWithTranslate(tokenDefs, false, func(t db.TokenDefinition) string {
 		return fmt.Sprintf("%d-%s-%s", t.Chain, t.ContractID, t.TokenID)
 	})
 }
 
-// dedupeUpsertTokens returns a slice of deduped tokens. This is necessary because the upsert cannot handle duplicates in input.
 func dedupeUpsertTokens(tokens []postgres.UpsertToken) (uniqueTokens []postgres.UpsertToken) {
 	return util.DedupeWithTranslate(tokens, false, func(t postgres.UpsertToken) string {
 		return fmt.Sprintf("%s-%s", t.Identifiers.String(), t.Token.OwnerUserID)
