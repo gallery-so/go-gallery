@@ -213,9 +213,12 @@ select t.* from collections c,
     limit sqlc.narg('limit');
 
 -- name: GetContractCreatorsByIds :many
-select o.*
-    from unnest(@contract_ids::text[]) as c(id)
-        join contract_creators o on o.contract_id = c.id;
+with keys as (
+    select unnest (@contract_ids::text[]) as id
+         , generate_subscripts(@contract_ids::text[], 1) as batch_key_index
+)
+select k.batch_key_index, sqlc.embed(c) from keys k
+    join contract_creators c on c.contract_id = k.id;
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
 with new_tokens as (
@@ -255,16 +258,14 @@ order by u.primary_wallet_id = w.id desc, w.id desc;
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetContractByTokenDefinitionIdBatch :batchone
-select contracts.*
-from contracts, token_definitions
-where token_definitions.id = $1
-    and contracts.id = token_definitions.contract_id
-    and not contracts.deleted
-    and not token_definitions.deleted;
-
 -- name: GetContractsByIDs :many
-SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
+with keys as (
+    select unnest (@contract_ids::varchar[]) as id
+         , generate_subscripts(@contract_ids::varchar[], 1) as batch_key_index
+)
+select k.batch_key_index, sqlc.embed(c) from keys k
+    join contracts c on c.id = k.id
+    where not c.deleted;
 
 -- name: GetContractsByTokenIDs :many
 select contracts.* from contracts join tokens on contracts.id = tokens.contract_id where tokens.id = any(@token_ids) and contracts.deleted = false;
@@ -1443,15 +1444,10 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByTokenIDIgnoringStatusBatch :batchone
-select m.*
-from token_medias m
-where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
-
 -- name: GetMediaByTokenDefinitionIDIgnoringStatusBatch :batchone
 select m.*
 from token_medias m
-where m.id = (select token_media_id from token_definitions where token_definitions.id = $1 and not token_definitions.deleted) and not m.deleted;
+where m.id = (select token_media_id from token_definitions td where td.id = $1 and not td.deleted) and not m.deleted;
 
 -- name: GetMediaByTokenIdentifiers :one
 select token_medias.*

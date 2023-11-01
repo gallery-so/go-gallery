@@ -34,12 +34,12 @@ where
 `
 
 type DeleteTokensBeforeTimestampParams struct {
-	RemoveHolderStatus  bool           `json:"remove_holder_status"`
-	RemoveCreatorStatus bool           `json:"remove_creator_status"`
-	OnlyFromUserID      sql.NullString `json:"only_from_user_id"`
-	OnlyFromContractIds []string       `json:"only_from_contract_ids"`
-	OnlyFromChains      []int32        `json:"only_from_chains"`
-	Timestamp           time.Time      `json:"timestamp"`
+	RemoveHolderStatus  bool           `db:"remove_holder_status" json:"remove_holder_status"`
+	RemoveCreatorStatus bool           `db:"remove_creator_status" json:"remove_creator_status"`
+	OnlyFromUserID      sql.NullString `db:"only_from_user_id" json:"only_from_user_id"`
+	OnlyFromContractIds []string       `db:"only_from_contract_ids" json:"only_from_contract_ids"`
+	OnlyFromChains      []int32        `db:"only_from_chains" json:"only_from_chains"`
+	Timestamp           time.Time      `db:"timestamp" json:"timestamp"`
 }
 
 func (q *Queries) DeleteTokensBeforeTimestamp(ctx context.Context, arg DeleteTokensBeforeTimestampParams) (int64, error) {
@@ -173,39 +173,39 @@ join contracts on token_definitions.contract_id = contracts.id
 `
 
 type UpsertTokensParams struct {
-	DefinitionDbid              []string       `json:"definition_dbid"`
-	DefinitionName              []string       `json:"definition_name"`
-	DefinitionDescription       []string       `json:"definition_description"`
-	DefinitionTokenType         []string       `json:"definition_token_type"`
-	DefinitionTokenID           []string       `json:"definition_token_id"`
-	DefinitionExternalUrl       []string       `json:"definition_external_url"`
-	DefinitionChain             []int32        `json:"definition_chain"`
-	DefinitionFallbackMedia     []pgtype.JSONB `json:"definition_fallback_media"`
-	DefinitionContractAddress   []string       `json:"definition_contract_address"`
-	DefinitionContractID        []string       `json:"definition_contract_id"`
-	DefinitionMetadata          []pgtype.JSONB `json:"definition_metadata"`
-	SetHolderFields             bool           `json:"set_holder_fields"`
-	SetCreatorFields            bool           `json:"set_creator_fields"`
-	TokenDbid                   []string       `json:"token_dbid"`
-	TokenVersion                []int32        `json:"token_version"`
-	TokenCollectorsNote         []string       `json:"token_collectors_note"`
-	TokenQuantity               []string       `json:"token_quantity"`
-	TokenBlockNumber            []int64        `json:"token_block_number"`
-	TokenOwnerUserID            []string       `json:"token_owner_user_id"`
-	TokenOwnedByWallets         []string       `json:"token_owned_by_wallets"`
-	TokenOwnedByWalletsStartIdx []int32        `json:"token_owned_by_wallets_start_idx"`
-	TokenOwnedByWalletsEndIdx   []int32        `json:"token_owned_by_wallets_end_idx"`
-	TokenIsCreatorToken         []bool         `json:"token_is_creator_token"`
-	TokenTokenID                []string       `json:"token_token_id"`
-	TokenContractAddress        []string       `json:"token_contract_address"`
-	TokenChain                  []int32        `json:"token_chain"`
-	TokenContractID             []string       `json:"token_contract_id"`
+	DefinitionDbid              []string       `db:"definition_dbid" json:"definition_dbid"`
+	DefinitionName              []string       `db:"definition_name" json:"definition_name"`
+	DefinitionDescription       []string       `db:"definition_description" json:"definition_description"`
+	DefinitionTokenType         []string       `db:"definition_token_type" json:"definition_token_type"`
+	DefinitionTokenID           []string       `db:"definition_token_id" json:"definition_token_id"`
+	DefinitionExternalUrl       []string       `db:"definition_external_url" json:"definition_external_url"`
+	DefinitionChain             []int32        `db:"definition_chain" json:"definition_chain"`
+	DefinitionFallbackMedia     []pgtype.JSONB `db:"definition_fallback_media" json:"definition_fallback_media"`
+	DefinitionContractAddress   []string       `db:"definition_contract_address" json:"definition_contract_address"`
+	DefinitionContractID        []string       `db:"definition_contract_id" json:"definition_contract_id"`
+	DefinitionMetadata          []pgtype.JSONB `db:"definition_metadata" json:"definition_metadata"`
+	SetHolderFields             bool           `db:"set_holder_fields" json:"set_holder_fields"`
+	SetCreatorFields            bool           `db:"set_creator_fields" json:"set_creator_fields"`
+	TokenDbid                   []string       `db:"token_dbid" json:"token_dbid"`
+	TokenVersion                []int32        `db:"token_version" json:"token_version"`
+	TokenCollectorsNote         []string       `db:"token_collectors_note" json:"token_collectors_note"`
+	TokenQuantity               []string       `db:"token_quantity" json:"token_quantity"`
+	TokenBlockNumber            []int64        `db:"token_block_number" json:"token_block_number"`
+	TokenOwnerUserID            []string       `db:"token_owner_user_id" json:"token_owner_user_id"`
+	TokenOwnedByWallets         []string       `db:"token_owned_by_wallets" json:"token_owned_by_wallets"`
+	TokenOwnedByWalletsStartIdx []int32        `db:"token_owned_by_wallets_start_idx" json:"token_owned_by_wallets_start_idx"`
+	TokenOwnedByWalletsEndIdx   []int32        `db:"token_owned_by_wallets_end_idx" json:"token_owned_by_wallets_end_idx"`
+	TokenIsCreatorToken         []bool         `db:"token_is_creator_token" json:"token_is_creator_token"`
+	TokenTokenID                []string       `db:"token_token_id" json:"token_token_id"`
+	TokenContractAddress        []string       `db:"token_contract_address" json:"token_contract_address"`
+	TokenChain                  []int32        `db:"token_chain" json:"token_chain"`
+	TokenContractID             []string       `db:"token_contract_id" json:"token_contract_id"`
 }
 
 type UpsertTokensRow struct {
-	Token           Token           `json:"token"`
-	TokenDefinition TokenDefinition `json:"tokendefinition"`
-	Contract        Contract        `json:"contract"`
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
 }
 
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]UpsertTokensRow, error) {

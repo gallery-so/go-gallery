@@ -578,6 +578,10 @@ migrate-prod-indexerdb: start-prod-sql-proxy confirm-prod-migrate
 fix-sops-macs:
 	@cd secrets; ../scripts/fix-sops-macs.sh
 
+sqlc-generate:
+	sqlc generate
+	go run cmd/dataloaders/main.go
+
 #----------------------------------------------------------------
 # End of targets
 #----------------------------------------------------------------

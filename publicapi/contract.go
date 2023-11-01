@@ -38,23 +38,7 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 		return nil, err
 	}
 
-	contract, err := api.loaders.ContractByContractID.Load(contractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &contract, nil
-}
-
-func (api ContractAPI) GetContractByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*db.Contract, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenDefinitionID": validate.WithTag(tokenDefinitionID, "required"),
-	}); err != nil {
-		return nil, err
-	}
-
-	contract, err := api.loaders.ContractByTokenDefinitionID.Load(tokenDefinitionID)
+	contract, err := api.loaders.GetContractsByIDs.Load(contractID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +54,10 @@ func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress
 		return nil, err
 	}
 
-	contract, err := api.loaders.ContractByChainAddress.Load(contractAddress)
+	contract, err := api.loaders.GetContractByChainAddressBatch.Load(db.GetContractByChainAddressBatchParams{
+		Address: contractAddress.Address(),
+		Chain:   contractAddress.Chain(),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +88,7 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 			Limit:         params.Limit,
 		}
 
-		keys, err := api.loaders.ContractsByParentID.Load(queryParams)
+		keys, err := api.loaders.GetChildContractsByParentIDBatchPaginate.Load(queryParams)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +133,7 @@ func (api ContractAPI) GetContractCreatorByContractID(ctx context.Context, contr
 		return db.ContractCreator{}, err
 	}
 
-	return api.loaders.ContractCreatorByContractID.Load(contractID)
+	return api.loaders.GetContractCreatorsByIds.Load(contractID.String())
 }
 
 func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
@@ -157,7 +144,7 @@ func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID
 		return nil, err
 	}
 
-	contracts, err := api.loaders.ContractsDisplayedByUserID.Load(userID)
+	contracts, err := api.loaders.GetContractsDisplayedByUserIDBatch.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +161,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 		return err
 	}
 
-	contract, err := api.loaders.ContractByContractID.Load(contractID)
+	contract, err := api.loaders.GetContractsByIDs.Load(contractID.String())
 	if err != nil {
 		return err
 	}
@@ -215,14 +202,17 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, PageInfo{}, err
 	}
 
-	contract, err := api.loaders.ContractByChainAddress.Load(contractAddress)
+	contract, err := api.loaders.GetContractByChainAddressBatch.Load(db.GetContractByChainAddressBatchParams{
+		Address: contractAddress.Address(),
+		Chain:   contractAddress.Chain(),
+	})
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
 
 	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
-		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
+		owners, err := api.loaders.GetOwnersByContractIdBatchPaginate.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			ID:                 contract.ID,
 			Limit:              sql.NullInt32{Int32: int32(params.Limit), Valid: true},
 			GalleryUsersOnly:   onlyGalleryUsers,
@@ -299,7 +289,7 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 
 	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 
-		posts, err := api.loaders.PostsPaginatedByContractID.Load(db.PaginatePostsByContractIDParams{
+		posts, err := api.loaders.PaginatePostsByContractID.Load(db.PaginatePostsByContractIDParams{
 			ContractID:    contractID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,

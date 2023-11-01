@@ -73,7 +73,7 @@ func (api InteractionAPI) loadInteractions(orderedKeys []InteractionKey,
 	if len(admireIDs) > 0 {
 		wg.Add(1)
 		go func() {
-			admires, errs := api.loaders.AdmireByAdmireID.LoadAll(admireIDs)
+			admires, errs := api.loaders.GetAdmireByAdmireIDBatch.LoadAll(admireIDs)
 
 			interactionsByIDMutex.Lock()
 			defer interactionsByIDMutex.Unlock()
@@ -90,7 +90,7 @@ func (api InteractionAPI) loadInteractions(orderedKeys []InteractionKey,
 	if len(commentIDs) > 0 {
 		wg.Add(1)
 		go func() {
-			comments, errs := api.loaders.CommentByCommentID.LoadAll(commentIDs)
+			comments, errs := api.loaders.GetCommentByCommentIDBatch.LoadAll(commentIDs)
 
 			interactionsByIDMutex.Lock()
 			defer interactionsByIDMutex.Unlock()
@@ -129,7 +129,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	}
 
 	queryFunc := func(params intTimeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.InteractionsByFeedEventID.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
+		keys, err := api.loaders.PaginateInteractionsByFeedEventIDBatch.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTag:  params.CursorBeforeInt,
@@ -156,7 +156,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	}
 
 	countFunc := func() (int, error) {
-		counts, err := api.loaders.InteractionCountByFeedEventID.Load(db.CountInteractionsByFeedEventIDBatchParams{
+		counts, err := api.loaders.CountInteractionsByFeedEventIDBatch.Load(db.CountInteractionsByFeedEventIDBatchParams{
 			FeedEventID: feedEventID,
 			AdmireTag:   tags[interactionTypeAdmire],
 			CommentTag:  tags[interactionTypeComment],
@@ -222,7 +222,7 @@ func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, post
 	}
 
 	queryFunc := func(params intTimeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.InteractionsByPostID.Load(db.PaginateInteractionsByPostIDBatchParams{
+		keys, err := api.loaders.PaginateInteractionsByPostIDBatch.Load(db.PaginateInteractionsByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
 			CurBeforeTag:  params.CursorBeforeInt,
@@ -249,7 +249,7 @@ func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, post
 	}
 
 	countFunc := func() (int, error) {
-		counts, err := api.loaders.InteractionCountByPostID.Load(db.CountInteractionsByPostIDBatchParams{
+		counts, err := api.loaders.CountInteractionsByPostIDBatch.Load(db.CountInteractionsByPostIDBatchParams{
 			PostID:     postID,
 			AdmireTag:  tags[interactionTypeAdmire],
 			CommentTag: tags[interactionTypeComment],
@@ -317,7 +317,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.AdmiresByFeedEventID.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
+		admires, err := api.loaders.PaginateAdmiresByFeedEventIDBatch.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -340,8 +340,8 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.loaders.AdmireCountByFeedEventID.Load(feedEventID)
-		return total, err
+		total, err := api.loaders.CountAdmiresByFeedEventIDBatch.Load(feedEventID)
+		return int(total), err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -380,7 +380,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		comments, err := api.loaders.CommentsByFeedEventID.Load(db.PaginateCommentsByFeedEventIDBatchParams{
+		comments, err := api.loaders.PaginateCommentsByFeedEventIDBatch.Load(db.PaginateCommentsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -403,8 +403,8 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.loaders.CommentCountByFeedEventID.Load(feedEventID)
-		return total, err
+		total, err := api.loaders.CountCommentsByFeedEventIDBatch.Load(feedEventID)
+		return int(total), err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -444,7 +444,7 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 
-		comments, err := api.loaders.RepliesByCommentID.Load(db.PaginateRepliesByCommentIDBatchParams{
+		comments, err := api.loaders.PaginateRepliesByCommentIDBatch.Load(db.PaginateRepliesByCommentIDBatchParams{
 			CommentID:     commentID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -467,8 +467,8 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.loaders.RepliesCountByCommentID.Load(commentID)
-		return total, err
+		total, err := api.loaders.CountRepliesByCommentIDBatch.Load(commentID)
+		return int(total), err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -508,7 +508,7 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.AdmiresByPostID.Load(db.PaginateAdmiresByPostIDBatchParams{
+		admires, err := api.loaders.PaginateAdmiresByPostIDBatch.Load(db.PaginateAdmiresByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -531,8 +531,8 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.loaders.AdmireCountByPostID.Load(postID)
-		return total, err
+		total, err := api.loaders.CountAdmiresByPostIDBatch.Load(postID)
+		return int(total), err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -580,7 +580,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 	onlyForActor := actorID != ""
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.AdmiresByTokenID.Load(db.PaginateAdmiresByTokenIDBatchParams{
+		admires, err := api.loaders.PaginateAdmiresByTokenIDBatch.Load(db.PaginateAdmiresByTokenIDBatchParams{
 			TokenID:       tokenID,
 			Limit:         params.Limit,
 			OnlyForActor:  onlyForActor,
@@ -605,8 +605,8 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.loaders.AdmireCountByTokenID.Load(tokenID)
-		return total, err
+		total, err := api.loaders.CountAdmiresByTokenIDBatch.Load(tokenID)
+		return int(total), err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -645,7 +645,7 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		comments, err := api.loaders.CommentsByPostID.Load(db.PaginateCommentsByPostIDBatchParams{
+		comments, err := api.loaders.PaginateCommentsByPostIDBatch.Load(db.PaginateCommentsByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -668,8 +668,8 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.loaders.CommentCountByPostID.Load(postID)
-		return total, err
+		total, err := api.loaders.CountCommentsByPostIDBatch.Load(postID)
+		return int(total), err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -704,7 +704,7 @@ func (api InteractionAPI) GetAdmireByActorIDAndFeedEventID(ctx context.Context, 
 		return nil, err
 	}
 
-	admire, err := api.loaders.AdmireByActorIDAndFeedEventID.Load(db.GetAdmireByActorIDAndFeedEventIDParams{
+	admire, err := api.loaders.GetAdmireByActorIDAndFeedEventID.Load(db.GetAdmireByActorIDAndFeedEventIDParams{
 		ActorID:     actorID,
 		FeedEventID: feedEventID,
 	})
@@ -725,7 +725,7 @@ func (api InteractionAPI) GetAdmireByActorIDAndPostID(ctx context.Context, actor
 		return nil, err
 	}
 
-	admire, err := api.loaders.AdmireByActorIDAndPostID.Load(db.GetAdmireByActorIDAndPostIDParams{
+	admire, err := api.loaders.GetAdmireByActorIDAndPostID.Load(db.GetAdmireByActorIDAndPostIDParams{
 		ActorID: actorID,
 		PostID:  postID,
 	})
@@ -746,7 +746,7 @@ func (api InteractionAPI) GetAdmireByActorIDAndTokenID(ctx context.Context, acto
 		return nil, err
 	}
 
-	admire, err := api.loaders.AdmireByActorIDAndTokenID.Load(db.GetAdmireByActorIDAndTokenIDParams{
+	admire, err := api.loaders.GetAdmireByActorIDAndTokenID.Load(db.GetAdmireByActorIDAndTokenIDParams{
 		ActorID: actorID,
 		TokenID: tokenID,
 	})
@@ -766,7 +766,7 @@ func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DB
 		return nil, err
 	}
 
-	admire, err := api.loaders.AdmireByAdmireID.Load(admireID)
+	admire, err := api.loaders.GetAdmireByAdmireIDBatch.Load(admireID)
 	if err != nil {
 		return nil, err
 	}
@@ -822,7 +822,7 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
-	_, err := api.loaders.TokenByTokenID.Load(tokenID)
+	_, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
 	if err != nil {
 		return "", err
 	}
@@ -942,7 +942,7 @@ func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.
 		return nil, err
 	}
 
-	comment, err := api.loaders.CommentByCommentID.Load(commentID)
+	comment, err := api.loaders.GetCommentByCommentIDBatch.Load(commentID)
 	if err != nil {
 		return nil, err
 	}
@@ -1117,7 +1117,7 @@ func (api InteractionAPI) GetMentionsByCommentID(ctx context.Context, commentID 
 		return nil, err
 	}
 
-	return api.loaders.MentionsByCommentID.Load(commentID)
+	return api.loaders.GetMentionsByCommentID.Load(commentID)
 }
 
 func (api InteractionAPI) GetMentionsByPostID(ctx context.Context, postID persist.DBID) ([]db.Mention, error) {
@@ -1128,7 +1128,7 @@ func (api InteractionAPI) GetMentionsByPostID(ctx context.Context, postID persis
 		return nil, err
 	}
 
-	return api.loaders.MentionsByPostID.Load(postID)
+	return api.loaders.GetMentionsByPostID.Load(postID)
 }
 
 func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, queries *db.Queries) ([]db.Mention, error) {

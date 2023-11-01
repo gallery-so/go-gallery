@@ -19,8 +19,8 @@ update galleries set collections = array_append(collections, $1), last_updated =
 `
 
 type AddCollectionToGalleryParams struct {
-	CollectionID interface{}  `json:"collection_id"`
-	GalleryID    persist.DBID `json:"gallery_id"`
+	CollectionID interface{}  `db:"collection_id" json:"collection_id"`
+	GalleryID    persist.DBID `db:"gallery_id" json:"gallery_id"`
 }
 
 func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionToGalleryParams) error {
@@ -33,9 +33,9 @@ insert into follows (id, follower, followee, deleted) select unnest($1::varchar[
 `
 
 type AddManyFollowsParams struct {
-	Ids       []string     `json:"ids"`
-	Follower  persist.DBID `json:"follower"`
-	Followees []string     `json:"followees"`
+	Ids       []string     `db:"ids" json:"ids"`
+	Follower  persist.DBID `db:"follower" json:"follower"`
+	Followees []string     `db:"followees" json:"followees"`
 }
 
 func (q *Queries) AddManyFollows(ctx context.Context, arg AddManyFollowsParams) error {
@@ -49,8 +49,8 @@ insert into pii.account_creation_info (user_id, ip_address, created_at) values (
 `
 
 type AddPiiAccountCreationInfoParams struct {
-	UserID    persist.DBID `json:"user_id"`
-	IpAddress string       `json:"ip_address"`
+	UserID    persist.DBID `db:"user_id" json:"user_id"`
+	IpAddress string       `db:"ip_address" json:"ip_address"`
 }
 
 func (q *Queries) AddPiiAccountCreationInfo(ctx context.Context, arg AddPiiAccountCreationInfoParams) error {
@@ -63,8 +63,8 @@ insert into pii.for_users (user_id, pii_socials) values ($1, $2) on conflict (us
 `
 
 type AddSocialToUserParams struct {
-	UserID  persist.DBID    `json:"user_id"`
-	Socials persist.Socials `json:"socials"`
+	UserID  persist.DBID    `db:"user_id" json:"user_id"`
+	Socials persist.Socials `db:"socials" json:"socials"`
 }
 
 func (q *Queries) AddSocialToUser(ctx context.Context, arg AddSocialToUserParams) error {
@@ -79,9 +79,9 @@ on conflict (user_id, role) do update set deleted = false, last_updated = now()
 `
 
 type AddUserRolesParams struct {
-	UserID persist.DBID `json:"user_id"`
-	Ids    []string     `json:"ids"`
-	Roles  []string     `json:"roles"`
+	UserID persist.DBID `db:"user_id" json:"user_id"`
+	Ids    []string     `db:"ids" json:"ids"`
+	Roles  []string     `db:"roles" json:"roles"`
 }
 
 func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) error {
@@ -94,9 +94,9 @@ INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
 `
 
 type BlockUserFromFeedParams struct {
-	ID     persist.DBID   `json:"id"`
-	UserID persist.DBID   `json:"user_id"`
-	Action persist.Action `json:"action"`
+	ID     persist.DBID   `db:"id" json:"id"`
+	UserID persist.DBID   `db:"user_id" json:"user_id"`
+	Action persist.Action `db:"action" json:"action"`
 }
 
 func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedParams) error {
@@ -110,8 +110,8 @@ select (select total from total_tokens) = (select total from user_tokens) owns_a
 `
 
 type CheckUserOwnsAllTokenDbidsParams struct {
-	OwnerUserID persist.DBID     `json:"owner_user_id"`
-	TokenIds    persist.DBIDList `json:"token_ids"`
+	OwnerUserID persist.DBID     `db:"owner_user_id" json:"owner_user_id"`
+	TokenIds    persist.DBIDList `db:"token_ids" json:"token_ids"`
 }
 
 func (q *Queries) CheckUserOwnsAllTokenDbids(ctx context.Context, arg CheckUserOwnsAllTokenDbidsParams) (bool, error) {
@@ -175,8 +175,8 @@ select count(distinct users.id) from users, tokens, contracts
 `
 
 type CountOwnersByContractIdParams struct {
-	ID               persist.DBID `json:"id"`
-	GalleryUsersOnly bool         `json:"gallery_users_only"`
+	ID               persist.DBID `db:"id" json:"id"`
+	GalleryUsersOnly bool         `db:"gallery_users_only" json:"gallery_users_only"`
 }
 
 func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersByContractIdParams) (int64, error) {
@@ -226,8 +226,8 @@ where a.user_id = $1
 `
 
 type CountSharedContractsParams struct {
-	UserAID persist.DBID `json:"user_a_id"`
-	UserBID persist.DBID `json:"user_b_id"`
+	UserAID persist.DBID `db:"user_a_id" json:"user_a_id"`
+	UserBID persist.DBID `db:"user_b_id" json:"user_b_id"`
 }
 
 func (q *Queries) CountSharedContracts(ctx context.Context, arg CountSharedContractsParams) (int64, error) {
@@ -250,8 +250,8 @@ where a.follower = $1
 `
 
 type CountSharedFollowsParams struct {
-	Follower persist.DBID `json:"follower"`
-	Followee persist.DBID `json:"followee"`
+	Follower persist.DBID `db:"follower" json:"follower"`
+	Followee persist.DBID `db:"followee" json:"followee"`
 }
 
 func (q *Queries) CountSharedFollows(ctx context.Context, arg CountSharedFollowsParams) (int64, error) {
@@ -270,10 +270,10 @@ where case when $4::bool then f.id is null else true end
 `
 
 type CountSocialConnectionsParams struct {
-	SocialIds       []string     `json:"social_ids"`
-	Social          string       `json:"social"`
-	UserID          persist.DBID `json:"user_id"`
-	OnlyUnfollowing bool         `json:"only_unfollowing"`
+	SocialIds       []string     `db:"social_ids" json:"social_ids"`
+	Social          string       `db:"social" json:"social"`
+	UserID          persist.DBID `db:"user_id" json:"user_id"`
+	OnlyUnfollowing bool         `db:"only_unfollowing" json:"only_unfollowing"`
 }
 
 func (q *Queries) CountSocialConnections(ctx context.Context, arg CountSocialConnectionsParams) (int64, error) {
@@ -299,8 +299,8 @@ where (contracts.id = $1 or contracts.parent_id = $1)
 `
 
 type CountTokensByContractIdParams struct {
-	ID               persist.DBID `json:"id"`
-	GalleryUsersOnly bool         `json:"gallery_users_only"`
+	ID               persist.DBID `db:"id" json:"id"`
+	GalleryUsersOnly bool         `db:"gallery_users_only" json:"gallery_users_only"`
 }
 
 func (q *Queries) CountTokensByContractId(ctx context.Context, arg CountTokensByContractIdParams) (int64, error) {
@@ -337,17 +337,17 @@ INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_even
 `
 
 type CreateAdmireEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	AdmireID       persist.DBID         `json:"admire_id"`
-	SubjectID      persist.DBID         `json:"subject_id"`
-	Data           persist.EventData    `json:"data"`
-	GroupID        sql.NullString       `json:"group_id"`
-	Caption        sql.NullString       `json:"caption"`
-	FeedEvent      sql.NullString       `json:"feed_event"`
-	Post           sql.NullString       `json:"post"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	AdmireID       persist.DBID         `db:"admire_id" json:"admire_id"`
+	SubjectID      persist.DBID         `db:"subject_id" json:"subject_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+	FeedEvent      sql.NullString       `db:"feed_event" json:"feed_event"`
+	Post           sql.NullString       `db:"post" json:"post"`
 }
 
 func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventParams) (Event, error) {
@@ -398,14 +398,14 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 `
 
 type CreateAdmireNotificationParams struct {
-	ID        persist.DBID             `json:"id"`
-	OwnerID   persist.DBID             `json:"owner_id"`
-	Action    persist.Action           `json:"action"`
-	Data      persist.NotificationData `json:"data"`
-	EventIds  persist.DBIDList         `json:"event_ids"`
-	FeedEvent sql.NullString           `json:"feed_event"`
-	Post      sql.NullString           `json:"post"`
-	Token     sql.NullString           `json:"token"`
+	ID        persist.DBID             `db:"id" json:"id"`
+	OwnerID   persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action    persist.Action           `db:"action" json:"action"`
+	Data      persist.NotificationData `db:"data" json:"data"`
+	EventIds  persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	FeedEvent sql.NullString           `db:"feed_event" json:"feed_event"`
+	Post      sql.NullString           `db:"post" json:"post"`
+	Token     sql.NullString           `db:"token" json:"token"`
 }
 
 func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmireNotificationParams) (Notification, error) {
@@ -448,15 +448,15 @@ insert into collections (id, version, name, collectors_note, owner_user_id, gall
 `
 
 type CreateCollectionParams struct {
-	ID             persist.DBID                                     `json:"id"`
-	Name           sql.NullString                                   `json:"name"`
-	CollectorsNote sql.NullString                                   `json:"collectors_note"`
-	OwnerUserID    persist.DBID                                     `json:"owner_user_id"`
-	GalleryID      persist.DBID                                     `json:"gallery_id"`
-	Layout         persist.TokenLayout                              `json:"layout"`
-	Nfts           persist.DBIDList                                 `json:"nfts"`
-	Hidden         bool                                             `json:"hidden"`
-	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings `json:"token_settings"`
+	ID             persist.DBID                                     `db:"id" json:"id"`
+	Name           sql.NullString                                   `db:"name" json:"name"`
+	CollectorsNote sql.NullString                                   `db:"collectors_note" json:"collectors_note"`
+	OwnerUserID    persist.DBID                                     `db:"owner_user_id" json:"owner_user_id"`
+	GalleryID      persist.DBID                                     `db:"gallery_id" json:"gallery_id"`
+	Layout         persist.TokenLayout                              `db:"layout" json:"layout"`
+	Nfts           persist.DBIDList                                 `db:"nfts" json:"nfts"`
+	Hidden         bool                                             `db:"hidden" json:"hidden"`
+	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings `db:"token_settings" json:"token_settings"`
 }
 
 func (q *Queries) CreateCollection(ctx context.Context, arg CreateCollectionParams) (persist.DBID, error) {
@@ -481,15 +481,15 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 `
 
 type CreateCollectionEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	CollectionID   persist.DBID         `json:"collection_id"`
-	Data           persist.EventData    `json:"data"`
-	Caption        sql.NullString       `json:"caption"`
-	GroupID        sql.NullString       `json:"group_id"`
-	GalleryID      persist.DBID         `json:"gallery_id"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	CollectionID   persist.DBID         `db:"collection_id" json:"collection_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	GalleryID      persist.DBID         `db:"gallery_id" json:"gallery_id"`
 }
 
 func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
@@ -538,18 +538,18 @@ INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_eve
 `
 
 type CreateCommentEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	CommentID      persist.DBID         `json:"comment_id"`
-	SubjectID      persist.DBID         `json:"subject_id"`
-	Data           persist.EventData    `json:"data"`
-	GroupID        sql.NullString       `json:"group_id"`
-	Caption        sql.NullString       `json:"caption"`
-	FeedEvent      sql.NullString       `json:"feed_event"`
-	Post           sql.NullString       `json:"post"`
-	Mention        sql.NullString       `json:"mention"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	CommentID      persist.DBID         `db:"comment_id" json:"comment_id"`
+	SubjectID      persist.DBID         `db:"subject_id" json:"subject_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+	FeedEvent      sql.NullString       `db:"feed_event" json:"feed_event"`
+	Post           sql.NullString       `db:"post" json:"post"`
+	Mention        sql.NullString       `db:"mention" json:"mention"`
 }
 
 func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEventParams) (Event, error) {
@@ -601,14 +601,14 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 `
 
 type CreateCommentNotificationParams struct {
-	ID        persist.DBID             `json:"id"`
-	OwnerID   persist.DBID             `json:"owner_id"`
-	Action    persist.Action           `json:"action"`
-	Data      persist.NotificationData `json:"data"`
-	EventIds  persist.DBIDList         `json:"event_ids"`
-	CommentID persist.DBID             `json:"comment_id"`
-	FeedEvent sql.NullString           `json:"feed_event"`
-	Post      sql.NullString           `json:"post"`
+	ID        persist.DBID             `db:"id" json:"id"`
+	OwnerID   persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action    persist.Action           `db:"action" json:"action"`
+	Data      persist.NotificationData `db:"data" json:"data"`
+	EventIds  persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	CommentID persist.DBID             `db:"comment_id" json:"comment_id"`
+	FeedEvent sql.NullString           `db:"feed_event" json:"feed_event"`
+	Post      sql.NullString           `db:"post" json:"post"`
 }
 
 func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateCommentNotificationParams) (Notification, error) {
@@ -651,18 +651,18 @@ INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject
 `
 
 type CreateContractEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	ContractID     persist.DBID         `json:"contract_id"`
-	Data           persist.EventData    `json:"data"`
-	GroupID        sql.NullString       `json:"group_id"`
-	Caption        sql.NullString       `json:"caption"`
-	Post           sql.NullString       `json:"post"`
-	Comment        sql.NullString       `json:"comment"`
-	FeedEvent      sql.NullString       `json:"feed_event"`
-	Mention        sql.NullString       `json:"mention"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	ContractID     persist.DBID         `db:"contract_id" json:"contract_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+	Post           sql.NullString       `db:"post" json:"post"`
+	Comment        sql.NullString       `db:"comment" json:"comment"`
+	FeedEvent      sql.NullString       `db:"feed_event" json:"feed_event"`
+	Mention        sql.NullString       `db:"mention" json:"mention"`
 }
 
 func (q *Queries) CreateContractEvent(ctx context.Context, arg CreateContractEventParams) (Event, error) {
@@ -714,16 +714,16 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 `
 
 type CreateContractNotificationParams struct {
-	ID         persist.DBID             `json:"id"`
-	OwnerID    persist.DBID             `json:"owner_id"`
-	Action     persist.Action           `json:"action"`
-	Data       persist.NotificationData `json:"data"`
-	EventIds   persist.DBIDList         `json:"event_ids"`
-	ContractID persist.DBID             `json:"contract_id"`
-	MentionID  persist.DBID             `json:"mention_id"`
-	FeedEvent  sql.NullString           `json:"feed_event"`
-	Post       sql.NullString           `json:"post"`
-	Comment    sql.NullString           `json:"comment"`
+	ID         persist.DBID             `db:"id" json:"id"`
+	OwnerID    persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action     persist.Action           `db:"action" json:"action"`
+	Data       persist.NotificationData `db:"data" json:"data"`
+	EventIds   persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	ContractID persist.DBID             `db:"contract_id" json:"contract_id"`
+	MentionID  persist.DBID             `db:"mention_id" json:"mention_id"`
+	FeedEvent  sql.NullString           `db:"feed_event" json:"feed_event"`
+	Post       sql.NullString           `db:"post" json:"post"`
+	Comment    sql.NullString           `db:"comment" json:"comment"`
 }
 
 func (q *Queries) CreateContractNotification(ctx context.Context, arg CreateContractNotificationParams) (Notification, error) {
@@ -768,14 +768,14 @@ INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, grou
 `
 
 type CreateFeedEventParams struct {
-	ID        persist.DBID          `json:"id"`
-	OwnerID   persist.DBID          `json:"owner_id"`
-	Action    persist.Action        `json:"action"`
-	Data      persist.FeedEventData `json:"data"`
-	EventTime time.Time             `json:"event_time"`
-	EventIds  persist.DBIDList      `json:"event_ids"`
-	GroupID   sql.NullString        `json:"group_id"`
-	Caption   sql.NullString        `json:"caption"`
+	ID        persist.DBID          `db:"id" json:"id"`
+	OwnerID   persist.DBID          `db:"owner_id" json:"owner_id"`
+	Action    persist.Action        `db:"action" json:"action"`
+	Data      persist.FeedEventData `db:"data" json:"data"`
+	EventTime time.Time             `db:"event_time" json:"event_time"`
+	EventIds  persist.DBIDList      `db:"event_ids" json:"event_ids"`
+	GroupID   sql.NullString        `db:"group_id" json:"group_id"`
+	Caption   sql.NullString        `db:"caption" json:"caption"`
 }
 
 func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams) (FeedEvent, error) {
@@ -812,15 +812,15 @@ INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_
 `
 
 type CreateGalleryEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	GalleryID      persist.DBID         `json:"gallery_id"`
-	Data           persist.EventData    `json:"data"`
-	ExternalID     sql.NullString       `json:"external_id"`
-	GroupID        sql.NullString       `json:"group_id"`
-	Caption        sql.NullString       `json:"caption"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	GalleryID      persist.DBID         `db:"gallery_id" json:"gallery_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	ExternalID     sql.NullString       `db:"external_id" json:"external_id"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
 }
 
 func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEventParams) (Event, error) {
@@ -869,15 +869,15 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 `
 
 type CreateMentionUserNotificationParams struct {
-	ID        persist.DBID             `json:"id"`
-	OwnerID   persist.DBID             `json:"owner_id"`
-	Action    persist.Action           `json:"action"`
-	Data      persist.NotificationData `json:"data"`
-	EventIds  persist.DBIDList         `json:"event_ids"`
-	MentionID persist.DBID             `json:"mention_id"`
-	FeedEvent sql.NullString           `json:"feed_event"`
-	Post      sql.NullString           `json:"post"`
-	Comment   sql.NullString           `json:"comment"`
+	ID        persist.DBID             `db:"id" json:"id"`
+	OwnerID   persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action    persist.Action           `db:"action" json:"action"`
+	Data      persist.NotificationData `db:"data" json:"data"`
+	EventIds  persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	MentionID persist.DBID             `db:"mention_id" json:"mention_id"`
+	FeedEvent sql.NullString           `db:"feed_event" json:"feed_event"`
+	Post      sql.NullString           `db:"post" json:"post"`
+	Comment   sql.NullString           `db:"comment" json:"comment"`
 }
 
 func (q *Queries) CreateMentionUserNotification(ctx context.Context, arg CreateMentionUserNotificationParams) (Notification, error) {
@@ -921,13 +921,13 @@ INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id,
 `
 
 type CreatePostEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	UserID         persist.DBID         `json:"user_id"`
-	SubjectID      persist.DBID         `json:"subject_id"`
-	PostID         persist.DBID         `json:"post_id"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	UserID         persist.DBID         `db:"user_id" json:"user_id"`
+	SubjectID      persist.DBID         `db:"subject_id" json:"subject_id"`
+	PostID         persist.DBID         `db:"post_id" json:"post_id"`
 }
 
 func (q *Queries) CreatePostEvent(ctx context.Context, arg CreatePostEventParams) (Event, error) {
@@ -984,9 +984,9 @@ insert into push_notification_tickets (id, push_token_id, ticket_id, created_at,
 `
 
 type CreatePushTicketsParams struct {
-	Ids          []string `json:"ids"`
-	PushTokenIds []string `json:"push_token_ids"`
-	TicketIds    []string `json:"ticket_ids"`
+	Ids          []string `db:"ids" json:"ids"`
+	PushTokenIds []string `db:"push_token_ids" json:"push_token_ids"`
+	TicketIds    []string `db:"ticket_ids" json:"ticket_ids"`
 }
 
 func (q *Queries) CreatePushTickets(ctx context.Context, arg CreatePushTicketsParams) error {
@@ -999,9 +999,9 @@ insert into push_notification_tokens (id, user_id, push_token, created_at, delet
 `
 
 type CreatePushTokenForUserParams struct {
-	ID        persist.DBID `json:"id"`
-	UserID    persist.DBID `json:"user_id"`
-	PushToken string       `json:"push_token"`
+	ID        persist.DBID `db:"id" json:"id"`
+	UserID    persist.DBID `db:"user_id" json:"user_id"`
+	PushToken string       `db:"push_token" json:"push_token"`
 }
 
 func (q *Queries) CreatePushTokenForUser(ctx context.Context, arg CreatePushTokenForUserParams) (PushNotificationToken, error) {
@@ -1022,11 +1022,11 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2
 `
 
 type CreateSimpleNotificationParams struct {
-	ID       persist.DBID             `json:"id"`
-	OwnerID  persist.DBID             `json:"owner_id"`
-	Action   persist.Action           `json:"action"`
-	Data     persist.NotificationData `json:"data"`
-	EventIds persist.DBIDList         `json:"event_ids"`
+	ID       persist.DBID             `db:"id" json:"id"`
+	OwnerID  persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action   persist.Action           `db:"action" json:"action"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
 }
 
 func (q *Queries) CreateSimpleNotification(ctx context.Context, arg CreateSimpleNotificationParams) (Notification, error) {
@@ -1066,16 +1066,16 @@ INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id
 `
 
 type CreateTokenEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	TokenID        persist.DBID         `json:"token_id"`
-	Data           persist.EventData    `json:"data"`
-	GroupID        sql.NullString       `json:"group_id"`
-	Caption        sql.NullString       `json:"caption"`
-	Gallery        sql.NullString       `json:"gallery"`
-	Collection     sql.NullString       `json:"collection"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	TokenID        persist.DBID         `db:"token_id" json:"token_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+	Gallery        sql.NullString       `db:"gallery" json:"gallery"`
+	Collection     sql.NullString       `db:"collection" json:"collection"`
 }
 
 func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventParams) (Event, error) {
@@ -1125,13 +1125,13 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amou
 `
 
 type CreateTokenNotificationParams struct {
-	ID       persist.DBID             `json:"id"`
-	OwnerID  persist.DBID             `json:"owner_id"`
-	Action   persist.Action           `json:"action"`
-	Data     persist.NotificationData `json:"data"`
-	EventIds persist.DBIDList         `json:"event_ids"`
-	TokenID  persist.DBID             `json:"token_id"`
-	Amount   int32                    `json:"amount"`
+	ID       persist.DBID             `db:"id" json:"id"`
+	OwnerID  persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action   persist.Action           `db:"action" json:"action"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	TokenID  persist.DBID             `db:"token_id" json:"token_id"`
+	Amount   int32                    `db:"amount" json:"amount"`
 }
 
 func (q *Queries) CreateTokenNotification(ctx context.Context, arg CreateTokenNotificationParams) (Notification, error) {
@@ -1173,18 +1173,18 @@ INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id,
 `
 
 type CreateUserEventParams struct {
-	ID             persist.DBID         `json:"id"`
-	ActorID        sql.NullString       `json:"actor_id"`
-	Action         persist.Action       `json:"action"`
-	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	UserID         persist.DBID         `json:"user_id"`
-	Data           persist.EventData    `json:"data"`
-	GroupID        sql.NullString       `json:"group_id"`
-	Caption        sql.NullString       `json:"caption"`
-	Post           sql.NullString       `json:"post"`
-	Comment        sql.NullString       `json:"comment"`
-	FeedEvent      sql.NullString       `json:"feed_event"`
-	Mention        sql.NullString       `json:"mention"`
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	UserID         persist.DBID         `db:"user_id" json:"user_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+	Post           sql.NullString       `db:"post" json:"post"`
+	Comment        sql.NullString       `db:"comment" json:"comment"`
+	FeedEvent      sql.NullString       `db:"feed_event" json:"feed_event"`
+	Mention        sql.NullString       `db:"mention" json:"mention"`
 }
 
 func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams) (Event, error) {
@@ -1236,13 +1236,13 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contr
 `
 
 type CreateUserPostedYourWorkNotificationParams struct {
-	ID         persist.DBID             `json:"id"`
-	OwnerID    persist.DBID             `json:"owner_id"`
-	Action     persist.Action           `json:"action"`
-	Data       persist.NotificationData `json:"data"`
-	EventIds   persist.DBIDList         `json:"event_ids"`
-	ContractID persist.DBID             `json:"contract_id"`
-	Post       sql.NullString           `json:"post"`
+	ID         persist.DBID             `db:"id" json:"id"`
+	OwnerID    persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action     persist.Action           `db:"action" json:"action"`
+	Data       persist.NotificationData `db:"data" json:"data"`
+	EventIds   persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	ContractID persist.DBID             `db:"contract_id" json:"contract_id"`
+	Post       sql.NullString           `db:"post" json:"post"`
 }
 
 func (q *Queries) CreateUserPostedYourWorkNotification(ctx context.Context, arg CreateUserPostedYourWorkNotificationParams) (Notification, error) {
@@ -1284,12 +1284,12 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VA
 `
 
 type CreateViewGalleryNotificationParams struct {
-	ID        persist.DBID             `json:"id"`
-	OwnerID   persist.DBID             `json:"owner_id"`
-	Action    persist.Action           `json:"action"`
-	Data      persist.NotificationData `json:"data"`
-	EventIds  persist.DBIDList         `json:"event_ids"`
-	GalleryID persist.DBID             `json:"gallery_id"`
+	ID        persist.DBID             `db:"id" json:"id"`
+	OwnerID   persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action    persist.Action           `db:"action" json:"action"`
+	Data      persist.NotificationData `db:"data" json:"data"`
+	EventIds  persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	GalleryID persist.DBID             `db:"gallery_id" json:"gallery_id"`
 }
 
 func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateViewGalleryNotificationParams) (Notification, error) {
@@ -1366,8 +1366,8 @@ update user_roles set deleted = true, last_updated = now() where user_id = $1 an
 `
 
 type DeleteUserRolesParams struct {
-	UserID persist.DBID     `json:"user_id"`
-	Roles  persist.RoleList `json:"roles"`
+	UserID persist.DBID     `db:"user_id" json:"user_id"`
+	Roles  persist.RoleList `db:"roles" json:"roles"`
 }
 
 func (q *Queries) DeleteUserRoles(ctx context.Context, arg DeleteUserRolesParams) error {
@@ -1538,59 +1538,59 @@ order by tokens.id
 `
 
 type GetAllTokensWithContractsByIDsParams struct {
-	StartID persist.DBID `json:"start_id"`
-	EndID   persist.DBID `json:"end_id"`
+	StartID persist.DBID `db:"start_id" json:"start_id"`
+	EndID   persist.DBID `db:"end_id" json:"end_id"`
 }
 
 type GetAllTokensWithContractsByIDsRow struct {
-	ID                             persist.DBID      `json:"id"`
-	Deleted                        bool              `json:"deleted"`
-	Version                        sql.NullInt32     `json:"version"`
-	CreatedAt                      time.Time         `json:"created_at"`
-	LastUpdated                    time.Time         `json:"last_updated"`
-	NameDeprecated                 sql.NullString    `json:"name__deprecated"`
-	DescriptionDeprecated          sql.NullString    `json:"description__deprecated"`
-	CollectorsNote                 sql.NullString    `json:"collectors_note"`
-	TokenTypeDeprecated            sql.NullString    `json:"token_type__deprecated"`
-	TokenIDDeprecated              sql.NullString    `json:"token_id__deprecated"`
-	Quantity                       persist.HexString `json:"quantity"`
-	OwnershipHistoryDeprecated     []pgtype.JSONB    `json:"ownership_history__deprecated"`
-	ExternalUrlDeprecated          sql.NullString    `json:"external_url__deprecated"`
-	BlockNumber                    sql.NullInt64     `json:"block_number"`
-	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
-	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
-	ChainDeprecated                sql.NullInt32     `json:"chain__deprecated"`
-	ContractID                     persist.DBID      `json:"contract_id"`
-	IsUserMarkedSpam               sql.NullBool      `json:"is_user_marked_spam"`
-	IsProviderMarkedSpamDeprecated sql.NullBool      `json:"is_provider_marked_spam__deprecated"`
-	LastSynced                     time.Time         `json:"last_synced"`
-	TokenUriDeprecated             sql.NullString    `json:"token_uri__deprecated"`
-	FallbackMediaDeprecated        pgtype.JSONB      `json:"fallback_media__deprecated"`
-	TokenMediaIDDeprecated         sql.NullString    `json:"token_media_id__deprecated"`
-	IsCreatorToken                 bool              `json:"is_creator_token"`
-	TokenDefinitionID              persist.DBID      `json:"token_definition_id"`
-	IsHolderToken                  bool              `json:"is_holder_token"`
-	Displayable                    bool              `json:"displayable"`
-	ID_2                           persist.DBID      `json:"id_2"`
-	Deleted_2                      bool              `json:"deleted_2"`
-	Version_2                      sql.NullInt32     `json:"version_2"`
-	CreatedAt_2                    time.Time         `json:"created_at_2"`
-	LastUpdated_2                  time.Time         `json:"last_updated_2"`
-	Name                           sql.NullString    `json:"name"`
-	Symbol                         sql.NullString    `json:"symbol"`
-	Address                        persist.Address   `json:"address"`
-	CreatorAddress                 persist.Address   `json:"creator_address"`
-	Chain                          persist.Chain     `json:"chain"`
-	ProfileBannerUrl               sql.NullString    `json:"profile_banner_url"`
-	ProfileImageUrl                sql.NullString    `json:"profile_image_url"`
-	BadgeUrl                       sql.NullString    `json:"badge_url"`
-	Description                    sql.NullString    `json:"description"`
-	OwnerAddress                   persist.Address   `json:"owner_address"`
-	IsProviderMarkedSpam           bool              `json:"is_provider_marked_spam"`
-	ParentID                       persist.DBID      `json:"parent_id"`
-	OverrideCreatorUserID          persist.DBID      `json:"override_creator_user_id"`
-	L1Chain                        persist.L1Chain   `json:"l1_chain"`
-	WalletAddress                  persist.Address   `json:"wallet_address"`
+	ID                             persist.DBID      `db:"id" json:"id"`
+	Deleted                        bool              `db:"deleted" json:"deleted"`
+	Version                        sql.NullInt32     `db:"version" json:"version"`
+	CreatedAt                      time.Time         `db:"created_at" json:"created_at"`
+	LastUpdated                    time.Time         `db:"last_updated" json:"last_updated"`
+	NameDeprecated                 sql.NullString    `db:"name__deprecated" json:"name__deprecated"`
+	DescriptionDeprecated          sql.NullString    `db:"description__deprecated" json:"description__deprecated"`
+	CollectorsNote                 sql.NullString    `db:"collectors_note" json:"collectors_note"`
+	TokenTypeDeprecated            sql.NullString    `db:"token_type__deprecated" json:"token_type__deprecated"`
+	TokenIDDeprecated              sql.NullString    `db:"token_id__deprecated" json:"token_id__deprecated"`
+	Quantity                       persist.HexString `db:"quantity" json:"quantity"`
+	OwnershipHistoryDeprecated     []pgtype.JSONB    `db:"ownership_history__deprecated" json:"ownership_history__deprecated"`
+	ExternalUrlDeprecated          sql.NullString    `db:"external_url__deprecated" json:"external_url__deprecated"`
+	BlockNumber                    sql.NullInt64     `db:"block_number" json:"block_number"`
+	OwnerUserID                    persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
+	OwnedByWallets                 persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
+	ChainDeprecated                sql.NullInt32     `db:"chain__deprecated" json:"chain__deprecated"`
+	ContractID                     persist.DBID      `db:"contract_id" json:"contract_id"`
+	IsUserMarkedSpam               sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
+	IsProviderMarkedSpamDeprecated sql.NullBool      `db:"is_provider_marked_spam__deprecated" json:"is_provider_marked_spam__deprecated"`
+	LastSynced                     time.Time         `db:"last_synced" json:"last_synced"`
+	TokenUriDeprecated             sql.NullString    `db:"token_uri__deprecated" json:"token_uri__deprecated"`
+	FallbackMediaDeprecated        pgtype.JSONB      `db:"fallback_media__deprecated" json:"fallback_media__deprecated"`
+	TokenMediaIDDeprecated         sql.NullString    `db:"token_media_id__deprecated" json:"token_media_id__deprecated"`
+	IsCreatorToken                 bool              `db:"is_creator_token" json:"is_creator_token"`
+	TokenDefinitionID              persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
+	IsHolderToken                  bool              `db:"is_holder_token" json:"is_holder_token"`
+	Displayable                    bool              `db:"displayable" json:"displayable"`
+	ID_2                           persist.DBID      `db:"id_2" json:"id_2"`
+	Deleted_2                      bool              `db:"deleted_2" json:"deleted_2"`
+	Version_2                      sql.NullInt32     `db:"version_2" json:"version_2"`
+	CreatedAt_2                    time.Time         `db:"created_at_2" json:"created_at_2"`
+	LastUpdated_2                  time.Time         `db:"last_updated_2" json:"last_updated_2"`
+	Name                           sql.NullString    `db:"name" json:"name"`
+	Symbol                         sql.NullString    `db:"symbol" json:"symbol"`
+	Address                        persist.Address   `db:"address" json:"address"`
+	CreatorAddress                 persist.Address   `db:"creator_address" json:"creator_address"`
+	Chain                          persist.Chain     `db:"chain" json:"chain"`
+	ProfileBannerUrl               sql.NullString    `db:"profile_banner_url" json:"profile_banner_url"`
+	ProfileImageUrl                sql.NullString    `db:"profile_image_url" json:"profile_image_url"`
+	BadgeUrl                       sql.NullString    `db:"badge_url" json:"badge_url"`
+	Description                    sql.NullString    `db:"description" json:"description"`
+	OwnerAddress                   persist.Address   `db:"owner_address" json:"owner_address"`
+	IsProviderMarkedSpam           bool              `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
+	ParentID                       persist.DBID      `db:"parent_id" json:"parent_id"`
+	OverrideCreatorUserID          persist.DBID      `db:"override_creator_user_id" json:"override_creator_user_id"`
+	L1Chain                        persist.L1Chain   `db:"l1_chain" json:"l1_chain"`
+	WalletAddress                  persist.Address   `db:"wallet_address" json:"wallet_address"`
 }
 
 func (q *Queries) GetAllTokensWithContractsByIDs(ctx context.Context, arg GetAllTokensWithContractsByIDsParams) ([]GetAllTokensWithContractsByIDsRow, error) {
@@ -1836,8 +1836,8 @@ select id, deleted, version, created_at, last_updated, name, symbol, address, cr
 `
 
 type GetContractByChainAddressParams struct {
-	Address persist.Address `json:"address"`
-	Chain   persist.Chain   `json:"chain"`
+	Address persist.Address `db:"address" json:"address"`
+	Chain   persist.Chain   `db:"chain" json:"chain"`
 }
 
 func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContractByChainAddressParams) (Contract, error) {
@@ -1899,25 +1899,34 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 }
 
 const getContractCreatorsByIds = `-- name: GetContractCreatorsByIds :many
-select o.contract_id, o.creator_user_id, o.chain, o.creator_address
-    from unnest($1::text[]) as c(id)
-        join contract_creators o on o.contract_id = c.id
+with keys as (
+    select unnest ($1::text[]) as id
+         , generate_subscripts($1::text[], 1) as batch_key_index
+)
+select k.batch_key_index, c.contract_id, c.creator_user_id, c.chain, c.creator_address from keys k
+    join contract_creators c on c.contract_id = k.id
 `
 
-func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []string) ([]ContractCreator, error) {
+type GetContractCreatorsByIdsRow struct {
+	BatchKeyIndex   int32           `db:"batch_key_index" json:"batch_key_index"`
+	ContractCreator ContractCreator `db:"contractcreator" json:"contractcreator"`
+}
+
+func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []string) ([]GetContractCreatorsByIdsRow, error) {
 	rows, err := q.db.Query(ctx, getContractCreatorsByIds, contractIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ContractCreator
+	var items []GetContractCreatorsByIdsRow
 	for rows.Next() {
-		var i ContractCreator
+		var i GetContractCreatorsByIdsRow
 		if err := rows.Scan(
-			&i.ContractID,
-			&i.CreatorUserID,
-			&i.Chain,
-			&i.CreatorAddress,
+			&i.BatchKeyIndex,
+			&i.ContractCreator.ContractID,
+			&i.ContractCreator.CreatorUserID,
+			&i.ContractCreator.Chain,
+			&i.ContractCreator.CreatorAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -1930,38 +1939,50 @@ func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []st
 }
 
 const getContractsByIDs = `-- name: GetContractsByIDs :many
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain from contracts WHERE id = ANY($1) AND deleted = false
+with keys as (
+    select unnest ($1::varchar[]) as id
+         , generate_subscripts($1::varchar[], 1) as batch_key_index
+)
+select k.batch_key_index, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from keys k
+    join contracts c on c.id = k.id
+    where not c.deleted
 `
 
-func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBIDList) ([]Contract, error) {
+type GetContractsByIDsRow struct {
+	BatchKeyIndex int32    `db:"batch_key_index" json:"batch_key_index"`
+	Contract      Contract `db:"contract" json:"contract"`
+}
+
+func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds []string) ([]GetContractsByIDsRow, error) {
 	rows, err := q.db.Query(ctx, getContractsByIDs, contractIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Contract
+	var items []GetContractsByIDsRow
 	for rows.Next() {
-		var i Contract
+		var i GetContractsByIDsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
-			&i.L1Chain,
+			&i.BatchKeyIndex,
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.Contract.L1Chain,
 		); err != nil {
 			return nil, err
 		}
@@ -2059,15 +2080,15 @@ where c.override_creator_user_id = $1
 `
 
 type GetCreatedContractsByUserIDParams struct {
-	UserID           persist.DBID `json:"user_id"`
-	Chains           []int32      `json:"chains"`
-	NewContractsOnly bool         `json:"new_contracts_only"`
+	UserID           persist.DBID `db:"user_id" json:"user_id"`
+	Chains           []int32      `db:"chains" json:"chains"`
+	NewContractsOnly bool         `db:"new_contracts_only" json:"new_contracts_only"`
 }
 
 type GetCreatedContractsByUserIDRow struct {
-	Contract          Contract     `json:"contract"`
-	WalletID          persist.DBID `json:"wallet_id"`
-	IsOverrideCreator bool         `json:"is_override_creator"`
+	Contract          Contract     `db:"contract" json:"contract"`
+	WalletID          persist.DBID `db:"wallet_id" json:"wallet_id"`
+	IsOverrideCreator bool         `db:"is_override_creator" json:"is_override_creator"`
 }
 
 func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]GetCreatedContractsByUserIDRow, error) {
@@ -2261,10 +2282,10 @@ select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, c
 `
 
 type GetEventsInWindowParams struct {
-	ID             persist.DBID       `json:"id"`
-	Secs           float64            `json:"secs"`
-	Actions        persist.ActionList `json:"actions"`
-	IncludeSubject bool               `json:"include_subject"`
+	ID             persist.DBID       `db:"id" json:"id"`
+	Secs           float64            `db:"secs" json:"secs"`
+	Actions        persist.ActionList `db:"actions" json:"actions"`
+	IncludeSubject bool               `db:"include_subject" json:"include_subject"`
 }
 
 func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowParams) ([]Event, error) {
@@ -2477,11 +2498,11 @@ select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, c
 `
 
 type GetGalleryEventsInWindowParams struct {
-	ID             persist.DBID       `json:"id"`
-	Secs           float64            `json:"secs"`
-	Actions        persist.ActionList `json:"actions"`
-	GalleryID      persist.DBID       `json:"gallery_id"`
-	IncludeSubject bool               `json:"include_subject"`
+	ID             persist.DBID       `db:"id" json:"id"`
+	Secs           float64            `db:"secs" json:"secs"`
+	Actions        persist.ActionList `db:"actions" json:"actions"`
+	GalleryID      persist.DBID       `db:"gallery_id" json:"gallery_id"`
+	IncludeSubject bool               `db:"include_subject" json:"include_subject"`
 }
 
 func (q *Queries) GetGalleryEventsInWindow(ctx context.Context, arg GetGalleryEventsInWindowParams) ([]Event, error) {
@@ -2556,10 +2577,10 @@ select id, version, owner_id, action, data, event_time, event_ids, deleted, last
 `
 
 type GetLastFeedEventForCollectionParams struct {
-	OwnerID      persist.DBID       `json:"owner_id"`
-	EventTime    time.Time          `json:"event_time"`
-	Actions      persist.ActionList `json:"actions"`
-	CollectionID persist.DBID       `json:"collection_id"`
+	OwnerID      persist.DBID       `db:"owner_id" json:"owner_id"`
+	EventTime    time.Time          `db:"event_time" json:"event_time"`
+	Actions      persist.ActionList `db:"actions" json:"actions"`
+	CollectionID persist.DBID       `db:"collection_id" json:"collection_id"`
 }
 
 func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLastFeedEventForCollectionParams) (FeedEvent, error) {
@@ -2598,10 +2619,10 @@ select id, version, owner_id, action, data, event_time, event_ids, deleted, last
 `
 
 type GetLastFeedEventForTokenParams struct {
-	OwnerID   persist.DBID       `json:"owner_id"`
-	EventTime time.Time          `json:"event_time"`
-	Actions   persist.ActionList `json:"actions"`
-	TokenID   string             `json:"token_id"`
+	OwnerID   persist.DBID       `db:"owner_id" json:"owner_id"`
+	EventTime time.Time          `db:"event_time" json:"event_time"`
+	Actions   persist.ActionList `db:"actions" json:"actions"`
+	TokenID   string             `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedEventForTokenParams) (FeedEvent, error) {
@@ -2639,9 +2660,9 @@ select id, version, owner_id, action, data, event_time, event_ids, deleted, last
 `
 
 type GetLastFeedEventForUserParams struct {
-	OwnerID   persist.DBID       `json:"owner_id"`
-	EventTime time.Time          `json:"event_time"`
-	Actions   persist.ActionList `json:"actions"`
+	OwnerID   persist.DBID       `db:"owner_id" json:"owner_id"`
+	EventTime time.Time          `db:"event_time" json:"event_time"`
+	Actions   persist.ActionList `db:"actions" json:"actions"`
 }
 
 func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEventForUserParams) (FeedEvent, error) {
@@ -2674,9 +2695,9 @@ where (chain, contract_address, token_id) = ($1, $2, $3)
 `
 
 type GetMediaByTokenIdentifiersParams struct {
-	Chain           persist.Chain   `json:"chain"`
-	ContractAddress persist.Address `json:"contract_address"`
-	TokenID         persist.TokenID `json:"token_id"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetMediaByTokenIdentifiers(ctx context.Context, arg GetMediaByTokenIdentifiersParams) (TokenMedia, error) {
@@ -2772,59 +2793,59 @@ ORDER BY tokens.id
 `
 
 type GetMissingThumbnailTokensByIDRangeParams struct {
-	StartID persist.DBID `json:"start_id"`
-	EndID   persist.DBID `json:"end_id"`
+	StartID persist.DBID `db:"start_id" json:"start_id"`
+	EndID   persist.DBID `db:"end_id" json:"end_id"`
 }
 
 type GetMissingThumbnailTokensByIDRangeRow struct {
-	ID                             persist.DBID      `json:"id"`
-	Deleted                        bool              `json:"deleted"`
-	Version                        sql.NullInt32     `json:"version"`
-	CreatedAt                      time.Time         `json:"created_at"`
-	LastUpdated                    time.Time         `json:"last_updated"`
-	NameDeprecated                 sql.NullString    `json:"name__deprecated"`
-	DescriptionDeprecated          sql.NullString    `json:"description__deprecated"`
-	CollectorsNote                 sql.NullString    `json:"collectors_note"`
-	TokenTypeDeprecated            sql.NullString    `json:"token_type__deprecated"`
-	TokenIDDeprecated              sql.NullString    `json:"token_id__deprecated"`
-	Quantity                       persist.HexString `json:"quantity"`
-	OwnershipHistoryDeprecated     []pgtype.JSONB    `json:"ownership_history__deprecated"`
-	ExternalUrlDeprecated          sql.NullString    `json:"external_url__deprecated"`
-	BlockNumber                    sql.NullInt64     `json:"block_number"`
-	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
-	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
-	ChainDeprecated                sql.NullInt32     `json:"chain__deprecated"`
-	ContractID                     persist.DBID      `json:"contract_id"`
-	IsUserMarkedSpam               sql.NullBool      `json:"is_user_marked_spam"`
-	IsProviderMarkedSpamDeprecated sql.NullBool      `json:"is_provider_marked_spam__deprecated"`
-	LastSynced                     time.Time         `json:"last_synced"`
-	TokenUriDeprecated             sql.NullString    `json:"token_uri__deprecated"`
-	FallbackMediaDeprecated        pgtype.JSONB      `json:"fallback_media__deprecated"`
-	TokenMediaIDDeprecated         sql.NullString    `json:"token_media_id__deprecated"`
-	IsCreatorToken                 bool              `json:"is_creator_token"`
-	TokenDefinitionID              persist.DBID      `json:"token_definition_id"`
-	IsHolderToken                  bool              `json:"is_holder_token"`
-	Displayable                    bool              `json:"displayable"`
-	ID_2                           persist.DBID      `json:"id_2"`
-	Deleted_2                      bool              `json:"deleted_2"`
-	Version_2                      sql.NullInt32     `json:"version_2"`
-	CreatedAt_2                    time.Time         `json:"created_at_2"`
-	LastUpdated_2                  time.Time         `json:"last_updated_2"`
-	Name                           sql.NullString    `json:"name"`
-	Symbol                         sql.NullString    `json:"symbol"`
-	Address                        persist.Address   `json:"address"`
-	CreatorAddress                 persist.Address   `json:"creator_address"`
-	Chain                          persist.Chain     `json:"chain"`
-	ProfileBannerUrl               sql.NullString    `json:"profile_banner_url"`
-	ProfileImageUrl                sql.NullString    `json:"profile_image_url"`
-	BadgeUrl                       sql.NullString    `json:"badge_url"`
-	Description                    sql.NullString    `json:"description"`
-	OwnerAddress                   persist.Address   `json:"owner_address"`
-	IsProviderMarkedSpam           bool              `json:"is_provider_marked_spam"`
-	ParentID                       persist.DBID      `json:"parent_id"`
-	OverrideCreatorUserID          persist.DBID      `json:"override_creator_user_id"`
-	L1Chain                        persist.L1Chain   `json:"l1_chain"`
-	WalletAddress                  persist.Address   `json:"wallet_address"`
+	ID                             persist.DBID      `db:"id" json:"id"`
+	Deleted                        bool              `db:"deleted" json:"deleted"`
+	Version                        sql.NullInt32     `db:"version" json:"version"`
+	CreatedAt                      time.Time         `db:"created_at" json:"created_at"`
+	LastUpdated                    time.Time         `db:"last_updated" json:"last_updated"`
+	NameDeprecated                 sql.NullString    `db:"name__deprecated" json:"name__deprecated"`
+	DescriptionDeprecated          sql.NullString    `db:"description__deprecated" json:"description__deprecated"`
+	CollectorsNote                 sql.NullString    `db:"collectors_note" json:"collectors_note"`
+	TokenTypeDeprecated            sql.NullString    `db:"token_type__deprecated" json:"token_type__deprecated"`
+	TokenIDDeprecated              sql.NullString    `db:"token_id__deprecated" json:"token_id__deprecated"`
+	Quantity                       persist.HexString `db:"quantity" json:"quantity"`
+	OwnershipHistoryDeprecated     []pgtype.JSONB    `db:"ownership_history__deprecated" json:"ownership_history__deprecated"`
+	ExternalUrlDeprecated          sql.NullString    `db:"external_url__deprecated" json:"external_url__deprecated"`
+	BlockNumber                    sql.NullInt64     `db:"block_number" json:"block_number"`
+	OwnerUserID                    persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
+	OwnedByWallets                 persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
+	ChainDeprecated                sql.NullInt32     `db:"chain__deprecated" json:"chain__deprecated"`
+	ContractID                     persist.DBID      `db:"contract_id" json:"contract_id"`
+	IsUserMarkedSpam               sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
+	IsProviderMarkedSpamDeprecated sql.NullBool      `db:"is_provider_marked_spam__deprecated" json:"is_provider_marked_spam__deprecated"`
+	LastSynced                     time.Time         `db:"last_synced" json:"last_synced"`
+	TokenUriDeprecated             sql.NullString    `db:"token_uri__deprecated" json:"token_uri__deprecated"`
+	FallbackMediaDeprecated        pgtype.JSONB      `db:"fallback_media__deprecated" json:"fallback_media__deprecated"`
+	TokenMediaIDDeprecated         sql.NullString    `db:"token_media_id__deprecated" json:"token_media_id__deprecated"`
+	IsCreatorToken                 bool              `db:"is_creator_token" json:"is_creator_token"`
+	TokenDefinitionID              persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
+	IsHolderToken                  bool              `db:"is_holder_token" json:"is_holder_token"`
+	Displayable                    bool              `db:"displayable" json:"displayable"`
+	ID_2                           persist.DBID      `db:"id_2" json:"id_2"`
+	Deleted_2                      bool              `db:"deleted_2" json:"deleted_2"`
+	Version_2                      sql.NullInt32     `db:"version_2" json:"version_2"`
+	CreatedAt_2                    time.Time         `db:"created_at_2" json:"created_at_2"`
+	LastUpdated_2                  time.Time         `db:"last_updated_2" json:"last_updated_2"`
+	Name                           sql.NullString    `db:"name" json:"name"`
+	Symbol                         sql.NullString    `db:"symbol" json:"symbol"`
+	Address                        persist.Address   `db:"address" json:"address"`
+	CreatorAddress                 persist.Address   `db:"creator_address" json:"creator_address"`
+	Chain                          persist.Chain     `db:"chain" json:"chain"`
+	ProfileBannerUrl               sql.NullString    `db:"profile_banner_url" json:"profile_banner_url"`
+	ProfileImageUrl                sql.NullString    `db:"profile_image_url" json:"profile_image_url"`
+	BadgeUrl                       sql.NullString    `db:"badge_url" json:"badge_url"`
+	Description                    sql.NullString    `db:"description" json:"description"`
+	OwnerAddress                   persist.Address   `db:"owner_address" json:"owner_address"`
+	IsProviderMarkedSpam           bool              `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
+	ParentID                       persist.DBID      `db:"parent_id" json:"parent_id"`
+	OverrideCreatorUserID          persist.DBID      `db:"override_creator_user_id" json:"override_creator_user_id"`
+	L1Chain                        persist.L1Chain   `db:"l1_chain" json:"l1_chain"`
+	WalletAddress                  persist.Address   `db:"wallet_address" json:"wallet_address"`
 }
 
 func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg GetMissingThumbnailTokensByIDRangeParams) ([]GetMissingThumbnailTokensByIDRangeRow, error) {
@@ -2908,12 +2929,12 @@ select id, deleted, owner_id, version, last_updated, created_at, action, data, e
 `
 
 type GetMostRecentNotificationByOwnerIDForActionParams struct {
-	OwnerID          persist.DBID   `json:"owner_id"`
-	Action           persist.Action `json:"action"`
-	FeedEventID      persist.DBID   `json:"feed_event_id"`
-	PostID           persist.DBID   `json:"post_id"`
-	OnlyForFeedEvent bool           `json:"only_for_feed_event"`
-	OnlyForPost      bool           `json:"only_for_post"`
+	OwnerID          persist.DBID   `db:"owner_id" json:"owner_id"`
+	Action           persist.Action `db:"action" json:"action"`
+	FeedEventID      persist.DBID   `db:"feed_event_id" json:"feed_event_id"`
+	PostID           persist.DBID   `db:"post_id" json:"post_id"`
+	OnlyForFeedEvent bool           `db:"only_for_feed_event" json:"only_for_feed_event"`
+	OnlyForPost      bool           `db:"only_for_post" json:"only_for_post"`
 }
 
 func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
@@ -2962,13 +2983,13 @@ select id, deleted, owner_id, version, last_updated, created_at, action, data, e
 `
 
 type GetMostRecentNotificationByOwnerIDTokenIDForActionParams struct {
-	OwnerID          persist.DBID   `json:"owner_id"`
-	TokenID          persist.DBID   `json:"token_id"`
-	Action           persist.Action `json:"action"`
-	FeedEventID      persist.DBID   `json:"feed_event_id"`
-	PostID           persist.DBID   `json:"post_id"`
-	OnlyForFeedEvent bool           `json:"only_for_feed_event"`
-	OnlyForPost      bool           `json:"only_for_post"`
+	OwnerID          persist.DBID   `db:"owner_id" json:"owner_id"`
+	TokenID          persist.DBID   `db:"token_id" json:"token_id"`
+	Action           persist.Action `db:"action" json:"action"`
+	FeedEventID      persist.DBID   `db:"feed_event_id" json:"feed_event_id"`
+	PostID           persist.DBID   `db:"post_id" json:"post_id"`
+	OnlyForFeedEvent bool           `db:"only_for_feed_event" json:"only_for_feed_event"`
+	OnlyForPost      bool           `db:"only_for_post" json:"only_for_post"`
 }
 
 func (q *Queries) GetMostRecentNotificationByOwnerIDTokenIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDTokenIDForActionParams) (Notification, error) {
@@ -3042,9 +3063,9 @@ SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, e
 `
 
 type GetNotificationsByOwnerIDForActionAfterParams struct {
-	OwnerID      persist.DBID   `json:"owner_id"`
-	Action       persist.Action `json:"action"`
-	CreatedAfter time.Time      `json:"created_after"`
+	OwnerID      persist.DBID   `db:"owner_id" json:"owner_id"`
+	Action       persist.Action `db:"action" json:"action"`
+	CreatedAfter time.Time      `db:"created_after" json:"created_after"`
 }
 
 func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, arg GetNotificationsByOwnerIDForActionAfterParams) ([]Notification, error) {
@@ -3167,15 +3188,15 @@ limit 1
 `
 
 type GetPotentialENSProfileImageByUserIdParams struct {
-	EnsAddress persist.Address `json:"ens_address"`
-	Chain      persist.Chain   `json:"chain"`
-	UserID     persist.DBID    `json:"user_id"`
+	EnsAddress persist.Address `db:"ens_address" json:"ens_address"`
+	Chain      persist.Chain   `db:"chain" json:"chain"`
+	UserID     persist.DBID    `db:"user_id" json:"user_id"`
 }
 
 type GetPotentialENSProfileImageByUserIdRow struct {
-	TokenDefinition TokenDefinition `json:"tokendefinition"`
-	TokenMedia      TokenMedia      `json:"tokenmedia"`
-	Wallet          Wallet          `json:"wallet"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
+	Wallet          Wallet          `db:"wallet" json:"wallet"`
 }
 
 func (q *Queries) GetPotentialENSProfileImageByUserId(ctx context.Context, arg GetPotentialENSProfileImageByUserIdParams) (GetPotentialENSProfileImageByUserIdRow, error) {
@@ -3241,8 +3262,8 @@ order by t.id limit 3
 `
 
 type GetPreviewURLsByContractIdAndUserIdParams struct {
-	OwnerID    persist.DBID `json:"owner_id"`
-	ContractID persist.DBID `json:"contract_id"`
+	OwnerID    persist.DBID `db:"owner_id" json:"owner_id"`
+	ContractID persist.DBID `db:"contract_id" json:"contract_id"`
 }
 
 func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg GetPreviewURLsByContractIdAndUserIdParams) ([]string, error) {
@@ -3347,9 +3368,9 @@ SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, e
 `
 
 type GetRecentUnseenNotificationsParams struct {
-	OwnerID      persist.DBID `json:"owner_id"`
-	CreatedAfter time.Time    `json:"created_after"`
-	Lim          int32        `json:"lim"`
+	OwnerID      persist.DBID `db:"owner_id" json:"owner_id"`
+	CreatedAfter time.Time    `db:"created_after" json:"created_after"`
+	Lim          int32        `db:"lim" json:"lim"`
 }
 
 func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecentUnseenNotificationsParams) ([]Notification, error) {
@@ -3423,59 +3444,59 @@ ORDER BY tokens.id
 `
 
 type GetSVGTokensWithContractsByIDsParams struct {
-	StartID persist.DBID `json:"start_id"`
-	EndID   persist.DBID `json:"end_id"`
+	StartID persist.DBID `db:"start_id" json:"start_id"`
+	EndID   persist.DBID `db:"end_id" json:"end_id"`
 }
 
 type GetSVGTokensWithContractsByIDsRow struct {
-	ID                             persist.DBID      `json:"id"`
-	Deleted                        bool              `json:"deleted"`
-	Version                        sql.NullInt32     `json:"version"`
-	CreatedAt                      time.Time         `json:"created_at"`
-	LastUpdated                    time.Time         `json:"last_updated"`
-	NameDeprecated                 sql.NullString    `json:"name__deprecated"`
-	DescriptionDeprecated          sql.NullString    `json:"description__deprecated"`
-	CollectorsNote                 sql.NullString    `json:"collectors_note"`
-	TokenTypeDeprecated            sql.NullString    `json:"token_type__deprecated"`
-	TokenIDDeprecated              sql.NullString    `json:"token_id__deprecated"`
-	Quantity                       persist.HexString `json:"quantity"`
-	OwnershipHistoryDeprecated     []pgtype.JSONB    `json:"ownership_history__deprecated"`
-	ExternalUrlDeprecated          sql.NullString    `json:"external_url__deprecated"`
-	BlockNumber                    sql.NullInt64     `json:"block_number"`
-	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
-	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
-	ChainDeprecated                sql.NullInt32     `json:"chain__deprecated"`
-	ContractID                     persist.DBID      `json:"contract_id"`
-	IsUserMarkedSpam               sql.NullBool      `json:"is_user_marked_spam"`
-	IsProviderMarkedSpamDeprecated sql.NullBool      `json:"is_provider_marked_spam__deprecated"`
-	LastSynced                     time.Time         `json:"last_synced"`
-	TokenUriDeprecated             sql.NullString    `json:"token_uri__deprecated"`
-	FallbackMediaDeprecated        pgtype.JSONB      `json:"fallback_media__deprecated"`
-	TokenMediaIDDeprecated         sql.NullString    `json:"token_media_id__deprecated"`
-	IsCreatorToken                 bool              `json:"is_creator_token"`
-	TokenDefinitionID              persist.DBID      `json:"token_definition_id"`
-	IsHolderToken                  bool              `json:"is_holder_token"`
-	Displayable                    bool              `json:"displayable"`
-	ID_2                           persist.DBID      `json:"id_2"`
-	Deleted_2                      bool              `json:"deleted_2"`
-	Version_2                      sql.NullInt32     `json:"version_2"`
-	CreatedAt_2                    time.Time         `json:"created_at_2"`
-	LastUpdated_2                  time.Time         `json:"last_updated_2"`
-	Name                           sql.NullString    `json:"name"`
-	Symbol                         sql.NullString    `json:"symbol"`
-	Address                        persist.Address   `json:"address"`
-	CreatorAddress                 persist.Address   `json:"creator_address"`
-	Chain                          persist.Chain     `json:"chain"`
-	ProfileBannerUrl               sql.NullString    `json:"profile_banner_url"`
-	ProfileImageUrl                sql.NullString    `json:"profile_image_url"`
-	BadgeUrl                       sql.NullString    `json:"badge_url"`
-	Description                    sql.NullString    `json:"description"`
-	OwnerAddress                   persist.Address   `json:"owner_address"`
-	IsProviderMarkedSpam           bool              `json:"is_provider_marked_spam"`
-	ParentID                       persist.DBID      `json:"parent_id"`
-	OverrideCreatorUserID          persist.DBID      `json:"override_creator_user_id"`
-	L1Chain                        persist.L1Chain   `json:"l1_chain"`
-	WalletAddress                  persist.Address   `json:"wallet_address"`
+	ID                             persist.DBID      `db:"id" json:"id"`
+	Deleted                        bool              `db:"deleted" json:"deleted"`
+	Version                        sql.NullInt32     `db:"version" json:"version"`
+	CreatedAt                      time.Time         `db:"created_at" json:"created_at"`
+	LastUpdated                    time.Time         `db:"last_updated" json:"last_updated"`
+	NameDeprecated                 sql.NullString    `db:"name__deprecated" json:"name__deprecated"`
+	DescriptionDeprecated          sql.NullString    `db:"description__deprecated" json:"description__deprecated"`
+	CollectorsNote                 sql.NullString    `db:"collectors_note" json:"collectors_note"`
+	TokenTypeDeprecated            sql.NullString    `db:"token_type__deprecated" json:"token_type__deprecated"`
+	TokenIDDeprecated              sql.NullString    `db:"token_id__deprecated" json:"token_id__deprecated"`
+	Quantity                       persist.HexString `db:"quantity" json:"quantity"`
+	OwnershipHistoryDeprecated     []pgtype.JSONB    `db:"ownership_history__deprecated" json:"ownership_history__deprecated"`
+	ExternalUrlDeprecated          sql.NullString    `db:"external_url__deprecated" json:"external_url__deprecated"`
+	BlockNumber                    sql.NullInt64     `db:"block_number" json:"block_number"`
+	OwnerUserID                    persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
+	OwnedByWallets                 persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
+	ChainDeprecated                sql.NullInt32     `db:"chain__deprecated" json:"chain__deprecated"`
+	ContractID                     persist.DBID      `db:"contract_id" json:"contract_id"`
+	IsUserMarkedSpam               sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
+	IsProviderMarkedSpamDeprecated sql.NullBool      `db:"is_provider_marked_spam__deprecated" json:"is_provider_marked_spam__deprecated"`
+	LastSynced                     time.Time         `db:"last_synced" json:"last_synced"`
+	TokenUriDeprecated             sql.NullString    `db:"token_uri__deprecated" json:"token_uri__deprecated"`
+	FallbackMediaDeprecated        pgtype.JSONB      `db:"fallback_media__deprecated" json:"fallback_media__deprecated"`
+	TokenMediaIDDeprecated         sql.NullString    `db:"token_media_id__deprecated" json:"token_media_id__deprecated"`
+	IsCreatorToken                 bool              `db:"is_creator_token" json:"is_creator_token"`
+	TokenDefinitionID              persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
+	IsHolderToken                  bool              `db:"is_holder_token" json:"is_holder_token"`
+	Displayable                    bool              `db:"displayable" json:"displayable"`
+	ID_2                           persist.DBID      `db:"id_2" json:"id_2"`
+	Deleted_2                      bool              `db:"deleted_2" json:"deleted_2"`
+	Version_2                      sql.NullInt32     `db:"version_2" json:"version_2"`
+	CreatedAt_2                    time.Time         `db:"created_at_2" json:"created_at_2"`
+	LastUpdated_2                  time.Time         `db:"last_updated_2" json:"last_updated_2"`
+	Name                           sql.NullString    `db:"name" json:"name"`
+	Symbol                         sql.NullString    `db:"symbol" json:"symbol"`
+	Address                        persist.Address   `db:"address" json:"address"`
+	CreatorAddress                 persist.Address   `db:"creator_address" json:"creator_address"`
+	Chain                          persist.Chain     `db:"chain" json:"chain"`
+	ProfileBannerUrl               sql.NullString    `db:"profile_banner_url" json:"profile_banner_url"`
+	ProfileImageUrl                sql.NullString    `db:"profile_image_url" json:"profile_image_url"`
+	BadgeUrl                       sql.NullString    `db:"badge_url" json:"badge_url"`
+	Description                    sql.NullString    `db:"description" json:"description"`
+	OwnerAddress                   persist.Address   `db:"owner_address" json:"owner_address"`
+	IsProviderMarkedSpam           bool              `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
+	ParentID                       persist.DBID      `db:"parent_id" json:"parent_id"`
+	OverrideCreatorUserID          persist.DBID      `db:"override_creator_user_id" json:"override_creator_user_id"`
+	L1Chain                        persist.L1Chain   `db:"l1_chain" json:"l1_chain"`
+	WalletAddress                  persist.Address   `db:"wallet_address" json:"wallet_address"`
 }
 
 func (q *Queries) GetSVGTokensWithContractsByIDs(ctx context.Context, arg GetSVGTokensWithContractsByIDsParams) ([]GetSVGTokensWithContractsByIDsRow, error) {
@@ -3552,8 +3573,8 @@ select id, deleted, version, created_at, last_updated, user_id, provider, access
 `
 
 type GetSocialAuthByUserIDParams struct {
-	UserID   persist.DBID           `json:"user_id"`
-	Provider persist.SocialProvider `json:"provider"`
+	UserID   persist.DBID           `db:"user_id" json:"user_id"`
+	Provider persist.SocialProvider `db:"provider" json:"provider"`
 }
 
 func (q *Queries) GetSocialAuthByUserID(ctx context.Context, arg GetSocialAuthByUserIDParams) (PiiSocialsAuth, error) {
@@ -3583,23 +3604,23 @@ order by (f.id is not null,user_view.created_at,user_view.id)
 `
 
 type GetSocialConnectionsParams struct {
-	SocialIds           []string     `json:"social_ids"`
-	SocialUsernames     []string     `json:"social_usernames"`
-	SocialDisplaynames  []string     `json:"social_displaynames"`
-	SocialProfileImages []string     `json:"social_profile_images"`
-	Social              string       `json:"social"`
-	UserID              persist.DBID `json:"user_id"`
-	OnlyUnfollowing     bool         `json:"only_unfollowing"`
+	SocialIds           []string     `db:"social_ids" json:"social_ids"`
+	SocialUsernames     []string     `db:"social_usernames" json:"social_usernames"`
+	SocialDisplaynames  []string     `db:"social_displaynames" json:"social_displaynames"`
+	SocialProfileImages []string     `db:"social_profile_images" json:"social_profile_images"`
+	Social              string       `db:"social" json:"social"`
+	UserID              persist.DBID `db:"user_id" json:"user_id"`
+	OnlyUnfollowing     bool         `db:"only_unfollowing" json:"only_unfollowing"`
 }
 
 type GetSocialConnectionsRow struct {
-	SocialID           interface{}  `json:"social_id"`
-	SocialUsername     interface{}  `json:"social_username"`
-	SocialDisplayname  interface{}  `json:"social_displayname"`
-	SocialProfileImage interface{}  `json:"social_profile_image"`
-	UserID             persist.DBID `json:"user_id"`
-	UserCreatedAt      time.Time    `json:"user_created_at"`
-	AlreadyFollowing   bool         `json:"already_following"`
+	SocialID           interface{}  `db:"social_id" json:"social_id"`
+	SocialUsername     interface{}  `db:"social_username" json:"social_username"`
+	SocialDisplayname  interface{}  `db:"social_displayname" json:"social_displayname"`
+	SocialProfileImage interface{}  `db:"social_profile_image" json:"social_profile_image"`
+	UserID             persist.DBID `db:"user_id" json:"user_id"`
+	UserCreatedAt      time.Time    `db:"user_created_at" json:"user_created_at"`
+	AlreadyFollowing   bool         `db:"already_following" json:"already_following"`
 }
 
 func (q *Queries) GetSocialConnections(ctx context.Context, arg GetSocialConnectionsParams) ([]GetSocialConnectionsRow, error) {
@@ -3652,31 +3673,31 @@ limit $1
 `
 
 type GetSocialConnectionsPaginateParams struct {
-	Limit               int32        `json:"limit"`
-	SocialIds           []string     `json:"social_ids"`
-	SocialUsernames     []string     `json:"social_usernames"`
-	SocialDisplaynames  []string     `json:"social_displaynames"`
-	SocialProfileImages []string     `json:"social_profile_images"`
-	Social              string       `json:"social"`
-	UserID              persist.DBID `json:"user_id"`
-	OnlyUnfollowing     bool         `json:"only_unfollowing"`
-	CurBeforeFollowing  bool         `json:"cur_before_following"`
-	CurBeforeTime       time.Time    `json:"cur_before_time"`
-	CurBeforeID         persist.DBID `json:"cur_before_id"`
-	CurAfterFollowing   bool         `json:"cur_after_following"`
-	CurAfterTime        time.Time    `json:"cur_after_time"`
-	CurAfterID          persist.DBID `json:"cur_after_id"`
-	PagingForward       bool         `json:"paging_forward"`
+	Limit               int32        `db:"limit" json:"limit"`
+	SocialIds           []string     `db:"social_ids" json:"social_ids"`
+	SocialUsernames     []string     `db:"social_usernames" json:"social_usernames"`
+	SocialDisplaynames  []string     `db:"social_displaynames" json:"social_displaynames"`
+	SocialProfileImages []string     `db:"social_profile_images" json:"social_profile_images"`
+	Social              string       `db:"social" json:"social"`
+	UserID              persist.DBID `db:"user_id" json:"user_id"`
+	OnlyUnfollowing     bool         `db:"only_unfollowing" json:"only_unfollowing"`
+	CurBeforeFollowing  bool         `db:"cur_before_following" json:"cur_before_following"`
+	CurBeforeTime       time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID         persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterFollowing   bool         `db:"cur_after_following" json:"cur_after_following"`
+	CurAfterTime        time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID          persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward       bool         `db:"paging_forward" json:"paging_forward"`
 }
 
 type GetSocialConnectionsPaginateRow struct {
-	SocialID           interface{}  `json:"social_id"`
-	SocialUsername     interface{}  `json:"social_username"`
-	SocialDisplayname  interface{}  `json:"social_displayname"`
-	SocialProfileImage interface{}  `json:"social_profile_image"`
-	UserID             persist.DBID `json:"user_id"`
-	UserCreatedAt      time.Time    `json:"user_created_at"`
-	AlreadyFollowing   bool         `json:"already_following"`
+	SocialID           interface{}  `db:"social_id" json:"social_id"`
+	SocialUsername     interface{}  `db:"social_username" json:"social_username"`
+	SocialDisplayname  interface{}  `db:"social_displayname" json:"social_displayname"`
+	SocialProfileImage interface{}  `db:"social_profile_image" json:"social_profile_image"`
+	UserID             persist.DBID `db:"user_id" json:"user_id"`
+	UserCreatedAt      time.Time    `db:"user_created_at" json:"user_created_at"`
+	AlreadyFollowing   bool         `db:"already_following" json:"already_following"`
 }
 
 // this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
@@ -3785,10 +3806,10 @@ where owner_user_id = $1 and token_definition_id = (select id from token_definit
 `
 
 type GetTokenByUserTokenIdentifiersParams struct {
-	OwnerID         persist.DBID    `json:"owner_id"`
-	Chain           persist.Chain   `json:"chain"`
-	ContractAddress persist.Address `json:"contract_address"`
-	TokenID         persist.TokenID `json:"token_id"`
+	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTokenByUserTokenIdentifiersParams) (Token, error) {
@@ -3844,8 +3865,8 @@ where tokens.id = $1
 `
 
 type GetTokenDefinitionAndMediaByTokenDbidRow struct {
-	TokenDefinition TokenDefinition `json:"tokendefinition"`
-	TokenMedia      TokenMedia      `json:"tokenmedia"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
 }
 
 func (q *Queries) GetTokenDefinitionAndMediaByTokenDbid(ctx context.Context, id persist.DBID) (GetTokenDefinitionAndMediaByTokenDbidRow, error) {
@@ -3895,14 +3916,14 @@ where (token_definitions.chain, token_definitions.contract_address, token_defini
 `
 
 type GetTokenDefinitionAndMediaByTokenIdentifiersParams struct {
-	Chain           persist.Chain   `json:"chain"`
-	ContractAddress persist.Address `json:"contract_address"`
-	TokenID         persist.TokenID `json:"token_id"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
 }
 
 type GetTokenDefinitionAndMediaByTokenIdentifiersRow struct {
-	TokenDefinition TokenDefinition `json:"tokendefinition"`
-	TokenMedia      TokenMedia      `json:"tokenmedia"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
 }
 
 func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionAndMediaByTokenIdentifiersParams) (GetTokenDefinitionAndMediaByTokenIdentifiersRow, error) {
@@ -4008,9 +4029,9 @@ where (chain, contract_address, token_id) = ($1, $2, $3) and not deleted
 `
 
 type GetTokenDefinitionByTokenIdentifiersParams struct {
-	Chain           persist.Chain   `json:"chain"`
-	ContractAddress persist.Address `json:"contract_address"`
-	TokenID         persist.TokenID `json:"token_id"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetTokenDefinitionByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionByTokenIdentifiersParams) (TokenDefinition, error) {
@@ -4046,9 +4067,9 @@ order by tokens.block_number desc
 `
 
 type GetTokenFullDetailsByContractIdRow struct {
-	Token           Token           `json:"token"`
-	TokenDefinition TokenDefinition `json:"tokendefinition"`
-	Contract        Contract        `json:"contract"`
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
 }
 
 func (q *Queries) GetTokenFullDetailsByContractId(ctx context.Context, id persist.DBID) ([]GetTokenFullDetailsByContractIdRow, error) {
@@ -4144,9 +4165,9 @@ order by tokens.block_number desc
 `
 
 type GetTokenFullDetailsByUserIdRow struct {
-	Token           Token           `json:"token"`
-	TokenDefinition TokenDefinition `json:"tokendefinition"`
-	Contract        Contract        `json:"contract"`
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
 }
 
 func (q *Queries) GetTokenFullDetailsByUserId(ctx context.Context, ownerUserID persist.DBID) ([]GetTokenFullDetailsByUserIdRow, error) {
@@ -4247,16 +4268,16 @@ order by tokens.block_number desc
 `
 
 type GetTokenFullDetailsByUserTokenIdentifiersParams struct {
-	OwnerUserID     persist.DBID    `json:"owner_user_id"`
-	Chain           persist.Chain   `json:"chain"`
-	ContractAddress persist.Address `json:"contract_address"`
-	TokenID         persist.TokenID `json:"token_id"`
+	OwnerUserID     persist.DBID    `db:"owner_user_id" json:"owner_user_id"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
 }
 
 type GetTokenFullDetailsByUserTokenIdentifiersRow struct {
-	Token           Token           `json:"token"`
-	TokenDefinition TokenDefinition `json:"tokendefinition"`
-	Contract        Contract        `json:"contract"`
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
 }
 
 func (q *Queries) GetTokenFullDetailsByUserTokenIdentifiers(ctx context.Context, arg GetTokenFullDetailsByUserTokenIdentifiersParams) (GetTokenFullDetailsByUserTokenIdentifiersRow, error) {
@@ -4383,16 +4404,16 @@ select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__depreca
 `
 
 type GetTokensByContractIdPaginateParams struct {
-	ID                 persist.DBID `json:"id"`
-	Limit              int32        `json:"limit"`
-	GalleryUsersOnly   bool         `json:"gallery_users_only"`
-	CurBeforeUniversal bool         `json:"cur_before_universal"`
-	CurBeforeTime      time.Time    `json:"cur_before_time"`
-	CurBeforeID        persist.DBID `json:"cur_before_id"`
-	CurAfterUniversal  bool         `json:"cur_after_universal"`
-	CurAfterTime       time.Time    `json:"cur_after_time"`
-	CurAfterID         persist.DBID `json:"cur_after_id"`
-	PagingForward      bool         `json:"paging_forward"`
+	ID                 persist.DBID `db:"id" json:"id"`
+	Limit              int32        `db:"limit" json:"limit"`
+	GalleryUsersOnly   bool         `db:"gallery_users_only" json:"gallery_users_only"`
+	CurBeforeUniversal bool         `db:"cur_before_universal" json:"cur_before_universal"`
+	CurBeforeTime      time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID        persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterUniversal  bool         `db:"cur_after_universal" json:"cur_after_universal"`
+	CurAfterTime       time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID         persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward      bool         `db:"paging_forward" json:"paging_forward"`
 }
 
 func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetTokensByContractIdPaginateParams) ([]Token, error) {
@@ -4478,8 +4499,8 @@ select collections.id from collections join ranking using(id) where score <= 100
 `
 
 type GetTopCollectionsForCommunityParams struct {
-	Chain   persist.Chain   `json:"chain"`
-	Address persist.Address `json:"address"`
+	Chain   persist.Chain   `db:"chain" json:"chain"`
+	Address persist.Address `db:"address" json:"address"`
 }
 
 func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopCollectionsForCommunityParams) ([]persist.DBID, error) {
@@ -4555,11 +4576,11 @@ group by (token_definitions.token_id, token_definitions.contract_address, token_
 `
 
 type GetUniqueTokenIdentifiersByTokenIDRow struct {
-	TokenID         persist.TokenID   `json:"token_id"`
-	ContractAddress persist.Address   `json:"contract_address"`
-	Chain           persist.Chain     `json:"chain"`
-	Quantity        persist.HexString `json:"quantity"`
-	OwnerAddresses  []string          `json:"owner_addresses"`
+	TokenID         persist.TokenID   `db:"token_id" json:"token_id"`
+	ContractAddress persist.Address   `db:"contract_address" json:"contract_address"`
+	Chain           persist.Chain     `db:"chain" json:"chain"`
+	Quantity        persist.HexString `db:"quantity" json:"quantity"`
+	OwnerAddresses  []string          `db:"owner_addresses" json:"owner_addresses"`
 }
 
 func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id persist.DBID) (GetUniqueTokenIdentifiersByTokenIDRow, error) {
@@ -4586,8 +4607,8 @@ where wallets.address = $1
 `
 
 type GetUserByAddressAndL1Params struct {
-	Address persist.Address `json:"address"`
-	L1Chain persist.L1Chain `json:"l1_chain"`
+	Address persist.Address `db:"address" json:"address"`
+	L1Chain persist.L1Chain `db:"l1_chain" json:"l1_chain"`
 }
 
 func (q *Queries) GetUserByAddressAndL1(ctx context.Context, arg GetUserByAddressAndL1Params) (User, error) {
@@ -4761,13 +4782,13 @@ SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, e
 `
 
 type GetUserNotificationsParams struct {
-	OwnerID       persist.DBID `json:"owner_id"`
-	Limit         int32        `json:"limit"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
+	OwnerID       persist.DBID `db:"owner_id" json:"owner_id"`
+	Limit         int32        `db:"limit" json:"limit"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
 }
 
 func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificationsParams) ([]Notification, error) {
@@ -4838,11 +4859,11 @@ select role from membership_roles where role is not null
 `
 
 type GetUserRolesByUserIdParams struct {
-	UserID                persist.DBID    `json:"user_id"`
-	Chain                 persist.Chain   `json:"chain"`
-	MembershipAddress     persist.Address `json:"membership_address"`
-	MembershipTokenIds    []string        `json:"membership_token_ids"`
-	GrantedMembershipRole string          `json:"granted_membership_role"`
+	UserID                persist.DBID    `db:"user_id" json:"user_id"`
+	Chain                 persist.Chain   `db:"chain" json:"chain"`
+	MembershipAddress     persist.Address `db:"membership_address" json:"membership_address"`
+	MembershipTokenIds    []string        `db:"membership_token_ids" json:"membership_token_ids"`
+	GrantedMembershipRole string          `db:"granted_membership_role" json:"granted_membership_role"`
 }
 
 func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUserIdParams) ([]persist.Role, error) {
@@ -4881,13 +4902,13 @@ SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, e
 `
 
 type GetUserUnseenNotificationsParams struct {
-	OwnerID       persist.DBID `json:"owner_id"`
-	Limit         int32        `json:"limit"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
+	OwnerID       persist.DBID `db:"owner_id" json:"owner_id"`
+	Limit         int32        `db:"limit" json:"limit"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
 }
 
 func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUnseenNotificationsParams) ([]Notification, error) {
@@ -4973,30 +4994,30 @@ select users.id, users.deleted, users.version, users.last_updated, users.created
 `
 
 type GetUsersByChainAddressesParams struct {
-	Addresses []string        `json:"addresses"`
-	L1Chain   persist.L1Chain `json:"l1_chain"`
+	Addresses []string        `db:"addresses" json:"addresses"`
+	L1Chain   persist.L1Chain `db:"l1_chain" json:"l1_chain"`
 }
 
 type GetUsersByChainAddressesRow struct {
-	ID                   persist.DBID                     `json:"id"`
-	Deleted              bool                             `json:"deleted"`
-	Version              sql.NullInt32                    `json:"version"`
-	LastUpdated          time.Time                        `json:"last_updated"`
-	CreatedAt            time.Time                        `json:"created_at"`
-	Username             sql.NullString                   `json:"username"`
-	UsernameIdempotent   sql.NullString                   `json:"username_idempotent"`
-	Wallets              persist.WalletList               `json:"wallets"`
-	Bio                  sql.NullString                   `json:"bio"`
-	Traits               pgtype.JSONB                     `json:"traits"`
-	Universal            bool                             `json:"universal"`
-	NotificationSettings persist.UserNotificationSettings `json:"notification_settings"`
-	EmailVerified        persist.EmailVerificationStatus  `json:"email_verified"`
-	EmailUnsubscriptions persist.EmailUnsubscriptions     `json:"email_unsubscriptions"`
-	FeaturedGallery      *persist.DBID                    `json:"featured_gallery"`
-	PrimaryWalletID      persist.DBID                     `json:"primary_wallet_id"`
-	UserExperiences      pgtype.JSONB                     `json:"user_experiences"`
-	ProfileImageID       persist.DBID                     `json:"profile_image_id"`
-	Address              persist.Address                  `json:"address"`
+	ID                   persist.DBID                     `db:"id" json:"id"`
+	Deleted              bool                             `db:"deleted" json:"deleted"`
+	Version              sql.NullInt32                    `db:"version" json:"version"`
+	LastUpdated          time.Time                        `db:"last_updated" json:"last_updated"`
+	CreatedAt            time.Time                        `db:"created_at" json:"created_at"`
+	Username             sql.NullString                   `db:"username" json:"username"`
+	UsernameIdempotent   sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
+	Wallets              persist.WalletList               `db:"wallets" json:"wallets"`
+	Bio                  sql.NullString                   `db:"bio" json:"bio"`
+	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
+	Universal            bool                             `db:"universal" json:"universal"`
+	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
+	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
+	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
+	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
+	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
+	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
+	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+	Address              persist.Address                  `db:"address" json:"address"`
 }
 
 func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByChainAddressesParams) ([]GetUsersByChainAddressesRow, error) {
@@ -5049,13 +5070,13 @@ SELECT id, deleted, version, last_updated, created_at, username, username_idempo
 `
 
 type GetUsersByIDsParams struct {
-	Limit         int32            `json:"limit"`
-	UserIds       persist.DBIDList `json:"user_ids"`
-	CurBeforeTime time.Time        `json:"cur_before_time"`
-	CurBeforeID   persist.DBID     `json:"cur_before_id"`
-	CurAfterTime  time.Time        `json:"cur_after_time"`
-	CurAfterID    persist.DBID     `json:"cur_after_id"`
-	PagingForward bool             `json:"paging_forward"`
+	Limit         int32            `db:"limit" json:"limit"`
+	UserIds       persist.DBIDList `db:"user_ids" json:"user_ids"`
+	CurBeforeTime time.Time        `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID     `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time        `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID     `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool             `db:"paging_forward" json:"paging_forward"`
 }
 
 func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([]User, error) {
@@ -5115,11 +5136,11 @@ select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.u
 `
 
 type GetUsersByPositionPaginateParams struct {
-	UserIds       []string `json:"user_ids"`
-	CurBeforePos  int32    `json:"cur_before_pos"`
-	CurAfterPos   int32    `json:"cur_after_pos"`
-	PagingForward bool     `json:"paging_forward"`
-	Limit         int32    `json:"limit"`
+	UserIds       []string `db:"user_ids" json:"user_ids"`
+	CurBeforePos  int32    `db:"cur_before_pos" json:"cur_before_pos"`
+	CurAfterPos   int32    `db:"cur_after_pos" json:"cur_after_pos"`
+	PagingForward bool     `db:"paging_forward" json:"paging_forward"`
+	Limit         int32    `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersByPositionPaginateParams) ([]User, error) {
@@ -5172,8 +5193,8 @@ select id, deleted, version, last_updated, created_at, username, username_idempo
 `
 
 type GetUsersBySocialIDsParams struct {
-	SocialAccountType string   `json:"social_account_type"`
-	SocialIds         []string `json:"social_ids"`
+	SocialAccountType string   `db:"social_account_type" json:"social_account_type"`
+	SocialIds         []string `db:"social_ids" json:"social_ids"`
 }
 
 func (q *Queries) GetUsersBySocialIDs(ctx context.Context, arg GetUsersBySocialIDsParams) ([]PiiUserView, error) {
@@ -5228,13 +5249,13 @@ WHERE not wallets.deleted AND not users.deleted and not users.universal
 `
 
 type GetUsersByWalletAddressesAndChainsParams struct {
-	WalletAddresses []string `json:"wallet_addresses"`
-	Chains          []int32  `json:"chains"`
+	WalletAddresses []string `db:"wallet_addresses" json:"wallet_addresses"`
+	Chains          []int32  `db:"chains" json:"chains"`
 }
 
 type GetUsersByWalletAddressesAndChainsRow struct {
-	Wallet Wallet `json:"wallet"`
-	User   User   `json:"user"`
+	Wallet Wallet `db:"wallet" json:"wallet"`
+	User   User   `db:"user" json:"user"`
 }
 
 func (q *Queries) GetUsersByWalletAddressesAndChains(ctx context.Context, arg GetUsersByWalletAddressesAndChainsParams) ([]GetUsersByWalletAddressesAndChainsRow, error) {
@@ -5297,13 +5318,13 @@ select id, deleted, version, last_updated, created_at, username, username_idempo
 `
 
 type GetUsersWithEmailNotificationsOnParams struct {
-	EmailVerified persist.EmailVerificationStatus `json:"email_verified"`
-	Limit         int32                           `json:"limit"`
-	CurBeforeTime time.Time                       `json:"cur_before_time"`
-	CurBeforeID   persist.DBID                    `json:"cur_before_id"`
-	CurAfterTime  time.Time                       `json:"cur_after_time"`
-	CurAfterID    persist.DBID                    `json:"cur_after_id"`
-	PagingForward bool                            `json:"paging_forward"`
+	EmailVerified persist.EmailVerificationStatus `db:"email_verified" json:"email_verified"`
+	Limit         int32                           `db:"limit" json:"limit"`
+	CurBeforeTime time.Time                       `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID                    `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time                       `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID                    `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool                            `db:"paging_forward" json:"paging_forward"`
 }
 
 // TODO: Does not appear to be used
@@ -5368,14 +5389,14 @@ select id, deleted, version, last_updated, created_at, username, username_idempo
 `
 
 type GetUsersWithEmailNotificationsOnForEmailTypeParams struct {
-	EmailVerified       persist.EmailVerificationStatus `json:"email_verified"`
-	Limit               int32                           `json:"limit"`
-	EmailUnsubscription string                          `json:"email_unsubscription"`
-	CurBeforeTime       time.Time                       `json:"cur_before_time"`
-	CurBeforeID         persist.DBID                    `json:"cur_before_id"`
-	CurAfterTime        time.Time                       `json:"cur_after_time"`
-	CurAfterID          persist.DBID                    `json:"cur_after_id"`
-	PagingForward       bool                            `json:"paging_forward"`
+	EmailVerified       persist.EmailVerificationStatus `db:"email_verified" json:"email_verified"`
+	Limit               int32                           `db:"limit" json:"limit"`
+	EmailUnsubscription string                          `db:"email_unsubscription" json:"email_unsubscription"`
+	CurBeforeTime       time.Time                       `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID         persist.DBID                    `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime        time.Time                       `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID          persist.DBID                    `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward       bool                            `db:"paging_forward" json:"paging_forward"`
 }
 
 // for some reason this query will not allow me to use @tags for $1
@@ -5439,13 +5460,13 @@ select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.u
 `
 
 type GetUsersWithRolePaginateParams struct {
-	Limit         int32        `json:"limit"`
-	Role          persist.Role `json:"role"`
-	CurBeforeKey  string       `json:"cur_before_key"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterKey   string       `json:"cur_after_key"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
+	Role          persist.Role `db:"role" json:"role"`
+	CurBeforeKey  string       `db:"cur_before_key" json:"cur_before_key"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterKey   string       `db:"cur_after_key" json:"cur_after_key"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
 }
 
 func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWithRolePaginateParams) ([]User, error) {
@@ -5543,10 +5564,10 @@ select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcast
 `
 
 type GetUsersWithoutSocialsRow struct {
-	ID      persist.DBID    `json:"id"`
-	Address persist.Address `json:"address"`
-	Column3 interface{}     `json:"column_3"`
-	Column4 interface{}     `json:"column_4"`
+	ID      persist.DBID    `db:"id" json:"id"`
+	Address persist.Address `db:"address" json:"address"`
+	Column3 interface{}     `db:"column_3" json:"column_3"`
+	Column4 interface{}     `db:"column_4" json:"column_4"`
 }
 
 func (q *Queries) GetUsersWithoutSocials(ctx context.Context) ([]GetUsersWithoutSocialsRow, error) {
@@ -5583,11 +5604,11 @@ limit $1
 `
 
 type GetVisibleCollectionsByIDsPaginateParams struct {
-	Limit         int32    `json:"limit"`
-	CollectionIds []string `json:"collection_ids"`
-	CurBeforePos  int32    `json:"cur_before_pos"`
-	CurAfterPos   int32    `json:"cur_after_pos"`
-	PagingForward bool     `json:"paging_forward"`
+	Limit         int32    `db:"limit" json:"limit"`
+	CollectionIds []string `db:"collection_ids" json:"collection_ids"`
+	CurBeforePos  int32    `db:"cur_before_pos" json:"cur_before_pos"`
+	CurAfterPos   int32    `db:"cur_after_pos" json:"cur_after_pos"`
+	PagingForward bool     `db:"paging_forward" json:"paging_forward"`
 }
 
 func (q *Queries) GetVisibleCollectionsByIDsPaginate(ctx context.Context, arg GetVisibleCollectionsByIDsPaginateParams) ([]Collection, error) {
@@ -5635,8 +5656,8 @@ SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wa
 `
 
 type GetWalletByAddressAndL1ChainParams struct {
-	Address persist.Address `json:"address"`
-	L1Chain persist.L1Chain `json:"l1_chain"`
+	Address persist.Address `db:"address" json:"address"`
+	L1Chain persist.L1Chain `db:"l1_chain" json:"l1_chain"`
 }
 
 func (q *Queries) GetWalletByAddressAndL1Chain(ctx context.Context, arg GetWalletByAddressAndL1ChainParams) (Wallet, error) {
@@ -5743,8 +5764,8 @@ limit $1
 `
 
 type GetWindowedTrendingUserIDsParams struct {
-	Limit     int32     `json:"limit"`
-	WindowEnd time.Time `json:"window_end"`
+	Limit     int32     `db:"limit" json:"limit"`
+	WindowEnd time.Time `db:"window_end" json:"window_end"`
 }
 
 func (q *Queries) GetWindowedTrendingUserIDs(ctx context.Context, arg GetWindowedTrendingUserIDsParams) ([]persist.DBID, error) {
@@ -5776,8 +5797,8 @@ select exists(
 `
 
 type HasLaterGroupedEventParams struct {
-	GroupID sql.NullString `json:"group_id"`
-	EventID persist.DBID   `json:"event_id"`
+	GroupID sql.NullString `db:"group_id" json:"group_id"`
+	EventID persist.DBID   `db:"event_id" json:"event_id"`
 }
 
 func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedEventParams) (bool, error) {
@@ -5792,12 +5813,12 @@ insert into mentions (id, user_id, contract_id, comment_id, start, length) value
 `
 
 type InsertCommentMentionParams struct {
-	ID        persist.DBID   `json:"id"`
-	User      sql.NullString `json:"user"`
-	Contract  sql.NullString `json:"contract"`
-	CommentID persist.DBID   `json:"comment_id"`
-	Start     sql.NullInt32  `json:"start"`
-	Length    sql.NullInt32  `json:"length"`
+	ID        persist.DBID   `db:"id" json:"id"`
+	User      sql.NullString `db:"user" json:"user"`
+	Contract  sql.NullString `db:"contract" json:"contract"`
+	CommentID persist.DBID   `db:"comment_id" json:"comment_id"`
+	Start     sql.NullInt32  `db:"start" json:"start"`
+	Length    sql.NullInt32  `db:"length" json:"length"`
 }
 
 func (q *Queries) InsertCommentMention(ctx context.Context, arg InsertCommentMentionParams) (Mention, error) {
@@ -5833,10 +5854,10 @@ returning id, version, social_account_type, follower_id, followee_id, created_at
 `
 
 type InsertExternalSocialConnectionsForUserParams struct {
-	SocialAccountType string   `json:"social_account_type"`
-	FollowerID        string   `json:"follower_id"`
-	Ids               []string `json:"ids"`
-	FolloweeIds       []string `json:"followee_ids"`
+	SocialAccountType string   `db:"social_account_type" json:"social_account_type"`
+	FollowerID        string   `db:"follower_id" json:"follower_id"`
+	Ids               []string `db:"ids" json:"ids"`
+	FolloweeIds       []string `db:"followee_ids" json:"followee_ids"`
 }
 
 func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, arg InsertExternalSocialConnectionsForUserParams) ([]ExternalSocialConnection, error) {
@@ -5878,11 +5899,11 @@ insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) va
 `
 
 type InsertPostParams struct {
-	ID          persist.DBID     `json:"id"`
-	TokenIds    persist.DBIDList `json:"token_ids"`
-	ContractIds persist.DBIDList `json:"contract_ids"`
-	ActorID     persist.DBID     `json:"actor_id"`
-	Caption     sql.NullString   `json:"caption"`
+	ID          persist.DBID     `db:"id" json:"id"`
+	TokenIds    persist.DBIDList `db:"token_ids" json:"token_ids"`
+	ContractIds persist.DBIDList `db:"contract_ids" json:"contract_ids"`
+	ActorID     persist.DBID     `db:"actor_id" json:"actor_id"`
+	Caption     sql.NullString   `db:"caption" json:"caption"`
 }
 
 func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist.DBID, error) {
@@ -5903,12 +5924,12 @@ insert into mentions (id, user_id, contract_id, post_id, start, length) values (
 `
 
 type InsertPostMentionParams struct {
-	ID       persist.DBID   `json:"id"`
-	User     sql.NullString `json:"user"`
-	Contract sql.NullString `json:"contract"`
-	PostID   persist.DBID   `json:"post_id"`
-	Start    sql.NullInt32  `json:"start"`
-	Length   sql.NullInt32  `json:"length"`
+	ID       persist.DBID   `db:"id" json:"id"`
+	User     sql.NullString `db:"user" json:"user"`
+	Contract sql.NullString `db:"contract" json:"contract"`
+	PostID   persist.DBID   `db:"post_id" json:"post_id"`
+	Start    sql.NullInt32  `db:"start" json:"start"`
+	Length   sql.NullInt32  `db:"length" json:"length"`
 }
 
 func (q *Queries) InsertPostMention(ctx context.Context, arg InsertPostMentionParams) (Mention, error) {
@@ -5950,11 +5971,11 @@ delete from alchemy_spam_contracts where created_at < (select created_at from in
 `
 
 type InsertSpamContractsParams struct {
-	ID        []string    `json:"id"`
-	Chain     []int32     `json:"chain"`
-	Address   []string    `json:"address"`
-	CreatedAt []time.Time `json:"created_at"`
-	IsSpam    []bool      `json:"is_spam"`
+	ID        []string    `db:"id" json:"id"`
+	Chain     []int32     `db:"chain" json:"chain"`
+	Address   []string    `db:"address" json:"address"`
+	CreatedAt []time.Time `db:"created_at" json:"created_at"`
+	IsSpam    []bool      `db:"is_spam" json:"is_spam"`
 }
 
 func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContractsParams) error {
@@ -6007,25 +6028,25 @@ select token_medias.id, token_medias.created_at, token_medias.last_updated, toke
 `
 
 type InsertTokenPipelineResultsParams struct {
-	ProcessingJobID  persist.DBID             `json:"processing_job_id"`
-	TokenProperties  persist.TokenProperties  `json:"token_properties"`
-	PipelineMetadata persist.PipelineMetadata `json:"pipeline_metadata"`
-	ProcessingCause  persist.ProcessingCause  `json:"processing_cause"`
-	ProcessorVersion string                   `json:"processor_version"`
-	RetiringMediaID  persist.DBID             `json:"retiring_media_id"`
-	Chain            persist.Chain            `json:"chain"`
-	ContractAddress  persist.Address          `json:"contract_address"`
-	TokenID          persist.TokenID          `json:"token_id"`
-	NewMediaIsActive bool                     `json:"new_media_is_active"`
-	NewMediaID       persist.DBID             `json:"new_media_id"`
-	NewMedia         pgtype.JSONB             `json:"new_media"`
-	NewMetadata      pgtype.JSONB             `json:"new_metadata"`
-	NewName          sql.NullString           `json:"new_name"`
-	NewDescription   sql.NullString           `json:"new_description"`
+	ProcessingJobID  persist.DBID             `db:"processing_job_id" json:"processing_job_id"`
+	TokenProperties  persist.TokenProperties  `db:"token_properties" json:"token_properties"`
+	PipelineMetadata persist.PipelineMetadata `db:"pipeline_metadata" json:"pipeline_metadata"`
+	ProcessingCause  persist.ProcessingCause  `db:"processing_cause" json:"processing_cause"`
+	ProcessorVersion string                   `db:"processor_version" json:"processor_version"`
+	RetiringMediaID  persist.DBID             `db:"retiring_media_id" json:"retiring_media_id"`
+	Chain            persist.Chain            `db:"chain" json:"chain"`
+	ContractAddress  persist.Address          `db:"contract_address" json:"contract_address"`
+	TokenID          persist.TokenID          `db:"token_id" json:"token_id"`
+	NewMediaIsActive bool                     `db:"new_media_is_active" json:"new_media_is_active"`
+	NewMediaID       persist.DBID             `db:"new_media_id" json:"new_media_id"`
+	NewMedia         pgtype.JSONB             `db:"new_media" json:"new_media"`
+	NewMetadata      pgtype.JSONB             `db:"new_metadata" json:"new_metadata"`
+	NewName          sql.NullString           `db:"new_name" json:"new_name"`
+	NewDescription   sql.NullString           `db:"new_description" json:"new_description"`
 }
 
 type InsertTokenPipelineResultsRow struct {
-	TokenMedia TokenMedia `json:"tokenmedia"`
+	TokenMedia TokenMedia `db:"tokenmedia" json:"tokenmedia"`
 }
 
 func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertTokenPipelineResultsParams) (InsertTokenPipelineResultsRow, error) {
@@ -6071,12 +6092,12 @@ insert into users (id, username, username_idempotent, bio, universal, email_unsu
 `
 
 type InsertUserParams struct {
-	ID                   persist.DBID                 `json:"id"`
-	Username             sql.NullString               `json:"username"`
-	UsernameIdempotent   sql.NullString               `json:"username_idempotent"`
-	Bio                  sql.NullString               `json:"bio"`
-	Universal            bool                         `json:"universal"`
-	EmailUnsubscriptions persist.EmailUnsubscriptions `json:"email_unsubscriptions"`
+	ID                   persist.DBID                 `db:"id" json:"id"`
+	Username             sql.NullString               `db:"username" json:"username"`
+	UsernameIdempotent   sql.NullString               `db:"username_idempotent" json:"username_idempotent"`
+	Bio                  sql.NullString               `db:"bio" json:"bio"`
+	Universal            bool                         `db:"universal" json:"universal"`
+	EmailUnsubscriptions persist.EmailUnsubscriptions `db:"email_unsubscriptions" json:"email_unsubscriptions"`
 }
 
 func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (persist.DBID, error) {
@@ -6103,12 +6124,12 @@ where users.id = $6 and not users.deleted
 `
 
 type InsertWalletParams struct {
-	ID         persist.DBID       `json:"id"`
-	Address    persist.Address    `json:"address"`
-	Chain      persist.Chain      `json:"chain"`
-	L1Chain    persist.L1Chain    `json:"l1_chain"`
-	WalletType persist.WalletType `json:"wallet_type"`
-	UserID     persist.DBID       `json:"user_id"`
+	ID         persist.DBID       `db:"id" json:"id"`
+	Address    persist.Address    `db:"address" json:"address"`
+	Chain      persist.Chain      `db:"chain" json:"chain"`
+	L1Chain    persist.L1Chain    `db:"l1_chain" json:"l1_chain"`
+	WalletType persist.WalletType `db:"wallet_type" json:"wallet_type"`
+	UserID     persist.DBID       `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) error {
@@ -6142,10 +6163,10 @@ select exists(
 `
 
 type IsActorActionActiveParams struct {
-	ActorID     sql.NullString     `json:"actor_id"`
-	Actions     persist.ActionList `json:"actions"`
-	WindowStart time.Time          `json:"window_start"`
-	WindowEnd   time.Time          `json:"window_end"`
+	ActorID     sql.NullString     `db:"actor_id" json:"actor_id"`
+	Actions     persist.ActionList `db:"actions" json:"actions"`
+	WindowStart time.Time          `db:"window_start" json:"window_start"`
+	WindowEnd   time.Time          `db:"window_end" json:"window_end"`
 }
 
 func (q *Queries) IsActorActionActive(ctx context.Context, arg IsActorActionActiveParams) (bool, error) {
@@ -6170,10 +6191,10 @@ select exists(
 `
 
 type IsActorGalleryActiveParams struct {
-	ActorID     sql.NullString `json:"actor_id"`
-	GalleryID   persist.DBID   `json:"gallery_id"`
-	WindowStart time.Time      `json:"window_start"`
-	WindowEnd   time.Time      `json:"window_end"`
+	ActorID     sql.NullString `db:"actor_id" json:"actor_id"`
+	GalleryID   persist.DBID   `db:"gallery_id" json:"gallery_id"`
+	WindowStart time.Time      `db:"window_start" json:"window_start"`
+	WindowEnd   time.Time      `db:"window_end" json:"window_end"`
 }
 
 func (q *Queries) IsActorGalleryActive(ctx context.Context, arg IsActorGalleryActiveParams) (bool, error) {
@@ -6199,11 +6220,11 @@ select exists(
 `
 
 type IsActorSubjectActionActiveParams struct {
-	ActorID     sql.NullString     `json:"actor_id"`
-	SubjectID   persist.DBID       `json:"subject_id"`
-	Actions     persist.ActionList `json:"actions"`
-	WindowStart time.Time          `json:"window_start"`
-	WindowEnd   time.Time          `json:"window_end"`
+	ActorID     sql.NullString     `db:"actor_id" json:"actor_id"`
+	SubjectID   persist.DBID       `db:"subject_id" json:"subject_id"`
+	Actions     persist.ActionList `db:"actions" json:"actions"`
+	WindowStart time.Time          `db:"window_start" json:"window_start"`
+	WindowEnd   time.Time          `db:"window_end" json:"window_end"`
 }
 
 func (q *Queries) IsActorSubjectActionActive(ctx context.Context, arg IsActorSubjectActionActiveParams) (bool, error) {
@@ -6229,10 +6250,10 @@ select exists(
 `
 
 type IsActorSubjectActiveParams struct {
-	ActorID     sql.NullString `json:"actor_id"`
-	SubjectID   persist.DBID   `json:"subject_id"`
-	WindowStart time.Time      `json:"window_start"`
-	WindowEnd   time.Time      `json:"window_end"`
+	ActorID     sql.NullString `db:"actor_id" json:"actor_id"`
+	SubjectID   persist.DBID   `db:"subject_id" json:"subject_id"`
+	WindowStart time.Time      `db:"window_start" json:"window_start"`
+	WindowEnd   time.Time      `db:"window_end" json:"window_end"`
 }
 
 func (q *Queries) IsActorSubjectActive(ctx context.Context, arg IsActorSubjectActiveParams) (bool, error) {
@@ -6266,8 +6287,8 @@ SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 o
 `
 
 type IsFeedUserActionBlockedParams struct {
-	UserID persist.DBID   `json:"user_id"`
-	Action persist.Action `json:"action"`
+	UserID persist.DBID   `db:"user_id" json:"user_id"`
+	Action persist.Action `db:"action" json:"action"`
 }
 
 func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserActionBlockedParams) (bool, error) {
@@ -6291,8 +6312,8 @@ select exists(
 `
 
 type IsMemberOfCommunityParams struct {
-	UserID     persist.DBID `json:"user_id"`
-	ContractID persist.DBID `json:"contract_id"`
+	UserID     persist.DBID `db:"user_id" json:"user_id"`
+	ContractID persist.DBID `db:"contract_id" json:"contract_id"`
 }
 
 func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommunityParams) (bool, error) {
@@ -6314,12 +6335,12 @@ LIMIT $6
 `
 
 type PaginateGlobalFeedParams struct {
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeedParams) ([]FeedEntity, error) {
@@ -6368,13 +6389,13 @@ limit $7
 `
 
 type PaginatePersonalFeedByUserIDParams struct {
-	Follower      persist.DBID `json:"follower"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	Follower      persist.DBID `db:"follower" json:"follower"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg PaginatePersonalFeedByUserIDParams) ([]FeedEntity, error) {
@@ -6435,14 +6456,14 @@ LIMIT $6
 `
 
 type PaginatePostsByContractIDAndProjectIDParams struct {
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
-	ContractID    persist.DBID `json:"contract_id"`
-	ProjectIDInt  int32        `json:"project_id_int"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
+	ContractID    persist.DBID `db:"contract_id" json:"contract_id"`
+	ProjectIDInt  int32        `db:"project_id_int" json:"project_id_int"`
 }
 
 func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg PaginatePostsByContractIDAndProjectIDParams) ([]Post, error) {
@@ -6498,13 +6519,13 @@ limit $7
 `
 
 type PaginatePostsByUserIDParams struct {
-	UserID        persist.DBID `json:"user_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginatePostsByUserID(ctx context.Context, arg PaginatePostsByUserIDParams) ([]Post, error) {
@@ -6550,8 +6571,8 @@ update merch set redeemed = true, token_id = $1, last_updated = now() where id =
 `
 
 type RedeemMerchParams struct {
-	TokenHex   persist.TokenID `json:"token_hex"`
-	ObjectType int32           `json:"object_type"`
+	TokenHex   persist.TokenID `db:"token_hex" json:"token_hex"`
+	ObjectType int32           `db:"object_type" json:"object_type"`
 }
 
 func (q *Queries) RedeemMerch(ctx context.Context, arg RedeemMerchParams) (sql.NullString, error) {
@@ -6566,8 +6587,8 @@ update galleries set collections = array_remove(collections, $1), last_updated =
 `
 
 type RemoveCollectionFromGalleryParams struct {
-	CollectionID interface{}  `json:"collection_id"`
-	GalleryID    persist.DBID `json:"gallery_id"`
+	CollectionID interface{}  `db:"collection_id" json:"collection_id"`
+	GalleryID    persist.DBID `db:"gallery_id" json:"gallery_id"`
 }
 
 func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCollectionFromGalleryParams) error {
@@ -6601,8 +6622,8 @@ update pii.for_users set pii_socials = pii_socials - $1::varchar where user_id =
 `
 
 type RemoveSocialFromUserParams struct {
-	Social string       `json:"social"`
-	UserID persist.DBID `json:"user_id"`
+	Social string       `db:"social" json:"social"`
+	UserID persist.DBID `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) RemoveSocialFromUser(ctx context.Context, arg RemoveSocialFromUserParams) error {
@@ -6642,8 +6663,8 @@ update tokens t
 `
 
 type RemoveWalletFromTokensParams struct {
-	WalletID string       `json:"wallet_id"`
-	UserID   persist.DBID `json:"user_id"`
+	WalletID string       `db:"wallet_id" json:"wallet_id"`
+	UserID   persist.DBID `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFromTokensParams) error {
@@ -6656,8 +6677,8 @@ update contracts set override_creator_user_id = $1, last_updated = now() where i
 `
 
 type SetContractOverrideCreatorParams struct {
-	CreatorUserID persist.DBID `json:"creator_user_id"`
-	ContractID    persist.DBID `json:"contract_id"`
+	CreatorUserID persist.DBID `db:"creator_user_id" json:"creator_user_id"`
+	ContractID    persist.DBID `db:"contract_id" json:"contract_id"`
 }
 
 func (q *Queries) SetContractOverrideCreator(ctx context.Context, arg SetContractOverrideCreatorParams) error {
@@ -6681,16 +6702,16 @@ update users set profile_image_id = profile_images.id from profile_images where 
 `
 
 type SetProfileImageToENSParams struct {
-	UserID        persist.DBID               `json:"user_id"`
-	ProfileID     persist.DBID               `json:"profile_id"`
-	EnsSourceType persist.ProfileImageSource `json:"ens_source_type"`
-	WalletID      persist.DBID               `json:"wallet_id"`
-	EnsDomain     sql.NullString             `json:"ens_domain"`
-	EnsAvatarUri  sql.NullString             `json:"ens_avatar_uri"`
+	UserID        persist.DBID               `db:"user_id" json:"user_id"`
+	ProfileID     persist.DBID               `db:"profile_id" json:"profile_id"`
+	EnsSourceType persist.ProfileImageSource `db:"ens_source_type" json:"ens_source_type"`
+	WalletID      persist.DBID               `db:"wallet_id" json:"wallet_id"`
+	EnsDomain     sql.NullString             `db:"ens_domain" json:"ens_domain"`
+	EnsAvatarUri  sql.NullString             `db:"ens_avatar_uri" json:"ens_avatar_uri"`
 }
 
 type SetProfileImageToENSRow struct {
-	ProfileImage ProfileImage `json:"profileimage"`
+	ProfileImage ProfileImage `db:"profileimage" json:"profileimage"`
 }
 
 func (q *Queries) SetProfileImageToENS(ctx context.Context, arg SetProfileImageToENSParams) (SetProfileImageToENSRow, error) {
@@ -6732,10 +6753,10 @@ update users set profile_image_id = new_image.id from new_image where users.id =
 `
 
 type SetProfileImageToTokenParams struct {
-	UserID          persist.DBID               `json:"user_id"`
-	ProfileID       persist.DBID               `json:"profile_id"`
-	TokenSourceType persist.ProfileImageSource `json:"token_source_type"`
-	TokenID         persist.DBID               `json:"token_id"`
+	UserID          persist.DBID               `db:"user_id" json:"user_id"`
+	ProfileID       persist.DBID               `db:"profile_id" json:"profile_id"`
+	TokenSourceType persist.ProfileImageSource `db:"token_source_type" json:"token_source_type"`
+	TokenID         persist.DBID               `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) SetProfileImageToToken(ctx context.Context, arg SetProfileImageToTokenParams) error {
@@ -6762,8 +6783,8 @@ update collections set gallery_id = $1, last_updated = now() where id = $2 and d
 `
 
 type UpdateCollectionGalleryParams struct {
-	GalleryID persist.DBID `json:"gallery_id"`
-	ID        persist.DBID `json:"id"`
+	GalleryID persist.DBID `db:"gallery_id" json:"gallery_id"`
+	ID        persist.DBID `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateCollectionGallery(ctx context.Context, arg UpdateCollectionGalleryParams) error {
@@ -6776,8 +6797,8 @@ update collections set nfts = $1, last_updated = now() where id = $2 and deleted
 `
 
 type UpdateCollectionTokensParams struct {
-	Nfts persist.DBIDList `json:"nfts"`
-	ID   persist.DBID     `json:"id"`
+	Nfts persist.DBIDList `db:"nfts" json:"nfts"`
+	ID   persist.DBID     `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateCollectionTokens(ctx context.Context, arg UpdateCollectionTokensParams) error {
@@ -6793,12 +6814,12 @@ update collections c set collectors_note = updates.collectors_note, layout = upd
 `
 
 type UpdateCollectionsInfoParams struct {
-	Ids             []string       `json:"ids"`
-	Names           []string       `json:"names"`
-	CollectorsNotes []string       `json:"collectors_notes"`
-	Layouts         []pgtype.JSONB `json:"layouts"`
-	TokenSettings   []pgtype.JSONB `json:"token_settings"`
-	Hidden          []bool         `json:"hidden"`
+	Ids             []string       `db:"ids" json:"ids"`
+	Names           []string       `db:"names" json:"names"`
+	CollectorsNotes []string       `db:"collectors_notes" json:"collectors_notes"`
+	Layouts         []pgtype.JSONB `db:"layouts" json:"layouts"`
+	TokenSettings   []pgtype.JSONB `db:"token_settings" json:"token_settings"`
+	Hidden          []bool         `db:"hidden" json:"hidden"`
 }
 
 func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectionsInfoParams) error {
@@ -6818,8 +6839,8 @@ update events set caption = $1 where group_id = $2 and deleted = false
 `
 
 type UpdateEventCaptionByGroupParams struct {
-	Caption sql.NullString `json:"caption"`
-	GroupID sql.NullString `json:"group_id"`
+	Caption sql.NullString `db:"caption" json:"caption"`
+	GroupID sql.NullString `db:"group_id" json:"group_id"`
 }
 
 func (q *Queries) UpdateEventCaptionByGroup(ctx context.Context, arg UpdateEventCaptionByGroupParams) error {
@@ -6856,8 +6877,8 @@ update galleries set collections = $1, last_updated = now() where galleries.id =
 `
 
 type UpdateGalleryCollectionsParams struct {
-	Collections persist.DBIDList `json:"collections"`
-	GalleryID   persist.DBID     `json:"gallery_id"`
+	Collections persist.DBIDList `db:"collections" json:"collections"`
+	GalleryID   persist.DBID     `db:"gallery_id" json:"gallery_id"`
 }
 
 func (q *Queries) UpdateGalleryCollections(ctx context.Context, arg UpdateGalleryCollectionsParams) error {
@@ -6870,8 +6891,8 @@ update galleries set hidden = $1, last_updated = now() where id = $2 and deleted
 `
 
 type UpdateGalleryHiddenParams struct {
-	Hidden bool         `json:"hidden"`
-	ID     persist.DBID `json:"id"`
+	Hidden bool         `db:"hidden" json:"hidden"`
+	ID     persist.DBID `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateGalleryHidden(ctx context.Context, arg UpdateGalleryHiddenParams) (Gallery, error) {
@@ -6898,11 +6919,11 @@ update galleries set name = case when $1::bool then $2 else name end, descriptio
 `
 
 type UpdateGalleryInfoParams struct {
-	NameSet        bool         `json:"name_set"`
-	Name           string       `json:"name"`
-	DescriptionSet bool         `json:"description_set"`
-	Description    string       `json:"description"`
-	ID             persist.DBID `json:"id"`
+	NameSet        bool         `db:"name_set" json:"name_set"`
+	Name           string       `db:"name" json:"name"`
+	DescriptionSet bool         `db:"description_set" json:"description_set"`
+	Description    string       `db:"description" json:"description"`
+	ID             persist.DBID `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateGalleryInfo(ctx context.Context, arg UpdateGalleryInfoParams) error {
@@ -6924,9 +6945,9 @@ update galleries g set position = updates.position, last_updated = now() from up
 `
 
 type UpdateGalleryPositionsParams struct {
-	OwnerUserID persist.DBID `json:"owner_user_id"`
-	GalleryIds  []string     `json:"gallery_ids"`
-	Positions   []string     `json:"positions"`
+	OwnerUserID persist.DBID `db:"owner_user_id" json:"owner_user_id"`
+	GalleryIds  []string     `db:"gallery_ids" json:"gallery_ids"`
+	Positions   []string     `db:"positions" json:"positions"`
 }
 
 func (q *Queries) UpdateGalleryPositions(ctx context.Context, arg UpdateGalleryPositionsParams) error {
@@ -6939,10 +6960,10 @@ UPDATE notifications SET data = $2, event_ids = event_ids || $3, amount = $4, la
 `
 
 type UpdateNotificationParams struct {
-	ID       persist.DBID             `json:"id"`
-	Data     persist.NotificationData `json:"data"`
-	EventIds persist.DBIDList         `json:"event_ids"`
-	Amount   int32                    `json:"amount"`
+	ID       persist.DBID             `db:"id" json:"id"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	Amount   int32                    `db:"amount" json:"amount"`
 }
 
 func (q *Queries) UpdateNotification(ctx context.Context, arg UpdateNotificationParams) error {
@@ -6960,8 +6981,8 @@ UPDATE users SET notification_settings = $2 WHERE id = $1
 `
 
 type UpdateNotificationSettingsByIDParams struct {
-	ID                   persist.DBID                     `json:"id"`
-	NotificationSettings persist.UserNotificationSettings `json:"notification_settings"`
+	ID                   persist.DBID                     `db:"id" json:"id"`
+	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
 }
 
 func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {
@@ -6977,11 +6998,11 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 `
 
 type UpdatePushTicketsParams struct {
-	Ids              []string    `json:"ids"`
-	CheckAfter       []time.Time `json:"check_after"`
-	NumCheckAttempts []int32     `json:"num_check_attempts"`
-	Status           []string    `json:"status"`
-	Deleted          []bool      `json:"deleted"`
+	Ids              []string    `db:"ids" json:"ids"`
+	CheckAfter       []time.Time `db:"check_after" json:"check_after"`
+	NumCheckAttempts []int32     `db:"num_check_attempts" json:"num_check_attempts"`
+	Status           []string    `db:"status" json:"status"`
+	Deleted          []bool      `db:"deleted" json:"deleted"`
 }
 
 func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsParams) error {
@@ -7000,9 +7021,9 @@ update tokens set collectors_note = $1, last_updated = now() where id = $2 and o
 `
 
 type UpdateTokenCollectorsNoteByTokenDbidUserIdParams struct {
-	CollectorsNote sql.NullString `json:"collectors_note"`
-	ID             persist.DBID   `json:"id"`
-	OwnerUserID    persist.DBID   `json:"owner_user_id"`
+	CollectorsNote sql.NullString `db:"collectors_note" json:"collectors_note"`
+	ID             persist.DBID   `db:"id" json:"id"`
+	OwnerUserID    persist.DBID   `db:"owner_user_id" json:"owner_user_id"`
 }
 
 func (q *Queries) UpdateTokenCollectorsNoteByTokenDbidUserId(ctx context.Context, arg UpdateTokenCollectorsNoteByTokenDbidUserIdParams) error {
@@ -7023,11 +7044,11 @@ returning id, created_at, last_updated, deleted, name, description, token_type, 
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
-	Name        sql.NullString  `json:"name"`
-	Description sql.NullString  `json:"description"`
-	TokenID     persist.TokenID `json:"token_id"`
-	ContractID  persist.DBID    `json:"contract_id"`
-	Chain       persist.Chain   `json:"chain"`
+	Name        sql.NullString  `db:"name" json:"name"`
+	Description sql.NullString  `db:"description" json:"description"`
+	TokenID     persist.TokenID `db:"token_id" json:"token_id"`
+	ContractID  persist.DBID    `db:"contract_id" json:"contract_id"`
+	Chain       persist.Chain   `db:"chain" json:"chain"`
 }
 
 func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) (TokenDefinition, error) {
@@ -7064,9 +7085,9 @@ update tokens set is_user_marked_spam = $1, last_updated = now() where owner_use
 `
 
 type UpdateTokensAsUserMarkedSpamParams struct {
-	IsUserMarkedSpam sql.NullBool     `json:"is_user_marked_spam"`
-	OwnerUserID      persist.DBID     `json:"owner_user_id"`
-	TokenIds         persist.DBIDList `json:"token_ids"`
+	IsUserMarkedSpam sql.NullBool     `db:"is_user_marked_spam" json:"is_user_marked_spam"`
+	OwnerUserID      persist.DBID     `db:"owner_user_id" json:"owner_user_id"`
+	TokenIds         persist.DBIDList `db:"token_ids" json:"token_ids"`
 }
 
 func (q *Queries) UpdateTokensAsUserMarkedSpam(ctx context.Context, arg UpdateTokensAsUserMarkedSpamParams) error {
@@ -7089,9 +7110,9 @@ update users set email_verified = $1 where users.id = $2
 `
 
 type UpdateUserEmailParams struct {
-	EmailVerificationStatus int32         `json:"email_verification_status"`
-	UserID                  persist.DBID  `json:"user_id"`
-	EmailAddress            persist.Email `json:"email_address"`
+	EmailVerificationStatus int32         `db:"email_verification_status" json:"email_verification_status"`
+	UserID                  persist.DBID  `db:"user_id" json:"user_id"`
+	EmailAddress            persist.Email `db:"email_address" json:"email_address"`
 }
 
 func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
@@ -7104,8 +7125,8 @@ UPDATE users SET email_unsubscriptions = $2 WHERE id = $1
 `
 
 type UpdateUserEmailUnsubscriptionsParams struct {
-	ID                   persist.DBID                 `json:"id"`
-	EmailUnsubscriptions persist.EmailUnsubscriptions `json:"email_unsubscriptions"`
+	ID                   persist.DBID                 `db:"id" json:"id"`
+	EmailUnsubscriptions persist.EmailUnsubscriptions `db:"email_unsubscriptions" json:"email_unsubscriptions"`
 }
 
 func (q *Queries) UpdateUserEmailUnsubscriptions(ctx context.Context, arg UpdateUserEmailUnsubscriptionsParams) error {
@@ -7118,8 +7139,8 @@ update users set user_experiences = user_experiences || $1 where id = $2
 `
 
 type UpdateUserExperienceParams struct {
-	Experience pgtype.JSONB `json:"experience"`
-	UserID     persist.DBID `json:"user_id"`
+	Experience pgtype.JSONB `db:"experience" json:"experience"`
+	UserID     persist.DBID `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) UpdateUserExperience(ctx context.Context, arg UpdateUserExperienceParams) error {
@@ -7132,8 +7153,8 @@ update users set featured_gallery = $1, last_updated = now() from galleries wher
 `
 
 type UpdateUserFeaturedGalleryParams struct {
-	GalleryID persist.DBID `json:"gallery_id"`
-	UserID    persist.DBID `json:"user_id"`
+	GalleryID persist.DBID `db:"gallery_id" json:"gallery_id"`
+	UserID    persist.DBID `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) UpdateUserFeaturedGallery(ctx context.Context, arg UpdateUserFeaturedGalleryParams) error {
@@ -7148,8 +7169,8 @@ update users set primary_wallet_id = $1 from wallets
 `
 
 type UpdateUserPrimaryWalletParams struct {
-	WalletID persist.DBID `json:"wallet_id"`
-	UserID   persist.DBID `json:"user_id"`
+	WalletID persist.DBID `db:"wallet_id" json:"wallet_id"`
+	UserID   persist.DBID `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) UpdateUserPrimaryWallet(ctx context.Context, arg UpdateUserPrimaryWalletParams) error {
@@ -7162,8 +7183,8 @@ update pii.for_users set pii_socials = $1 where user_id = $2
 `
 
 type UpdateUserSocialsParams struct {
-	Socials persist.Socials `json:"socials"`
-	UserID  persist.DBID    `json:"user_id"`
+	Socials persist.Socials `db:"socials" json:"socials"`
+	UserID  persist.DBID    `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) UpdateUserSocials(ctx context.Context, arg UpdateUserSocialsParams) error {
@@ -7176,8 +7197,8 @@ UPDATE users SET email_verified = $2 WHERE id = $1
 `
 
 type UpdateUserVerificationStatusParams struct {
-	ID            persist.DBID                    `json:"id"`
-	EmailVerified persist.EmailVerificationStatus `json:"email_verified"`
+	ID            persist.DBID                    `db:"id" json:"id"`
+	EmailVerified persist.EmailVerificationStatus `db:"email_verified" json:"email_verified"`
 }
 
 func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {
@@ -7202,13 +7223,13 @@ insert into sessions (id, user_id,
 `
 
 type UpsertSessionParams struct {
-	ID               persist.DBID `json:"id"`
-	UserID           persist.DBID `json:"user_id"`
-	UserAgent        string       `json:"user_agent"`
-	Platform         string       `json:"platform"`
-	Os               string       `json:"os"`
-	CurrentRefreshID string       `json:"current_refresh_id"`
-	ActiveUntil      time.Time    `json:"active_until"`
+	ID               persist.DBID `db:"id" json:"id"`
+	UserID           persist.DBID `db:"user_id" json:"user_id"`
+	UserAgent        string       `db:"user_agent" json:"user_agent"`
+	Platform         string       `db:"platform" json:"platform"`
+	Os               string       `db:"os" json:"os"`
+	CurrentRefreshID string       `db:"current_refresh_id" json:"current_refresh_id"`
+	ActiveUntil      time.Time    `db:"active_until" json:"active_until"`
 }
 
 func (q *Queries) UpsertSession(ctx context.Context, arg UpsertSessionParams) (Session, error) {
@@ -7247,11 +7268,11 @@ insert into pii.socials_auth (id, user_id, provider, access_token, refresh_token
 `
 
 type UpsertSocialOAuthParams struct {
-	ID           persist.DBID           `json:"id"`
-	UserID       persist.DBID           `json:"user_id"`
-	Provider     persist.SocialProvider `json:"provider"`
-	AccessToken  sql.NullString         `json:"access_token"`
-	RefreshToken sql.NullString         `json:"refresh_token"`
+	ID           persist.DBID           `db:"id" json:"id"`
+	UserID       persist.DBID           `db:"user_id" json:"user_id"`
+	Provider     persist.SocialProvider `db:"provider" json:"provider"`
+	AccessToken  sql.NullString         `db:"access_token" json:"access_token"`
+	RefreshToken sql.NullString         `db:"refresh_token" json:"refresh_token"`
 }
 
 func (q *Queries) UpsertSocialOAuth(ctx context.Context, arg UpsertSocialOAuthParams) error {
@@ -7281,8 +7302,8 @@ select exists(select 1 from collections where id = $1 and owner_user_id = $2 and
 `
 
 type UserOwnsCollectionParams struct {
-	ID          persist.DBID `json:"id"`
-	OwnerUserID persist.DBID `json:"owner_user_id"`
+	ID          persist.DBID `db:"id" json:"id"`
+	OwnerUserID persist.DBID `db:"owner_user_id" json:"owner_user_id"`
 }
 
 func (q *Queries) UserOwnsCollection(ctx context.Context, arg UserOwnsCollectionParams) (bool, error) {
@@ -7297,8 +7318,8 @@ select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and d
 `
 
 type UserOwnsGalleryParams struct {
-	ID          persist.DBID `json:"id"`
-	OwnerUserID persist.DBID `json:"owner_user_id"`
+	ID          persist.DBID `db:"id" json:"id"`
+	OwnerUserID persist.DBID `db:"owner_user_id" json:"owner_user_id"`
 }
 
 func (q *Queries) UserOwnsGallery(ctx context.Context, arg UserOwnsGalleryParams) (bool, error) {

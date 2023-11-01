@@ -32,7 +32,7 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 		return nil, err
 	}
 
-	address, err := api.loaders.WalletByWalletID.Load(walletID)
+	address, err := api.loaders.GetWalletByIDBatch.Load(walletID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID
 		return nil, err
 	}
 
-	a, err := api.loaders.WalletsByUserID.Load(userID)
+	a, err := api.loaders.GetWalletsByUserIDBatch.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (api WalletAPI) GetWalletsByIDs(ctx context.Context, walletIDs []persist.DB
 		return []db.Wallet{}, nil
 	}
 
-	wallets, errs := api.loaders.WalletByWalletID.LoadAll(walletIDs)
+	wallets, errs := api.loaders.GetWalletByIDBatch.LoadAll(walletIDs)
 
 	for _, err := range errs {
 		if err != nil {

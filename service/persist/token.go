@@ -1088,3 +1088,11 @@ type ErrTokenDefinitionNotFoundByTokenDBID struct {
 func (e ErrTokenDefinitionNotFoundByTokenDBID) Error() string {
 	return fmt.Sprintf("tokenDefinition not found by tokenDBID=%s", e.ID)
 }
+
+type ErrMediaNotFoundByTokenDefinitionID struct {
+	ID DBID
+}
+
+func (e ErrMediaNotFoundByTokenDefinitionID) Error() string {
+	return fmt.Sprintf("media not found by tokenDefinitionID=%s", e.ID)
+}

@@ -2913,13 +2913,7 @@ func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*s
 
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
-	if contractID := obj.HelperTokenData.Token.ContractID; contractID != "" {
-		return resolveContractByContractID(ctx, contractID)
-	}
-	if tDefID := obj.HelperTokenData.Token.TokenDefinitionID; tDefID != "" {
-		return resolveContractByTokenDefinitionID(ctx, tDefID)
-	}
-	return resolveContractByTokenID(ctx, obj.Dbid)
+	return resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
 }
 
 // Community is the resolver for the community field.
@@ -2938,15 +2932,7 @@ func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*str
 
 // IsSpamByProvider is the resolver for the isSpamByProvider field.
 func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
-	var c *model.Contract
-	var err error
-	if contractID := obj.HelperTokenData.Token.ContractID; contractID != "" {
-		c, err = resolveContractByContractID(ctx, contractID)
-	} else if tDefID := obj.HelperTokenData.Token.TokenDefinitionID; tDefID != "" {
-		c, err = resolveContractByTokenDefinitionID(ctx, tDefID)
-	} else {
-		c, err = resolveContractByTokenID(ctx, obj.Dbid)
-	}
+	c, err := resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
 	if err != nil {
 		return nil, err
 	}

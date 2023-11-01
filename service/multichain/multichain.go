@@ -1965,7 +1965,7 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 			contractAddress := chainToken.chain.NormalizeAddress(token.ContractAddress)
 			contract, ok := addressToContract[contractAddress]
 			if !ok {
-				panic(fmt.Sprintf("no persisted contract for chain=%s, address=%s", chainToken.chain, contractAddress))
+				panic(fmt.Sprintf("no persisted contract for chain=%d, address=%s", chainToken.chain, contractAddress))
 			}
 
 			// Last write wins

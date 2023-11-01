@@ -1,4 +1,8 @@
 version: 2
+plugins:
+  - name: jsonb
+    process:
+      cmd: db/bin/sqlc-gen-json
 sql:
   # Indexer model gen
   - schema: 'db/migrations/indexer'
@@ -36,6 +40,12 @@ sql:
   - schema:
       - 'db/migrations/core'
       - 'db/migrations/sqlc/core'
+    codegen:
+      - out: 'db/gen/coredb'
+        plugin: jsonb
+        options:
+          indent: "  "
+          filename: 'manifest.json'
     queries: 'db/queries/core'
     engine: 'postgresql'
     gen:
@@ -46,6 +56,7 @@ sql:
         output_db_file_name: 'db_gen.go'
         output_models_file_name: 'models_gen.go'
         emit_json_tags: true
+        emit_db_tags: true
         overrides:
           # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
           # the override should come _before_ the * entry

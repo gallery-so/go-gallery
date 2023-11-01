@@ -503,14 +503,6 @@ func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model
 	return resolveContractByContractID(ctx, td.ContractID)
 }
 
-func resolveContractByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*model.Contract, error) {
-	contract, err := publicapi.For(ctx).Contract.GetContractByTokenDefinitionID(ctx, tokenDefinitionID)
-	if err != nil {
-		return nil, err
-	}
-	return contractToModel(ctx, *contract), nil
-}
-
 func resolveContractByContractID(ctx context.Context, contractID persist.DBID) (*model.Contract, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
@@ -1976,18 +1968,17 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		isSpamByUser = &token.IsUserMarkedSpam.Bool
 	}
 	return &model.Token{
-		HelperTokenData:  model.HelperTokenData{Token: token, CollectionID: collectionID},
-		Dbid:             token.ID,
-		CreationTime:     &token.CreatedAt,
-		LastUpdated:      &token.LastUpdated,
-		CollectorsNote:   util.ToPointer(html.UnescapeString(token.CollectorsNote.String)),
-		Quantity:         util.ToPointer(token.Quantity.String()),
-		Owner:            nil, // handled by dedicated resolver
-		OwnershipHistory: nil, // TODO: later
-		OwnerIsHolder:    &token.IsHolderToken,
-		OwnerIsCreator:   &token.IsCreatorToken,
-		IsSpamByUser:     isSpamByUser,
-		Definition:       nil, // handled by dedicated resolver
+		HelperTokenData: model.HelperTokenData{Token: token, CollectionID: collectionID},
+		Dbid:            token.ID,
+		CreationTime:    &token.CreatedAt,
+		LastUpdated:     &token.LastUpdated,
+		CollectorsNote:  util.ToPointer(html.UnescapeString(token.CollectorsNote.String)),
+		Quantity:        util.ToPointer(token.Quantity.String()),
+		Owner:           nil, // handled by dedicated resolver
+		OwnerIsHolder:   &token.IsHolderToken,
+		OwnerIsCreator:  &token.IsCreatorToken,
+		IsSpamByUser:    isSpamByUser,
+		Definition:      nil, // handled by dedicated resolver
 		// Fields to be deprecated
 		Media:                 nil, // handled by dedicated resolver
 		TokenType:             nil, // handled by dedicated resolver
@@ -2001,6 +1992,7 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		IsSpamByProvider:      nil, // handled by dedicated resolver
 		OwnedByWallets:        nil, // handled by dedicated resolver
 		BlockNumber:           nil,
+		OwnershipHistory:      nil, // TODO: later
 		OpenseaCollectionName: nil, // TODO: later
 	}
 }
@@ -2162,7 +2154,7 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
 	// Use the token's profile image if the token exists
 	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
-		if tokenMedia, err := publicapi.For(ctx).Token.GetMediaByTokenID(ctx, token.ID); err == nil {
+		if tokenMedia, err := publicapi.For(ctx).Token.GetMediaByTokenDefinitionID(ctx, token.TokenDefinitionID); err == nil {
 			if tokenMedia.Media.ProfileImageURL != "" {
 				url = string(tokenMedia.Media.ProfileImageURL)
 			}
