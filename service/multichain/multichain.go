@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
-	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
@@ -45,7 +44,7 @@ var contractNameBlacklist = map[string]bool{
 }
 
 // SubmitTokens is called to process a batch of tokens
-type SubmitTokensF func(ctx context.Context, tokenDefinitionIDs []persist.DBID) error
+type SubmitTokensF func(ctx context.Context, tDefIDs []persist.DBID) error
 
 type Provider struct {
 	Repos        *postgres.Repositories
@@ -510,12 +509,12 @@ func (p *Provider) TokenExists(ctx context.Context, token persist.TokenIdentifie
 		return err
 	}
 
-	retryCondition := func(err error) bool {
+	logRetryF := func(err error) bool {
 		logger.For(ctx).Errorf("polling for token: %s: retrying on error: %s", token.String(), err.Error())
 		return true
 	}
 
-	retry.RetryFunc(ctx, searchF, retryCondition, r)
+	retry.RetryFunc(ctx, searchF, logRetryF, r)
 
 	return
 }
@@ -534,7 +533,7 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 			return nil
 		}
 		// Unexpected error
-		if err != nil && err != pgx.ErrNoRows {
+		if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
 			return err
 		}
 		// Try to sync the token from each wallet. This treats SyncTokensByUserIDAndTokenIdentifiers as a black box: it runs each
@@ -557,18 +556,15 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 		}
 		wg.Wait()
 		token, err = p.Repos.TokenRepository.GetByUserTokenIdentifiers(ctx, user.ID, t)
-		if err == pgx.ErrNoRows {
-			return persist.ErrTokenNotFoundByUserTokenIdentifers{UserID: user.ID, Token: t}
-		}
 		return err
 	}
 
-	retryCondition := func(err error) bool {
+	logRetryF := func(err error) bool {
 		logger.For(ctx).Errorf("polling for token for user=%s: polling for token=%s: retrying on error: %s", user.ID, t.String(), err.Error())
 		return true
 	}
 
-	err = retry.RetryFunc(ctx, searchF, retryCondition, r)
+	err = retry.RetryFunc(ctx, searchF, logRetryF, r)
 
 	return token, err
 }
@@ -914,8 +910,8 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 
 	contractToDBID := make(map[persist.ContractIdentifiers]persist.DBID)
 	for _, c := range parentContracts {
-		contractIdentifiers := persist.NewContractIdentifiers(c.Address, c.Chain)
-		contractToDBID[contractIdentifiers] = c.ID
+		cID := persist.NewContractIdentifiers(c.Address, c.Chain)
+		contractToDBID[cID] = c.ID
 	}
 
 	params := db.UpsertChildContractsParams{}
@@ -954,7 +950,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		upsertableDefinitions = append(upsertableDefinitions, definitions...)
 	}
 
-	uniqueTokens := dedupeUpsertTokens(upsertableTokens)
+	uniqueTokens := dedupeTokenInstances(upsertableTokens)
 	uniqueDefinitions := dedupeTokenDefinitions(upsertableDefinitions)
 
 	upsertTime, upsertedTokens, err := p.Repos.TokenRepository.BulkUpsert(ctx, uniqueTokens, uniqueDefinitions, upsertParams.SetCreatorFields, upsertParams.SetHolderFields)
@@ -1907,7 +1903,8 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 	addressToContract := make(map[string]db.Contract)
 
 	util.Map(existingContracts, func(c db.Contract) (any, error) {
-		addressToContract[c.Chain.NormalizeAddress(c.Address)] = c
+		addr := c.Chain.NormalizeAddress(c.Address)
+		addressToContract[addr] = c
 		return nil, nil
 	})
 
@@ -2171,18 +2168,18 @@ func (e errWithPriority) Error() string {
 
 func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	return util.DedupeWithTranslate(wallets, false, func(w persist.Wallet) string {
-		return fmt.Sprintf("%d-%s", w.Chain, w.Address)
+		return fmt.Sprintf("%d:%s", w.Chain, w.Address)
 	})
 }
 
-func dedupeTokenDefinitions(tokenDefs []db.TokenDefinition) (uniqueDefs []db.TokenDefinition) {
-	return util.DedupeWithTranslate(tokenDefs, false, func(t db.TokenDefinition) string {
-		return fmt.Sprintf("%d-%s-%s", t.Chain, t.ContractID, t.TokenID)
+func dedupeTokenDefinitions(tDefs []db.TokenDefinition) (uniqueDefs []db.TokenDefinition) {
+	return util.DedupeWithTranslate(tDefs, false, func(t db.TokenDefinition) string {
+		return fmt.Sprintf("%d:%s:%s", t.Chain, t.ContractID, t.TokenID)
 	})
 }
 
-func dedupeUpsertTokens(tokens []postgres.UpsertToken) (uniqueTokens []postgres.UpsertToken) {
+func dedupeTokenInstances(tokens []postgres.UpsertToken) (uniqueTokens []postgres.UpsertToken) {
 	return util.DedupeWithTranslate(tokens, false, func(t postgres.UpsertToken) string {
-		return fmt.Sprintf("%s-%s", t.Identifiers.String(), t.Token.OwnerUserID)
+		return fmt.Sprintf("%d:%s:%s:%s", t.Identifiers.Chain, t.Token.ContractID, t.Identifiers.TokenID, t.Token.OwnerUserID)
 	})
 }

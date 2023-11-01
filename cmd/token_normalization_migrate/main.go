@@ -41,12 +41,9 @@ var rootCmd = &cobra.Command{
 
 var saveCmd = &cobra.Command{
 	Use:   "stage",
-	Short: "create token_chunks table for chunking tokens",
+	Short: "create token_chunks table (for dev purposes)",
 	Run: func(cmd *cobra.Command, args []string) {
 		defer pq.Close()
-		tx, err := pq.Begin()
-		defer tx.Commit()
-		check(err)
 		saveStagingTable()
 	},
 }
@@ -79,7 +76,7 @@ create table token_chunks(
 );
 
 insert into token_chunks(chain, contract_id, token_id, address) (
-select 
+select
 	tokens.chain,
 	tokens.contract,
 	tokens.token_id,
@@ -376,7 +373,7 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 					m.ExternalURL = append(m.ExternalURL, r.TokenExternalURL)
 					m.Fallback = append(m.Fallback, r.TokenFallbackMedia)
 					m.ContractAddress = append(m.ContractAddress, r.ContractAddress)
-					// To be filled in later from media query
+					// Filled in with data from media query
 					m.Name = append(m.Name, "")
 					m.Description = append(m.Description, "")
 					m.Metadata = append(m.Metadata, persist.TokenMetadata{})

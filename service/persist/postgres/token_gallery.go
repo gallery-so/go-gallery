@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/jackc/pgx/v4"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -33,6 +35,9 @@ func (t *TokenFullDetailsRepository) GetByUserTokenIdentifiers(ctx context.Conte
 		TokenID:         tID.TokenID,
 	})
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return TokenFullDetails{}, persist.ErrTokenNotFoundByUserTokenIdentifers{UserID: userID, Token: tID}
+		}
 		return TokenFullDetails{}, err
 	}
 	return TokenFullDetails{
