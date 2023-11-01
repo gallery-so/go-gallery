@@ -73,6 +73,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneMentionedYourCommunityNotification:   fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
 	OnSomeoneRepliedToYourCommentNotification:     fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
 	OnSomeoneAdmiredYourTokenNotification:         fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
+	OnSomeonePostedYourWorkNotification:           fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
