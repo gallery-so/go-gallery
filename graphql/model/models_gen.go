@@ -2185,6 +2185,19 @@ type SomeoneMentionedYourCommunityNotification struct {
 func (SomeoneMentionedYourCommunityNotification) IsNotification() {}
 func (SomeoneMentionedYourCommunityNotification) IsNode()         {}
 
+type SomeonePostedYourWorkNotification struct {
+	HelperSomeonePostedYourWorkNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Post         *Post        `json:"post"`
+	Community    *Community   `json:"community"`
+}
+
+func (SomeonePostedYourWorkNotification) IsNotification() {}
+func (SomeonePostedYourWorkNotification) IsNode()         {}
+
 type SomeoneRepliedToYourCommentNotification struct {
 	HelperSomeoneRepliedToYourCommentNotificationData
 	Dbid            persist.DBID `json:"dbid"`
