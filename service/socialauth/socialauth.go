@@ -60,6 +60,7 @@ func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResu
 			"username":          ids.Username,
 			"name":              ids.Name,
 			"profile_image_url": ids.ProfileImageURL,
+			"scope":             access.Scope,
 		},
 	}, nil
 }
@@ -188,6 +189,17 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 		return nil, err
 	}
 
+	res := &SocialAuthResult{
+		Provider: persist.SocialProviderFarcaster,
+		ID:       lu.ID,
+		Metadata: map[string]interface{}{
+			"username":          lu.Handle,
+			"name":              lu.Name,
+			"profile_image_url": lu.Picture.Optimized.URL,
+			"bio":               lu.Bio,
+		},
+	}
+
 	if a.Signature != "" {
 		access, refresh, err := api.AuthenticateWithSignature(ctx, a.Address, a.Signature)
 		if err != nil {
@@ -203,17 +215,10 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 		if err != nil {
 			return nil, err
 		}
+
+		res.Metadata["signature_approved"] = true
 	}
 
-	return &SocialAuthResult{
-		Provider: persist.SocialProviderFarcaster,
-		ID:       lu.ID,
-		Metadata: map[string]interface{}{
-			"username":          lu.Handle,
-			"name":              lu.Name,
-			"profile_image_url": lu.Picture.Optimized.URL,
-			"bio":               lu.Bio,
-		},
-	}, nil
+	return res, nil
 
 }
