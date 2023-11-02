@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/service/tracing"
-
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"golang.org/x/sync/errgroup"
@@ -20,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -27,8 +27,9 @@ import (
 type sendType int
 
 const (
-	eventSenderContextKey          = "event.eventSender"
-	delayedKey            sendType = iota
+	eventSenderContextKey           = "event.eventSender"
+	sentryEventContextName          = "event context"
+	delayedKey             sendType = iota
 	immediateKey
 	groupKey
 )
@@ -112,13 +113,21 @@ func DispatchMany(ctx context.Context, evts []db.Event, editID *string) error {
 }
 
 func PushEvent(ctx context.Context, evt db.Event) {
-	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-		sentryutil.SetEventContext(hub.Scope(), persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
+	err := dispatchDelayed(ctx, evt)
+	if err != nil {
+		sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
+			logger.For(ctx).Error(err)
+			setEventContext(scope, persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
+		})
 	}
-	if err := dispatchDelayed(ctx, evt); err != nil {
-		logger.For(ctx).Error(err)
-		sentryutil.ReportError(ctx, err)
-	}
+}
+
+func setEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, action persist.Action) {
+	scope.SetContext(sentryEventContextName, sentry.Context{
+		"ActorID":   actorID,
+		"SubjectID": subjectID,
+		"Action":    action,
+	})
 }
 
 // dispatchDelayed sends the event to all of its registered handlers.
@@ -534,7 +543,13 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 		}
 
 	case persist.ResourceTypeAdmire:
-		if event.FeedEventID != "" {
+		if event.Action == persist.ActionAdmiredToken {
+			token, err := h.dataloaders.GetTokenByIdBatch.Load(event.SubjectID)
+			if err != nil {
+				return "", err
+			}
+			return token.Token.OwnerUserID, nil
+		} else if event.FeedEventID != "" {
 			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
 			if err != nil {
 				return "", err

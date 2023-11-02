@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
 
 	"github.com/getsentry/sentry-go"
@@ -19,7 +18,6 @@ import (
 
 const (
 	errorContextName  = "error context"
-	eventContextName  = "event context"
 	loggerContextName = "logger context"
 )
 
@@ -124,16 +122,6 @@ func SetErrorContext(scope *sentry.Scope, mapped bool, mappedTo string) {
 	}
 
 	scope.SetContext(errorContextName, errCtx)
-}
-
-func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, action persist.Action) {
-	eventCtx := sentry.Context{
-		"ActorID":   actorID,
-		"SubjectID": subjectID,
-		"Action":    action,
-	}
-
-	scope.SetContext(eventContextName, eventCtx)
 }
 
 // NewSentryHubGinContext returns a new Gin context with a cloned hub of the original context's hub.
