@@ -154,14 +154,18 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 
 func (r *EventRepository) AddContractEvent(ctx context.Context, event db.Event) (*db.Event, error) {
 	event, err := r.Queries.CreateContractEvent(ctx, db.CreateContractEventParams{
-		Post:       util.ToNullString(event.PostID.String(), true),
-		Comment:    util.ToNullString(event.CommentID.String(), true),
-		FeedEvent:  util.ToNullString(event.FeedEventID.String(), true),
-		Mention:    util.ToNullString(event.MentionID.String(), true),
-		ContractID: event.ContractID,
-		Data:       event.Data,
-		GroupID:    event.GroupID,
-		Caption:    event.Caption,
+		Post:           util.ToNullString(event.PostID.String(), true),
+		Comment:        util.ToNullString(event.CommentID.String(), true),
+		FeedEvent:      util.ToNullString(event.FeedEventID.String(), true),
+		Mention:        util.ToNullString(event.MentionID.String(), true),
+		ContractID:     event.ContractID,
+		Data:           event.Data,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
+		Action:         event.Action,
+		ActorID:        event.ActorID,
+		ID:             persist.GenerateID(),
+		ResourceTypeID: event.ResourceTypeID,
 	})
 	return &event, err
 }
