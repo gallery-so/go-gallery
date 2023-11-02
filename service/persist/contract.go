@@ -70,13 +70,12 @@ type ContractRepository interface {
 	BulkUpsert(context.Context, []Contract) error
 }
 
-type ErrContractNotFoundByID struct {
-	ID DBID
-}
+var errContractNotFound ErrContractNotFound
 
-func (e ErrContractNotFoundByID) Error() string {
-	return fmt.Sprintf("contract not found by ID: %s", e.ID)
-}
+type ErrContractNotFound struct{}
+
+func (e ErrContractNotFound) Unwrap() error { return notFoundError }
+func (e ErrContractNotFound) Error() string { return "contract not found" }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
 type ErrContractNotFoundByAddress struct {
@@ -84,14 +83,7 @@ type ErrContractNotFoundByAddress struct {
 	Chain   Chain
 }
 
+func (e ErrContractNotFoundByAddress) Unwrap() error { return errContractNotFound }
 func (e ErrContractNotFoundByAddress) Error() string {
 	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
-}
-
-type ErrContractNotFoundByTokenDefinitionID struct {
-	ID DBID
-}
-
-func (e ErrContractNotFoundByTokenDefinitionID) Error() string {
-	return fmt.Sprintf("contract not found by token definition ID: %s", e.ID)
 }
