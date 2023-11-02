@@ -687,6 +687,11 @@ type FarcasterSocialAccount implements SocialAccount {
   signerStatus: String
 }
 
+type LensSignables {
+  challenge: String!
+  dispatcherTypedData: String
+}
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -695,7 +700,14 @@ type LensSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
-  signatureApproved: Boolean!
+  """
+  writeApproved represents whether they have signed a message that we verified with the Lens API to generate an access to token and refresh token for the Lens API
+  """
+  writeApproved: Boolean!
+  """
+  signables represents the typed data and challenge that the user needs to sign if they want to enable the dispatcher and approve us to write on their behalf
+  """
+  signables(signingAddress: Address!): LensSignables! @goField(forceResolver: true)
 }
 
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
@@ -1801,9 +1813,14 @@ input FarcasterAuth {
 input LensAuth {
   address: Address!
   """
-  signature is the signed challenge provided by a GQL request to the lens endpoint
+  writeSignature is the signed challenge provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
   """
-  signature: String @scrub
+  writeSignature: String @scrub
+  """
+  dispatcherSignature is the signed typed data provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+  """
+  dispatcherSignature: String @scrub
+
   # lens only supports ETH addresses currently so no need to specify a chain
 }
 

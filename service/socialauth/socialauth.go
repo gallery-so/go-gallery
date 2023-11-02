@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -161,14 +162,16 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 type LensAuthenticator struct {
 	Queries    *coredb.Queries
 	HTTPClient *http.Client
+	RedisCache *redis.Cache
 
-	UserID    persist.DBID
-	Address   persist.Address
-	Signature string
+	UserID              persist.DBID
+	Address             persist.Address
+	ChallengeSignature  string
+	DispatcherSignature string
 }
 
 func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
-	api := lens.NewAPI(a.HTTPClient)
+	api := lens.NewAPI(a.HTTPClient, a.RedisCache)
 	user, err := a.Queries.GetUserByAddressAndL1(ctx, coredb.GetUserByAddressAndL1Params{
 		Address: a.Address,
 		L1Chain: persist.L1Chain(persist.ChainETH),
@@ -189,6 +192,8 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 		return nil, err
 	}
 
+	dispatcherEnabled := lu.Dispatcher.CanUseRelay && strings.EqualFold(lu.Dispatcher.Address, lens.DispatcherAddress)
+
 	res := &SocialAuthResult{
 		Provider: persist.SocialProviderFarcaster,
 		ID:       lu.ID,
@@ -197,11 +202,12 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 			"name":              lu.Name,
 			"profile_image_url": lu.Picture.Optimized.URL,
 			"bio":               lu.Bio,
+			"dipatcher_enabled": dispatcherEnabled,
 		},
 	}
 
-	if a.Signature != "" {
-		access, refresh, err := api.AuthenticateWithSignature(ctx, a.Address, a.Signature)
+	if a.ChallengeSignature != "" {
+		access, refresh, err := api.AuthenticateWithSignature(ctx, a.Address, a.ChallengeSignature)
 		if err != nil {
 			return nil, err
 		}
@@ -217,6 +223,15 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 		}
 
 		res.Metadata["signature_approved"] = true
+
+		if !dispatcherEnabled && a.DispatcherSignature == "" {
+			return nil, fmt.Errorf("dispatcher signature not provided and dispatcher is not enabled, cannot authenticate")
+		}
+
+		if dispatcherEnabled {
+			res.Metadata["dispatcher_enabled"] = true
+		}
+
 	}
 
 	return res, nil

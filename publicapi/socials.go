@@ -11,6 +11,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/lens"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -50,13 +51,15 @@ func (s SocialAPI) NewFarcasterAuthenticator(userID persist.DBID, address persis
 	}
 }
 
-func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Address, sig string) *socialauth.LensAuthenticator {
+func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Address, challengeSig, dispatcherSig string) *socialauth.LensAuthenticator {
 	return &socialauth.LensAuthenticator{
-		HTTPClient: s.httpClient,
-		UserID:     userID,
-		Queries:    s.queries,
-		Address:    address,
-		Signature:  sig,
+		HTTPClient:          s.httpClient,
+		RedisCache:          s.redis,
+		UserID:              userID,
+		Queries:             s.queries,
+		Address:             address,
+		ChallengeSignature:  challengeSig,
+		DispatcherSignature: dispatcherSig,
 	}
 }
 
@@ -288,6 +291,47 @@ func (api SocialAPI) GetConnections(ctx context.Context, socialProvider persist.
 	}
 }
 
+func (api SocialAPI) GetLensSignables(ctx context.Context, address persist.Address) (*model.LensSignables, error) {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userAPI, err := api.newLensAPIForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &model.LensSignables{}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	lensSocials, ok := socials[persist.SocialProviderLens]
+	if !ok {
+		return nil, fmt.Errorf("user does not have a lens social account")
+	}
+	de, _ := lensSocials.Metadata["dispatcher_enabled"].(bool)
+
+	if !de {
+		_, toSign, err := userAPI.GetDispatcherTypedData(ctx, false)
+		if err != nil {
+			return nil, err
+		}
+		res.DispatcherTypedData = &toSign
+	}
+
+	challenge, err := lens.NewAPI(api.httpClient, api.redis).GetChallenge(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	res.Challenge = challenge
+
+	return res, nil
+}
+
 func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DBID) (*twitter.API, error) {
 	socialAuth, err := api.queries.GetSocialAuthByUserID(ctx, db.GetSocialAuthByUserIDParams{UserID: userID, Provider: persist.SocialProviderTwitter})
 	if err != nil {
@@ -312,6 +356,24 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 	}
 
 	return tapi, nil
+}
+
+func (api SocialAPI) newLensAPIForUser(ctx context.Context, userID persist.DBID) (*lens.AuthenticatedLensAPI, error) {
+	socialAuth, err := api.queries.GetSocialAuthByUserID(ctx, db.GetSocialAuthByUserIDParams{UserID: userID, Provider: persist.SocialProviderTwitter})
+	if err != nil {
+		return nil, fmt.Errorf("error getting social auth: %w", err)
+	}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting socials: %w", err)
+	}
+	lensSocials, ok := socials[persist.SocialProviderLens]
+	if !ok {
+		return nil, fmt.Errorf("user does not have a lens social account")
+	}
+
+	return lens.NewAPI(api.httpClient, api.redis).WithAuth(ctx, lensSocials.ID, socialAuth.AccessToken.String, socialAuth.RefreshToken.String), nil
 }
 
 func (s *SocialAPI) DisconnectSocialAccount(ctx context.Context, socialType persist.SocialProvider) error {

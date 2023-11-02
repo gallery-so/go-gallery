@@ -317,15 +317,20 @@ func (v *IntervalInput) GetLength() int { return v.Length }
 
 type LensAuth struct {
 	Address string `json:"address"`
-	// signature is the signed challenge provided by a GQL request to the lens endpoint
-	Signature *string `json:"signature"`
+	// writeSignature is the signed challenge provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+	WriteSignature *string `json:"writeSignature"`
+	// dispatcherSignature is the signed typed data provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+	DispatcherSignature *string `json:"dispatcherSignature"`
 }
 
 // GetAddress returns LensAuth.Address, and is useful for accessing the field via an interface.
 func (v *LensAuth) GetAddress() string { return v.Address }
 
-// GetSignature returns LensAuth.Signature, and is useful for accessing the field via an interface.
-func (v *LensAuth) GetSignature() *string { return v.Signature }
+// GetWriteSignature returns LensAuth.WriteSignature, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetWriteSignature() *string { return v.WriteSignature }
+
+// GetDispatcherSignature returns LensAuth.DispatcherSignature, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetDispatcherSignature() *string { return v.DispatcherSignature }
 
 type MagicLinkAuth struct {
 	Token string `json:"token"`

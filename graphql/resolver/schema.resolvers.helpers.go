@@ -218,7 +218,7 @@ func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m mod
 	}
 
 	if m.Lens != nil {
-		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address, util.FromPointer(m.Lens.Signature)), nil
+		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address, util.FromPointer(m.Lens.WriteSignature), util.FromPointer(m.Lens.DispatcherSignature)), nil
 	}
 
 	return nil, errNoAuthMechanismFound

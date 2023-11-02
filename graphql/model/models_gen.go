@@ -1590,19 +1590,29 @@ func (JSONMedia) IsMedia()        {}
 
 type LensAuth struct {
 	Address persist.Address `json:"address"`
-	// signature is the signed challenge provided by a GQL request to the lens endpoint
-	Signature *string `json:"signature"`
+	// writeSignature is the signed challenge provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+	WriteSignature *string `json:"writeSignature"`
+	// dispatcherSignature is the signed typed data provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+	DispatcherSignature *string `json:"dispatcherSignature"`
+}
+
+type LensSignables struct {
+	Challenge           string  `json:"challenge"`
+	DispatcherTypedData *string `json:"dispatcherTypedData"`
 }
 
 type LensSocialAccount struct {
-	Type              persist.SocialProvider `json:"type"`
-	SocialID          string                 `json:"social_id"`
-	Name              string                 `json:"name"`
-	Username          string                 `json:"username"`
-	ProfileImageURL   string                 `json:"profileImageURL"`
-	Bio               string                 `json:"bio"`
-	Display           bool                   `json:"display"`
-	SignatureApproved bool                   `json:"signatureApproved"`
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Bio             string                 `json:"bio"`
+	Display         bool                   `json:"display"`
+	// writeApproved represents whether they have signed a message that we verified with the Lens API to generate an access to token and refresh token for the Lens API
+	WriteApproved bool `json:"writeApproved"`
+	// signables represents the typed data and challenge that the user needs to sign if they want to enable the dispatcher and approve us to write on their behalf
+	Signables *LensSignables `json:"signables"`
 }
 
 func (LensSocialAccount) IsSocialAccount() {}

@@ -715,6 +715,11 @@ func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *mode
 	return publicapi.For(ctx).User.IsMemberOfCommunity(ctx, obj.Dbid, communityID)
 }
 
+// Signables is the resolver for the signables field.
+func (r *lensSocialAccountResolver) Signables(ctx context.Context, obj *model.LensSocialAccount, signingAddress persist.Address) (*model.LensSignables, error) {
+	return publicapi.For(ctx).Social.GetLensSignables(ctx, signingAddress)
+}
+
 // Entity is the resolver for the entity field.
 func (r *mentionResolver) Entity(ctx context.Context, obj *model.Mention) (model.MentionEntity, error) {
 	if obj.CommunityID != nil {
@@ -3216,6 +3221,11 @@ func (r *Resolver) GalleryUpdatedFeedEventData() generated.GalleryUpdatedFeedEve
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
+// LensSocialAccount returns generated.LensSocialAccountResolver implementation.
+func (r *Resolver) LensSocialAccount() generated.LensSocialAccountResolver {
+	return &lensSocialAccountResolver{r}
+}
+
 // Mention returns generated.MentionResolver implementation.
 func (r *Resolver) Mention() generated.MentionResolver { return &mentionResolver{r} }
 
@@ -3400,6 +3410,7 @@ type galleryResolver struct{ *Resolver }
 type galleryInfoUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
+type lensSocialAccountResolver struct{ *Resolver }
 type mentionResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type newTokensNotificationResolver struct{ *Resolver }
