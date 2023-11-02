@@ -1231,6 +1231,10 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		if ok {
 			t.ProfileImageURL = profile
 		}
+		scope, ok := social.Metadata["scope"].(string)
+		if ok {
+			t.Scope = scope
+		}
 		result.Twitter = t
 	case persist.SocialProviderFarcaster:
 		logger.For(ctx).Infof("found farcaster social account: %+v", social)
@@ -1286,6 +1290,10 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		bio, ok := social.Metadata["bio"].(string)
 		if ok {
 			l.Bio = bio
+		}
+		signtatureApproved, ok := social.Metadata["signature_approved"].(bool)
+		if ok {
+			l.SignatureApproved = signtatureApproved
 		}
 		result.Lens = l
 	default:

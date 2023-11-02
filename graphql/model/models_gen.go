@@ -1300,8 +1300,10 @@ type FallbackMedia struct {
 }
 
 type FarcasterAuth struct {
-	Address    persist.Address `json:"address"`
-	WithSigner *bool           `json:"withSigner"`
+	Address persist.Address `json:"address"`
+	// withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+	// the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+	WithSigner *bool `json:"withSigner"`
 }
 
 type FarcasterSocialAccount struct {
@@ -1587,18 +1589,20 @@ func (JSONMedia) IsMediaSubtype() {}
 func (JSONMedia) IsMedia()        {}
 
 type LensAuth struct {
-	Address   persist.Address `json:"address"`
-	Signature *string         `json:"signature"`
+	Address persist.Address `json:"address"`
+	// signature is the signed challenge provided by a GQL request to the lens endpoint
+	Signature *string `json:"signature"`
 }
 
 type LensSocialAccount struct {
-	Type            persist.SocialProvider `json:"type"`
-	SocialID        string                 `json:"social_id"`
-	Name            string                 `json:"name"`
-	Username        string                 `json:"username"`
-	ProfileImageURL string                 `json:"profileImageURL"`
-	Bio             string                 `json:"bio"`
-	Display         bool                   `json:"display"`
+	Type              persist.SocialProvider `json:"type"`
+	SocialID          string                 `json:"social_id"`
+	Name              string                 `json:"name"`
+	Username          string                 `json:"username"`
+	ProfileImageURL   string                 `json:"profileImageURL"`
+	Bio               string                 `json:"bio"`
+	Display           bool                   `json:"display"`
+	SignatureApproved bool                   `json:"signatureApproved"`
 }
 
 func (LensSocialAccount) IsSocialAccount() {}
@@ -2414,6 +2418,7 @@ type TwitterSocialAccount struct {
 	Username        string                 `json:"username"`
 	ProfileImageURL string                 `json:"profileImageURL"`
 	Display         bool                   `json:"display"`
+	Scope           string                 `json:"scope"`
 }
 
 func (TwitterSocialAccount) IsSocialAccount() {}

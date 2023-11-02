@@ -11,7 +11,6 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/lens"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
@@ -74,8 +73,6 @@ func checkFarcasterApproval(q *coredb.Queries, n *farcaster.NeynarAPI) gin.Handl
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-
-		logger.For(c).Infof("checking farcaster approval for %s", in.SignerUUID)
 
 		s, err := n.GetSignerByUUID(c, in.SignerUUID)
 		if err != nil {

@@ -17,13 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 
 const neynarV1BaseURL = "https://api.neynar.com/v1/farcaster"
 const neynarV2BaseURL = "https://api.neynar.com/v2/farcaster"
+const expirationSeconds = time.Minute * 10
 
 func init() {
 	env.RegisterValidation("NEYNAR_API_KEY", "required")
@@ -227,7 +227,7 @@ func (n *NeynarAPI) CreateSignerForUser(ctx context.Context, fid NeynarID) (Neyn
 	appFid := new(big.Int)
 	appFid.SetString(appFidStr, 10)
 
-	deadline := big.NewInt(time.Now().Unix() + 86400)
+	deadline := big.NewInt(time.Now().Unix() + int64(expirationSeconds.Seconds()))
 
 	// Make sure this matches the network you're using
 	signature, err := generateSignatureForSigner(ctx, curSigner, appFid, deadline)
@@ -282,8 +282,6 @@ func generateSignatureForSigner(ctx context.Context, curSigner NeynarSigner, app
 	if err != nil {
 		return nil, err
 	}
-
-	logger.For(ctx).Warnf("account %s", account.Address.Hex())
 
 	pubBytes, err := hex.DecodeString(strings.TrimPrefix(curSigner.PublicKey, "0x"))
 	if err != nil {

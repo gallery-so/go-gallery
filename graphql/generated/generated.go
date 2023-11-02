@@ -753,13 +753,14 @@ type ComplexityRoot struct {
 	}
 
 	LensSocialAccount struct {
-		Bio             func(childComplexity int) int
-		Display         func(childComplexity int) int
-		Name            func(childComplexity int) int
-		ProfileImageURL func(childComplexity int) int
-		SocialID        func(childComplexity int) int
-		Type            func(childComplexity int) int
-		Username        func(childComplexity int) int
+		Bio               func(childComplexity int) int
+		Display           func(childComplexity int) int
+		Name              func(childComplexity int) int
+		ProfileImageURL   func(childComplexity int) int
+		SignatureApproved func(childComplexity int) int
+		SocialID          func(childComplexity int) int
+		Type              func(childComplexity int) int
+		Username          func(childComplexity int) int
 	}
 
 	LoginPayload struct {
@@ -1439,6 +1440,7 @@ type ComplexityRoot struct {
 		Display         func(childComplexity int) int
 		Name            func(childComplexity int) int
 		ProfileImageURL func(childComplexity int) int
+		Scope           func(childComplexity int) int
 		SocialID        func(childComplexity int) int
 		Type            func(childComplexity int) int
 		Username        func(childComplexity int) int
@@ -4460,6 +4462,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.LensSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "LensSocialAccount.signatureApproved":
+		if e.complexity.LensSocialAccount.SignatureApproved == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.SignatureApproved(childComplexity), true
 
 	case "LensSocialAccount.social_id":
 		if e.complexity.LensSocialAccount.SocialID == nil {
@@ -7936,6 +7945,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TwitterSocialAccount.ProfileImageURL(childComplexity), true
 
+	case "TwitterSocialAccount.scope":
+		if e.complexity.TwitterSocialAccount.Scope == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.Scope(childComplexity), true
+
 	case "TwitterSocialAccount.social_id":
 		if e.complexity.TwitterSocialAccount.SocialID == nil {
 			break
@@ -9338,6 +9354,7 @@ type TwitterSocialAccount implements SocialAccount {
   username: String!
   profileImageURL: String!
   display: Boolean!
+  scope: String!
 }
 
 type FarcasterSocialAccount implements SocialAccount {
@@ -9360,6 +9377,7 @@ type LensSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  signatureApproved: Boolean!
 }
 
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
@@ -10454,12 +10472,19 @@ input TwitterAuth {
 
 input FarcasterAuth {
   address: Address!
+  """
+  withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+  the ` + "`" + `FarcasterSocialAccount` + "`" + ` type will return an ` + "`" + `approvalURL` + "`" + ` that will link the user to make the on chain transaction.
+  """
   withSigner: Boolean
   # farcaster only supports ETH addresses currently so no need to specify a chain
 }
 
 input LensAuth {
   address: Address!
+  """
+  signature is the signed challenge provided by a GQL request to the lens endpoint
+  """
   signature: String @scrub
   # lens only supports ETH addresses currently so no need to specify a chain
 }
@@ -31937,6 +31962,50 @@ func (ec *executionContext) fieldContext_LensSocialAccount_display(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _LensSocialAccount_signatureApproved(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_signatureApproved(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SignatureApproved, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_signatureApproved(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _LoginPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.LoginPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_LoginPayload_userId(ctx, field)
 	if err != nil {
@@ -45562,6 +45631,8 @@ func (ec *executionContext) fieldContext_SocialAccounts_twitter(ctx context.Cont
 				return ec.fieldContext_TwitterSocialAccount_profileImageURL(ctx, field)
 			case "display":
 				return ec.fieldContext_TwitterSocialAccount_display(ctx, field)
+			case "scope":
+				return ec.fieldContext_TwitterSocialAccount_scope(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TwitterSocialAccount", field.Name)
 		},
@@ -45680,6 +45751,8 @@ func (ec *executionContext) fieldContext_SocialAccounts_lens(ctx context.Context
 				return ec.fieldContext_LensSocialAccount_bio(ctx, field)
 			case "display":
 				return ec.fieldContext_LensSocialAccount_display(ctx, field)
+			case "signatureApproved":
+				return ec.fieldContext_LensSocialAccount_signatureApproved(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type LensSocialAccount", field.Name)
 		},
@@ -54623,6 +54696,50 @@ func (ec *executionContext) fieldContext_TwitterSocialAccount_display(ctx contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TwitterSocialAccount_scope(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TwitterSocialAccount_scope(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Scope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TwitterSocialAccount_scope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -72566,6 +72683,13 @@ func (ec *executionContext) _LensSocialAccount(ctx context.Context, sel ast.Sele
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "signatureApproved":
+
+			out.Values[i] = ec._LensSocialAccount_signatureApproved(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -77734,6 +77858,13 @@ func (ec *executionContext) _TwitterSocialAccount(ctx context.Context, sel ast.S
 		case "display":
 
 			out.Values[i] = ec._TwitterSocialAccount_display(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "scope":
+
+			out.Values[i] = ec._TwitterSocialAccount_scope(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
