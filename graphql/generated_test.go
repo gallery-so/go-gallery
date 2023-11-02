@@ -370,9 +370,10 @@ type OneTimeLoginTokenAuth struct {
 func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 
 type PostTokensInput struct {
-	TokenIds []persist.DBID `json:"tokenIds"`
-	Caption  *string        `json:"caption"`
-	Mentions []MentionInput `json:"mentions"`
+	TokenIds   []persist.DBID      `json:"tokenIds"`
+	Caption    *string             `json:"caption"`
+	Mentions   []MentionInput      `json:"mentions"`
+	CrossPosts []SocialAccountType `json:"crossPosts"`
 }
 
 // GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
@@ -383,6 +384,9 @@ func (v *PostTokensInput) GetCaption() *string { return v.Caption }
 
 // GetMentions returns PostTokensInput.Mentions, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
+
+// GetCrossPosts returns PostTokensInput.CrossPosts, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetCrossPosts() []SocialAccountType { return v.CrossPosts }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`

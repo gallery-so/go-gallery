@@ -32,6 +32,8 @@ func init() {
 type NeynarAPI struct {
 	httpClient *http.Client
 	apiKey     string
+
+	signerUUID string
 }
 
 func NewNeynarAPI(httpClient *http.Client) *NeynarAPI {
@@ -373,4 +375,80 @@ func (n *NeynarAPI) GetSignerByUUID(ctx context.Context, uuid string) (NeynarSig
 	}
 
 	return curSigner, nil
+}
+
+func (n *NeynarAPI) WithSigner(signerUUID string) *NeynarAPI {
+	nn := *n
+	nn.signerUUID = signerUUID
+	return &nn
+}
+
+type CastEmbed struct {
+	URL    string `json:"url"`
+	CastID struct {
+		FID  NeynarID `json:"fid"`
+		Hash string   `json:"hash"`
+	} `json:"castId"`
+}
+type CastInput struct {
+	Text       string      `json:"text"`
+	SignerUUID string      `json:"signer_uuid"`
+	Embeds     []CastEmbed `json:"embeds,omitempty"`
+	ParentID   string      `json:"parent_id,omitempty"`
+}
+
+type CastResponse struct {
+	Success bool `json:"success"`
+	Cast    struct {
+		Hash   string `json:"hash"`
+		Text   string `json:"text"`
+		Author struct {
+			FID NeynarID `json:"fid"`
+		}
+	} `json:"cast"`
+}
+
+func (n *NeynarAPI) Cast(ctx context.Context, text string, embeds []CastEmbed) error {
+	url := fmt.Sprintf("%s/cast", neynarV2BaseURL)
+	in := CastInput{
+		Text:       text,
+		SignerUUID: n.signerUUID,
+		Embeds:     embeds,
+	}
+
+	asJSON, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(asJSON)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, buf)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("api-key", n.apiKey)
+
+	resp, err := n.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("neynar returned status %d (%s)", resp.StatusCode, util.BodyAsError(resp))
+	}
+
+	defer resp.Body.Close()
+
+	var castResp CastResponse
+	if err := json.NewDecoder(resp.Body).Decode(&castResp); err != nil {
+		return err
+	}
+
+	if !castResp.Success {
+		return fmt.Errorf("neynar returned success false")
+	}
+
+	return nil
 }

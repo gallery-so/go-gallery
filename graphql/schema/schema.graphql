@@ -2600,6 +2600,7 @@ input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
   mentions: [MentionInput!]
+  crossPosts: [SocialAccountType!]
 }
 
 type PostTokensPayload {

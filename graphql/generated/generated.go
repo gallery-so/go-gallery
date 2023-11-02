@@ -11282,6 +11282,7 @@ input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
   mentions: [MentionInput!]
+  crossPosts: [SocialAccountType!]
 }
 
 type PostTokensPayload {
@@ -62395,7 +62396,7 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokenIds", "caption", "mentions"}
+	fieldsInOrder := [...]string{"tokenIds", "caption", "mentions", "crossPosts"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -62429,6 +62430,15 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 				return it, err
 			}
 			it.Mentions = data
+		case "crossPosts":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("crossPosts"))
+			data, err := ec.unmarshalOSocialAccountType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProviderᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CrossPosts = data
 		}
 	}
 
@@ -83612,6 +83622,73 @@ func (ec *executionContext) marshalOSetSpamPreferencePayloadOrError2githubᚗcom
 		return graphql.Null
 	}
 	return ec._SetSpamPreferencePayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOSocialAccountType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProviderᚄ(ctx context.Context, v interface{}) ([]persist.SocialProvider, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.SocialProvider, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOSocialAccountType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProviderᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.SocialProvider) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOSocialAccounts2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialAccounts(ctx context.Context, sel ast.SelectionSet, v *model.SocialAccounts) graphql.Marshaler {

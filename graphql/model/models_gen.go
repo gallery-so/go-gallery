@@ -1837,9 +1837,10 @@ type PostEdge struct {
 }
 
 type PostTokensInput struct {
-	TokenIds []persist.DBID  `json:"tokenIds"`
-	Caption  *string         `json:"caption"`
-	Mentions []*MentionInput `json:"mentions"`
+	TokenIds   []persist.DBID           `json:"tokenIds"`
+	Caption    *string                  `json:"caption"`
+	Mentions   []*MentionInput          `json:"mentions"`
+	CrossPosts []persist.SocialProvider `json:"crossPosts"`
 }
 
 type PostTokensPayload struct {

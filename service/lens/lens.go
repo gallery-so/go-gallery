@@ -14,6 +14,9 @@ const baseURL = "https://api.lens.dev"
 
 type LensAPI struct {
 	httpClient *http.Client
+
+	accessToken  string
+	refreshToken string
 }
 
 func NewAPI(httpClient *http.Client) *LensAPI {
@@ -251,4 +254,11 @@ func (n *LensAPI) RefreshAccessToken(ctx context.Context, refreshToken string) (
 	}
 
 	return lensResp.Data.Refresh.AccessToken, lensResp.Data.Refresh.RefreshToken, nil
+}
+
+func (l *LensAPI) WithAuth(ctx context.Context, accessToken string, refreshToken string) *LensAPI {
+	ll := *l
+	ll.accessToken = accessToken
+	ll.refreshToken = refreshToken
+	return &ll
 }
