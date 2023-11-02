@@ -1,17 +1,29 @@
 package farcaster
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
+	"strings"
+	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
-const neynarBaseURL = "https://api.neynar.com/v1/farcaster"
+const neynarV1BaseURL = "https://api.neynar.com/v1/farcaster"
+const neynarV2BaseURL = "https://api.neynar.com/v2/farcaster"
+const expirationSeconds = time.Minute * 10
 
 func init() {
 	env.RegisterValidation("NEYNAR_API_KEY", "required")
@@ -98,7 +110,7 @@ type NeynarUserByVerificationResponse struct {
 }
 
 func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) (NeynarUser, error) {
-	u := fmt.Sprintf("%s/user-by-verification/?api_key=%s&address=%s", neynarBaseURL, n.apiKey, address)
+	u := fmt.Sprintf("%s/user-by-verification/?api_key=%s&address=%s", neynarV1BaseURL, n.apiKey, address)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return NeynarUser{}, err
@@ -141,7 +153,7 @@ type NeynarFollowingByUserIDResponse struct {
 
 func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]NeynarUser, error) {
 	// e.g. https://api.neynar.com/v1/farcaster/following/?api_key={$api-key}&fid=3
-	u := fmt.Sprintf("%s/following/?api_key=%s&fid=%s", neynarBaseURL, n.apiKey, fid)
+	u := fmt.Sprintf("%s/following/?api_key=%s&fid=%s", neynarV1BaseURL, n.apiKey, fid)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -167,4 +179,198 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 	}
 
 	return neynarResp.Result.Users, nil
+}
+
+type NeynarSigner struct {
+	SignerUUID        string `json:"signer_uuid"`
+	PublicKey         string `json:"public_key"`
+	Status            string `json:"status"`
+	SignerApprovalURL string `json:"signer_approval_url"`
+	SignerApprovalFID any    `json:"fid"`
+}
+type EIP712Domain struct {
+	Name              string   `json:"name"`
+	Version           string   `json:"version"`
+	ChainID           *big.Int `json:"chainId"`
+	VerifyingContract string   `json:"verifyingContract"`
+}
+
+type SignedKeyRequest struct {
+	RequestFid *big.Int `json:"requestFid"`
+	Key        []byte   `json:"key"`
+	Deadline   *big.Int `json:"deadline"`
+}
+
+func (n *NeynarAPI) CreateSignerForUser(ctx context.Context, fid NeynarID) (NeynarSigner, error) {
+	su := fmt.Sprintf("%s/signer/?api_key=%s", neynarV2BaseURL, n.apiKey)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, su, nil)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	sResp, err := n.httpClient.Do(req)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	if sResp.StatusCode != http.StatusOK {
+		return NeynarSigner{}, fmt.Errorf("neynar returned status %d (%s)", sResp.StatusCode, util.GetErrFromResp(sResp))
+	}
+	defer sResp.Body.Close()
+
+	var curSigner NeynarSigner
+	if err := json.NewDecoder(sResp.Body).Decode(&curSigner); err != nil {
+		return NeynarSigner{}, err
+	}
+
+	appFidStr := env.GetString("FARCASTER_APP_ID")
+	appFid := new(big.Int)
+	appFid.SetString(appFidStr, 10)
+
+	deadline := big.NewInt(time.Now().Unix() + int64(expirationSeconds.Seconds()))
+
+	// Make sure this matches the network you're using
+	signature, err := generateSignatureForSigner(ctx, curSigner, appFid, deadline)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	rsu := fmt.Sprintf("%s/signer/signed_key/?api_key=%s", neynarV2BaseURL, n.apiKey)
+	in := map[string]any{
+		"signer_uuid": curSigner.SignerUUID,
+		"signature":   fmt.Sprintf("0x%s", hex.EncodeToString(signature)),
+		"app_fid":     appFid,
+		"deadline":    deadline,
+	}
+	asJSON, err := json.Marshal(in)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+	buf := bytes.NewBuffer(asJSON)
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, rsu, buf)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	rsResp, err := n.httpClient.Do(req)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	if rsResp.StatusCode != http.StatusOK {
+		return NeynarSigner{}, fmt.Errorf("neynar returned status %d (%s)", rsResp.StatusCode, util.GetErrFromResp(rsResp))
+	}
+	defer rsResp.Body.Close()
+
+	err = json.NewDecoder(rsResp.Body).Decode(&curSigner)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	return curSigner, nil
+}
+
+func generateSignatureForSigner(ctx context.Context, curSigner NeynarSigner, appFid, deadline *big.Int) ([]byte, error) {
+
+	mnemonic := env.GetString("FARCASTER_MNEMONIC")
+	wallet, err := hdwallet.NewFromMnemonic(mnemonic)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := wallet.Derive(accounts.DefaultBaseDerivationPath, true)
+	if err != nil {
+		return nil, err
+	}
+
+	pubBytes, err := hex.DecodeString(strings.TrimPrefix(curSigner.PublicKey, "0x"))
+	if err != nil {
+		return nil, err
+	}
+
+	domain := apitypes.TypedDataDomain{
+		Name:              "Farcaster SignedKeyRequestValidator",
+		Version:           "1",
+		ChainId:           math.NewHexOrDecimal256(10),
+		VerifyingContract: "0x00000000fc700472606ed4fa22623acf62c60553",
+	}
+
+	typedData := apitypes.TypedData{
+		Types: apitypes.Types{
+			"EIP712Domain": []apitypes.Type{
+				{Name: "name", Type: "string"},
+				{Name: "version", Type: "string"},
+				{Name: "chainId", Type: "uint256"},
+				{Name: "verifyingContract", Type: "address"},
+			},
+			"SignedKeyRequest": []apitypes.Type{
+				{Name: "requestFid", Type: "uint256"},
+				{Name: "key", Type: "bytes"},
+				{Name: "deadline", Type: "uint256"},
+			},
+		},
+		PrimaryType: "SignedKeyRequest",
+		Domain:      domain,
+		Message: map[string]interface{}{
+			"requestFid": appFid.String(),
+			"key":        pubBytes,
+			"deadline":   deadline.String(),
+		},
+	}
+
+	signature, err := signEIP712TypedData(wallet, account, typedData)
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
+}
+
+func signEIP712TypedData(wallet *hdwallet.Wallet, account accounts.Account, typedData apitypes.TypedData) ([]byte, error) {
+
+	hash, _, err := apitypes.TypedDataAndHash(typedData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sign the final hash
+	signature, err := wallet.SignHash(account, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	signature[64] += 27
+
+	return signature, nil
+}
+
+func (n *NeynarAPI) GetSignerByUUID(ctx context.Context, uuid string) (NeynarSigner, error) {
+	su := fmt.Sprintf("%s/signer/?api_key=%s&signer_uuid=%s", neynarV2BaseURL, n.apiKey, uuid)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, su, nil)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", n.apiKey)
+
+	sResp, err := n.httpClient.Do(req)
+	if err != nil {
+		return NeynarSigner{}, err
+	}
+
+	if sResp.StatusCode != http.StatusOK {
+		bs, err := io.ReadAll(sResp.Body)
+		if err != nil {
+			return NeynarSigner{}, err
+		}
+		return NeynarSigner{}, fmt.Errorf("neynar returned status %d (%s)", sResp.StatusCode, bs)
+	}
+	defer sResp.Body.Close()
+
+	var curSigner NeynarSigner
+	if err := json.NewDecoder(sResp.Body).Decode(&curSigner); err != nil {
+		return NeynarSigner{}, err
+	}
+
+	return curSigner, nil
 }

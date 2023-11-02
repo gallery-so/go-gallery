@@ -66,6 +66,11 @@ type AutosocialProcessUsersMessage struct {
 	Users map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress `json:"users" binding:"required"`
 }
 
+type AutosocialPollFarcasterMessage struct {
+	SignerUUID string       `form:"signer_uuid" binding:"required"`
+	UserID     persist.DBID `form:"user_id" binding:"required"`
+}
+
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
 
 func (t TokenIdentifiersQuantities) MarshalJSON() ([]byte, error) {
@@ -216,6 +221,14 @@ func CreateTaskForAutosocialProcessUsers(ctx context.Context, message Autosocial
 	queue := env.GetString("AUTOSOCIAL_QUEUE")
 	url := fmt.Sprintf("%s/process/users", env.GetString("AUTOSOCIAL_URL"))
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
+}
+
+func CreateTaskForAutosocialPollFarcaster(ctx context.Context, message AutosocialPollFarcasterMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAutosocialPollFarcaster")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("AUTOSOCIAL_POLL_QUEUE")
+	url := fmt.Sprintf("%s/checkFarcasterApproval?signer_uuid=%s&user_id=%s", env.GetString("AUTOSOCIAL_URL"), message.SignerUUID, message.UserID)
+	return submitTask(ctx, client, queue, url, withTrace(span))
 }
 
 func CreateTaskForSlackPostFeedBot(ctx context.Context, message FeedbotSlackPostMessage, client *gcptasks.Client) error {
