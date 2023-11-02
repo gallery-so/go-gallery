@@ -686,7 +686,7 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 			return
 		}
 
-		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiers(c, coredb.GetMediaByTokenIdentifiersParams{
+		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiersIgnoringStatus(c, coredb.GetMediaByTokenIdentifiersIgnoringStatusParams{
 			Chain:           input.Token.Chain,
 			ContractAddress: input.Token.ContractAddress,
 			TokenID:         input.Token.TokenID,

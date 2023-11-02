@@ -114,10 +114,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUsernameNotAvailable{Message: message}
 	case util.ErrorAs[persist.ErrCollectionNotFoundByID](err):
 		mappedErr = model.ErrCollectionNotFound{Message: message}
-	case util.ErrorAs[persist.ErrTokenNotFoundByID](err) || util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) || util.ErrorAs[persist.ErrTokenDefinitionNotFoundByID](err) || util.ErrorAs[persist.ErrTokenDefinitionNotFoundByTokenDBID](err):
 	case util.ErrorAs[persist.ErrTokenNotFound](err) || util.ErrorAs[persist.ErrTokenDefinitionNotFound](err):
 		mappedErr = model.ErrTokenNotFound{Message: message}
-	case util.ErrorAs[persist.ErrContractNotFoundByAddress](err):
 	case util.ErrorAs[persist.ErrContractNotFound](err):
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case util.ErrorAs[persist.ErrAddressOwnedByUser](err):
@@ -2154,9 +2152,15 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 }
 
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
+	api := publicapi.For(ctx).Token
 	// Use the token's profile image if the token exists
-	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
-		if tokenMedia, err := publicapi.For(ctx).Token.GetMediaByTokenDefinitionID(ctx, token.TokenDefinitionID); err == nil {
+	if token, err := api.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
+		// This should be free because the definition is cached from the call above
+		tDef, err := api.GetTokenDefinitionByID(ctx, token.TokenDefinitionID)
+		if err != nil {
+			return nil, err
+		}
+		if tokenMedia, err := api.GetMediaByMediaID(ctx, tDef.TokenMediaID); err == nil {
 			if tokenMedia.Media.ProfileImageURL != "" {
 				url = string(tokenMedia.Media.ProfileImageURL)
 			}

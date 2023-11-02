@@ -92,12 +92,17 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	return api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+	r, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
 		OwnerID:         userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
 		Chain:           persist.ChainETH,
 	})
+	if err != nil {
+		return db.Token{}, err
+	}
+
+	return r.Token, err
 }
 
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
@@ -274,7 +279,16 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, 
 		params.IncludeCreator = true
 	}
 
-	return api.loaders.GetTokensByUserIdBatch.Load(params)
+	results, err := api.loaders.GetTokensByUserIdBatch.Load(params)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := util.MapWithoutError(results, func(r db.GetTokensByUserIdBatchRow) db.Token {
+		return r.Token
+	})
+
+	return tokens, nil
 }
 
 func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain, userID persist.DBID) error {
@@ -572,14 +586,14 @@ func (api TokenAPI) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Con
 	return tokenDefAndMedia.TokenDefinition, tokenDefAndMedia.TokenMedia, err
 }
 
-func (api TokenAPI) GetMediaByTokenDefinitionID(ctx context.Context, id persist.DBID) (db.TokenMedia, error) {
+func (api TokenAPI) GetMediaByMediaID(ctx context.Context, id persist.DBID) (db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenDefinitionID": validate.WithTag(id, "required"),
+		"mediaID": validate.WithTag(id, "required"),
 	}); err != nil {
 		return db.TokenMedia{}, err
 	}
-	return api.loaders.GetMediaByTokenDefinitionIDIgnoringStatusBatch.Load(id)
+	return api.loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(id)
 }
 
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {

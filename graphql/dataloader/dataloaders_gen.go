@@ -1105,34 +1105,34 @@ func newGetGalleryTokenMediasByGalleryIDBatch(
 	return d
 }
 
-// GetMediaByTokenDefinitionIDIgnoringStatusBatch batches and caches requests
-type GetMediaByTokenDefinitionIDIgnoringStatusBatch struct {
+// GetMediaByMediaIdIgnoringStatusBatch batches and caches requests
+type GetMediaByMediaIdIgnoringStatusBatch struct {
 	generator.Dataloader[persist.DBID, coredb.TokenMedia]
 }
 
-// newGetMediaByTokenDefinitionIDIgnoringStatusBatch creates a new GetMediaByTokenDefinitionIDIgnoringStatusBatch with the given settings, functions, and options
-func newGetMediaByTokenDefinitionIDIgnoringStatusBatch(
+// newGetMediaByMediaIdIgnoringStatusBatch creates a new GetMediaByMediaIdIgnoringStatusBatch with the given settings, functions, and options
+func newGetMediaByMediaIdIgnoringStatusBatch(
 	ctx context.Context,
 	maxBatchSize int,
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetMediaByTokenDefinitionIDIgnoringStatusBatch, []persist.DBID) ([]coredb.TokenMedia, []error),
+	fetch func(context.Context, *GetMediaByMediaIdIgnoringStatusBatch, []persist.DBID) ([]coredb.TokenMedia, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
-) *GetMediaByTokenDefinitionIDIgnoringStatusBatch {
-	d := &GetMediaByTokenDefinitionIDIgnoringStatusBatch{}
+) *GetMediaByMediaIdIgnoringStatusBatch {
+	d := &GetMediaByMediaIdIgnoringStatusBatch{}
 
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenMedia, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetMediaByTokenDefinitionIDIgnoringStatusBatch")
+			ctx = preFetchHook(ctx, "GetMediaByMediaIdIgnoringStatusBatch")
 		}
 
 		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
-			postFetchHook(ctx, "GetMediaByTokenDefinitionIDIgnoringStatusBatch")
+			postFetchHook(ctx, "GetMediaByMediaIdIgnoringStatusBatch")
 		}
 
 		return results, errors
@@ -1144,7 +1144,7 @@ func newGetMediaByTokenDefinitionIDIgnoringStatusBatch(
 	return d
 }
 
-func (*GetMediaByTokenDefinitionIDIgnoringStatusBatch) getKeyForResult(result coredb.TokenMedia) persist.DBID {
+func (*GetMediaByMediaIdIgnoringStatusBatch) getKeyForResult(result coredb.TokenMedia) persist.DBID {
 	return result.ID
 }
 
@@ -1638,7 +1638,7 @@ func (*GetTokenByIdIgnoreDisplayableBatch) getKeyForResult(result coredb.Token) 
 
 // GetTokenByUserTokenIdentifiersBatch batches and caches requests
 type GetTokenByUserTokenIdentifiersBatch struct {
-	generator.Dataloader[coredb.GetTokenByUserTokenIdentifiersBatchParams, coredb.Token]
+	generator.Dataloader[coredb.GetTokenByUserTokenIdentifiersBatchParams, coredb.GetTokenByUserTokenIdentifiersBatchRow]
 }
 
 // newGetTokenByUserTokenIdentifiersBatch creates a new GetTokenByUserTokenIdentifiersBatch with the given settings, functions, and options
@@ -1648,13 +1648,13 @@ func newGetTokenByUserTokenIdentifiersBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetTokenByUserTokenIdentifiersBatch, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error),
+	fetch func(context.Context, *GetTokenByUserTokenIdentifiersBatch, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokenByUserTokenIdentifiersBatch {
 	d := &GetTokenByUserTokenIdentifiersBatch{}
 
-	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokenByUserTokenIdentifiersBatch")
@@ -1884,7 +1884,7 @@ func newGetTokensByCollectionIdBatch(
 
 // GetTokensByUserIdBatch batches and caches requests
 type GetTokensByUserIdBatch struct {
-	generator.Dataloader[coredb.GetTokensByUserIdBatchParams, []coredb.Token]
+	generator.Dataloader[coredb.GetTokensByUserIdBatchParams, []coredb.GetTokensByUserIdBatchRow]
 }
 
 // newGetTokensByUserIdBatch creates a new GetTokensByUserIdBatch with the given settings, functions, and options
@@ -1894,13 +1894,13 @@ func newGetTokensByUserIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetTokensByUserIdBatch, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error),
+	fetch func(context.Context, *GetTokensByUserIdBatch, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokensByUserIdBatch {
 	d := &GetTokensByUserIdBatch{}
 
-	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokensByUserIdBatch")

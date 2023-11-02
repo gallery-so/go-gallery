@@ -180,16 +180,21 @@ select * from tokens where id = $1 and displayable and deleted = false;
 select * from tokens where id = $1 and deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
-select t.*
-from tokens t, token_definitions td
+select sqlc.embed(t),
+    -- Fetch the definition and contract to cache since downstream queries will likely need them
+    sqlc.embed(td),
+    sqlc.embed(c)
+from tokens t, token_definitions td, contracts c
 where t.token_definition_id = td.token_definition_id
+    and td.contract_id = c.id
     and t.owner_user_id = @owner_id
     and td.token_id = @token_id
     and td.chain = @chain
     and td.contract_address = @contract_address
     and t.displayable
     and not t.deleted
-    and not td.deleted;
+    and not td.deleted
+    and not c.deleted;
 
 -- name: GetTokenByUserTokenIdentifiers :one
 select *
@@ -395,13 +400,16 @@ where t.owner_user_id = @owner_id
 order by t.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
-select t.* 
+select sqlc.embed(t), sqlc.embed(c)
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
+join contracts c on c.id = td.contract_id
 where t.owner_user_id = @owner_user_id
     and t.deleted = false
     and t.displayable
     and ((@include_holder::bool and t.is_holder_token) or (@include_creator::bool and t.is_creator_token))
+    and td.deleted = false
+    and c.deleted = false
 order by t.created_at desc, td.name desc, t.id desc;
 
 -- name: CreateUserEvent :one
@@ -1449,12 +1457,12 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByTokenDefinitionIDIgnoringStatusBatch :batchone
+-- name: GetMediaByMediaIdIgnoringStatusBatch :batchone
 select m.*
 from token_medias m
 where m.id = (select token_media_id from token_definitions td where td.id = $1 and not td.deleted) and not m.deleted;
 
--- name: GetMediaByTokenIdentifiers :one
+-- name: GetMediaByTokenIdentifiersIgnoringStatus :one
 select token_medias.*
 from token_definitions
 join token_medias on token_definitions.token_media_id = token_medias.id

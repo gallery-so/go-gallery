@@ -269,7 +269,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		}
 	}
 
-	token, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+	r, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
 		OwnerID:         user.ID,
 		TokenID:         t.TokenID,
 		ContractAddress: t.ContractAddress,
@@ -278,15 +278,10 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 
 	// The token is already synced
 	if err == nil {
-		contract, err := api.queries.GetContractByChainAddress(ctx, db.GetContractByChainAddressParams{Chain: t.Chain, Address: t.ContractAddress})
-		if err != nil {
-			return "", err
-		}
-
 		postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 			ID:          persist.GenerateID(),
-			TokenIds:    []persist.DBID{token.ID},
-			ContractIds: []persist.DBID{contract.ID},
+			TokenIds:    []persist.DBID{r.Token.ID},
+			ContractIds: []persist.DBID{r.Contract.ID},
 			ActorID:     user.ID,
 			Caption:     c,
 		})
@@ -294,7 +289,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			return postID, err
 		}
 
-		creator, _ := api.loaders.GetContractCreatorsByIds.Load(contract.ID.String())
+		creator, _ := api.loaders.GetContractCreatorsByIds.Load(r.Contract.ID.String())
 		if creator.CreatorUserID != "" {
 			err = event.Dispatch(ctx, db.Event{
 				ActorID:        persist.DBIDToNullStr(userID),

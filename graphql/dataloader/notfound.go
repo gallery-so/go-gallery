@@ -133,8 +133,8 @@ func (*GetContractsByIDs) getNotFoundError(key string) error {
 	return pgx.ErrNoRows
 }
 
-func (*GetMediaByTokenDefinitionIDIgnoringStatusBatch) getNotFoundError(key persist.DBID) error {
-	return persist.ErrMediaNotFoundByTokenDefinitionID{ID: key}
+func (*GetMediaByMediaIdIgnoringStatusBatch) getNotFoundError(key persist.DBID) error {
+	return persist.ErrMediaNotFoundByID{ID: key}
 }
 
 func (*GetTokenDefinitionByIdBatch) getNotFoundError(key persist.DBID) error {
@@ -146,5 +146,5 @@ func (*GetTokenDefinitionByTokenDbidBatch) getNotFoundError(key persist.DBID) er
 }
 
 func (*GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch) getNotFoundError(key persist.DBID) error {
-	return persist.ErrMediaNotFoundByTokenDefinitionID{ID: key}
+	panic("not implemented")
 }

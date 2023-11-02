@@ -2685,7 +2685,7 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 	return i, err
 }
 
-const getMediaByTokenIdentifiers = `-- name: GetMediaByTokenIdentifiers :one
+const getMediaByTokenIdentifiersIgnoringStatus = `-- name: GetMediaByTokenIdentifiersIgnoringStatus :one
 select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
 from token_definitions
 join token_medias on token_definitions.token_media_id = token_medias.id
@@ -2694,14 +2694,14 @@ where (chain, contract_address, token_id) = ($1, $2, $3)
     and not token_medias.deleted
 `
 
-type GetMediaByTokenIdentifiersParams struct {
+type GetMediaByTokenIdentifiersIgnoringStatusParams struct {
 	Chain           persist.Chain   `db:"chain" json:"chain"`
 	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
 	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
 }
 
-func (q *Queries) GetMediaByTokenIdentifiers(ctx context.Context, arg GetMediaByTokenIdentifiersParams) (TokenMedia, error) {
-	row := q.db.QueryRow(ctx, getMediaByTokenIdentifiers, arg.Chain, arg.ContractAddress, arg.TokenID)
+func (q *Queries) GetMediaByTokenIdentifiersIgnoringStatus(ctx context.Context, arg GetMediaByTokenIdentifiersIgnoringStatusParams) (TokenMedia, error) {
+	row := q.db.QueryRow(ctx, getMediaByTokenIdentifiersIgnoringStatus, arg.Chain, arg.ContractAddress, arg.TokenID)
 	var i TokenMedia
 	err := row.Scan(
 		&i.ID,

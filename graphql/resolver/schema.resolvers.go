@@ -255,9 +255,6 @@ func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
 	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
-		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
-			return nil, nil
-		}
 		return nil, err
 	}
 
@@ -2951,7 +2948,7 @@ func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*str
 
 // Media is the resolver for the media field.
 func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error) {
-	media, err := publicapi.For(ctx).Token.GetMediaByTokenDefinitionID(ctx, obj.Dbid)
+	media, err := publicapi.For(ctx).Token.GetMediaByMediaID(ctx, obj.HelperTokenDefinitionData.Definition.TokenMediaID)
 	if err != nil {
 		return nil, err
 	}

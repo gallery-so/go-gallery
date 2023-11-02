@@ -41,7 +41,7 @@ type Loaders struct {
 	GetGalleryByCollectionIdBatch                                    *GetGalleryByCollectionIdBatch
 	GetGalleryByIdBatch                                              *GetGalleryByIdBatch
 	GetGalleryTokenMediasByGalleryIDBatch                            *GetGalleryTokenMediasByGalleryIDBatch
-	GetMediaByTokenDefinitionIDIgnoringStatusBatch                   *GetMediaByTokenDefinitionIDIgnoringStatusBatch
+	GetMediaByMediaIdIgnoringStatusBatch                             *GetMediaByMediaIdIgnoringStatusBatch
 	GetMembershipByMembershipIdBatch                                 *GetMembershipByMembershipIdBatch
 	GetMentionsByCommentID                                           *GetMentionsByCommentID
 	GetMentionsByPostID                                              *GetMentionsByPostID
@@ -112,7 +112,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetGalleryByCollectionIdBatch = newGetGalleryByCollectionIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryByCollectionIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryByIdBatch = newGetGalleryByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryTokenMediasByGalleryIDBatch = newGetGalleryTokenMediasByGalleryIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryTokenMediasByGalleryIDBatch(q), preFetchHook, postFetchHook)
-	loaders.GetMediaByTokenDefinitionIDIgnoringStatusBatch = newGetMediaByTokenDefinitionIDIgnoringStatusBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMediaByTokenDefinitionIDIgnoringStatusBatch(q), preFetchHook, postFetchHook)
+	loaders.GetMediaByMediaIdIgnoringStatusBatch = newGetMediaByMediaIdIgnoringStatusBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMediaByMediaIdIgnoringStatusBatch(q), preFetchHook, postFetchHook)
 	loaders.GetMembershipByMembershipIdBatch = newGetMembershipByMembershipIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMembershipByMembershipIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetMentionsByCommentID = newGetMentionsByCommentID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMentionsByCommentID(q), preFetchHook, postFetchHook)
 	loaders.GetMentionsByPostID = newGetMentionsByPostID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMentionsByPostID(q), preFetchHook, postFetchHook)
@@ -216,6 +216,14 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result.Contract), result.Contract)
+	})
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
+		}
+	})
 	loaders.GetContractsByIDs.RegisterResultSubscriber(func(result coredb.Contract) {
 		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result), result)
 	})
@@ -249,11 +257,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	})
 	loaders.GetGalleryTokenMediasByGalleryIDBatch.RegisterResultSubscriber(func(result []coredb.TokenMedia) {
 		for _, entry := range result {
-			loaders.GetMediaByTokenDefinitionIDIgnoringStatusBatch.Prime(loaders.GetMediaByTokenDefinitionIDIgnoringStatusBatch.getKeyForResult(entry), entry)
+			loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(entry), entry)
 		}
 	})
 	loaders.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch.RegisterResultSubscriber(func(result coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow) {
-		loaders.GetMediaByTokenDefinitionIDIgnoringStatusBatch.Prime(loaders.GetMediaByTokenDefinitionIDIgnoringStatusBatch.getKeyForResult(result.TokenMedia), result.TokenMedia)
+		loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(result.TokenMedia), result.TokenMedia)
 	})
 	loaders.GetUserNotificationsBatch.RegisterResultSubscriber(func(result []coredb.Notification) {
 		for _, entry := range result {
@@ -273,17 +281,17 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetTokenByIdIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.Token) {
 		loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(result), result)
 	})
-	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.Token) {
-		loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(result), result)
+	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(result.Token), result.Token)
 	})
 	loaders.GetTokensByCollectionIdBatch.RegisterResultSubscriber(func(result []coredb.Token) {
 		for _, entry := range result {
 			loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.Token) {
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
 		for _, entry := range result {
-			loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(entry), entry)
+			loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(entry.Token), entry.Token)
 		}
 	})
 	loaders.GetTokensByWalletIdsBatch.RegisterResultSubscriber(func(result []coredb.Token) {
@@ -299,17 +307,17 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetTokenByIdBatch.RegisterResultSubscriber(func(result coredb.Token) {
 		loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(result), result)
 	})
-	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.Token) {
-		loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(result), result)
+	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(result.Token), result.Token)
 	})
 	loaders.GetTokensByCollectionIdBatch.RegisterResultSubscriber(func(result []coredb.Token) {
 		for _, entry := range result {
 			loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.Token) {
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
 		for _, entry := range result {
-			loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(entry), entry)
+			loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(entry.Token), entry.Token)
 		}
 	})
 	loaders.GetTokensByWalletIdsBatch.RegisterResultSubscriber(func(result []coredb.Token) {
@@ -317,11 +325,17 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
+	})
 	loaders.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch.RegisterResultSubscriber(func(result coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow) {
 		loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
 	})
 	loaders.GetTokenDefinitionByTokenDbidBatch.RegisterResultSubscriber(func(result coredb.TokenDefinition) {
 		loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(result), result)
+	})
+	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetTokenDefinitionByTokenDbidBatch.Prime(loaders.GetTokenDefinitionByTokenDbidBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
 	})
 	loaders.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch.RegisterResultSubscriber(func(result coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow) {
 		loaders.GetTokenDefinitionByTokenDbidBatch.Prime(loaders.GetTokenDefinitionByTokenDbidBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
@@ -437,6 +451,14 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCreatedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.Contract) {
 		for _, entry := range result {
 			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(result.Contract), result.Contract)
+	})
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry.Contract), entry.Contract)
 		}
 	})
 
@@ -923,12 +945,12 @@ func loadGetGalleryTokenMediasByGalleryIDBatch(q *coredb.Queries) func(context.C
 	}
 }
 
-func loadGetMediaByTokenDefinitionIDIgnoringStatusBatch(q *coredb.Queries) func(context.Context, *GetMediaByTokenDefinitionIDIgnoringStatusBatch, []persist.DBID) ([]coredb.TokenMedia, []error) {
-	return func(ctx context.Context, d *GetMediaByTokenDefinitionIDIgnoringStatusBatch, params []persist.DBID) ([]coredb.TokenMedia, []error) {
+func loadGetMediaByMediaIdIgnoringStatusBatch(q *coredb.Queries) func(context.Context, *GetMediaByMediaIdIgnoringStatusBatch, []persist.DBID) ([]coredb.TokenMedia, []error) {
+	return func(ctx context.Context, d *GetMediaByMediaIdIgnoringStatusBatch, params []persist.DBID) ([]coredb.TokenMedia, []error) {
 		results := make([]coredb.TokenMedia, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetMediaByTokenDefinitionIDIgnoringStatusBatch(ctx, params)
+		b := q.GetMediaByMediaIdIgnoringStatusBatch(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, r coredb.TokenMedia, err error) {
@@ -1152,15 +1174,15 @@ func loadGetTokenByIdIgnoreDisplayableBatch(q *coredb.Queries) func(context.Cont
 	}
 }
 
-func loadGetTokenByUserTokenIdentifiersBatch(q *coredb.Queries) func(context.Context, *GetTokenByUserTokenIdentifiersBatch, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
-	return func(ctx context.Context, d *GetTokenByUserTokenIdentifiersBatch, params []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
-		results := make([]coredb.Token, len(params))
+func loadGetTokenByUserTokenIdentifiersBatch(q *coredb.Queries) func(context.Context, *GetTokenByUserTokenIdentifiersBatch, []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersBatchRow, []error) {
+	return func(ctx context.Context, d *GetTokenByUserTokenIdentifiersBatch, params []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersBatchRow, []error) {
+		results := make([]coredb.GetTokenByUserTokenIdentifiersBatchRow, len(params))
 		errors := make([]error, len(params))
 
 		b := q.GetTokenByUserTokenIdentifiersBatch(ctx, params)
 		defer b.Close()
 
-		b.QueryRow(func(i int, r coredb.Token, err error) {
+		b.QueryRow(func(i int, r coredb.GetTokenByUserTokenIdentifiersBatchRow, err error) {
 			results[i], errors[i] = r, err
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = d.getNotFoundError(params[i])
@@ -1263,15 +1285,15 @@ func loadGetTokensByCollectionIdBatch(q *coredb.Queries) func(context.Context, *
 	}
 }
 
-func loadGetTokensByUserIdBatch(q *coredb.Queries) func(context.Context, *GetTokensByUserIdBatch, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error) {
-	return func(ctx context.Context, d *GetTokensByUserIdBatch, params []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error) {
-		results := make([][]coredb.Token, len(params))
+func loadGetTokensByUserIdBatch(q *coredb.Queries) func(context.Context, *GetTokensByUserIdBatch, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
+	return func(ctx context.Context, d *GetTokensByUserIdBatch, params []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
+		results := make([][]coredb.GetTokensByUserIdBatchRow, len(params))
 		errors := make([]error, len(params))
 
 		b := q.GetTokensByUserIdBatch(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, r []coredb.Token, err error) {
+		b.Query(func(i int, r []coredb.GetTokensByUserIdBatchRow, err error) {
 			results[i], errors[i] = r, err
 		})
 
