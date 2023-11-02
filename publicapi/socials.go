@@ -297,11 +297,6 @@ func (api SocialAPI) GetLensSignables(ctx context.Context, address persist.Addre
 		return nil, err
 	}
 
-	userAPI, err := api.newLensAPIForUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
 	res := &model.LensSignables{}
 
 	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
@@ -315,11 +310,13 @@ func (api SocialAPI) GetLensSignables(ctx context.Context, address persist.Addre
 	de, _ := lensSocials.Metadata["dispatcher_enabled"].(bool)
 
 	if !de {
-		_, toSign, err := userAPI.GetDispatcherTypedData(ctx, false)
-		if err != nil {
-			return nil, err
+		userAPI, err := api.newLensAPIForUser(ctx, userID)
+		if err == nil {
+			_, toSign, err := userAPI.GetDispatcherTypedData(ctx, false)
+			if err == nil && toSign != "" {
+				res.DispatcherTypedData = &toSign
+			}
 		}
-		res.DispatcherTypedData = &toSign
 	}
 
 	challenge, err := lens.NewAPI(api.httpClient, api.redis).GetChallenge(ctx, address)

@@ -195,7 +195,7 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 	dispatcherEnabled := lu.Dispatcher.CanUseRelay && strings.EqualFold(lu.Dispatcher.Address, lens.DispatcherAddress)
 
 	res := &SocialAuthResult{
-		Provider: persist.SocialProviderFarcaster,
+		Provider: persist.SocialProviderLens,
 		ID:       lu.ID,
 		Metadata: map[string]interface{}{
 			"username":          lu.Handle,
@@ -223,15 +223,23 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 		}
 
 		res.Metadata["signature_approved"] = true
-
-		if !dispatcherEnabled && a.DispatcherSignature == "" {
-			return nil, fmt.Errorf("dispatcher signature not provided and dispatcher is not enabled, cannot authenticate")
+	}
+	if a.DispatcherSignature != "" {
+		socialAuth, err := a.Queries.GetSocialAuthByUserID(ctx, coredb.GetSocialAuthByUserIDParams{
+			Provider: persist.SocialProviderFarcaster,
+			UserID:   a.UserID,
+		})
+		if err != nil {
+			return nil, err
 		}
+		withAuth := api.WithAuth(ctx, lu.ID, socialAuth.AccessToken.String, socialAuth.RefreshToken.String)
 
-		if dispatcherEnabled {
-			res.Metadata["dispatcher_enabled"] = true
+		err = withAuth.BroadcastDispatcherChange(ctx, a.DispatcherSignature)
+		if err != nil {
+			return nil, err
 		}
-
+		res.Metadata["dispatcher_enabled"] = true
+		res.Metadata["signature_approved"] = true
 	}
 
 	return res, nil

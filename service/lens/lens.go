@@ -350,7 +350,24 @@ type BroadcastResponse struct {
 	Error *string `json:"error"`
 }
 
-func (n *AuthenticatedLensAPI) Broadcast(ctx context.Context, sigID, sig string) error {
+func (n *AuthenticatedLensAPI) BroadcastDispatcherChange(ctx context.Context, sig string) error {
+	redisKey := fmt.Sprintf("lens:typeddata:%s", n.profileID)
+
+	fromCache, err := n.api.redis.Get(ctx, redisKey)
+	if err != nil {
+		return err
+	}
+
+	var cached map[string]string
+	if err := json.Unmarshal(fromCache, &cached); err != nil {
+		return err
+	}
+
+	sigID, ok := cached["typedDataID"]
+	if !ok {
+		return fmt.Errorf("no typed data id found for profile %s, recreate dispatcher typed data", n.profileID)
+	}
+
 	gqlQuery := fmt.Sprintf(`mutation {
 		broadcast(request: { id: %s, signature: %s }) {
 			... on RelayerResult {
