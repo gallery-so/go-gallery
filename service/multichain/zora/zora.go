@@ -29,16 +29,8 @@ type Provider struct {
 type tokenID string
 
 func (t tokenID) toBase16String() string {
-	copy := string(t)
-	if strings.Contains("-", copy) {
-		// take what is after the dash
-		parts := strings.Split(copy, "-")
-		if len(parts) != 2 {
-			panic(fmt.Sprintf("invalid token id %s", t))
-		}
-		copy = parts[1]
-	}
-	big, ok := new(big.Int).SetString(copy, 10)
+	spl := strings.Split(string(t), "-")
+	big, ok := new(big.Int).SetString(spl[len(spl)-1], 10)
 	if !ok {
 		panic(fmt.Sprintf("invalid token id %s", t))
 	}
