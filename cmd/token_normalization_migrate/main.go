@@ -165,7 +165,7 @@ insert into token_definitions (
 		nullif(external_url, ''),
 		metadata,
 		fallback_media,
-		nullif(contract_id, ''),
+		contract_id,
 		nullif(token_media_id, ''),
 		chain,
 		contract_address,
