@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/service/tracing"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -495,8 +496,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
 	case persist.ActionReplyToComment:
 		data.OriginalCommentID = event.SubjectID
-	case persist.ActionUserPostedYourWork:
-		data.YourContractID = event.Data.YourContractID
+
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
