@@ -942,9 +942,16 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 
 	upsertableDefinitions := make([]db.TokenDefinition, 0)
 	upsertableTokens := make([]postgres.UpsertToken, 0)
+	tokensIsNewForUser := make(map[persist.DBID]map[persist.TokenIdentifiers]bool)
 
 	for userID, user := range users {
 		tokens := chainTokensToUpsertableTokens(chainTokensForUsers[userID], contracts, user)
+		tokensIsNewForUser[userID] = differenceTokens(
+			util.MapWithoutError(tokens, func(t postgres.UpsertToken) persist.TokenIdentifiers { return t.Identifiers }),
+			util.MapWithoutError(existingTokensForUsers[userID], func(t postgres.TokenFullDetails) persist.TokenIdentifiers {
+				return persist.NewTokenIdentifiers(t.Definition.ContractAddress, t.Definition.TokenID, t.Definition.Chain)
+			}),
+		)
 		definitions := chainTokensToUpsertableTokenDefinitions(chainTokensForUsers[userID], contracts)
 		upsertableTokens = append(upsertableTokens, tokens...)
 		upsertableDefinitions = append(upsertableDefinitions, definitions...)
@@ -975,9 +982,15 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	newUserTokens = make(map[persist.DBID][]postgres.TokenFullDetails, len(users))
 
 	for userID := range users {
+		newTokensForUser := tokensIsNewForUser[userID]
 		currentTokensForUser := currentUserTokens[userID]
-		newPersistedTokens := util.Filter(currentTokensForUser, func(t postgres.TokenFullDetails) bool { return t.Instance.CreatedAt.Equal(t.Instance.LastUpdated) }, false)
-		newUserTokens[userID] = newPersistedTokens
+		newUserTokens[userID] = make([]postgres.TokenFullDetails, 0, len(currentTokensForUser))
+		for _, token := range currentTokensForUser {
+			tID := persist.NewTokenIdentifiers(token.Definition.ContractAddress, token.Definition.TokenID, token.Definition.Chain)
+			if newTokensForUser[tID] {
+				newUserTokens[userID] = append(newUserTokens[userID], token)
+			}
+		}
 	}
 
 	for userID := range users {
@@ -2173,13 +2186,52 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 }
 
 func dedupeTokenDefinitions(tDefs []db.TokenDefinition) (uniqueDefs []db.TokenDefinition) {
-	return util.DedupeWithTranslate(tDefs, false, func(t db.TokenDefinition) string {
-		return fmt.Sprintf("%d:%s:%s", t.Chain, t.ContractID, t.TokenID)
+	type Key struct {
+		Val db.TokenDefinition
+		ID  string
+	}
+
+	keys := util.MapWithoutError(tDefs, func(tDef db.TokenDefinition) Key {
+		return Key{
+			Val: tDef,
+			ID:  fmt.Sprintf("%d:%s:%s", tDef.Chain, tDef.ContractID, tDef.TokenID),
+		}
 	})
+
+	t := util.DedupeWithTranslate(keys, false, func(k Key) string { return k.ID })
+	return util.MapWithoutError(t, func(k Key) db.TokenDefinition { return k.Val })
 }
 
 func dedupeTokenInstances(tokens []postgres.UpsertToken) (uniqueTokens []postgres.UpsertToken) {
-	return util.DedupeWithTranslate(tokens, false, func(t postgres.UpsertToken) string {
-		return fmt.Sprintf("%d:%s:%s:%s", t.Identifiers.Chain, t.Token.ContractID, t.Identifiers.TokenID, t.Token.OwnerUserID)
+	type Key struct {
+		Val postgres.UpsertToken
+		ID  string
+	}
+
+	keys := util.MapWithoutError(tokens, func(t postgres.UpsertToken) Key {
+		return Key{
+			Val: t,
+			ID:  fmt.Sprintf("%d:%s:%s:%s", t.Identifiers.Chain, t.Token.ContractID, t.Identifiers.TokenID, t.Token.OwnerUserID),
+		}
 	})
+
+	t := util.DedupeWithTranslate(keys, false, func(k Key) string { return k.ID })
+	return util.MapWithoutError(t, func(k Key) postgres.UpsertToken { return k.Val })
+}
+
+// differenceTokens finds the difference of newState - oldState to get the new tokens
+func differenceTokens(newState []persist.TokenIdentifiers, oldState []persist.TokenIdentifiers) map[persist.TokenIdentifiers]bool {
+	old := make(map[persist.TokenIdentifiers]bool, len(oldState))
+	for _, t := range oldState {
+		old[t] = true
+	}
+
+	diff := make(map[persist.TokenIdentifiers]bool)
+	for _, t := range newState {
+		if !old[t] {
+			diff[t] = true
+		}
+	}
+
+	return diff
 }
