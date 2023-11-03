@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -371,19 +370,6 @@ type TokenUpdateOwnerInput struct {
 type TokenUpdateBalanceInput struct {
 	Quantity    HexString   `json:"quantity"`
 	BlockNumber BlockNumber `json:"block_number"`
-}
-
-// TokenRepository represents a repository for interacting with persisted tokens
-type TokenRepository interface {
-	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
-	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
-	GetOwnedByContract(context.Context, EthereumAddress, EthereumAddress, int64, int64) ([]Token, Contract, error)
-	GetURIByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, error)
-	DeleteByID(context.Context, DBID) error
-	BulkUpsert(context.Context, []Token) error
-	Upsert(context.Context, Token) error
-	MostRecentBlock(context.Context) (BlockNumber, error)
-	TokenExistsByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (bool, error)
 }
 
 var errTokenNotFound ErrTokenNotFound

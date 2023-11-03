@@ -65,9 +65,9 @@ func (c *ContractOwnerMethod) Scan(src interface{}) error {
 type ContractRepository interface {
 	GetByAddress(context.Context, EthereumAddress) (Contract, error)
 	UpdateByAddress(context.Context, EthereumAddress, ContractUpdateInput) error
-	UpsertByAddress(context.Context, EthereumAddress, Contract) error
 	GetContractsOwnedByAddress(context.Context, EthereumAddress) ([]Contract, error)
 	BulkUpsert(context.Context, []Contract) error
+	MostRecentBlock(context.Context) (BlockNumber, error)
 }
 
 var errContractNotFound ErrContractNotFound
