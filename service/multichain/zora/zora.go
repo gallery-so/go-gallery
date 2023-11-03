@@ -159,12 +159,12 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
 	return d.getToken(ctx, owner, url)
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
 	token, _, err := d.getToken(ctx, "", url)
 	if err != nil {
 		return nil, err
@@ -331,7 +331,6 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 }
 
 func (d *Provider) getToken(ctx context.Context, ownerAddress persist.Address, url string) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
