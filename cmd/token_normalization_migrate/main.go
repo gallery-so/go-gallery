@@ -5,29 +5,39 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 const (
-	poolSize  = 12  // concurrent workers to use
+	poolSize  = 24  // concurrent workers to use
 	batchSize = 100 // number of tokens to process per worker
 )
+
+var targetEnv string
 
 func init() {
 	rootCmd.AddCommand(saveCmd)
 	rootCmd.AddCommand(migrateCmd)
+	rootCmd.PersistentFlags().StringVarP(&targetEnv, "env", "e", "local", "env to run with")
 	server.SetDefaults()
 	viper.SetDefault("POSTGRES_USER", "gallery_migrator")
-	pq = postgres.MustCreateClient()
-	pq.SetMaxIdleConns(2 * poolSize)
+}
+
+func setEnv() {
+	if targetEnv != "local" {
+		envFile := util.ResolveEnvFile("tokennorm", targetEnv)
+		util.LoadEncryptedEnvFile(envFile)
+	}
 }
 
 func main() {
@@ -43,8 +53,11 @@ var saveCmd = &cobra.Command{
 	Use:   "stage",
 	Short: "create token_chunks table (for dev purposes)",
 	Run: func(cmd *cobra.Command, args []string) {
+		setEnv()
+		pq = createPostgresClient()
+		pq.SetMaxIdleConns(2 * poolSize)
 		defer pq.Close()
-		saveStagingTable()
+		// saveStagingTable()
 	},
 }
 
@@ -52,8 +65,11 @@ var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "create token_definitions table",
 	Run: func(cmd *cobra.Command, args []string) {
+		setEnv()
+		pq = createPostgresClient()
+		pq.SetMaxIdleConns(2 * poolSize)
 		defer pq.Close()
-		createTokenDefinitions(context.Background(), pq)
+		// createTokenDefinitions(context.Background(), pq)
 	},
 }
 
@@ -278,11 +294,11 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 	check(err)
 
 	requireMustBeEmpty()
-	prepareStatements()
 	analyzeTokens()
 	dropTokenDefinitionConstraints()
 	lockTables(tx)
 	totalTokens := saveStagingTable()
+	prepareStatements()
 
 	wp := workerpool.New(poolSize)
 
@@ -494,3 +510,111 @@ func check(err error) {
 	}
 
 }
+
+func createPostgresClient() *sql.DB {
+	c, err := NewClient()
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
+// Start of copied code ---------------------------------------
+// Copied from persist/postgres/postgres.go
+// Need to create an SSL connection without the proxy because it
+// doesn't support connection pooling
+
+type ErrRoleDoesNotExist struct {
+	role string
+}
+
+func (e ErrRoleDoesNotExist) Error() string {
+	return fmt.Sprintf("role '%s' does not exist", e.role)
+}
+
+type connectionParams struct {
+	user     string
+	password string
+	dbname   string
+	host     string
+	port     int
+}
+
+func (c *connectionParams) toConnectionString() string {
+	port := c.port
+	if port == 0 {
+		port = 5432
+	}
+
+	connStr := fmt.Sprintf("user=%s dbname=%s host=%s port=%d", c.user, c.dbname, c.host, port)
+
+	// Empty passwords should be omitted so they don't interfere with other parameters
+	// (e.g. "password= dbname=something" causes Postgres to ignore the dbname)
+	if c.password != "" {
+		connStr += fmt.Sprintf(" password=%s", c.password)
+	}
+
+	countNonEmptyStrings := func(str ...string) int {
+		numNotEmpty := 0
+		for _, s := range str {
+			if s != "" {
+				numNotEmpty++
+			}
+		}
+
+		return numNotEmpty
+	}
+
+	dbServerCa := env.GetString("POSTGRES_SERVER_CA")
+	dbClientKey := env.GetString("POSTGRES_CLIENT_KEY")
+	dbClientCert := env.GetString("POSTGRES_CLIENT_CERT")
+
+	numSSLParams := countNonEmptyStrings(dbServerCa, dbClientKey, dbClientCert)
+	if numSSLParams == 0 {
+		return connStr
+	} else if numSSLParams == 3 {
+		return connStr + fmt.Sprintf(" sslmode=verify-ca sslrootcert=%s sslcert=%s sslkey=%s", dbServerCa, dbClientCert, dbClientKey)
+	}
+
+	panic(fmt.Errorf("POSTGRES_SERVER_CA, POSTGRES_CLIENT_KEY, and POSTGRES_CLIENT_CERT must be set together (all must have values or all must be empty)"))
+}
+
+func newConnectionParamsFromEnv() connectionParams {
+	return connectionParams{
+		user:     env.GetString("POSTGRES_USER"),
+		password: env.GetString("POSTGRES_PASSWORD"),
+		dbname:   env.GetString("POSTGRES_DB"),
+		host:     env.GetString("POSTGRES_HOST"),
+		port:     env.GetInt("POSTGRES_PORT"),
+	}
+}
+
+type ConnectionOption func(params *connectionParams)
+
+func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	params := newConnectionParamsFromEnv()
+	for _, opt := range opts {
+		opt(&params)
+	}
+
+	db, err := sql.Open("pgx", params.toConnectionString())
+	if err != nil {
+		return nil, err
+	}
+
+	db.SetMaxOpenConns(50)
+
+	err = db.PingContext(ctx)
+	if err != nil && strings.Contains(err.Error(), fmt.Sprintf("role \"%s\" does not exist", params.user)) {
+		return nil, ErrRoleDoesNotExist{params.user}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+// End of copied code ---------------------------------------
