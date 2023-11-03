@@ -1035,6 +1035,74 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getCommunityByKey = `-- name: GetCommunityByKey :batchone
+select id, version, name, description, community_type, community_subtype, community_key, created_at, last_updated, deleted from communities
+    where $1 = community_type
+        and $2 = community_subtype
+        and $3 = community_key
+        and not deleted
+`
+
+type GetCommunityByKeyBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetCommunityByKeyParams struct {
+	Type    int32  `db:"type" json:"type"`
+	Subtype string `db:"subtype" json:"subtype"`
+	Key     string `db:"key" json:"key"`
+}
+
+func (q *Queries) GetCommunityByKey(ctx context.Context, arg []GetCommunityByKeyParams) *GetCommunityByKeyBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Type,
+			a.Subtype,
+			a.Key,
+		}
+		batch.Queue(getCommunityByKey, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCommunityByKeyBatchResults{br, len(arg), false}
+}
+
+func (b *GetCommunityByKeyBatchResults) QueryRow(f func(int, Community, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Community
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.Name,
+			&i.Description,
+			&i.CommunityType,
+			&i.CommunitySubtype,
+			&i.CommunityKey,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetCommunityByKeyBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
 select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `

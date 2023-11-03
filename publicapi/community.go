@@ -34,7 +34,13 @@ func (api CommunityAPI) GetCommunityByKey(ctx context.Context, communityKey pers
 		return nil, err
 	}
 
-	community, err := api.loaders.CommunityByKey.Load(communityKey)
+	params := db.GetCommunityByKeyParams{
+		Type:    int32(communityKey.Type),
+		Subtype: communityKey.Subtype,
+		Key:     communityKey.Key,
+	}
+
+	community, err := api.loaders.GetCommunityByKey.Load(params)
 	if err != nil {
 		return nil, err
 	}

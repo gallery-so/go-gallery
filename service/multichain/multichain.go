@@ -1974,17 +1974,17 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 		return nil, nil, err
 	}
 
-	currentContractState, err := util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c persist.ContractGallery) persist.DBID { return c.ID })
-    if err != nil {
-		return nil, nil, err
-	}  
-    
-	_, err = d.processContractCommunities(ctx, contracts)
+	currentContractState = util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c persist.ContractGallery) persist.DBID { return c.ID })
 	if err != nil {
 		return nil, nil, err
 	}
-    
-    return currentContractState, newUpsertedContracts, nil
+
+	_, err = d.processContractCommunities(ctx, currentContractState)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return currentContractState, newUpsertedContracts, nil
 }
 
 func tokensToNewDedupedTokens(tokens []chainTokens, existingTokens []persist.TokenGallery, existingContracts []persist.ContractGallery, ownerUser persist.User) []persist.TokenGallery {

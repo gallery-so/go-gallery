@@ -94,7 +94,7 @@ func (p *Provider) processProhibitionTokenCommunities(ctx context.Context, contr
 	tokensByProjectID := make(map[string][]persist.TokenGallery)
 
 	for _, token := range tokens {
-		if token.Contract != prohibitionContractID {
+		if token.Contract.ID != prohibitionContractID {
 			continue
 		}
 
@@ -112,7 +112,7 @@ func (p *Provider) processProhibitionTokenCommunities(ctx context.Context, contr
 	// TODO: Abstract this pattern into a helper function. This will be a common pattern among community providers:
 	// look up communities in the database, query for and upsert any communities we don't have in the database,
 	// and then merge the results
-	existingCommunities, err := p.Queries.GetCommunitiesByKeysWithPreservedOrder(ctx, db.GetCommunitiesByKeysWithPreservedOrderParams{
+	existingCommunities, err := p.Queries.GetCommunitiesByKeys(ctx, db.GetCommunitiesByKeysParams{
 		Types:    communityTypes,
 		Subtypes: communitySubtypes,
 		Keys:     communityKeys,
@@ -124,7 +124,7 @@ func (p *Provider) processProhibitionTokenCommunities(ctx context.Context, contr
 
 	communitiesByProjectID := make(map[string]db.Community)
 	for _, c := range existingCommunities {
-		communitiesByProjectID[c.CommunityKey] = c
+		communitiesByProjectID[c.Community.CommunityKey] = c.Community
 	}
 
 	if len(communityKeys) != len(existingCommunities) {

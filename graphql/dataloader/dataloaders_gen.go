@@ -703,6 +703,45 @@ func (*GetCommentByCommentIDBatch) getKeyForResult(result coredb.Comment) persis
 	return result.ID
 }
 
+// GetCommunityByKey batches and caches requests
+type GetCommunityByKey struct {
+	generator.Dataloader[coredb.GetCommunityByKeyParams, coredb.Community]
+}
+
+// newGetCommunityByKey creates a new GetCommunityByKey with the given settings, functions, and options
+func newGetCommunityByKey(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetCommunityByKey, []coredb.GetCommunityByKeyParams) ([]coredb.Community, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetCommunityByKey {
+	d := &GetCommunityByKey{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetCommunityByKeyParams) ([]coredb.Community, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetCommunityByKey")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetCommunityByKey")
+		}
+
+		return results, errors
+	}
+
+	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+
+	d.Dataloader = *dataloader
+	return d
+}
+
 // GetContractByChainAddressBatch batches and caches requests
 type GetContractByChainAddressBatch struct {
 	generator.Dataloader[coredb.GetContractByChainAddressBatchParams, coredb.Contract]

@@ -136,3 +136,11 @@ func (*GetContractCreatorsByIds) getNotFoundError(key string) error {
 func (*GetContractsByIDs) getNotFoundError(key string) error {
 	return pgx.ErrNoRows
 }
+
+func (*GetCommunityByKey) getNotFoundError(key coredb.GetCommunityByKeyParams) error {
+	return persist.ErrCommunityNotFound{Key: persist.CommunityKey{
+		Type:    persist.CommunityType(key.Type),
+		Subtype: key.Subtype,
+		Key:     key.Key,
+	}}
+}

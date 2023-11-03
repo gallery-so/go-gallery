@@ -9,49 +9,55 @@ import (
 	"context"
 )
 
-const getCommunitiesByKeysWithPreservedOrder = `-- name: GetCommunitiesByKeysWithPreservedOrder :many
+const getCommunitiesByKeys = `-- name: GetCommunitiesByKeys :many
 with keys as (
     select unnest ($1::int[]) as type
          , unnest ($2::varchar[]) as subtype
          , unnest ($3::varchar[]) as key
-         , generate_subscripts($1::varchar[], 1) as idx
+         , generate_subscripts($1::varchar[], 1) as batch_key_index
 )
-select c.id, c.version, c.name, c.description, c.community_type, c.community_subtype, c.community_key, c.created_at, c.last_updated, c.deleted from keys k
+select k.batch_key_index, c.id, c.version, c.name, c.description, c.community_type, c.community_subtype, c.community_key, c.created_at, c.last_updated, c.deleted from keys k
     join communities c on
         k.type = c.community_type
         and k.subtype = c.community_subtype
         and k.key = c.community_key
     where not c.deleted
-    order by k.idx
 `
 
-type GetCommunitiesByKeysWithPreservedOrderParams struct {
-	Types    []int32  `json:"types"`
-	Subtypes []string `json:"subtypes"`
-	Keys     []string `json:"keys"`
+type GetCommunitiesByKeysParams struct {
+	Types    []int32  `db:"types" json:"types"`
+	Subtypes []string `db:"subtypes" json:"subtypes"`
+	Keys     []string `db:"keys" json:"keys"`
 }
 
-// Get communities by keys, and preserve the ordering of the results
-func (q *Queries) GetCommunitiesByKeysWithPreservedOrder(ctx context.Context, arg GetCommunitiesByKeysWithPreservedOrderParams) ([]Community, error) {
-	rows, err := q.db.Query(ctx, getCommunitiesByKeysWithPreservedOrder, arg.Types, arg.Subtypes, arg.Keys)
+type GetCommunitiesByKeysRow struct {
+	BatchKeyIndex int32     `db:"batch_key_index" json:"batch_key_index"`
+	Community     Community `db:"community" json:"community"`
+}
+
+// dataloader-config: skip=true
+// Get communities by keys
+func (q *Queries) GetCommunitiesByKeys(ctx context.Context, arg GetCommunitiesByKeysParams) ([]GetCommunitiesByKeysRow, error) {
+	rows, err := q.db.Query(ctx, getCommunitiesByKeys, arg.Types, arg.Subtypes, arg.Keys)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Community
+	var items []GetCommunitiesByKeysRow
 	for rows.Next() {
-		var i Community
+		var i GetCommunitiesByKeysRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.Name,
-			&i.Description,
-			&i.CommunityType,
-			&i.CommunitySubtype,
-			&i.CommunityKey,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Deleted,
+			&i.BatchKeyIndex,
+			&i.Community.ID,
+			&i.Community.Version,
+			&i.Community.Name,
+			&i.Community.Description,
+			&i.Community.CommunityType,
+			&i.Community.CommunitySubtype,
+			&i.Community.CommunityKey,
+			&i.Community.CreatedAt,
+			&i.Community.LastUpdated,
+			&i.Community.Deleted,
 		); err != nil {
 			return nil, err
 		}
@@ -86,13 +92,13 @@ returning id, version, name, description, community_type, community_subtype, com
 `
 
 type UpsertCommunitiesParams struct {
-	Ids              []string `json:"ids"`
-	Version          []int32  `json:"version"`
-	Name             []string `json:"name"`
-	Description      []string `json:"description"`
-	CommunityType    []int32  `json:"community_type"`
-	CommunitySubtype []string `json:"community_subtype"`
-	CommunityKey     []string `json:"community_key"`
+	Ids              []string `db:"ids" json:"ids"`
+	Version          []int32  `db:"version" json:"version"`
+	Name             []string `db:"name" json:"name"`
+	Description      []string `db:"description" json:"description"`
+	CommunityType    []int32  `db:"community_type" json:"community_type"`
+	CommunitySubtype []string `db:"community_subtype" json:"community_subtype"`
+	CommunityKey     []string `db:"community_key" json:"community_key"`
 }
 
 func (q *Queries) UpsertCommunities(ctx context.Context, arg UpsertCommunitiesParams) ([]Community, error) {
@@ -158,9 +164,9 @@ returning id, version, contract_id, community_id, created_at, last_updated, dele
 `
 
 type UpsertContractCommunityMembershipsParams struct {
-	Ids         []string `json:"ids"`
-	ContractID  []string `json:"contract_id"`
-	CommunityID []string `json:"community_id"`
+	Ids         []string `db:"ids" json:"ids"`
+	ContractID  []string `db:"contract_id" json:"contract_id"`
+	CommunityID []string `db:"community_id" json:"community_id"`
 }
 
 func (q *Queries) UpsertContractCommunityMemberships(ctx context.Context, arg UpsertContractCommunityMembershipsParams) ([]ContractCommunityMembership, error) {
@@ -215,9 +221,9 @@ returning id, version, token_id, community_id, created_at, last_updated, deleted
 `
 
 type UpsertTokenCommunityMembershipsParams struct {
-	Ids         []string `json:"ids"`
-	TokenID     []string `json:"token_id"`
-	CommunityID []string `json:"community_id"`
+	Ids         []string `db:"ids" json:"ids"`
+	TokenID     []string `db:"token_id" json:"token_id"`
+	CommunityID []string `db:"community_id" json:"community_id"`
 }
 
 func (q *Queries) UpsertTokenCommunityMemberships(ctx context.Context, arg UpsertTokenCommunityMembershipsParams) ([]TokenCommunityMembership, error) {

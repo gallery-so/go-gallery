@@ -63,19 +63,26 @@ on conflict (community_id, token_id) where not deleted
     do nothing
 returning *;
 
--- name: GetCommunitiesByKeysWithPreservedOrder :many
--- Get communities by keys, and preserve the ordering of the results
+-- name: GetCommunityByKey :batchone
+select * from communities
+    where @type = community_type
+        and @subtype = community_subtype
+        and @key = community_key
+        and not deleted;
+
+-- name: GetCommunitiesByKeys :many
+-- dataloader-config: skip=true
+-- Get communities by keys
 with keys as (
     select unnest (@types::int[]) as type
          , unnest (@subtypes::varchar[]) as subtype
          , unnest (@keys::varchar[]) as key
-         , generate_subscripts(@types::varchar[], 1) as idx
+         , generate_subscripts(@types::varchar[], 1) as batch_key_index
 )
-select c.* from keys k
+select k.batch_key_index, sqlc.embed(c) from keys k
     join communities c on
         k.type = c.community_type
         and k.subtype = c.community_subtype
         and k.key = c.community_key
-    where not c.deleted
-    order by k.idx;
+    where not c.deleted;
 

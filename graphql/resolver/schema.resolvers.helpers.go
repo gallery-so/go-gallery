@@ -2080,7 +2080,7 @@ func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRe
 	// TODO: Should this use CreatorAddress or OwnerAddress?
 	var creatorAddress *persist.ChainAddress
 	if contract.OwnerAddress != "" {
-		chainAddress := persist.NewChainAddress(community.OwnerAddress, chain)
+		chainAddress := persist.NewChainAddress(contract.OwnerAddress, chain)
 		creatorAddress = &chainAddress
 	}
 
