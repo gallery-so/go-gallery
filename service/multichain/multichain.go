@@ -1392,6 +1392,9 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}
 	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
+	if len(tokenFetchers) == 0 {
+		return db.TokenDefinition{}, fmt.Errorf("no token fetchers for chain %d", ti.Chain)
+	}
 	tokenExists := false
 
 	for _, tokenFetcher := range tokenFetchers {
