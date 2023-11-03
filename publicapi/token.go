@@ -15,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -138,7 +137,6 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
-		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
 		rows, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			ID:                 contractID,
 			Limit:              params.Limit,

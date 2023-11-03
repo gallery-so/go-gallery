@@ -1427,9 +1427,7 @@ ORDER BY tokens.id;
 select * from reprocess_jobs where id = $1;
 
 -- name: GetMediaByMediaIdIgnoringStatusBatch :batchone
-select m.*
-from token_medias m
-where m.id = (select token_media_id from token_definitions td where td.id = $1 and not td.deleted) and not m.deleted;
+select m.* from token_medias m where m.id = $1 and not deleted;
 
 -- name: GetMediaByTokenIdentifiersIgnoringStatus :one
 select token_medias.*

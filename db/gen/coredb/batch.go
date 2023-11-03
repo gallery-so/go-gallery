@@ -1807,9 +1807,7 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Close() error {
 }
 
 const getMediaByMediaIdIgnoringStatusBatch = `-- name: GetMediaByMediaIdIgnoringStatusBatch :batchone
-select m.id, m.created_at, m.last_updated, m.version, m.contract_id__deprecated, m.token_id__deprecated, m.chain__deprecated, m.active, m.metadata__deprecated, m.media, m.name__deprecated, m.description__deprecated, m.processing_job_id, m.deleted
-from token_medias m
-where m.id = (select token_media_id from token_definitions td where td.id = $1 and not td.deleted) and not m.deleted
+select m.id, m.created_at, m.last_updated, m.version, m.contract_id__deprecated, m.token_id__deprecated, m.chain__deprecated, m.active, m.metadata__deprecated, m.media, m.name__deprecated, m.description__deprecated, m.processing_job_id, m.deleted from token_medias m where m.id = $1 and not deleted
 `
 
 type GetMediaByMediaIdIgnoringStatusBatchBatchResults struct {

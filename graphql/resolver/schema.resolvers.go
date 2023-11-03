@@ -2780,9 +2780,13 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		return nil, err
 	}
 
-	media, err := publicapi.For(ctx).Token.GetMediaByMediaID(ctx, td.TokenMediaID)
-	if err != nil {
-		return nil, err
+	var media coredb.TokenMedia
+
+	if td.TokenMediaID != "" {
+		media, err = publicapi.For(ctx).Token.GetMediaByMediaID(ctx, td.TokenMediaID)
+		if util.ErrorAs[persist.ErrMediaNotFound](err) {
+			err = nil
+		}
 	}
 
 	return resolveTokenMedia(ctx, td, media, highDef), err
