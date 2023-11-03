@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/machinebox/graphql"
@@ -159,12 +160,12 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s&token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
 	return d.getToken(ctx, owner, url)
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s&token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
 	token, _, err := d.getToken(ctx, "", url)
 	if err != nil {
 		return nil, err
@@ -427,6 +428,8 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraToken
 
 }
 
+const ipfsFallbackURLFormat = "https://ipfs.decentralized-content.com/ipfs/%s"
+
 func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multichain.ChainAgnosticToken, error) {
 	var tokenType persist.TokenType
 	switch token.TokenStandard {
@@ -439,6 +442,16 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 	}
 	metadataName, _ := token.Metadata["name"].(string)
 	metadataDescription, _ := token.Metadata["description"].(string)
+
+	if strings.HasPrefix(token.Media.ImagePreview.Raw, "ipfs://") {
+		afterIPFS := strings.TrimPrefix(token.Media.ImagePreview.Raw, "ipfs://")
+		fallbackFormat, _ := url.Parse("https://remote-image.decentralized-content.com/image?w=1080&q=75")
+		u := fmt.Sprintf(ipfsFallbackURLFormat, afterIPFS)
+		q := fallbackFormat.Query()
+		q.Set("url", u)
+		fallbackFormat.RawQuery = q.Encode()
+		token.Media.ImagePreview.EncodedPreview = fallbackFormat.String()
+	}
 
 	return multichain.ChainAgnosticToken{
 		Descriptors: multichain.ChainAgnosticTokenDescriptors{
