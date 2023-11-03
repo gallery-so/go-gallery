@@ -1979,15 +1979,17 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 				panic(fmt.Sprintf("no persisted contract for chain=%d, address=%s", chainToken.chain, contractAddress))
 			}
 
-			// Last write wins
-			seenTokens[ti] = op.UpsertToken{
-				Identifiers: ti,
-				Token: db.Token{
-					OwnerUserID:    ownerUser.ID,
-					BlockNumber:    sql.NullInt64{Int64: token.BlockNumber.BigInt().Int64(), Valid: true},
-					IsCreatorToken: createdContracts[persist.Address(contractAddress)],
-					ContractID:     contract.ID,
-				},
+			// Duplicate tokens will have the same values for these fields, so we only need to set them once
+			if _, ok := seenTokens[ti]; !ok {
+				seenTokens[ti] = op.UpsertToken{
+					Identifiers: ti,
+					Token: db.Token{
+						OwnerUserID:    ownerUser.ID,
+						BlockNumber:    sql.NullInt64{Int64: token.BlockNumber.BigInt().Int64(), Valid: true},
+						IsCreatorToken: createdContracts[persist.Address(contractAddress)],
+						ContractID:     contract.ID,
+					},
+				}
 			}
 
 			var found bool
