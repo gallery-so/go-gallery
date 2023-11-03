@@ -282,10 +282,16 @@ func (v *EoaAuth) GetSignature() string { return v.Signature }
 
 type FarcasterAuth struct {
 	Address string `json:"address"`
+	// withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+	// the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+	WithSigner *bool `json:"withSigner"`
 }
 
 // GetAddress returns FarcasterAuth.Address, and is useful for accessing the field via an interface.
 func (v *FarcasterAuth) GetAddress() string { return v.Address }
+
+// GetWithSigner returns FarcasterAuth.WithSigner, and is useful for accessing the field via an interface.
+func (v *FarcasterAuth) GetWithSigner() *bool { return v.WithSigner }
 
 type GnosisSafeAuth struct {
 	Address string `json:"address"`
@@ -311,10 +317,15 @@ func (v *IntervalInput) GetLength() int { return v.Length }
 
 type LensAuth struct {
 	Address string `json:"address"`
+	// signature is the signed challenge provided by a GQL request to the lens endpoint
+	Signature *string `json:"signature"`
 }
 
 // GetAddress returns LensAuth.Address, and is useful for accessing the field via an interface.
 func (v *LensAuth) GetAddress() string { return v.Address }
+
+// GetSignature returns LensAuth.Signature, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetSignature() *string { return v.Signature }
 
 type MagicLinkAuth struct {
 	Token string `json:"token"`

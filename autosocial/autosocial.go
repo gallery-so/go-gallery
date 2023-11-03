@@ -41,8 +41,10 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 	pgx := postgres.NewPgxClient()
 	queries := coredb.New(pgx)
 
+	ney := farcaster.NewNeynarAPI(http.DefaultClient)
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
-	router.POST("/process/users", processUsers(queries, farcaster.NewNeynarAPI(http.DefaultClient), lens.NewAPI(http.DefaultClient)))
+	router.POST("/process/users", processUsers(queries, ney, lens.NewAPI(http.DefaultClient)))
+	router.POST("/checkFarcasterApproval", checkFarcasterApproval(queries, ney))
 	return router
 }
 
@@ -58,6 +60,8 @@ func setDefaults() {
 	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("NEYNAR_API_KEY", "")
+	viper.SetDefault("FARCASTER_MNEMONIC", "")
+	viper.SetDefault("FARCASTER_APP_ID", "")
 
 	viper.AutomaticEnv()
 

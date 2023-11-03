@@ -1302,6 +1302,9 @@ type FallbackMedia struct {
 
 type FarcasterAuth struct {
 	Address persist.Address `json:"address"`
+	// withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+	// the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+	WithSigner *bool `json:"withSigner"`
 }
 
 type FarcasterSocialAccount struct {
@@ -1312,6 +1315,8 @@ type FarcasterSocialAccount struct {
 	ProfileImageURL string                 `json:"profileImageURL"`
 	Bio             string                 `json:"bio"`
 	Display         bool                   `json:"display"`
+	ApprovalURL     *string                `json:"approvalURL"`
+	SignerStatus    *string                `json:"signerStatus"`
 }
 
 func (FarcasterSocialAccount) IsSocialAccount() {}
@@ -1585,16 +1590,19 @@ func (JSONMedia) IsMedia()        {}
 
 type LensAuth struct {
 	Address persist.Address `json:"address"`
+	// signature is the signed challenge provided by a GQL request to the lens endpoint
+	Signature *string `json:"signature"`
 }
 
 type LensSocialAccount struct {
-	Type            persist.SocialProvider `json:"type"`
-	SocialID        string                 `json:"social_id"`
-	Name            string                 `json:"name"`
-	Username        string                 `json:"username"`
-	ProfileImageURL string                 `json:"profileImageURL"`
-	Bio             string                 `json:"bio"`
-	Display         bool                   `json:"display"`
+	Type              persist.SocialProvider `json:"type"`
+	SocialID          string                 `json:"social_id"`
+	Name              string                 `json:"name"`
+	Username          string                 `json:"username"`
+	ProfileImageURL   string                 `json:"profileImageURL"`
+	Bio               string                 `json:"bio"`
+	Display           bool                   `json:"display"`
+	SignatureApproved bool                   `json:"signatureApproved"`
 }
 
 func (LensSocialAccount) IsSocialAccount() {}
@@ -2185,6 +2193,19 @@ type SomeoneMentionedYourCommunityNotification struct {
 func (SomeoneMentionedYourCommunityNotification) IsNotification() {}
 func (SomeoneMentionedYourCommunityNotification) IsNode()         {}
 
+type SomeonePostedYourWorkNotification struct {
+	HelperSomeonePostedYourWorkNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Post         *Post        `json:"post"`
+	Community    *Community   `json:"community"`
+}
+
+func (SomeonePostedYourWorkNotification) IsNotification() {}
+func (SomeonePostedYourWorkNotification) IsNode()         {}
+
 type SomeoneRepliedToYourCommentNotification struct {
 	HelperSomeoneRepliedToYourCommentNotificationData
 	Dbid            persist.DBID `json:"dbid"`
@@ -2416,6 +2437,7 @@ type TwitterSocialAccount struct {
 	Username        string                 `json:"username"`
 	ProfileImageURL string                 `json:"profileImageURL"`
 	Display         bool                   `json:"display"`
+	Scope           string                 `json:"scope"`
 }
 
 func (TwitterSocialAccount) IsSocialAccount() {}

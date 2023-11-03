@@ -702,6 +702,7 @@ type TwitterSocialAccount implements SocialAccount {
   username: String!
   profileImageURL: String!
   display: Boolean!
+  scope: String!
 }
 
 type FarcasterSocialAccount implements SocialAccount {
@@ -712,7 +713,10 @@ type FarcasterSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  approvalURL: String
+  signerStatus: String
 }
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -721,6 +725,7 @@ type LensSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  signatureApproved: Boolean!
 }
 
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
@@ -1819,11 +1824,20 @@ input TwitterAuth {
 
 input FarcasterAuth {
   address: Address!
+  """
+  withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+  the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+  """
+  withSigner: Boolean
   # farcaster only supports ETH addresses currently so no need to specify a chain
 }
 
 input LensAuth {
   address: Address!
+  """
+  signature is the signed challenge provided by a GQL request to the lens endpoint
+  """
+  signature: String @scrub
   # lens only supports ETH addresses currently so no need to specify a chain
 }
 
@@ -2140,6 +2154,17 @@ type SomeoneMentionedYourCommunityNotification implements Notification & Node @g
 
   # Don't need a `who` here since the `comment` or `post` can provide that
   mentionSource: MentionSource @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+}
+
+type SomeonePostedYourWorkNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  post: Post @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
 }
 

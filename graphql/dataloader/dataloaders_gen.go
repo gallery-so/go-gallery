@@ -61,9 +61,7 @@ func newCountAdmiresByFeedEventIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -100,9 +98,7 @@ func newCountAdmiresByPostIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -139,9 +135,7 @@ func newCountAdmiresByTokenIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -178,9 +172,7 @@ func newCountCommentsByFeedEventIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -217,9 +209,7 @@ func newCountCommentsByPostIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -256,9 +246,7 @@ func newCountInteractionsByFeedEventIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -295,9 +283,7 @@ func newCountInteractionsByPostIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -334,9 +320,7 @@ func newCountRepliesByCommentIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -373,9 +357,7 @@ func newGetAdmireByActorIDAndFeedEventID(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -412,9 +394,7 @@ func newGetAdmireByActorIDAndPostID(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -451,9 +431,7 @@ func newGetAdmireByActorIDAndTokenID(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -490,9 +468,7 @@ func newGetAdmireByAdmireIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -533,9 +509,7 @@ func newGetAdmiresByActorIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -572,9 +546,7 @@ func newGetChildContractsByParentIDBatchPaginate(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -611,9 +583,7 @@ func newGetCollectionByIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -654,9 +624,7 @@ func newGetCollectionsByGalleryIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -693,9 +661,7 @@ func newGetCommentByCommentIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -736,9 +702,7 @@ func newGetContractByChainAddressBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -775,9 +739,7 @@ func newGetContractsDisplayedByUserIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -814,9 +776,7 @@ func newGetCreatedContractsBatchPaginate(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -853,9 +813,7 @@ func newGetEventByIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -896,9 +854,7 @@ func newGetFollowersByUserIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -935,9 +891,7 @@ func newGetFollowingByUserIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -974,9 +928,7 @@ func newGetGalleriesByUserIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1013,9 +965,7 @@ func newGetGalleryByCollectionIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1056,9 +1006,7 @@ func newGetGalleryByIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1099,9 +1047,7 @@ func newGetGalleryTokenMediasByGalleryIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1138,9 +1084,7 @@ func newGetMediaByMediaIdIgnoringStatusBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1181,9 +1125,7 @@ func newGetMembershipByMembershipIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1224,9 +1166,7 @@ func newGetMentionsByCommentID(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1263,9 +1203,7 @@ func newGetMentionsByPostID(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1302,9 +1240,7 @@ func newGetNewTokensByFeedEventIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1341,9 +1277,7 @@ func newGetNotificationByIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1384,9 +1318,7 @@ func newGetOwnersByContractIdBatchPaginate(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1423,9 +1355,7 @@ func newGetPostByIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1466,9 +1396,7 @@ func newGetProfileImageByID(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1505,9 +1433,7 @@ func newGetSharedContractsBatchPaginate(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1544,9 +1470,7 @@ func newGetSharedFollowersBatchPaginate(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1583,9 +1507,7 @@ func newGetTokenByIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1622,9 +1544,7 @@ func newGetTokenByIdIgnoreDisplayableBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1661,9 +1581,7 @@ func newGetTokenByUserTokenIdentifiersBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1700,9 +1618,7 @@ func newGetTokenDefinitionByIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1743,9 +1659,7 @@ func newGetTokenDefinitionByTokenDbidBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1786,9 +1700,7 @@ func newGetTokenOwnerByIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1829,9 +1741,7 @@ func newGetTokensByCollectionIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1868,9 +1778,7 @@ func newGetTokensByUserIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1907,9 +1815,7 @@ func newGetTokensByWalletIdsBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1946,9 +1852,7 @@ func newGetUserByAddressAndL1Batch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -1985,9 +1889,7 @@ func newGetUserByIdBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2028,9 +1930,7 @@ func newGetUserByUsernameBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2067,9 +1967,7 @@ func newGetUserNotificationsBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2106,9 +2004,7 @@ func newGetUsersWithTraitBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2145,9 +2041,7 @@ func newGetWalletByIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2188,9 +2082,7 @@ func newGetWalletsByUserIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2227,9 +2119,7 @@ func newPaginateAdmiresByFeedEventIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2266,9 +2156,7 @@ func newPaginateAdmiresByPostIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2305,9 +2193,7 @@ func newPaginateAdmiresByTokenIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2344,9 +2230,7 @@ func newPaginateCommentsByFeedEventIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2383,9 +2267,7 @@ func newPaginateCommentsByPostIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2422,9 +2304,7 @@ func newPaginateInteractionsByFeedEventIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2461,9 +2341,7 @@ func newPaginateInteractionsByPostIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2500,9 +2378,7 @@ func newPaginatePostsByContractID(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2539,9 +2415,7 @@ func newPaginateRepliesByCommentIDBatch(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2578,9 +2452,7 @@ func newGetContractCreatorsByIds(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
@@ -2617,8 +2489,6 @@ func newGetContractsByIDs(
 		return results, errors
 	}
 
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }

@@ -264,7 +264,6 @@ func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any
 
 // SyncTokensByUserID updates the media for all tokens for a user
 func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
-
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"user_id": userID, "chains": chains})
 
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
@@ -276,6 +275,11 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
+
+	// Guard against removing user's tokens inadverdently
+	if len(chainsToAddresses) == 0 {
+		return nil
+	}
 
 	wg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -326,7 +330,6 @@ type chainTokensAndContracts struct {
 
 // SyncTokensIncrementallyByUserID processes a user's tokens incrementally
 func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
-
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"user_id": userID, "chains": chains})
 
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
@@ -336,6 +339,11 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 
 	errChan := make(chan error)
 	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
+
+	// Guard against removing user's tokens inadverdently
+	if len(chainsToAddresses) == 0 {
+		return nil
+	}
 
 	totalBuf := 0
 	for c := range chainsToAddresses {
@@ -1955,10 +1963,7 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 		}
 
 		if wallet, ok := addressToWallets[contract.Chain.NormalizeAddress(creatorAddress)]; ok {
-			// TODO: Figure out the implication for L2 chains here. Might want a function like
-			// Chain.IsCompatibleWith(Chain) to determine whether a wallet on one chain can claim
-			// ownership of a contract on a different chain.
-			createdContracts[contractAddress] = wallet.Chain == contract.Chain
+			createdContracts[contractAddress] = wallet.L1Chain == contract.L1Chain
 		} else {
 			createdContracts[contractAddress] = false
 		}

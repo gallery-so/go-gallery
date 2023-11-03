@@ -2,6 +2,7 @@ package autosocial
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -58,6 +59,53 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 
 		if len(errs) > 0 {
 			util.ErrResponse(c, http.StatusInternalServerError, util.MultiErr(errs))
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func checkFarcasterApproval(q *coredb.Queries, n *farcaster.NeynarAPI) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var in task.AutosocialPollFarcasterMessage
+		if err := c.ShouldBindQuery(&in); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		s, err := n.GetSignerByUUID(c, in.SignerUUID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		if s.Status != "approved" {
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("signer status is %s", s.Status))
+			return
+		}
+
+		user, err := q.GetSocialsByUserID(c, in.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		far, ok := user[persist.SocialProviderFarcaster]
+		if !ok {
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("user does not have farcaster social"))
+			return
+		}
+
+		far.Metadata["signer_status"] = s.Status
+
+		err = q.AddSocialToUser(c, coredb.AddSocialToUserParams{
+			UserID: in.UserID,
+			Socials: persist.Socials{
+				persist.SocialProviderFarcaster: far,
+			},
+		})
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
