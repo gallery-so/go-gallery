@@ -31,13 +31,13 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8, true))
 		}
-		processMediaForUsersTokens(tp, repos.TokenRepository, repos.ContractRepository, syncManager)(c)
+		processBatch(tp, mc.Queries, syncManager)(c)
 	})
-	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.WalletRepository, refreshManager))
-	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, repos.TokenRepository, repos.ContractRepository, syncManager))
-	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc.Queries, mc, repos.ContractRepository, repos.UserRepository, repos.TokenRepository))
+	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, refreshManager))
+	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, syncManager))
+	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc, repos.UserRepository))
 	ownersGroup := router.Group("/owners")
-	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
+	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, throttler))
 	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))
@@ -47,10 +47,10 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	return router
 }
 
-func syncMaxRetries(token persist.TokenIdentifiers) int {
-	c := persist.NewContractIdentifiers(token.ContractAddress, token.Chain)
-	if v, ok := contractSpecificRetries[c]; ok {
-		return v
+func syncMaxRetries(tID persist.TokenIdentifiers) int {
+	cID := persist.NewContractIdentifiers(tID.ContractAddress, tID.Chain)
+	if retries, ok := contractSpecificRetries[cID]; ok {
+		return retries
 	}
 	return defaultSyncMaxRetries
 }

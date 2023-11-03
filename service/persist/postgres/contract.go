@@ -13,9 +13,9 @@ import (
 type ContractRepository struct {
 	db                  *sql.DB
 	getByAddressStmt    *sql.Stmt
-	upsertByAddressStmt *sql.Stmt
 	updateByAddressStmt *sql.Stmt
 	ownedByAddressStmt  *sql.Stmt
+	mostRecentBlockStmt *sql.Stmt
 }
 
 // NewContractRepository creates a new postgres repository for interacting with contracts
@@ -26,16 +26,22 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,OWNER_ADDRESS FROM contracts WHERE ADDRESS = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,OWNER_ADDRESS, CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6,OWNER_ADDRESS = $7, CREATOR_ADDRESS = $8;`)
-	checkNoErr(err)
-
 	updateByAddressStmt, err := db.PrepareContext(ctx, `UPDATE contracts SET NAME = $2, SYMBOL = $3, OWNER_ADDRESS = $4, CREATOR_ADDRESS = $5, LATEST_BLOCK = $6, LAST_UPDATED = now() WHERE ADDRESS = $1;`)
 	checkNoErr(err)
 
 	ownedByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,OWNER_ADDRESS FROM contracts WHERE OWNER_ADDRESS = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, updateByAddressStmt: updateByAddressStmt, ownedByAddressStmt: ownedByAddressStmt}
+	mostRecentBlockStmt, err := db.PrepareContext(ctx, `SELECT MAX(LATEST_BLOCK) FROM contracts;`)
+	checkNoErr(err)
+
+	return &ContractRepository{
+		db:                  db,
+		getByAddressStmt:    getByAddressStmt,
+		updateByAddressStmt: updateByAddressStmt,
+		ownedByAddressStmt:  ownedByAddressStmt,
+		mostRecentBlockStmt: mostRecentBlockStmt,
+	}
 }
 
 // GetByAddress returns the contract with the given address
@@ -53,16 +59,6 @@ func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist
 	}
 
 	return contract, nil
-}
-
-// UpsertByAddress upserts the contract with the given address
-func (c *ContractRepository) UpsertByAddress(pCtx context.Context, pAddress persist.EthereumAddress, pContract persist.Contract) error {
-	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.LatestBlock, pContract.OwnerAddress, pContract.CreatorAddress)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // BulkUpsert bulk upserts the contracts by address
@@ -116,6 +112,16 @@ func (c *ContractRepository) GetContractsOwnedByAddress(ctx context.Context, add
 		return nil, err
 	}
 	return contracts, nil
+}
+
+// MostRecentBlock returns the most recent block number of any token
+func (c *ContractRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNumber, error) {
+	var blockNumber persist.BlockNumber
+	err := c.mostRecentBlockStmt.QueryRowContext(pCtx).Scan(&blockNumber)
+	if err != nil {
+		return 0, err
+	}
+	return blockNumber, nil
 }
 
 func removeDuplicateContracts(pContracts []persist.Contract) []persist.Contract {

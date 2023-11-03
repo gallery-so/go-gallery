@@ -1666,8 +1666,8 @@ type EnsAvatar struct {
 	URI      string
 }
 
-// GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
-func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
+// GetPotentialENSProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
+func (api UserAPI) GetPotentialENSProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
@@ -1676,14 +1676,14 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 	}
 
 	// Check if profile images have been processed
-	pfp, err := api.queries.GetEnsProfileImagesByUserID(ctx, db.GetEnsProfileImagesByUserIDParams{
+	pfp, err := api.queries.GetPotentialENSProfileImageByUserId(ctx, db.GetPotentialENSProfileImageByUserIdParams{
 		EnsAddress: eth.EnsAddress,
 		Chain:      persist.ChainETH,
 		UserID:     userID,
 	})
 	if err == nil {
 		// Validate that the name is valid
-		domain, err := eth.NormalizeDomain(pfp.TokenMedia.Name)
+		domain, err := eth.NormalizeDomain(pfp.TokenDefinition.Name.String)
 		if err == nil {
 			return EnsAvatar{
 				WalletID: pfp.Wallet.ID,

@@ -72,12 +72,10 @@ func new{{.Name}}(
 	}
 
 	{{ if .KeyIsComparable }}
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-	{{ else }}
-	dataloader := generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-	{{ end }}
-
-	d.Dataloader = *dataloader
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	{{- else }}
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	{{- end }}
 	return d
 }
 

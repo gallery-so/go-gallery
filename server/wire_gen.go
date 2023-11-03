@@ -55,13 +55,13 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverArbitrumProviderList := arbitrumProviderSet(httpClient, serverTokenMetadataCache)
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
 	manager := tokenmanage.New(ctx, client)
-	submitUserTokensF := newManagedTokens(ctx, manager)
+	submitTokensF := newSubmitBatch(manager)
 	provider := &multichain.Provider{
-		Repos:            repositories,
-		Queries:          queries,
-		Cache:            cache,
-		Chains:           v,
-		SubmitUserTokens: submitUserTokensF,
+		Repos:        repositories,
+		Queries:      queries,
+		Cache:        cache,
+		Chains:       v,
+		SubmitTokens: submitTokensF,
 	}
 	return provider, func() {
 		cleanup2()
@@ -435,11 +435,6 @@ func newTokenMetadataCache() *tokenMetadataCache {
 	return util.ToPointer(tokenMetadataCache(*cache))
 }
 
-func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
-		if len(tokenIDs) == 0 {
-			return nil
-		}
-		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
-	}
+func newSubmitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
+	return tm.SubmitBatch
 }

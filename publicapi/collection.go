@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -26,6 +27,8 @@ const (
 	maxSectionsPerCollection       = 100
 	currentCollectionSchemaVersion = 1
 )
+
+var ErrTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
 
 type CollectionAPI struct {
 	repos     *postgres.Repositories
@@ -221,9 +224,15 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, nil, err
 	}
 
-	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
+	ownsAll, err := api.queries.CheckUserOwnsAllTokenDbids(ctx, db.CheckUserOwnsAllTokenDbidsParams{
+		OwnerUserID: userID,
+		TokenIds:    tokens,
+	})
 	if err != nil {
 		return nil, nil, err
+	}
+	if !ownsAll {
+		return nil, nil, ErrTokensNotOwnedByUser
 	}
 
 	collection := persist.CollectionDB{
@@ -371,9 +380,15 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return nil, err
 	}
 
-	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
+	ownsAll, err := api.queries.CheckUserOwnsAllTokenDbids(ctx, db.CheckUserOwnsAllTokenDbidsParams{
+		OwnerUserID: userID,
+		TokenIds:    tokens,
+	})
 	if err != nil {
 		return nil, err
+	}
+	if !ownsAll {
+		return nil, ErrTokensNotOwnedByUser
 	}
 
 	update := persist.CollectionUpdateTokensInput{
