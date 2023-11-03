@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
 	// register postgres driver
@@ -304,7 +302,6 @@ type Repositories struct {
 	UserRepository        *UserRepository
 	NonceRepository       *NonceRepository
 	GalleryRepository     *GalleryRepository
-	TokenRepository       *TokenFullDetailsRepository
 	CollectionRepository  *CollectionTokenRepository
 	ContractRepository    *ContractGalleryRepository
 	MembershipRepository  *MembershipRepository
@@ -323,7 +320,6 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		pool:                  pgx,
 		UserRepository:        NewUserRepository(pq, queries, pgx),
 		NonceRepository:       NewNonceRepository(pq, queries),
-		TokenRepository:       NewTokenFullDetailsRepository(queries),
 		CollectionRepository:  NewCollectionTokenRepository(pq, queries),
 		GalleryRepository:     NewGalleryRepository(queries),
 		ContractRepository:    NewContractGalleryRepository(pq, queries),
@@ -338,31 +334,4 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 
 func (r *Repositories) BeginTx(ctx context.Context) (pgx.Tx, error) {
 	return r.pool.BeginTx(ctx, pgx.TxOptions{})
-}
-
-func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
-	// Postgres uses 1-based indexing
-	startIndex := int32(1)
-	if len(*endIndices) > 0 {
-		startIndex = (*endIndices)[len(*endIndices)-1] + 1
-	}
-	*startIndices = append(*startIndices, startIndex)
-	*endIndices = append(*endIndices, startIndex+int32(entryLength)-1)
-}
-
-func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
-	jsonb, err := persist.ToJSONB(src)
-	if err != nil {
-		*errs = append(*errs, err)
-		return err
-	}
-	*dest = append(*dest, jsonb)
-	return nil
-}
-
-func appendDBIDList(dest *[]string, src []persist.DBID, startIndices, endIndices *[]int32) {
-	for _, id := range src {
-		*dest = append(*dest, id.String())
-	}
-	appendIndices(startIndices, endIndices, len(src))
 }

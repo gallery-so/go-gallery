@@ -1,10 +1,11 @@
-package postgres
+package operation
 
 import (
 	"context"
 	"database/sql"
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -19,16 +20,8 @@ type TokenFullDetails struct {
 	Definition db.TokenDefinition
 }
 
-type TokenFullDetailsRepository struct {
-	queries *db.Queries
-}
-
-func NewTokenFullDetailsRepository(queries *db.Queries) *TokenFullDetailsRepository {
-	return &TokenFullDetailsRepository{queries: queries}
-}
-
-func (t *TokenFullDetailsRepository) GetByUserTokenIdentifiers(ctx context.Context, userID persist.DBID, tID persist.TokenIdentifiers) (TokenFullDetails, error) {
-	r, err := t.queries.GetTokenFullDetailsByUserTokenIdentifiers(ctx, db.GetTokenFullDetailsByUserTokenIdentifiersParams{
+func TokenFullDetailsByUserTokenIdentifiers(ctx context.Context, q *db.Queries, userID persist.DBID, tID persist.TokenIdentifiers) (TokenFullDetails, error) {
+	r, err := q.GetTokenFullDetailsByUserTokenIdentifiers(ctx, db.GetTokenFullDetailsByUserTokenIdentifiersParams{
 		OwnerUserID:     userID,
 		Chain:           tID.Chain,
 		ContractAddress: tID.ContractAddress,
@@ -47,9 +40,8 @@ func (t *TokenFullDetailsRepository) GetByUserTokenIdentifiers(ctx context.Conte
 	}, nil
 }
 
-// GetByUserID gets all tokens for a user
-func (t *TokenFullDetailsRepository) GetByUserID(ctx context.Context, userID persist.DBID) ([]TokenFullDetails, error) {
-	r, err := t.queries.GetTokenFullDetailsByUserId(ctx, userID)
+func TokensFullDetailsByUserID(ctx context.Context, q *db.Queries, userID persist.DBID) ([]TokenFullDetails, error) {
+	r, err := q.GetTokenFullDetailsByUserId(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,9 +55,8 @@ func (t *TokenFullDetailsRepository) GetByUserID(ctx context.Context, userID per
 	return tokens, nil
 }
 
-// GetByContractID gets all tokens for a contract
-func (t *TokenFullDetailsRepository) GetByContractID(ctx context.Context, contractID persist.DBID) ([]TokenFullDetails, error) {
-	r, err := t.queries.GetTokenFullDetailsByContractId(ctx, contractID)
+func TokensFullDetailsByContractID(ctx context.Context, q *db.Queries, contractID persist.DBID) ([]TokenFullDetails, error) {
+	r, err := q.GetTokenFullDetailsByContractId(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,13 +109,13 @@ type UpsertToken struct {
 	Identifiers persist.TokenIdentifiers
 }
 
-func (t *TokenFullDetailsRepository) BulkUpsert(ctx context.Context, tokens []UpsertToken, definitions []db.TokenDefinition, setCreatorFields bool, setHolderFields bool) (time.Time, []TokenFullDetails, error) {
-	tokens = t.excludeZeroQuantityTokens(ctx, tokens)
+func BulkUpsert(ctx context.Context, q *db.Queries, tokens []UpsertToken, definitions []db.TokenDefinition, setCreatorFields bool, setHolderFields bool) (time.Time, []TokenFullDetails, error) {
+	tokens = excludeZeroQuantityTokens(ctx, tokens)
 
 	// If we're not upserting anything, we still need to return the current database time
 	// since it may be used by the caller and is assumed valid if err == nil
 	if len(tokens) == 0 {
-		currentTime, err := t.queries.GetCurrentTime(ctx)
+		currentTime, err := q.GetCurrentTime(ctx)
 		if err != nil {
 			return time.Time{}, nil, err
 		}
@@ -181,7 +172,7 @@ func (t *TokenFullDetailsRepository) BulkUpsert(ctx context.Context, tokens []Up
 		}
 	}
 
-	upserted, err := t.queries.UpsertTokens(ctx, params)
+	upserted, err := q.UpsertTokens(ctx, params)
 	if err != nil {
 		return time.Time{}, nil, err
 	}
@@ -197,7 +188,7 @@ func (t *TokenFullDetailsRepository) BulkUpsert(ctx context.Context, tokens []Up
 	return upserted[0].Token.LastSynced, upsertedTokens, nil
 }
 
-func (t *TokenFullDetailsRepository) excludeZeroQuantityTokens(ctx context.Context, tokens []UpsertToken) []UpsertToken {
+func excludeZeroQuantityTokens(ctx context.Context, tokens []UpsertToken) []UpsertToken {
 	return util.Filter(tokens, func(t UpsertToken) bool {
 		if t.Token.Quantity == "" || t.Token.Quantity == "0" {
 			logger.For(ctx).Warnf("Token(chain=%d, address=%s, tokenID=%s) has 0 quantity", t.Identifiers.Chain, t.Identifiers.ContractAddress, t.Identifiers.TokenID)
@@ -205,4 +196,31 @@ func (t *TokenFullDetailsRepository) excludeZeroQuantityTokens(ctx context.Conte
 		}
 		return true
 	}, false)
+}
+
+func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
+	// Postgres uses 1-based indexing
+	startIndex := int32(1)
+	if len(*endIndices) > 0 {
+		startIndex = (*endIndices)[len(*endIndices)-1] + 1
+	}
+	*startIndices = append(*startIndices, startIndex)
+	*endIndices = append(*endIndices, startIndex+int32(entryLength)-1)
+}
+
+func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
+	jsonb, err := persist.ToJSONB(src)
+	if err != nil {
+		*errs = append(*errs, err)
+		return err
+	}
+	*dest = append(*dest, jsonb)
+	return nil
+}
+
+func appendDBIDList(dest *[]string, src []persist.DBID, startIndices, endIndices *[]int32) {
+	for _, id := range src {
+		*dest = append(*dest, id.String())
+	}
+	appendIndices(startIndices, endIndices, len(src))
 }
