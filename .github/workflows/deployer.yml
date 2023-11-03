@@ -2,7 +2,7 @@ name: deployer
 on:
   push:
     branches:
-      - main
+      - main-hotfixes
 env:
   CLOUDSDK_CORE_DISABLE_PROMPTS: 1
 jobs:
