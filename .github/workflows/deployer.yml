@@ -137,7 +137,7 @@ jobs:
           #         gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
           #     - name: 'Deploy'
           #       run: make deploy-dev-graphql-gateway
-          # deploy-prod-graphql-gateway:
+  deploy-prod-graphql-gateway:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
