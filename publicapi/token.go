@@ -2,20 +2,19 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -54,12 +53,12 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 		return nil, err
 	}
 
-	token, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
+	r, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &token, nil
+	return &r.Token, nil
 }
 
 // GetTokenByIdIgnoreDisplayable returns a token by ID, ignoring the displayable flag.
@@ -71,12 +70,12 @@ func (api TokenAPI) GetTokenByIdIgnoreDisplayable(ctx context.Context, tokenID p
 		return nil, err
 	}
 
-	token, err := api.loaders.GetTokenByIdIgnoreDisplayableBatch.Load(tokenID)
+	r, err := api.loaders.GetTokenByIdIgnoreDisplayableBatch.Load(tokenID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &token, nil
+	return &r.Token, nil
 }
 
 func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, error) {
@@ -92,12 +91,17 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	return api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+	r, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
 		OwnerID:         userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
 		Chain:           persist.ChainETH,
 	})
+	if err != nil {
+		return db.Token{}, err
+	}
+
+	return r.Token, err
 }
 
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
@@ -133,8 +137,7 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
-		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
-		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
+		rows, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			ID:                 contractID,
 			Limit:              params.Limit,
 			GalleryUsersOnly:   onlyGalleryUsers,
@@ -150,9 +153,9 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 			return nil, err
 		}
 
-		results := make([]interface{}, len(tokens))
-		for i, token := range tokens {
-			results[i] = token
+		results := make([]interface{}, len(rows))
+		for i, r := range rows {
+			results[i] = r.Token
 		}
 
 		return results, nil
@@ -203,10 +206,10 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {
 	tokens, errs := api.loaders.GetTokenByIdBatch.LoadAll(tokenIDs)
-	foundTokens := tokens[:0]
+	foundTokens := make([]db.Token, 0, len(tokens))
 	for i, t := range tokens {
 		if errs[i] == nil {
-			foundTokens = append(foundTokens, t)
+			foundTokens = append(foundTokens, t.Token)
 		} else if _, ok := errs[i].(persist.ErrTokenNotFoundByID); !ok {
 			return []db.Token{}, errs[i]
 		}
@@ -242,10 +245,12 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 		return nil, err
 	}
 
-	tokens, err := api.loaders.GetTokensByWalletIdsBatch.Load(persist.DBIDList{walletID})
+	r, err := api.loaders.GetTokensByWalletIdsBatch.Load(persist.DBIDList{walletID})
 	if err != nil {
 		return nil, err
 	}
+
+	tokens := util.MapWithoutError(r, func(r db.GetTokensByWalletIdsBatchRow) db.Token { return r.Token })
 
 	return tokens, nil
 }
@@ -282,26 +287,6 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, 
 	tokens := util.MapWithoutError(results, func(r db.GetTokensByUserIdBatchRow) db.Token {
 		return r.Token
 	})
-
-	return tokens, nil
-}
-
-func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]db.Token, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": validate.WithTag(userID, "required"),
-		"chain":  validate.WithTag(chain, "chain"),
-	}); err != nil {
-		return nil, err
-	}
-
-	tokens, err := api.loaders.GetTokensByUserIdAndChainBatch.Load(db.GetTokensByUserIdAndChainBatchParams{
-		OwnerUserID: userID,
-		Chain:       chain,
-	})
-	if err != nil {
-		return nil, err
-	}
 
 	return tokens, nil
 }
@@ -410,7 +395,10 @@ func (api TokenAPI) SyncCreatedTokensForExistingContractAdmin(ctx context.Contex
 		return err
 	}
 
-	contract, err := api.repos.ContractRepository.GetByAddress(ctx, chainAddress.Address(), chainAddress.Chain())
+	contract, err := api.queries.GetContractByChainAddress(ctx, db.GetContractByChainAddressParams{
+		Address: chainAddress.Address(),
+		Chain:   chainAddress.Chain(),
+	})
 	if err != nil {
 		return err
 	}
@@ -432,16 +420,12 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		return err
 	}
 
-	token, err := api.loaders.GetTokenByIdBatch.Load(tokenDBID)
+	td, err := api.loaders.GetTokenDefinitionByTokenDbidBatch.Load(tokenDBID)
 	if err != nil {
-		return fmt.Errorf("failed to load token: %w", err)
-	}
-	contract, err := api.loaders.GetContractsByIDs.Load(token.Contract.String())
-	if err != nil {
-		return fmt.Errorf("failed to load contract for token: %w", err)
+		return err
 	}
 
-	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain))
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain))
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -482,13 +466,13 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	for _, token := range tokens {
 		token := token
 		wp.Submit(func() {
-			contract, err := api.loaders.GetContractsByIDs.Load(token.Contract.String())
+			td, err := api.queries.GetTokenDefinitionByTokenDbid(ctx, token.ID)
 			if err != nil {
 				errChan <- err
 				return
 			}
 
-			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain))
+			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain))
 			if err != nil {
 				errChan <- ErrTokenRefreshFailed{Message: err.Error()}
 				return
@@ -523,11 +507,11 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		return err
 	}
 
-	update := persist.TokenUpdateInfoInput{
-		CollectorsNote: persist.NullString(collectorsNote),
-	}
-
-	err = api.repos.TokenRepository.UpdateByID(ctx, tokenID, userID, update)
+	err = api.queries.UpdateTokenCollectorsNoteByTokenDbidUserId(ctx, db.UpdateTokenCollectorsNoteByTokenDbidUserIdParams{
+		ID:             tokenID,
+		OwnerUserID:    userID,
+		CollectorsNote: util.ToNullString(collectorsNote, true),
+	})
 	if err != nil {
 		return err
 	}
@@ -566,74 +550,43 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 		return err
 	}
 
-	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
-	if err != nil {
-		return err
-	}
-
-	return api.repos.TokenRepository.FlagTokensAsUserMarkedSpam(ctx, userID, tokens, isSpam)
+	return api.queries.UpdateTokensAsUserMarkedSpam(ctx, db.UpdateTokensAsUserMarkedSpamParams{
+		IsUserMarkedSpam: sql.NullBool{Bool: isSpam, Valid: true},
+		OwnerUserID:      userID,
+		TokenIds:         tokens,
+	})
 }
 
-func (api TokenAPI) MediaByMediaID(ctx context.Context, mediaID persist.DBID) (db.TokenMedia, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"mediaID": validate.WithTag(mediaID, "required"),
-	}); err != nil {
-		return db.TokenMedia{}, err
-	}
-
-	return api.loaders.GetMediaByMediaIDIgnoringStatus.Load(mediaID)
-}
-
-// MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.
-func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenMedia, db.Token, error) {
+func (api TokenAPI) GetMediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
 		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
 	}); err != nil {
-		return db.TokenMedia{}, db.Token{}, err
+		return db.TokenDefinition{}, db.TokenMedia{}, err
 	}
 
-	// Check if the user is logged in, and if so sort results by prioritizing results specific to the user first
-	userID, _ := getAuthenticatedUserID(ctx)
-
-	// This query only returns a row if there is matching media, and it may not have a token instance even if it did return a row
-	media, err := api.queries.GetMediaByUserTokenIdentifiers(ctx, db.GetMediaByUserTokenIdentifiersParams{
-		UserID:  userID,
-		Chain:   tokenIdentifiers.Chain,
-		Address: tokenIdentifiers.ContractAddress,
-		TokenID: tokenIdentifiers.TokenID,
+	td, err := api.queries.GetTokenDefinitionByTokenIdentifiers(ctx, db.GetTokenDefinitionByTokenIdentifiersParams{
+		Chain:           tokenIdentifiers.Chain,
+		ContractAddress: tokenIdentifiers.ContractAddress,
+		TokenID:         tokenIdentifiers.TokenID,
 	})
-
-	// Got media and a token instance
-	if err == nil && media.TokenInstanceID != "" {
-		token, err := api.GetTokenById(ctx, media.TokenInstanceID)
-		if err != nil || token == nil {
-			return media.TokenMedia, db.Token{}, err
-		}
-		return media.TokenMedia, *token, err
+	if err != nil {
+		return db.TokenDefinition{}, db.TokenMedia{}, err
 	}
 
-	// Unexpected error
-	if err != nil && err != pgx.ErrNoRows {
-		return db.TokenMedia{}, db.Token{}, err
+	media, err := api.loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(td.TokenMediaID)
+	return td, media, err
+}
+
+func (api TokenAPI) GetMediaByMediaID(ctx context.Context, id persist.DBID) (db.TokenMedia, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"mediaID": validate.WithTag(id, "required"),
+	}); err != nil {
+		return db.TokenMedia{}, err
 	}
-
-	// Try to find a suitable instance with fallback media
-	token, err := api.queries.GetFallbackTokenByUserTokenIdentifiers(ctx, db.GetFallbackTokenByUserTokenIdentifiersParams{
-		UserID:  userID,
-		Chain:   tokenIdentifiers.Chain,
-		Address: tokenIdentifiers.ContractAddress,
-		TokenID: tokenIdentifiers.TokenID,
-	})
-
-	// Unexpected error
-	if err != nil && err != pgx.ErrNoRows {
-		return media.TokenMedia, db.Token{}, err
-	}
-
-	return media.TokenMedia, token, nil
+	return api.loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(id)
 }
 
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
@@ -645,7 +598,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return db.Event{}, err
 	}
 
-	token, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
+	td, err := api.queries.GetTokenDefinitionByTokenDbid(ctx, tokenID)
 	if err != nil {
 		return db.Event{}, err
 	}
@@ -671,7 +624,8 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 			GalleryID:      currCol.GalleryID,
 			SubjectID:      tokenID,
 			Data: persist.EventData{
-				TokenContractID: token.Contract,
+				TokenContractID:   td.ContractID,
+				TokenDefinitionID: td.ID,
 			},
 		})
 		if err != nil {
@@ -682,18 +636,29 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 	return db.Event{}, nil
 }
 
-// GetProcessingState returns true if a token is queued for processing, or is currently being processed.
-func (api TokenAPI) GetProcessingState(ctx context.Context, tokenID persist.DBID) (bool, error) {
-	token, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
-	if err != nil {
-		return false, err
+// GetProcessingStateByTokenDefinitionID returns true if a token is queued for processing, or is currently being processed.
+func (api TokenAPI) GetProcessingStateByTokenDefinitionID(ctx context.Context, id persist.DBID) (bool, error) {
+	return api.manager.Processing(ctx, id), nil
+}
+
+func (api TokenAPI) GetTokenDefinitionByTokenDBID(ctx context.Context, id persist.DBID) (db.TokenDefinition, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDBID": validate.WithTag(id, "required"),
+	}); err != nil {
+		return db.TokenDefinition{}, err
 	}
-	contract, err := api.loaders.GetContractsByIDs.Load(token.Contract.String())
-	if err != nil {
-		return false, err
+	return api.loaders.GetTokenDefinitionByTokenDbidBatch.Load(id)
+}
+
+func (api TokenAPI) GetTokenDefinitionByID(ctx context.Context, id persist.DBID) (db.TokenDefinition, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDefinitionID": validate.WithTag(id, "required"),
+	}); err != nil {
+		return db.TokenDefinition{}, err
 	}
-	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain)
-	return api.manager.Processing(ctx, t), nil
+	return api.loaders.GetTokenDefinitionByIdBatch.Load(id)
 }
 
 // syncableChains returns a list of chains that the user is allowed to sync, and a callback to release the locks for those chains.

@@ -35,10 +35,14 @@ func (m *Media) Scan(src interface{}) error {
 	return json.Unmarshal(src.([]byte), &m)
 }
 
-type ErrMediaNotFound struct {
-	ID DBID
-}
+var errMediaNotFound ErrMediaNotFound
 
-func (e ErrMediaNotFound) Error() string {
-	return fmt.Sprintf("no media found for ID %s", e.ID)
-}
+type ErrMediaNotFound struct{}
+
+func (e ErrMediaNotFound) Unwrap() error { return notFoundError }
+func (e ErrMediaNotFound) Error() string { return "media not found" }
+
+type ErrMediaNotFoundByID struct{ ID DBID }
+
+func (e ErrMediaNotFoundByID) Unwrap() error { return errMediaNotFound }
+func (e ErrMediaNotFoundByID) Error() string { return fmt.Sprintf("no media found for ID %s", e.ID) }

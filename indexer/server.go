@@ -9,12 +9,12 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-func getStatus(i *indexer, tokenRepository persist.TokenRepository) gin.HandlerFunc {
+func getStatus(i *indexer, contractRepo persist.ContractRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c, 10*time.Second)
 		defer cancel()
 
-		mostRecent, _ := tokenRepository.MostRecentBlock(ctx)
+		mostRecent, _ := contractRepo.MostRecentBlock(ctx)
 
 		readableSyncMap := make(map[persist.ContractOwnerMethod]int)
 

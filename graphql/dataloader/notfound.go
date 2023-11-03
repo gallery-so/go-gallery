@@ -70,10 +70,6 @@ func (*GetGalleryByIdBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrGalleryNotFound{ID: key}
 }
 
-func (*GetMediaByMediaIDIgnoringStatus) getNotFoundError(key persist.DBID) error {
-	return persist.ErrMediaNotFound{ID: key}
-}
-
 func (*GetMembershipByMembershipIdBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrMembershipNotFoundByID{ID: key}
 }
@@ -135,4 +131,16 @@ func (*GetContractCreatorsByIds) getNotFoundError(key string) error {
 
 func (*GetContractsByIDs) getNotFoundError(key string) error {
 	return pgx.ErrNoRows
+}
+
+func (*GetMediaByMediaIdIgnoringStatusBatch) getNotFoundError(key persist.DBID) error {
+	return persist.ErrMediaNotFoundByID{ID: key}
+}
+
+func (*GetTokenDefinitionByIdBatch) getNotFoundError(key persist.DBID) error {
+	return persist.ErrTokenDefinitionNotFoundByID{ID: key}
+}
+
+func (*GetTokenDefinitionByTokenDbidBatch) getNotFoundError(key persist.DBID) error {
+	return persist.ErrTokenDefinitionNotFoundByTokenDBID{ID: key}
 }

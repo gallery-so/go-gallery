@@ -927,20 +927,13 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		}, nil
 	case persist.ActionNewTokensReceived:
 		data := UserFacingNotificationData{}
-		tm, err := queries.GetTokenMediaByTokenId(ctx, n.Data.NewTokenID)
+
+		td, err := queries.GetTokenDefinitionByTokenDbid(ctx, n.Data.NewTokenID)
 		if err != nil {
 			return UserFacingNotificationData{}, err
 		}
-		name := tm.Name
-		if name == "" {
-			to, err := queries.GetTokenById(ctx, n.Data.NewTokenID)
-			if err != nil {
-				return UserFacingNotificationData{}, err
-			}
-			name = to.Name.String
-		}
 
-		name = util.TruncateWithEllipsis(name, 20)
+		name := util.TruncateWithEllipsis(td.Name.String, 20)
 
 		amount := n.Data.NewTokenQuantity
 		i := amount.BigInt().Uint64()

@@ -51,6 +51,7 @@ type EventData struct {
 	TokenCollectorsNote                 string            `json:"token_collectors_note"`
 	TokenCollectionID                   DBID              `json:"token_collection_id"`
 	TokenContractID                     DBID              `json:"token_contract_id"`
+	TokenDefinitionID                   DBID              `json:"token_definition_id"`
 	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`
 	CollectionCollectorsNote            string            `json:"collection_collectors_note"`
 	GalleryName                         *string           `json:"gallery_name"`

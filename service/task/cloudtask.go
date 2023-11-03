@@ -38,9 +38,9 @@ type FeedbotSlackPostMessage struct {
 	PostID persist.DBID `json:"post_id" binding:"required"`
 }
 
-type TokenProcessingUserMessage struct {
-	UserID   persist.DBID   `json:"user_id" binding:"required"`
-	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
+type TokenProcessingBatchMessage struct {
+	BatchID            persist.DBID   `json:"batch_id" binding:"required"`
+	TokenDefinitionIDs []persist.DBID `json:"token_definition_ids" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
@@ -49,8 +49,8 @@ type TokenProcessingContractTokensMessage struct {
 }
 
 type TokenProcessingTokenMessage struct {
-	Token    persist.TokenIdentifiers `json:"token" binding:"required"`
-	Attempts int                      `json:"attempts" binding:"required"`
+	TokenDefinitionID persist.DBID `json:"token_definition_id" binding:"required"`
+	Attempts          int          `json:"attempts" binding:"required"`
 }
 
 type AddEmailToMailingListMessage struct {
@@ -153,10 +153,9 @@ func CreateTaskForFeedbot(ctx context.Context, message FeedbotMessage, client *g
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
+func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingBatchMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
 	defer tracing.FinishSpan(span)
-	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process", env.GetString("TOKEN_PROCESSING_URL"))
 	return submitTask(ctx, client, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))

@@ -58,6 +58,7 @@ func NewRecommender(queries *db.Queries) *Recommender {
 
 	r.SaveResultFunc = func(ctx context.Context, userID persist.DBID, recommendedIDs []persist.DBID) error {
 		params := db.UpdatedRecommendationResultsParams{}
+		recommendedIDs = util.Dedupe(recommendedIDs, true)
 		for _, id := range recommendedIDs {
 			params.ID = append(params.ID, persist.GenerateID().String())
 			params.UserID = append(params.UserID, userID.String())
