@@ -49,6 +49,22 @@ type NullInt32 int32
 // NullBool represents a bool that may be null in the DB
 type NullBool bool
 
+type CompleteIndex struct {
+	Index  int `json:"start"`
+	Length int `json:"end"`
+}
+
+func (c CompleteIndex) Value() (driver.Value, error) {
+	return json.Marshal(c)
+}
+
+func (c *CompleteIndex) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	return json.Unmarshal(value.([]uint8), c)
+}
+
 // GenerateID generates a application-wide unique ID
 func GenerateID() DBID {
 	id, err := ksuid.NewRandom()

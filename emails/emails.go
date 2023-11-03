@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -40,7 +41,7 @@ func coreInitServer() *gin.Engine {
 
 	queries := coredb.New(pgxClient)
 
-	loaders := dataloader.NewLoaders(context.Background(), queries, false)
+	loaders := dataloader.NewLoaders(context.Background(), queries, false, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 
 	sendgridClient := sendgrid.NewSendClient(env.GetString("SENDGRID_API_KEY"))
 
@@ -71,7 +72,9 @@ func coreInitServer() *gin.Engine {
 		}
 	}
 
-	go autoSendNotificationEmails(queries, sendgridClient, pub)
+	lock := redis.NewLockClient(redis.NewCache(redis.EmailThrottleCache))
+
+	go autoSendNotificationEmails(queries, sendgridClient, pub, lock)
 
 	return handlersInitServer(router, loaders, queries, sendgridClient)
 }

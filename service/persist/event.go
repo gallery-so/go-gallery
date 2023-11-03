@@ -16,16 +16,24 @@ const (
 	ResourceTypeGallery
 	ResourceTypeAdmire
 	ResourceTypeComment
+	ResourceTypeContract
+	ResourceTypePost
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
+	ActionUserPosted                      Action = "UserPosted"
+	ActionUserPostedYourWork              Action = "UserPostedYourWork"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
 	ActionCollectionCreated               Action = "CollectionCreated"
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"
 	ActionTokensAddedToCollection         Action = "TokensAddedToCollection"
 	ActionAdmiredFeedEvent                Action = "AdmiredFeedEvent"
 	ActionAdmiredPost                     Action = "AdmiredPost"
+	ActionAdmiredToken                    Action = "AdmiredToken"
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
+	ActionReplyToComment                  Action = "RepliedToComment"
+	ActionMentionUser                     Action = "MentionUser"
+	ActionMentionCommunity                Action = "MentionCommunity"
 	ActionViewedGallery                   Action = "ViewedGallery"
 	ActionViewedToken                     Action = "ViewedToken"
 	ActionCollectionUpdated               Action = "CollectionUpdated"
@@ -51,6 +59,7 @@ type EventData struct {
 	GalleryNewTokenIDs                  map[DBID]DBIDList `json:"gallery_new_token_ids"`
 	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`
 	GalleryNewTokenCollectorsNotes      map[DBID]string   `json:"gallery_new_token_collectors_notes"`
+	YourContractID                      DBID              `json:"your_contract_id"`
 }
 
 type FeedEventData struct {

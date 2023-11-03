@@ -138,8 +138,8 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	}
 }
 
-func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	tokens, err := getNFTsPaginate(ctx, fmt.Sprintf("%s/accounts/%s/assets/nfts", baseURL, address), limit, offset, "", p.httpClient, p.apiKey, p.apiSecret, &getNFTsForOwnerResponse{})
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	tokens, err := getNFTsPaginate(ctx, fmt.Sprintf("%s/accounts/%s/assets/nfts", baseURL, address), "", p.httpClient, p.apiKey, p.apiSecret, &getNFTsForOwnerResponse{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -267,7 +267,7 @@ func (d *Provider) getOwnersPaginate(ctx context.Context, tids multichain.ChainA
 	return owners, nil
 }
 
-func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string, limit, offset int, pageKey string, httpClient *http.Client, key, secret string, result T) ([]Token, error) {
+func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string, pageKey string, httpClient *http.Client, key, secret string, result T) ([]Token, error) {
 
 	tokens := []Token{}
 	u := startingURL
@@ -310,33 +310,13 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string,
 		return nil, err
 	}
 
-	if offset > 0 && offset < pageSize {
-		if len(newTokens) > offset {
-			newTokens = newTokens[offset:]
-		} else {
-			newTokens = nil
-		}
-	}
-
-	if limit > 0 && limit < pageSize {
-		if len(newTokens) > limit {
-			newTokens = newTokens[:limit]
-		}
-	}
-
 	tokens = append(tokens, newTokens...)
 
 	next := result.GetNextPageKey()
 
 	if next != "" && next != pageKey {
 
-		if limit > 0 {
-			limit -= pageSize
-		}
-		if offset > 0 {
-			offset -= pageSize
-		}
-		newTokens, err := getNFTsPaginate(ctx, startingURL, limit, offset, next, httpClient, key, secret, result)
+		newTokens, err := getNFTsPaginate(ctx, startingURL, next, httpClient, key, secret, result)
 		if err != nil {
 			return nil, err
 		}

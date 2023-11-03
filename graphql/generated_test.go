@@ -280,6 +280,19 @@ func (v *EoaAuth) GetNonce() string { return v.Nonce }
 // GetSignature returns EoaAuth.Signature, and is useful for accessing the field via an interface.
 func (v *EoaAuth) GetSignature() string { return v.Signature }
 
+type FarcasterAuth struct {
+	Address string `json:"address"`
+	// withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+	// the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+	WithSigner *bool `json:"withSigner"`
+}
+
+// GetAddress returns FarcasterAuth.Address, and is useful for accessing the field via an interface.
+func (v *FarcasterAuth) GetAddress() string { return v.Address }
+
+// GetWithSigner returns FarcasterAuth.WithSigner, and is useful for accessing the field via an interface.
+func (v *FarcasterAuth) GetWithSigner() *bool { return v.WithSigner }
+
 type GnosisSafeAuth struct {
 	Address string `json:"address"`
 	Nonce   string `json:"nonce"`
@@ -291,12 +304,50 @@ func (v *GnosisSafeAuth) GetAddress() string { return v.Address }
 // GetNonce returns GnosisSafeAuth.Nonce, and is useful for accessing the field via an interface.
 func (v *GnosisSafeAuth) GetNonce() string { return v.Nonce }
 
+type IntervalInput struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
+
+// GetStart returns IntervalInput.Start, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetStart() int { return v.Start }
+
+// GetLength returns IntervalInput.Length, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetLength() int { return v.Length }
+
+type LensAuth struct {
+	Address string `json:"address"`
+	// signature is the signed challenge provided by a GQL request to the lens endpoint
+	Signature *string `json:"signature"`
+}
+
+// GetAddress returns LensAuth.Address, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetAddress() string { return v.Address }
+
+// GetSignature returns LensAuth.Signature, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetSignature() *string { return v.Signature }
+
 type MagicLinkAuth struct {
 	Token string `json:"token"`
 }
 
 // GetToken returns MagicLinkAuth.Token, and is useful for accessing the field via an interface.
 func (v *MagicLinkAuth) GetToken() string { return v.Token }
+
+type MentionInput struct {
+	Interval    *IntervalInput `json:"interval"`
+	UserId      *persist.DBID  `json:"userId"`
+	CommunityId *persist.DBID  `json:"communityId"`
+}
+
+// GetInterval returns MentionInput.Interval, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetInterval() *IntervalInput { return v.Interval }
+
+// GetUserId returns MentionInput.UserId, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetUserId() *persist.DBID { return v.UserId }
+
+// GetCommunityId returns MentionInput.CommunityId, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetCommunityId() *persist.DBID { return v.CommunityId }
 
 type MoveCollectionToGalleryInput struct {
 	SourceCollectionId persist.DBID `json:"sourceCollectionId"`
@@ -321,6 +372,7 @@ func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 type PostTokensInput struct {
 	TokenIds []persist.DBID `json:"tokenIds"`
 	Caption  *string        `json:"caption"`
+	Mentions []MentionInput `json:"mentions"`
 }
 
 // GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
@@ -328,6 +380,9 @@ func (v *PostTokensInput) GetTokenIds() []persist.DBID { return v.TokenIds }
 
 // GetCaption returns PostTokensInput.Caption, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetCaption() *string { return v.Caption }
+
+// GetMentions returns PostTokensInput.Mentions, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`
@@ -361,8 +416,10 @@ const (
 )
 
 type SocialAuthMechanism struct {
-	Twitter *TwitterAuth     `json:"twitter"`
-	Debug   *DebugSocialAuth `json:"debug"`
+	Twitter   *TwitterAuth     `json:"twitter"`
+	Debug     *DebugSocialAuth `json:"debug"`
+	Farcaster *FarcasterAuth   `json:"farcaster"`
+	Lens      *LensAuth        `json:"lens"`
 }
 
 // GetTwitter returns SocialAuthMechanism.Twitter, and is useful for accessing the field via an interface.
@@ -370,6 +427,12 @@ func (v *SocialAuthMechanism) GetTwitter() *TwitterAuth { return v.Twitter }
 
 // GetDebug returns SocialAuthMechanism.Debug, and is useful for accessing the field via an interface.
 func (v *SocialAuthMechanism) GetDebug() *DebugSocialAuth { return v.Debug }
+
+// GetFarcaster returns SocialAuthMechanism.Farcaster, and is useful for accessing the field via an interface.
+func (v *SocialAuthMechanism) GetFarcaster() *FarcasterAuth { return v.Farcaster }
+
+// GetLens returns SocialAuthMechanism.Lens, and is useful for accessing the field via an interface.
+func (v *SocialAuthMechanism) GetLens() *LensAuth { return v.Lens }
 
 type TrendingUsersInput struct {
 	Report ReportWindow `json:"report"`
@@ -497,6 +560,8 @@ const (
 	UserExperienceTypeMobileupsell1                     UserExperienceType = "MobileUpsell1"
 	UserExperienceTypeMobilebetaupsell                  UserExperienceType = "MobileBetaUpsell"
 	UserExperienceTypeUpsellmintmemento5                UserExperienceType = "UpsellMintMemento5"
+	UserExperienceTypeUpsellbanner                      UserExperienceType = "UpsellBanner"
+	UserExperienceTypePostsbetaannouncement             UserExperienceType = "PostsBetaAnnouncement"
 )
 
 // __addUserWalletMutationInput is used internally by genqlient
@@ -685,11 +750,15 @@ func (v *__removeUserWalletsMutationInput) GetWalletIds() []persist.DBID { retur
 
 // __syncTokensMutationInput is used internally by genqlient
 type __syncTokensMutationInput struct {
-	Chains []Chain `json:"chains"`
+	Chains        []Chain `json:"chains"`
+	Incrementally *bool   `json:"incrementally"`
 }
 
 // GetChains returns __syncTokensMutationInput.Chains, and is useful for accessing the field via an interface.
 func (v *__syncTokensMutationInput) GetChains() []Chain { return v.Chains }
+
+// GetIncrementally returns __syncTokensMutationInput.Incrementally, and is useful for accessing the field via an interface.
+func (v *__syncTokensMutationInput) GetIncrementally() *bool { return v.Incrementally }
 
 // __tokenByIdQueryInput is used internally by genqlient
 type __tokenByIdQueryInput struct {
@@ -11820,8 +11889,8 @@ func removeUserWalletsMutation(
 
 // The query or mutation executed by syncTokensMutation.
 const syncTokensMutation_Operation = `
-mutation syncTokensMutation ($chains: [Chain!]) {
-	syncTokens(chains: $chains) {
+mutation syncTokensMutation ($chains: [Chain!], $incrementally: Boolean) {
+	syncTokens(chains: $chains, incrementally: $incrementally) {
 		__typename
 		... on Error {
 			__typename
@@ -11897,12 +11966,14 @@ func syncTokensMutation(
 	ctx context.Context,
 	client graphql.Client,
 	chains []Chain,
+	incrementally *bool,
 ) (*syncTokensMutationResponse, error) {
 	req := &graphql.Request{
 		OpName: "syncTokensMutation",
 		Query:  syncTokensMutation_Operation,
 		Variables: &__syncTokensMutationInput{
-			Chains: chains,
+			Chains:        chains,
+			Incrementally: incrementally,
 		},
 	}
 	var err error

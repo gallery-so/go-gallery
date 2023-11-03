@@ -2,7 +2,7 @@ package zora
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -10,85 +10,67 @@ import (
 
 	"github.com/machinebox/graphql"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 
-var zoraURL = "https://api.zora.co/graphql"
+var zoraRESTURL = "https://api.zora.co/discover"
 var goldskyURL = "https://api.goldsky.com/api/public/project_clhk16b61ay9t49vm6ntn4mkz/subgraphs/zora-create-zora-mainnet/stable/gn"
 
 // Provider is an the struct for retrieving data from the zora blockchain
 type Provider struct {
 	zoraAPIKey string
 	httpClient *http.Client
-	zgql       *graphql.Client
 	ggql       *graphql.Client
 }
 
 type tokenID string
 
 func (t tokenID) toBase16String() string {
-	big, ok := new(big.Int).SetString(string(t), 10)
+	spl := strings.Split(string(t), "-")
+	big, ok := new(big.Int).SetString(spl[len(spl)-1], 10)
 	if !ok {
-		panic("invalid token ID")
+		panic(fmt.Sprintf("invalid token id %s", t))
 	}
 	return big.Text(16)
 }
 
-type token struct {
-	TokenID       tokenID                `json:"tokenId"`
-	TokenURL      string                 `json:"tokenUrl"`
-	TokenStandard string                 `json:"tokenStandard"`
-	TokenContract tokenContract          `json:"tokenContract"`
-	Metadata      map[string]interface{} `json:"metadata"`
-	Description   string                 `json:"description"`
-	Name          string                 `json:"name"`
-	Owner         string                 `json:"owner"`
-	Image         struct {
-		URL string `json:"url"`
-	} `json:"image"`
+type zoraToken struct {
+	ChainName         string         `json:"chain_name"`
+	CollectionAddress string         `json:"collection_address"`
+	TokenID           tokenID        `json:"token_id"`
+	TokenStandard     string         `json:"token_standard"`
+	Owner             string         `json:"owner"`
+	Metadata          map[string]any `json:"metadata"`
+	Mintable          struct {
+		CreatorAddress string `json:"creator_address"`
+		Collection     struct {
+			Symbol      string `json:"symbol"`
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		}
+	} `json:"mintable"`
+	Media struct {
+		ImagePreview struct {
+			Raw            string `json:"raw"`
+			MimeType       string `json:"mime_type"`
+			EncodedLarge   string `json:"encoded_large"`
+			EncodedPreview string `json:"encoded_preview"`
+		} `json:"image_preview"`
+		MimeType string `json:"mime_type"`
+	} `json:"media"`
 }
-
-type tokenContract struct {
-	CollectionAddress string `json:"collectionAddress"`
-	Name              string `json:"name"`
-	Symbol            string `json:"symbol"`
-	Description       string `json:"description"`
-}
-
-type pageInfo struct {
-	hasNextPage bool   `json:"hasNextPage"`
-	endCursor   string `json:"endCursor"`
-	limit       int    `json:"limit"`
-}
-
-type tokenNode struct {
-	Token token `json:"token"`
-}
-type getTokensResponse struct {
-	Tokens struct {
-		Nodes    []tokenNode `json:"nodes"`
-		PageInfo pageInfo    `json:"pageInfo"`
-	} `json:"tokens"`
-}
-
-type getTokenResponse struct {
-	Token struct {
-		Token token `json:"token"`
-	}
+type zoraBalanceToken struct {
+	Balance int       `json:"balance"`
+	Token   zoraToken `json:"token"`
 }
 
 type getContractCreatorResponse struct {
 	ZoraCreateContracts []struct {
 		Creator string `json:"creator"`
 	} `json:"zoraCreateContracts"`
-}
-
-type getContractsResponse struct {
-	Collections struct {
-		Nodes []tokenContract `json:"nodes"`
-	} `json:"collections"`
 }
 
 type getZoraCreateContractsResponse struct {
@@ -131,9 +113,8 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 
 	return &Provider{
-		zgql:       graphql.NewClient(zoraURL, graphql.WithHTTPClient(zoraClient)),
 		ggql:       graphql.NewClient(goldskyURL, graphql.WithHTTPClient(httpClient)),
-		httpClient: httpClient,
+		httpClient: zoraClient,
 	}
 }
 
@@ -147,228 +128,97 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	}
 }
 
+type getBalanceTokensResponse struct {
+	Tokens      []zoraBalanceToken `json:"results"`
+	HasNextPage bool               `json:"has_next_page"`
+}
+
+type getTokensResponse struct {
+	Tokens      []zoraToken `json:"results"`
+	HasNextPage bool        `json:"has_next_page"`
+}
+
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the zora Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	return d.getTokensByWalletAddressPaginate(ctx, addr, "")
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	url := fmt.Sprintf("%s/user/%s/tokens?chain_names=ZORA-MAINNET&sort_direction=DESC", zoraRESTURL, addr.String())
+	return d.getTokens(ctx, url, nil, true)
 }
 
-func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, collection persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-
-	greq := graphql.NewRequest(req)
-	greq.Var("address", owner)
-	greq.Var("collection", collection)
-	greq.Var("after", endCursor)
-	greq.Var("limit", 500)
-
-	resp := getTokensResponse{}
-	err := d.zgql.Run(ctx, greq, &resp)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error getting tokens from zora: %w", err)
-	}
-
-	nodesToTokens, _ := util.Map(resp.Tokens.Nodes, func(n tokenNode) (token, error) {
-		return n.Token, nil
-	})
-	tokens, contracts, err := d.tokensToChainAgnostic(ctx, nodesToTokens, owner)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if resp.Tokens.PageInfo.hasNextPage {
-		nextTokens, nextContracts, err := d.getTokensWithRequest(ctx, req, owner, collection, resp.Tokens.PageInfo.endCursor)
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	url := fmt.Sprintf("%s/user/%s/tokens?chain_names=ZORA-MAINNET&sort_direction=DESC", zoraRESTURL, addr.String())
+	go func() {
+		_, _, err := d.getTokens(ctx, url, rec, true)
 		if err != nil {
-			return nil, nil, err
+			errChan <- err
+			return
 		}
-		tokens = append(tokens, nextTokens...)
-		contracts = append(contracts, nextContracts...)
-	}
-
-	return tokens, contracts, nil
+	}()
+	return rec, errChan
 }
 
-func (d *Provider) GetTokenByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	panic("implement me")
+func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	return d.getToken(ctx, owner, url)
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	treq := fmt.Sprintf(`query tokenByIdentifiers($address: String!, $tokenId: String!) {
-  token(token:{address: $address, tokenId: $tokenId}, network: {network:ZORA, chain: ZORA_MAINNET}) {
-    token {
-        metadata
-    }
-  }
-}`)
-
-	greq := graphql.NewRequest(treq)
-	greq.Var("address", ti.ContractAddress)
-	greq.Var("tokenId", ti.TokenID.Base10String())
-
-	resp := getTokenResponse{}
-	err := d.zgql.Run(ctx, greq, &resp)
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	token, _, err := d.getToken(ctx, "", url)
 	if err != nil {
-		return persist.TokenMetadata{}, fmt.Errorf("error getting token from zora: %w", err)
+		return nil, err
 	}
 
-	return resp.Token.Token.Metadata, nil
-}
-
-func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	req := fmt.Sprintf(`query tokensByWalletAddress($address: String!, $after:String!, $limit:Int!) {
-  tokens(where:{ownerAddresses:[$address]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: $limit, after:$after}, sort:{sortKey: TRANSFERRED, sortDirection: ASC}) {
-    nodes {
-      token {
-        tokenId
-        tokenUrl
-        tokenStandard
-        tokenContract {
-          collectionAddress
-          name
-          symbol
-          description
-        }
-        collectionName
-        metadata
-        description
-        name
-        owner
-        image {
-          url
-        }
-      }
-    }
-    pageInfo {
-      limit
-      endCursor
-      hasNextPage
-    }
-  }
-}`)
-
-	return d.getTokensWithRequest(ctx, req, addr, "", endCursor)
-}
-
-func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	req := fmt.Sprintf(`query tokensByContractAddress($collection: String!, $after:String!, $limit:Int!) {
-  tokens(where:{collectionAddresses:[$collection]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: $limit, after:$after}, sort:{sortKey: TRANSFERRED, sortDirection: ASC}) {
-    nodes {
-      token {
-        tokenId
-        tokenUrl
-        tokenStandard
-        tokenContract {
-          collectionAddress
-          name
-          symbol
-          description
-        }
-        collectionName
-        metadata
-        description
-        name
-        owner
-        image {
-          url
-        }
-      }
-    }
-    pageInfo {
-      limit
-      endCursor
-      hasNextPage
-    }
-  }
-}`)
-
-	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, "", endCursor)
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
-	if len(contracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, errors.New("no contract found")
-	}
-	return tokens, contracts[0], nil
-}
-
-func (d *Provider) getTokensByWalletAddressAndContractPaginate(ctx context.Context, addr, contractAddress persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	req := fmt.Sprintf(`query tokensByAll($address: String!, $collection: String!, $after:String!, $limit:Int!) {
-  tokens(where:{collectionAddresses: [$collection], ownerAddresses: [$address]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: $limit, after:$after}, sort:{sortKey: TRANSFERRED, sortDirection: ASC}) {
-    nodes {
-      token {
-        tokenId
-        tokenUrl
-        tokenStandard
-        tokenContract {
-          collectionAddress
-          name
-          symbol
-          description
-        }
-        collectionName
-        metadata
-        description
-        name
-        owner
-        image {
-          url
-        }
-      }
-    }
-    pageInfo {
-      limit
-      endCursor
-      hasNextPage
-    }
-  }
-}`)
-
-	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, contractAddress, endCursor)
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
-	if len(contracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address %s amd owner %s", contractAddress, addr)
-	}
-
-	return tokens, contracts[0], nil
+	return token.TokenMetadata, nil
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the zora Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return d.getTokensByContractAddressPaginate(ctx, contractAddress, "")
+	url := fmt.Sprintf("%s/tokens/ZORA-MAINNET/%s?&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, contractAddress.String())
+	tokens, contracts, err := d.getTokens(ctx, url, nil, false)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	if len(contracts) != 1 {
+		logger.For(ctx).Warnf("invalid number of contracts returned from zora: %d", len(contracts))
+		return nil, multichain.ChainAgnosticContract{}, nil
+	}
+	return tokens, contracts[0], nil
+
 }
 
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return d.getTokensByWalletAddressAndContractPaginate(ctx, ownerAddress, contractAddress, "")
+	tokens, contracts, err := d.GetTokensByWalletAddress(ctx, ownerAddress)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	// filter for contract and tokens
+	filteredTokens := []multichain.ChainAgnosticToken{}
+	for _, token := range tokens {
+		if strings.EqualFold(token.ContractAddress.String(), contractAddress.String()) {
+			filteredTokens = append(filteredTokens, token)
+		}
+	}
+	foundContract := multichain.ChainAgnosticContract{}
+	for _, contract := range contracts {
+		if strings.EqualFold(contract.Address.String(), contractAddress.String()) {
+			foundContract = contract
+		}
+	}
+
+	return filteredTokens, foundContract, nil
 }
 
 // GetContractByAddress retrieves an zora contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
-	req := graphql.NewRequest(fmt.Sprintf(`{
-	  "query": "query contractByAddress($address:String!) {
-  collections(where:{collectionAddresses:[$address]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: 1}, sort:{sortKey: CREATED, sortDirection: ASC}) {
-    nodes {
-      address
-      description
-      name
-      symbol
-    }
-  }",
-	  "variables": {
-		"address": %s
-	  }
-	}`, addr.String()))
-
-	resp := getContractsResponse{}
-	err := d.zgql.Run(ctx, req, &resp)
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s", zoraRESTURL, addr.String())
+	_, contract, err := d.getToken(ctx, "", url)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
-
-	if len(resp.Collections.Nodes) == 0 {
-		return multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address %s", addr.String())
-	}
-
-	return d.contractToChainAgnostic(ctx, resp.Collections.Nodes[0]), nil
+	return contract, nil
 
 }
 
@@ -410,80 +260,213 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	return result, nil
 }
 
-func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []token, owner persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	result := make([]multichain.ChainAgnosticToken, len(tokens))
-	contracts := map[string]multichain.ChainAgnosticContract{}
-	for i, token := range tokens {
-		var tokenType persist.TokenType
-		switch token.TokenStandard {
-		case "ERC721":
-			tokenType = persist.TokenTypeERC721
-		case "ERC1155":
-			tokenType = persist.TokenTypeERC1155
-		default:
-			panic(fmt.Sprintf("unknown token standard %s %+v", token.TokenStandard, token))
+func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	offset := 0
+	limit := 50
+	allTokens := []multichain.ChainAgnosticToken{}
+	allContracts := []multichain.ChainAgnosticContract{}
+	for ; ; offset += limit {
+		urlWithPagination := fmt.Sprintf("%s&offset=%d&limit=%d", url, offset, limit)
+		logger.For(ctx).Infof("getting zora tokens from %s", urlWithPagination)
+		req, err := http.NewRequestWithContext(ctx, "GET", urlWithPagination, nil)
+		if err != nil {
+			return nil, nil, err
 		}
-		result[i] = multichain.ChainAgnosticToken{
-			Descriptors: multichain.ChainAgnosticTokenDescriptors{
-				Name:        token.Name,
-				Description: token.Description,
-			},
-			TokenType:       tokenType,
-			TokenMetadata:   token.Metadata,
-			TokenID:         persist.TokenID(token.TokenID.toBase16String()),
-			Quantity:        "1",
-			OwnerAddress:    persist.Address(util.FirstNonEmptyString(strings.ToLower(token.Owner), owner.String())),
-			ContractAddress: persist.Address(strings.ToLower(token.TokenContract.CollectionAddress)),
-			ExternalURL:     token.TokenURL,
-			FallbackMedia: persist.FallbackMedia{
-				// IPFS url
-				ImageURL: persist.NullString(token.Image.URL),
-			},
+		resp, err := d.httpClient.Do(req)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer resp.Body.Close()
+
+		var tokens []multichain.ChainAgnosticToken
+		var contracts []multichain.ChainAgnosticContract
+		var willBreak bool
+		if balance {
+			var result getBalanceTokensResponse
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			logger.For(ctx).Infof("zora raw tokens retrieved: %d", len(result.Tokens))
+
+			tokens, contracts = d.balanceTokensToChainAgnostic(ctx, result.Tokens)
+			if len(result.Tokens) < limit || !result.HasNextPage {
+				willBreak = true
+			}
+
+		} else {
+			var result getTokensResponse
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			logger.For(ctx).Infof("zora raw tokens retrieved: %d", len(result.Tokens))
+
+			tokens, contracts = d.tokensToChainAgnostic(ctx, result.Tokens)
+			if len(result.Tokens) < limit || !result.HasNextPage {
+				willBreak = true
+			}
 		}
 
-		if _, ok := contracts[token.TokenContract.CollectionAddress]; ok {
+		allTokens = append(allTokens, tokens...)
+		allContracts = append(allContracts, contracts...)
+
+		if rec != nil {
+			rec <- multichain.ChainAgnosticTokensAndContracts{
+				Tokens:    tokens,
+				Contracts: contracts,
+			}
+		}
+		if willBreak {
+			break
+		}
+
+	}
+
+	logger.For(ctx).Infof("zora tokens retrieved: %d", len(allTokens))
+
+	return allTokens, allContracts, nil
+}
+
+func (d *Provider) getToken(ctx context.Context, ownerAddress persist.Address, url string) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	defer resp.Body.Close()
+
+	var result zoraToken
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	tokens, contracts := d.tokensToChainAgnostic(ctx, []zoraToken{result})
+
+	if len(tokens) == 0 || len(contracts) == 0 {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("invalid number of tokens or contracts returned from zora: %d %d", len(tokens), len(contracts))
+	}
+
+	if ownerAddress != "" {
+		for _, token := range tokens {
+			if strings.EqualFold(token.OwnerAddress.String(), ownerAddress.String()) {
+				return token, contracts[0], nil
+			}
+		}
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for owner %s", ownerAddress.String())
+	}
+
+	return tokens[0], contracts[0], nil
+}
+
+func (d *Provider) balanceTokensToChainAgnostic(ctx context.Context, tokens []zoraBalanceToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
+	result := make([]multichain.ChainAgnosticToken, 0, len(tokens))
+	contracts := map[string]multichain.ChainAgnosticContract{}
+	for _, token := range tokens {
+		converted, err := d.tokenToAgnostic(ctx, token.Token)
+		if err != nil {
+			logger.For(ctx).Errorf("error converting zora token %+v: %s", token, err.Error())
+			continue
+		}
+		balanceAsBig := new(big.Int).SetInt64(int64(token.Balance))
+		balanceAsHex := balanceAsBig.Text(16)
+		if balanceAsHex == "" {
+			balanceAsHex = "1"
+		}
+		converted.Quantity = persist.HexString(balanceAsHex)
+
+		result = append(result, converted)
+
+		if _, ok := contracts[token.Token.CollectionAddress]; ok {
 			continue
 		}
 
-		contracts[token.TokenContract.CollectionAddress] = d.contractToChainAgnostic(ctx, token.TokenContract)
+		contracts[token.Token.CollectionAddress] = d.contractToChainAgnostic(ctx, token.Token)
 
 	}
 
 	contractResults := util.MapValues(contracts)
 
-	return result, contractResults, nil
+	logger.For(ctx).Infof("zora tokens converted: %d (%d)", len(result), len(contractResults))
+
+	return result, contractResults
 
 }
 
-func (d *Provider) contractToChainAgnostic(ctx context.Context, contract tokenContract) multichain.ChainAgnosticContract {
-	creator, _ := d.getContractCreator(ctx, persist.Address(strings.ToLower(contract.CollectionAddress)))
+func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
+	result := make([]multichain.ChainAgnosticToken, 0, len(tokens))
+	contracts := map[string]multichain.ChainAgnosticContract{}
+	for _, token := range tokens {
+		converted, err := d.tokenToAgnostic(ctx, token)
+		if err != nil {
+			logger.For(ctx).Errorf("error converting zora token %+v: %s", token, err.Error())
+			continue
+		}
+		result = append(result, converted)
+
+		if _, ok := contracts[token.CollectionAddress]; ok {
+			continue
+		}
+
+		contracts[token.CollectionAddress] = d.contractToChainAgnostic(ctx, token)
+
+	}
+
+	contractResults := util.MapValues(contracts)
+
+	logger.For(ctx).Infof("zora tokens converted: %d (%d)", len(result), len(contractResults))
+
+	return result, contractResults
+
+}
+
+func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multichain.ChainAgnosticToken, error) {
+	var tokenType persist.TokenType
+	switch token.TokenStandard {
+	case "ERC721":
+		tokenType = persist.TokenTypeERC721
+	case "ERC1155":
+		tokenType = persist.TokenTypeERC1155
+	default:
+		return multichain.ChainAgnosticToken{}, fmt.Errorf("unknown token standard %s", token.TokenStandard)
+	}
+	metadataName, _ := token.Metadata["name"].(string)
+	metadataDescription, _ := token.Metadata["description"].(string)
+
+	return multichain.ChainAgnosticToken{
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name:        metadataName,
+			Description: metadataDescription,
+		},
+		TokenType:       tokenType,
+		TokenMetadata:   token.Metadata,
+		TokenID:         persist.TokenID(token.TokenID.toBase16String()),
+		Quantity:        persist.HexString("1"),
+		OwnerAddress:    persist.Address(strings.ToLower(token.Owner)),
+		ContractAddress: persist.Address(strings.ToLower(token.CollectionAddress)),
+
+		FallbackMedia: persist.FallbackMedia{
+			ImageURL: persist.NullString(token.Media.ImagePreview.EncodedPreview),
+		},
+	}, nil
+}
+
+func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken) multichain.ChainAgnosticContract {
 
 	return multichain.ChainAgnosticContract{
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         contract.Symbol,
-			Name:           contract.Name,
-			Description:    contract.Description,
-			CreatorAddress: creator,
+			Symbol:         token.Mintable.Collection.Symbol,
+			Name:           token.Mintable.Collection.Name,
+			Description:    token.Mintable.Collection.Description,
+			CreatorAddress: persist.Address(strings.ToLower(token.Mintable.CreatorAddress)),
 		},
-		Address: persist.Address(strings.ToLower(contract.CollectionAddress)),
+		Address: persist.Address(strings.ToLower(token.CollectionAddress)),
 	}
-}
-
-func (d *Provider) getContractCreator(ctx context.Context, address persist.Address) (persist.Address, error) {
-	req := graphql.NewRequest(`query createdContract($address:Bytes!) {
-  zoraCreateContracts(where: {address:$address}) {
-    creator
-  }
-}`)
-	req.Var("address", address.String())
-
-	resp := getContractCreatorResponse{}
-	err := d.ggql.Run(ctx, req, &resp)
-	if err != nil {
-		return "", err
-	}
-	if len(resp.ZoraCreateContracts) == 0 {
-		return "", fmt.Errorf("contract not found at address %s", address)
-	}
-	return persist.Address(strings.ToLower(resp.ZoraCreateContracts[0].Creator)), nil
 }

@@ -70,19 +70,20 @@ type ContractRepository interface {
 	BulkUpsert(context.Context, []Contract) error
 }
 
-// ErrContractNotFoundByAddress is an error type for when a contract is not found by address
-type ErrContractNotFoundByAddress struct {
-	Address EthereumAddress
-}
-
 type ErrContractNotFoundByID struct {
 	ID DBID
 }
 
-func (e ErrContractNotFoundByAddress) Error() string {
-	return fmt.Sprintf("contract not found by address: %s", e.Address)
-}
-
 func (e ErrContractNotFoundByID) Error() string {
 	return fmt.Sprintf("contract not found by ID: %s", e.ID)
+}
+
+// ErrContractNotFoundByAddress is an error type for when a contract is not found by address
+type ErrContractNotFoundByAddress struct {
+	Address Address
+	Chain   Chain
+}
+
+func (e ErrContractNotFoundByAddress) Error() string {
+	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }

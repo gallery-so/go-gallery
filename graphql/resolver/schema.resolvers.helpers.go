@@ -7,9 +7,12 @@ package graphql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -20,6 +23,7 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/notifications"
@@ -57,86 +61,31 @@ var nodeFetcher = model.NodeFetcher{
 	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
 		return resolveCommunityByID(ctx, dbid)
 	},
-	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
+	OnSomeoneAdmiredYourFeedEventNotification:     fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
+	OnSomeoneCommentedOnYourFeedEventNotification: fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
+	OnSomeoneAdmiredYourPostNotification:          fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
+	OnSomeoneCommentedOnYourPostNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourPostNotification],
+	OnSomeoneFollowedYouBackNotification:          fetchNotificationByID[model.SomeoneFollowedYouBackNotification],
+	OnSomeoneFollowedYouNotification:              fetchNotificationByID[model.SomeoneFollowedYouNotification],
+	OnSomeoneViewedYourGalleryNotification:        fetchNotificationByID[model.SomeoneViewedYourGalleryNotification],
+	OnNewTokensNotification:                       fetchNotificationByID[model.NewTokensNotification],
+	OnSomeoneMentionedYouNotification:             fetchNotificationByID[model.SomeoneMentionedYouNotification],
+	OnSomeoneMentionedYourCommunityNotification:   fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
+	OnSomeoneRepliedToYourCommentNotification:     fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
+	OnSomeoneAdmiredYourTokenNotification:         fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
+	OnSomeonePostedYourWorkNotification:           fetchNotificationByID[model.SomeonePostedYourWorkNotification],
+}
 
-		notifConverted := notif.(model.SomeoneAdmiredYourFeedEventNotification)
+// T any is a notification type, will panic if it is not a notification type
+func fetchNotificationByID[T any](ctx context.Context, dbid persist.DBID) (*T, error) {
+	notif, err := resolveNotificationByID(ctx, dbid)
+	if err != nil {
+		return nil, err
+	}
 
-		return &notifConverted, nil
-	},
-	OnSomeoneCommentedOnYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourFeedEventNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
+	notifConverted := notif.(T)
 
-		notifConverted := notif.(model.SomeoneCommentedOnYourFeedEventNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneAdmiredYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourPostNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneAdmiredYourPostNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneCommentedOnYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourPostNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneCommentedOnYourPostNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneFollowedYouBackNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneFollowedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneFollowedYouNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneViewedYourGalleryNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneViewedYourGalleryNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneViewedYourGalleryNotification)
-
-		return &notifConverted, nil
-	},
-	OnNewTokensNotification: func(ctx context.Context, dbid persist.DBID) (*model.NewTokensNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.NewTokensNotification)
-
-		return &notifConverted, nil
-	},
+	return &notifConverted, nil
 }
 
 var defaultTokenSettings = persist.CollectionTokenSettings{}
@@ -153,56 +102,56 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 
 	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
 
-	switch errTyp := err.(type) {
-	case auth.ErrAuthenticationFailed:
+	switch {
+	case util.ErrorAs[auth.ErrAuthenticationFailed](err):
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
-	case auth.ErrDoesNotOwnRequiredNFT:
+	case util.ErrorAs[auth.ErrDoesNotOwnRequiredNFT](err):
 		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
-	case persist.ErrUserNotFound:
+	case util.ErrorAs[persist.ErrUserNotFound](err):
 		mappedErr = model.ErrUserNotFound{Message: message}
-	case persist.ErrUserAlreadyExists:
+	case util.ErrorAs[persist.ErrUserAlreadyExists](err):
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
-	case persist.ErrUsernameNotAvailable:
+	case util.ErrorAs[persist.ErrUsernameNotAvailable](err):
 		mappedErr = model.ErrUsernameNotAvailable{Message: message}
-	case persist.ErrCollectionNotFoundByID:
+	case util.ErrorAs[persist.ErrCollectionNotFoundByID](err):
 		mappedErr = model.ErrCollectionNotFound{Message: message}
-	case persist.ErrTokenNotFoundByID:
+	case util.ErrorAs[persist.ErrTokenNotFoundByID](err) || util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err):
 		mappedErr = model.ErrTokenNotFound{Message: message}
-	case persist.ErrContractNotFoundByAddress:
+	case util.ErrorAs[persist.ErrContractNotFoundByAddress](err):
 		mappedErr = model.ErrCommunityNotFound{Message: message}
-	case persist.ErrAddressOwnedByUser:
+	case util.ErrorAs[persist.ErrAddressOwnedByUser](err):
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case persist.ErrAdmireNotFound, persist.ErrAdmireFeedEventNotFound, persist.ErrAdmirePostNotFound, persist.ErrAdmireTokenNotFound:
+	case util.ErrorAs[persist.ErrAdmireNotFound](err) || util.ErrorAs[persist.ErrAdmireFeedEventNotFound](err) || util.ErrorAs[persist.ErrAdmirePostNotFound](err) || util.ErrorAs[persist.ErrAdmireTokenNotFound](err):
 		mappedErr = model.ErrAdmireNotFound{Message: message}
-	case persist.ErrAdmireAlreadyExists:
+	case util.ErrorAs[persist.ErrAdmireAlreadyExists](err):
 		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
-	case persist.ErrCommentNotFound:
+	case util.ErrorAs[persist.ErrCommentNotFound](err):
 		mappedErr = model.ErrCommentNotFound{Message: message}
-	case publicapi.ErrTokenRefreshFailed:
+	case util.ErrorAs[publicapi.ErrTokenRefreshFailed](err):
 		mappedErr = model.ErrSyncFailed{Message: message}
-	case validate.ErrInvalidInput:
+	case util.ErrorAs[validate.ErrInvalidInput](err):
+		errTyp := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: errTyp.Parameters, Reasons: errTyp.Reasons}
-	case persist.ErrFeedEventNotFoundByID:
+	case util.ErrorAs[persist.ErrFeedEventNotFoundByID](err):
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
-	case persist.ErrUnknownAction:
+	case util.ErrorAs[persist.ErrUnknownAction](err):
 		mappedErr = model.ErrUnknownAction{Message: message}
-	case persist.ErrGalleryNotFound:
+	case util.ErrorAs[persist.ErrGalleryNotFound](err):
 		mappedErr = model.ErrGalleryNotFound{Message: message}
-	case twitter.ErrInvalidRefreshToken:
+	case util.ErrorAs[twitter.ErrInvalidRefreshToken](err):
 		mappedErr = model.ErrNeedsToReconnectSocial{SocialAccountType: persist.SocialProviderTwitter, Message: message}
-	case persist.ErrPushTokenBelongsToAnotherUser:
+	case util.ErrorAs[persist.ErrPushTokenBelongsToAnotherUser](err):
 		mappedErr = model.ErrPushTokenBelongsToAnotherUser{Message: message}
-	}
-
-	switch err {
-	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageUnknownSource:
+	case errors.Is(err, publicapi.ErrProfileImageTooManySources) || errors.Is(err, publicapi.ErrProfileImageUnknownSource):
 		mappedErr = model.ErrInvalidInput{Message: message}
-	case publicapi.ErrProfileImageNotTokenOwner, publicapi.ErrProfileImageNotWalletOwner:
+	case errors.Is(err, publicapi.ErrProfileImageNotTokenOwner) || errors.Is(err, publicapi.ErrProfileImageNotWalletOwner):
 		mappedErr = model.ErrNotAuthorized{Message: message}
-	case auth.ErrEmailUnverified:
+	case errors.Is(err, auth.ErrEmailUnverified):
 		mappedErr = model.ErrEmailUnverified{Message: message}
-	case auth.ErrEmailAlreadyUsed:
+	case errors.Is(err, auth.ErrEmailAlreadyUsed):
 		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
+	case errors.Is(err, eth.ErrNoAvatarRecord) || errors.Is(err, eth.ErrNoResolution):
+		mappedErr = model.ErrNoAvatarRecordSet{Message: message}
 	}
 
 	if mappedErr != nil {
@@ -259,9 +208,17 @@ func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m mod
 		}
 	}
 
+	authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	if m.Twitter != nil {
-		authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 		return publicapi.For(ctx).Social.NewTwitterAuthenticator(authedUserID, m.Twitter.Code), nil
+	}
+
+	if m.Farcaster != nil {
+		return publicapi.For(ctx).Social.NewFarcasterAuthenticator(authedUserID, m.Farcaster.Address, util.FromPointer(m.Farcaster.WithSigner)), nil
+	}
+
+	if m.Lens != nil {
+		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address, util.FromPointer(m.Lens.Signature)), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -728,9 +685,9 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 	edges := make([]*model.PostEdge, len(posts))
 	for i, post := range posts {
 
-		p := post
+		po := post
 
-		cval, _ := p.Caption.Value()
+		cval, _ := po.Caption.Value()
 
 		var caption *string
 		if cval != nil {
@@ -740,11 +697,11 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 		edges[i] = &model.PostEdge{
 			Node: &model.Post{
 				HelperPostData: model.HelperPostData{
-					TokenIDs: p.TokenIds,
-					AuthorID: p.ActorID,
+					TokenIDs: po.TokenIds,
+					AuthorID: po.ActorID,
 				},
-				CreationTime: &p.CreatedAt,
-				Dbid:         p.ID,
+				CreationTime: &po.CreatedAt,
+				Dbid:         po.ID,
 				Tokens:       nil, // handled by dedicated resolver
 				Caption:      caption,
 				Admires:      nil, // handled by dedicated resolver
@@ -830,6 +787,34 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 	}
 
 	return postToModel(post)
+}
+
+func resolveMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByCommentID(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func resolveMentionsByPostID(ctx context.Context, postID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByPostID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func mentionsToModel(ctx context.Context, mentions []db.Mention) ([]*model.Mention, error) {
+	result := make([]*model.Mention, len(mentions))
+
+	for i, mention := range mentions {
+		result[i] = mentionToModel(ctx, mention)
+	}
+
+	return result, nil
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -919,6 +904,21 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Post:         nil, // handled by dedicated resolver
 			Admirers:     nil, // handled by dedicated resolver
 		}, nil
+	case persist.ActionAdmiredToken:
+		return model.SomeoneAdmiredYourTokenNotification{
+			HelperSomeoneAdmiredYourTokenNotificationData: model.HelperSomeoneAdmiredYourTokenNotificationData{
+				OwnerID:          notif.OwnerID,
+				TokenID:          notif.TokenID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Token:        nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
 	case persist.ActionCommentedOnPost:
 		return model.SomeoneCommentedOnYourPostNotification{
 			HelperSomeoneCommentedOnYourPostNotificationData: model.HelperSomeoneCommentedOnYourPostNotificationData{
@@ -991,6 +991,82 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Count:        &amount,
 			Token:        nil, // handled by dedicated resolver
 		}, nil
+	case persist.ActionReplyToComment:
+		return model.SomeoneRepliedToYourCommentNotification{
+			HelperSomeoneRepliedToYourCommentNotificationData: model.HelperSomeoneRepliedToYourCommentNotificationData{
+				OwnerID:          notif.OwnerID,
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:            notif.ID,
+			Seen:            &notif.Seen,
+			CreationTime:    &notif.CreatedAt,
+			UpdatedTime:     &notif.LastUpdated,
+			Comment:         nil, // handled by dedicated resolver
+			OriginalComment: nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionMentionUser:
+		var postID *persist.DBID
+		var commentID *persist.DBID
+
+		if notif.PostID != "" {
+			postID = &notif.PostID
+		}
+		if notif.CommentID != "" {
+			commentID = &notif.CommentID
+		}
+		return model.SomeoneMentionedYouNotification{
+			HelperSomeoneMentionedYouNotificationData: model.HelperSomeoneMentionedYouNotificationData{
+
+				PostID:    postID,
+				CommentID: commentID,
+			},
+			Dbid:          notif.ID,
+			Seen:          &notif.Seen,
+			CreationTime:  &notif.CreatedAt,
+			UpdatedTime:   &notif.LastUpdated,
+			MentionSource: nil, // handled by dedicated resolver
+		}, nil
+
+	case persist.ActionMentionCommunity:
+		var postID *persist.DBID
+		var commentID *persist.DBID
+
+		if notif.PostID != "" {
+			postID = &notif.PostID
+		}
+		if notif.CommentID != "" {
+			commentID = &notif.CommentID
+		}
+		return model.SomeoneMentionedYourCommunityNotification{
+			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
+
+				ContractID: notif.ContractID,
+				PostID:     postID,
+				CommentID:  commentID,
+			},
+			Dbid:          notif.ID,
+			Seen:          &notif.Seen,
+			CreationTime:  &notif.CreatedAt,
+			UpdatedTime:   &notif.LastUpdated,
+			Community:     nil, // handled by dedicated resolver
+			MentionSource: nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserPostedYourWork:
+		return model.SomeonePostedYourWorkNotification{
+			HelperSomeonePostedYourWorkNotificationData: model.HelperSomeonePostedYourWorkNotificationData{
+
+				ContractID: notif.ContractID,
+				PostID:     notif.PostID,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Community:    nil, // handled by dedicated resolver
+			Post:         nil, // handled by dedicated resolver
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
@@ -1635,7 +1711,7 @@ func postToModel(event *db.Post) (*model.Post, error) {
 
 	var captionVal *string
 	if caption != nil {
-		captionVal = util.ToPointer(caption.(string))
+		captionVal = util.ToPointer(html.UnescapeString(caption.(string)))
 	}
 
 	return &model.Post{
@@ -1713,7 +1789,7 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
-		Bio:       &user.Bio.String,
+		Bio:       util.ToPointer(html.UnescapeString(user.Bio.String)),
 		Wallets:   wallets,
 		Universal: &user.Universal,
 
@@ -1743,7 +1819,19 @@ func usersToEdges(ctx context.Context, users []db.User) []*model.UserEdge {
 // admireToModel converts a db.Admire to a model.Admire
 func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 
+	var postID, feedEventID *persist.DBID
+	if admire.PostID != "" {
+		postID = &admire.PostID
+	}
+	if admire.FeedEventID != "" {
+		feedEventID = &admire.FeedEventID
+	}
+
 	return &model.Admire{
+		HelperAdmireData: model.HelperAdmireData{
+			PostID:      postID,
+			FeedEventID: feedEventID,
+		},
 		Dbid:         admire.ID,
 		CreationTime: &admire.CreatedAt,
 		LastUpdated:  &admire.LastUpdated,
@@ -1754,12 +1842,31 @@ func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 // commentToModel converts a db.Admire to a model.Admire
 func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 
+	var postID, feedEventID, replyToID *persist.DBID
+	if comment.PostID != "" {
+		postID = &comment.PostID
+	}
+	if comment.FeedEventID != "" {
+		feedEventID = &comment.FeedEventID
+	}
+	if comment.ReplyTo != "" {
+		replyToID = &comment.ReplyTo
+	}
 	return &model.Comment{
+		HelperCommentData: model.HelperCommentData{
+			PostID:      postID,
+			FeedEventID: feedEventID,
+			ReplyToID:   replyToID,
+		},
 		Dbid:         comment.ID,
 		CreationTime: &comment.CreatedAt,
 		LastUpdated:  &comment.LastUpdated,
-		Comment:      &comment.Comment,
+		Comment:      util.ToPointer(html.UnescapeString(comment.Comment)),
 		Commenter:    &model.GalleryUser{Dbid: comment.ActorID}, // remaining fields handled by dedicated resolver
+		ReplyTo:      nil,                                       // handled by dedicated resolver
+		Replies:      nil,                                       // handled by dedicated resolver
+		Source:       nil,                                       // handled by dedicated resolver
+		Deleted:      &comment.Removed,
 	}
 }
 
@@ -1898,7 +2005,7 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		Dbid:             token.ID,
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
-		CollectorsNote:   &token.CollectorsNote.String,
+		CollectorsNote:   util.ToPointer(html.UnescapeString(token.CollectorsNote.String)),
 		Media:            nil, // handled by dedicated resolver
 		TokenType:        &tokenType,
 		Chain:            &chain,
@@ -1972,8 +2079,8 @@ func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRe
 
 	// TODO: Should this use CreatorAddress or OwnerAddress?
 	var creatorAddress *persist.ChainAddress
-	if contract.CreatorAddress != "" {
-		chainAddress := persist.NewChainAddress(contract.CreatorAddress, chain)
+	if contract.OwnerAddress != "" {
+		chainAddress := persist.NewChainAddress(community.OwnerAddress, chain)
 		creatorAddress = &chainAddress
 	}
 
@@ -1986,9 +2093,9 @@ func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRe
 		Contract:        contractToModel(ctx, contract),
 		ContractAddress: &contractAddress,
 		CreatorAddress:  creatorAddress,
-		Name:            util.ToPointer(contract.Name.String),
-		Description:     util.ToPointer(contract.Description.String),
-		// PreviewImage:     util.ToPointer(contract.Pr.String()), // TODO do we still need this with the new image fields?
+		Name:            util.ToPointer(html.UnescapeString(contract.Name.String)),
+		Description:     util.ToPointer(html.UnescapeString(contract.Description.String)),
+		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
 		Chain:             &chain,
 		ProfileImageURL:   util.ToPointer(contract.ProfileImageUrl.String),
 		ProfileBannerURL:  util.ToPointer(contract.ProfileBannerUrl.String),
@@ -2031,7 +2138,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
-		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); !inFlight {
+		if inFlight, err := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); !inFlight || err != nil {
 			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
@@ -2041,7 +2148,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
-		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
+		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); inFlight {
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}
@@ -2087,11 +2194,11 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 	}
 	switch pfp.SourceType {
 	case persist.ProfileImageSourceToken:
-		token, err := resolveTokenByTokenID(ctx, pfp.TokenID)
+		token, err := publicapi.For(ctx).Token.GetTokenByIdIgnoreDisplayable(ctx, pfp.TokenID)
 		if err != nil {
 			return nil, err
 		}
-		return &model.TokenProfileImage{Token: token}, nil
+		return &model.TokenProfileImage{Token: tokenToModel(ctx, *token, nil)}, nil
 	case persist.ProfileImageSourceENS:
 		return ensProfileImageToModel(ctx, pfp.UserID, pfp.WalletID, pfp.EnsAvatarUri.String, pfp.EnsDomain.String)
 	default:
@@ -2102,7 +2209,7 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
 	// Use the token's profile image if the token exists
 	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
-		if tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, token.ID); err == nil {
+		if tokenMedia, err := publicapi.For(ctx).Token.MediaByMediaID(ctx, token.TokenMediaID); err == nil {
 			if tokenMedia.Media.ProfileImageURL != "" {
 				url = string(tokenMedia.Media.ProfileImageURL)
 			}
@@ -2111,7 +2218,19 @@ func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, 
 
 	var pfp *model.HTTPSProfileImage = nil
 
-	if url != "" {
+	if strings.HasPrefix(url, "data:image/svg") {
+		previewURL := util.ToPointer(url)
+		pfp = &model.HTTPSProfileImage{
+			PreviewURLs: &model.PreviewURLSet{
+				Raw:       &url,
+				Thumbnail: previewURL,
+				Small:     previewURL,
+				Medium:    previewURL,
+				Large:     previewURL,
+				SrcSet:    previewURL,
+			},
+		}
+	} else {
 		pfp = &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, url, nil)}
 	}
 
@@ -2356,4 +2475,25 @@ func mediaToDimensions(dimensions persist.Dimensions) *model.MediaDimensions {
 		Width:       &dimensions.Width,
 		AspectRatio: &aspect,
 	}
+}
+
+func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
+	m := &model.Mention{}
+	if mention.Start.Valid {
+		m.Interval = &model.Interval{
+			Start:  int(mention.Start.Int32),
+			Length: int(mention.Length.Int32),
+		}
+	}
+
+	switch {
+	case mention.UserID != "":
+		m.HelperMentionData.UserID = &mention.UserID
+	case mention.ContractID != "":
+		m.HelperMentionData.CommunityID = &mention.ContractID
+	default:
+		panic(fmt.Sprintf("unknown mention type: %+v", mention))
+	}
+
+	return m
 }

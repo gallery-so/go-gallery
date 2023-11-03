@@ -58,6 +58,22 @@ type HelperGalleryUserData struct {
 	FeaturedGalleryID *persist.DBID
 }
 
+type HelperCommentData struct {
+	PostID      *persist.DBID
+	FeedEventID *persist.DBID
+	ReplyToID   *persist.DBID
+}
+
+type HelperMentionData struct {
+	UserID      *persist.DBID
+	CommunityID *persist.DBID
+}
+
+type HelperAdmireData struct {
+	PostID      *persist.DBID
+	FeedEventID *persist.DBID
+}
+
 type HelperNotificationSettingsData struct {
 	UserId persist.DBID
 }
@@ -101,9 +117,36 @@ type HelperSomeoneAdmiredYourPostNotificationData struct {
 	NotificationData persist.NotificationData
 }
 
+type HelperSomeoneAdmiredYourTokenNotificationData struct {
+	OwnerID          persist.DBID
+	TokenID          persist.DBID
+	NotificationData persist.NotificationData
+}
+
 type HelperNewTokensNotificationData struct {
 	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
+}
+
+type HelperSomeoneRepliedToYourCommentNotificationData struct {
+	OwnerID          persist.DBID
+	CommentID        persist.DBID
+	NotificationData persist.NotificationData
+}
+
+type HelperSomeoneMentionedYouNotificationData struct {
+	PostID    *persist.DBID
+	CommentID *persist.DBID
+}
+type HelperSomeoneMentionedYourCommunityNotificationData struct {
+	ContractID persist.DBID
+	PostID     *persist.DBID
+	CommentID  *persist.DBID
+}
+
+type HelperSomeonePostedYourWorkNotificationData struct {
+	ContractID persist.DBID
+	PostID     persist.DBID
 }
 
 type HelperNotificationsConnectionData struct {
@@ -149,6 +192,11 @@ type HelperEnsProfileImageData struct {
 type HelperPostData struct {
 	TokenIDs persist.DBIDList
 	AuthorID persist.DBID
+}
+
+type HelperPostComposerDraftDetailsPayloadData struct {
+	Token      persist.TokenIdentifiers
+	ContractID persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

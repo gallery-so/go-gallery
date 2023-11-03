@@ -243,12 +243,12 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
 	if d.chain == persist.ChainPolygon {
 		url += "&excludeFilters[]=SPAM"
 	}
-	tokens, err := getNFTsPaginate(ctx, url, 100, "pageKey", limit, offset, "", d.httpClient, &getNFTsResponse{})
+	tokens, err := getNFTsPaginate(ctx, url, 100, "pageKey", 0, 0, "", d.httpClient, nil, &getNFTsResponse{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -258,7 +258,55 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return cTokens, cContracts, d.cacheMetadatasForTokens(ctx, cTokens...)
 }
 
-func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, defaultLimit int, pageKeyName string, limit, offset int, pageKey string, httpClient *http.Client, result T) ([]Token, error) {
+// GetTokensIncrementallyByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+
+	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
+	if d.chain == persist.ChainPolygon {
+		url += "&excludeFilters[]=SPAM"
+	}
+	alchemyRec := make(chan []Token)
+	subErrChan := make(chan error)
+
+	go func() {
+		defer close(alchemyRec)
+		_, err := getNFTsPaginate(ctx, url, 100, "pageKey", 0, 0, "", d.httpClient, alchemyRec, &getNFTsResponse{})
+		if err != nil {
+			subErrChan <- err
+			return
+		}
+	}()
+
+	go func() {
+		defer close(rec)
+	outer:
+		for {
+			select {
+			case err := <-subErrChan:
+				errChan <- err
+				return
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			case tokens, ok := <-alchemyRec:
+				if !ok {
+					break outer
+				}
+				cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
+				rec <- multichain.ChainAgnosticTokensAndContracts{
+					Tokens:    cTokens,
+					Contracts: cContracts,
+				}
+			}
+		}
+	}()
+
+	return rec, errChan
+}
+
+func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, defaultLimit int, pageKeyName string, limit, offset int, pageKey string, httpClient *http.Client, rec chan<- []Token, result T) ([]Token, error) {
 
 	tokens := []Token{}
 	u := baseURL
@@ -284,7 +332,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get tokens from alchemy api: %w (url: %s)", err, u)
 	}
 
 	defer resp.Body.Close()
@@ -317,6 +365,10 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 		}
 	}
 
+	if rec != nil {
+		rec <- newTokens
+	}
+
 	tokens = append(tokens, newTokens...)
 
 	if nextPageKey != "" && nextPageKey != pageKey {
@@ -327,7 +379,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 		if offset > 0 {
 			offset -= defaultLimit
 		}
-		newTokens, err := getNFTsPaginate(ctx, baseURL, defaultLimit, pageKeyName, limit, offset, nextPageKey, httpClient, result)
+		newTokens, err := getNFTsPaginate(ctx, baseURL, defaultLimit, pageKeyName, limit, offset, nextPageKey, httpClient, rec, result)
 		if err != nil {
 			return nil, err
 		}
@@ -392,7 +444,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get token metadata from alchemy api: %w (url: %s)", err, url)
 	}
 
 	defer resp.Body.Close()
@@ -405,7 +457,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 	// will have most of the fields empty
 	var token Token
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to decode token metadata response: %w (url: %s)", err, url)
 	}
 
 	if token.Metadata.Image == "" && !forceRefresh {
@@ -414,7 +466,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 
 	tokens, contracts, err := d.alchemyTokensToChainAgnosticTokens(ctx, []Token{token})
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to convert token to chain agnostic token: %w (url: %s)", err, url)
 	}
 
 	if len(contracts) == 0 {
@@ -430,11 +482,11 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, fmt.Errorf("not implemented")
 	}
 
-	cached, err := d.fetchMetadataFromCache(ctx, ti)
-	if cached != nil && err == nil {
-		logger.For(ctx).Infof("got cached metadata for %s", ti)
-		return cached, nil
-	}
+	// cached, err := d.fetchMetadataFromCache(ctx, ti)
+	// if cached != nil && err == nil {
+	// 	logger.For(ctx).Infof("got cached metadata for %s", ti)
+	// 	return cached, nil
+	// }
 
 	logger.For(ctx).Infof("no cached metadata for %s", ti)
 
@@ -447,13 +499,14 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, nil
 	}
 
-	return tokens[0].TokenMetadata, d.cacheMetadatasForTokens(ctx, tokens...)
+	// return tokens[0].TokenMetadata, d.cacheMetadatasForTokens(ctx, tokens...)
+	return tokens[0].TokenMetadata, nil
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTsForCollection?contractAddress=%s&withMetadata=true&tokenUriTimeoutInMs=20000", d.alchemyAPIURL, contractAddress)
-	tokens, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, offset, "", d.httpClient, &getNFTsForCollectionResponse{})
+	tokens, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, offset, "", d.httpClient, nil, &getNFTsForCollectionResponse{})
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -490,7 +543,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTs?contractAddresses[]=%s&owner=%s&withMetadata=true&tokenUriTimeoutInMs=20000", d.alchemyAPIURL, contractAddress, ownerAddress)
-	tokens, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, offset, "", d.httpClient, &getNFTsResponse{})
+	tokens, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, offset, "", d.httpClient, nil, &getNFTsResponse{})
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -589,7 +642,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&contractAddresses[]=%s&withMetadata=true&orderBy=transferTime", d.alchemyAPIURL, ownerAddress, contractAddress)
-	tokens, err := getNFTsPaginate(ctx, url, 100, "pageKey", limit, offset, "", d.httpClient, &getNFTsResponse{})
+	tokens, err := getNFTsPaginate(ctx, url, 100, "pageKey", limit, offset, "", d.httpClient, nil, &getNFTsResponse{})
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -681,7 +734,10 @@ func (d *Provider) getOwnersForToken(ctx context.Context, token Token) ([]persis
 
 func (d *Provider) cacheMetadatasForTokens(ctx context.Context, tokens ...multichain.ChainAgnosticToken) error {
 	for _, token := range tokens {
-		if token.TokenMetadata != nil {
+		if token.TokenMetadata != nil && len(token.TokenMetadata) > 0 {
+			if token.TokenMetadata["name"] == "" && token.TokenMetadata["description"] == "" && token.TokenMetadata["external_url"] == "" && token.TokenMetadata["image_url"] == "" && token.TokenMetadata["animation_url"] == "" {
+				continue
+			}
 			mar, err := json.Marshal(token.TokenMetadata)
 			if err != nil {
 				return err

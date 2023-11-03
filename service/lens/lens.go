@@ -125,17 +125,130 @@ func (n *LensAPI) DefaultProfileByAddress(ctx context.Context, address persist.A
 
 	defer resp.Body.Close()
 
-	var neynarResp DefaultProfileByAddressResponse
-	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
+	var lensResp DefaultProfileByAddressResponse
+	if err := json.NewDecoder(resp.Body).Decode(&lensResp); err != nil {
 		return User{}, err
 	}
-	if neynarResp.Data == nil || neynarResp.Data.DefaultProfile == nil {
+	if lensResp.Data == nil || lensResp.Data.DefaultProfile == nil {
 		var errStr string
-		if neynarResp.Error != nil {
-			errStr = *neynarResp.Error
+		if lensResp.Error != nil {
+			errStr = *lensResp.Error
 		}
 		return User{}, fmt.Errorf("no result for %s (err %s)", address, errStr)
 	}
 
-	return *neynarResp.Data.DefaultProfile, nil
+	return *lensResp.Data.DefaultProfile, nil
+}
+
+type AuthResponse struct {
+	Data *struct {
+		Authenticate *struct {
+			AccessToken  string `json:"accessToken"`
+			RefreshToken string `json:"refreshToken"`
+		} `json:"authenticate"`
+	} `json:"data"`
+	Error *string `json:"error"`
+}
+
+func (n *LensAPI) AuthenticateWithSignature(ctx context.Context, address persist.Address, sig string) (string, string, error) {
+	gqlQuery := fmt.Sprintf(`mutation {
+		authenticate(request: {
+    address: "%s",
+    signature: "%s"
+  }) {
+    accessToken
+    refreshToken
+  }
+	}`, address, sig)
+
+	body, err := json.Marshal(map[string]string{
+		"query": gqlQuery,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	buf := bytes.NewBuffer(body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, buf)
+	if err != nil {
+		return "", "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := n.httpClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+
+	defer resp.Body.Close()
+
+	var lensResp AuthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&lensResp); err != nil {
+		return "", "", err
+	}
+	if lensResp.Data == nil || lensResp.Data.Authenticate == nil {
+		var errStr string
+		if lensResp.Error != nil {
+			errStr = *lensResp.Error
+		}
+		return "", "", fmt.Errorf("no result for %s (err %s)", address, errStr)
+	}
+
+	return lensResp.Data.Authenticate.AccessToken, lensResp.Data.Authenticate.RefreshToken, nil
+}
+
+type RefreshResponse struct {
+	Data *struct {
+		Refresh *struct {
+			AccessToken  string `json:"accessToken"`
+			RefreshToken string `json:"refreshToken"`
+		} `json:"Refresh"`
+	} `json:"data"`
+	Error *string `json:"error"`
+}
+
+func (n *LensAPI) RefreshAccessToken(ctx context.Context, refreshToken string) (string, string, error) {
+	gqlQuery := fmt.Sprintf(`mutation {
+		refresh(request: {
+    refreshToken: "%s"
+  }) {
+    accessToken
+    refreshToken
+  }
+	}`, refreshToken)
+
+	body, err := json.Marshal(map[string]string{
+		"query": gqlQuery,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	buf := bytes.NewBuffer(body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, buf)
+	if err != nil {
+		return "", "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := n.httpClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+
+	defer resp.Body.Close()
+
+	var lensResp RefreshResponse
+	if err := json.NewDecoder(resp.Body).Decode(&lensResp); err != nil {
+		return "", "", err
+	}
+	if lensResp.Data == nil || lensResp.Data.Refresh == nil {
+		var errStr string
+		if lensResp.Error != nil {
+			errStr = *lensResp.Error
+		}
+		return "", "", fmt.Errorf("no result (err %s)", errStr)
+	}
+
+	return lensResp.Data.Refresh.AccessToken, lensResp.Data.Refresh.RefreshToken, nil
 }

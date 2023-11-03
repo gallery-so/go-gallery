@@ -20,6 +20,7 @@ type ContractGalleryRepository struct {
 	getByIDStmt           *sql.Stmt
 	getByAddressStmt      *sql.Stmt
 	getByAddressesStmt    *sql.Stmt
+	getByTokenIDsStmt     *sql.Stmt
 	upsertByAddressStmt   *sql.Stmt
 	getOwnersStmt         *sql.Stmt
 	getUserByWalletIDStmt *sql.Stmt
@@ -40,17 +41,19 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN,IS_PROVIDER_MARKED_SPAM FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
+	getByTokenIDsStmt, err := db.PrepareContext(ctx, `select distinct on (contracts.ID) contracts.ID,contracts.VERSION,contracts.CREATED_AT,contracts.LAST_UPDATED,contracts.ADDRESS,contracts.SYMBOL,contracts.NAME,contracts.OWNER_ADDRESS,contracts.CHAIN,contracts.IS_PROVIDER_MARKED_SPAM from contracts join tokens on contracts.id = tokens.contract where tokens.id = any($1) and contracts.deleted = false ORDER BY contracts.ID;`)
+	checkNoErr(err)
+
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `
-		insert into contracts (id,version,address,symbol,name,owner_address,chain,description,profile_image_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-			on conflict (address,chain) where parent_id is null do update set
+		insert into contracts (id,version,address,symbol,name,owner_address,chain,l1_chain,description,profile_image_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			on conflict (address,l1_chain) where parent_id is null do update set
 			version = $2,
 			address = $3,
 			symbol = coalesce(nullif(contracts.symbol, ''), nullif($4, '')),
 			name = coalesce(nullif(contracts.name, ''), nullif($5, '')),
-			description = coalesce(nullif(contracts.description, ''), nullif($8, '')),
-			profile_image_url = coalesce(nullif(contracts.profile_image_url, ''), nullif($9, '')),
-			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end,
-			chain = $7
+			description = coalesce(nullif(contracts.description, ''), nullif($9, '')),
+			profile_image_url = coalesce(nullif(contracts.profile_image_url, ''), nullif($10, '')),
+			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end
 		returning id;
 	`)
 	checkNoErr(err)
@@ -70,7 +73,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT coalesce(nullif(token_medias.media->>'thumbnail_url', ''), nullif(token_medias.media->>'media_url', ''))::varchar FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.CONTRACT = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false AND tokens.OWNED_BY_WALLETS && $2 AND (LENGTH(token_medias.MEDIA->>'thumbnail_url') > 0 or LENGTH(token_medias.MEDIA->>'media_url') > 0) ORDER BY tokens.ID LIMIT 3`)
 	checkNoErr(err)
 
-	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
+	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt, getByTokenIDsStmt: getByTokenIDsStmt}
 }
 
 func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
@@ -91,6 +94,9 @@ func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress 
 	contract := persist.ContractGallery{}
 	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain, &contract.IsProviderMarkedSpam)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return persist.ContractGallery{}, persist.ErrContractNotFoundByAddress{Address: pAddress, Chain: pChain}
+		}
 		return persist.ContractGallery{}, err
 	}
 
@@ -122,9 +128,33 @@ func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddres
 	return res, nil
 }
 
+func (c *ContractGalleryRepository) GetByTokenIDs(pCtx context.Context, pDBIDs persist.DBIDList) ([]persist.ContractGallery, error) {
+	res := []persist.ContractGallery{}
+	rows, err := c.getByTokenIDsStmt.QueryContext(pCtx, pDBIDs)
+	if err != nil {
+		return res, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var contract persist.ContractGallery
+		err := rows.Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain, &contract.IsProviderMarkedSpam)
+		if err != nil {
+			return res, err
+		}
+		res = append(res, contract)
+	}
+
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
 // UpsertByAddress upserts the contract with the given address
-func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) (contractID persist.DBID, err error) {
-	err = c.upsertByAddressStmt.QueryRowContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.Description, pContract.ProfileImageURL).Scan(&contractID)
+func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pContract persist.ContractGallery) (contractID persist.DBID, err error) {
+	err = c.upsertByAddressStmt.QueryRowContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.L1Chain, pContract.Description, pContract.ProfileImageURL).Scan(&contractID)
 	if err != nil {
 		return "", err
 	}
@@ -152,6 +182,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		params.Name = append(params.Name, c.Name.String())
 		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
 		params.Chain = append(params.Chain, int32(c.Chain))
+		params.L1Chain = append(params.L1Chain, int32(c.Chain.L1Chain()))
 		params.Description = append(params.Description, c.Description.String())
 		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageURL.String())
 		params.ProviderMarkedSpam = append(params.ProviderMarkedSpam, c.IsProviderMarkedSpam)

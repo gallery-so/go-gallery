@@ -112,6 +112,9 @@ models:
   CommunityType:
     model:
       - github.com/mikeydub/go-gallery/service/persist.CommunityType
+  TokenId:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.TokenID
 directives:
   goGqlId:
     skip_runtime: true

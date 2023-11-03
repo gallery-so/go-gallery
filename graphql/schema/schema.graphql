@@ -53,6 +53,7 @@ scalar Address
 scalar PubKey
 scalar DBID
 scalar Email
+scalar TokenId
 
 interface Node {
   id: ID!
@@ -114,13 +115,11 @@ type GalleryUser implements Node @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
-    @authRequired
     @goField(forceResolver: true)
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
-    @authRequired
     @goField(forceResolver: true)
   createdCommunities(
     input: CreatedCommunitiesInput!
@@ -463,6 +462,9 @@ type Token implements Node @goEmbedHelper {
     last: Int
     userID: DBID
   ): TokenAdmiresConnection @goField(forceResolver: true)
+
+  viewerAdmire: Admire @goField(forceResolver: true)
+
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
   creatorAddress: ChainAddress
@@ -613,6 +615,14 @@ type Community implements Node @goEmbedHelper {
 
   posts(before: String, after: String, first: Int, last: Int): PostsConnection
     @goField(forceResolver: true)
+
+  tmpPostsWithProjectID(
+    projectID: Int!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): PostsConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -673,6 +683,7 @@ type TwitterSocialAccount implements SocialAccount {
   username: String!
   profileImageURL: String!
   display: Boolean!
+  scope: String!
 }
 
 type FarcasterSocialAccount implements SocialAccount {
@@ -683,7 +694,10 @@ type FarcasterSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  approvalURL: String
+  signerStatus: String
 }
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -692,6 +706,7 @@ type LensSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  signatureApproved: Boolean!
 }
 
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
@@ -704,7 +719,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
 
   email: UserEmail @goField(forceResolver: true)
@@ -781,6 +796,8 @@ enum UserExperienceType {
   MobileUpsell1
   MobileBetaUpsell
   UpsellMintMemento5
+  UpsellBanner
+  PostsBetaAnnouncement
 }
 
 type UserExperience {
@@ -814,16 +831,20 @@ union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidI
 
 union CommunityByKeyOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
-type Admire implements Node {
+union AdmireSource = Post | FeedEvent
+
+type Admire implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
   admirer: GalleryUser @goField(forceResolver: true)
-  # should we include the feed event here?
+  source: AdmireSource @goField(forceResolver: true)
 }
 
-type Comment implements Node {
+union CommentSource = Post | FeedEvent
+
+type Comment implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
@@ -831,7 +852,25 @@ type Comment implements Node {
   replyTo: Comment @goField(forceResolver: true)
   commenter: GalleryUser @goField(forceResolver: true)
   comment: String
-  # should we include the feed event here?
+  mentions: [Mention] @goField(forceResolver: true)
+  replies(before: String, after: String, first: Int, last: Int): CommentsConnection
+    @goField(forceResolver: true)
+  source: CommentSource @goField(forceResolver: true)
+
+  # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
+  deleted: Boolean
+}
+
+union MentionEntity = GalleryUser | Community
+
+type Mention @goEmbedHelper {
+  entity: MentionEntity @goField(forceResolver: true)
+  interval: Interval
+}
+
+type Interval {
+  start: Int!
+  length: Int!
 }
 
 # Actions a user can take on a resource
@@ -849,10 +888,19 @@ type FollowInfo {
   followedBack: Boolean
 }
 
+type PostAdmireEdge {
+  node: Admire
+  cursor: String
+}
+
 type FeedEventAdmireEdge {
   node: Admire
-  event: FeedEvent
   cursor: String
+}
+
+type PostAdmiresConnection {
+  edges: [PostAdmireEdge]
+  pageInfo: PageInfo!
 }
 
 type FeedEventAdmiresConnection {
@@ -860,9 +908,28 @@ type FeedEventAdmiresConnection {
   pageInfo: PageInfo!
 }
 
+type PostCommentEdge {
+  node: Comment
+  cursor: String
+}
+
+type CommentEdge {
+  node: Comment
+  cursor: String
+}
+
+type CommentsConnection {
+  edges: [CommentEdge]
+  pageInfo: PageInfo!
+}
+
+type PostCommentsConnection {
+  edges: [PostCommentEdge]
+  pageInfo: PageInfo!
+}
+
 type FeedEventCommentEdge {
   node: Comment
-  event: FeedEvent
   cursor: String
 }
 
@@ -877,28 +944,6 @@ type TokenAdmireEdge {
   token: Token
 }
 
-type PostAdmireEdge {
-  node: Admire
-  cursor: String
-  post: Post
-}
-
-type PostCommentEdge {
-  node: Comment
-  cursor: String
-  post: Post
-}
-
-type PostCommentsConnection {
-  edges: [PostCommentEdge]
-  pageInfo: PageInfo!
-}
-
-type PostAdmiresConnection {
-  edges: [PostAdmireEdge]
-  pageInfo: PageInfo!
-}
-
 type TokenAdmiresConnection {
   edges: [TokenAdmireEdge]
   pageInfo: PageInfo
@@ -906,25 +951,13 @@ type TokenAdmiresConnection {
 
 union Interaction = Admire | Comment
 
-type FeedEventInteractionsEdge {
-  node: Interaction
-  event: FeedEvent
-  cursor: String
-}
-
-type FeedEventInteractionsConnection {
-  edges: [FeedEventInteractionsEdge]
-  pageInfo: PageInfo!
-}
-
-type PostInteractionsEdge {
+type InteractionsEdge {
   node: Interaction
   cursor: String
-  post: Post
 }
 
-type PostInteractionsConnection {
-  edges: [PostInteractionsEdge]
+type InteractionsConnection {
+  edges: [InteractionsEdge]
   pageInfo: PageInfo!
 }
 
@@ -957,12 +990,8 @@ type FeedEvent implements Node @key(fields: "dbid") {
     @goField(forceResolver: true)
   caption: String
 
-  interactions(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): FeedEventInteractionsConnection @goField(forceResolver: true)
+  interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
+    @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
 
@@ -981,12 +1010,14 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   tokens: [Token] @goField(forceResolver: true)
 
   caption: String
+  mentions: [Mention] @goField(forceResolver: true)
+
   admires(before: String, after: String, first: Int, last: Int): PostAdmiresConnection
     @goField(forceResolver: true)
   comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
     @goField(forceResolver: true)
 
-  interactions(before: String, after: String, first: Int, last: Int): PostInteractionsConnection
+  interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
@@ -1236,6 +1267,30 @@ union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInp
 
 union SocialQueriesOrError = SocialQueries | ErrNotAuthorized | ErrNeedsToReconnectSocial
 
+input ChainAddressTokenInput {
+  chainAddress: ChainAddressInput!
+  """
+  Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  """
+  tokenId: TokenId!
+}
+
+input PostComposerDraftDetailsInput {
+  token: ChainAddressTokenInput!
+}
+
+type PostComposerDraftDetailsPayload @goEmbedHelper {
+  media: MediaSubtype
+  community: Community @goField(forceResolver: true)
+  tokenName: String
+  tokenDescription: String
+}
+
+union PostComposerDraftDetailsPayloadOrError =
+    PostComposerDraftDetailsPayload
+  | ErrInvalidInput
+  | ErrCommunityNotFound
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -1260,7 +1315,7 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
   trendingFeed(
@@ -1268,14 +1323,14 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   curatedFeed(
     before: String
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError
@@ -1343,6 +1398,9 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
+  postComposerDraftDetails(
+    input: PostComposerDraftDetailsInput!
+  ): PostComposerDraftDetailsPayloadOrError
 }
 
 type SocialQueries {
@@ -1736,10 +1794,31 @@ input OneTimeLoginTokenAuth {
 input SocialAuthMechanism {
   twitter: TwitterAuth
   debug: DebugSocialAuth
+  farcaster: FarcasterAuth
+  lens: LensAuth
 }
 
 input TwitterAuth {
   code: String!
+}
+
+input FarcasterAuth {
+  address: Address!
+  """
+  withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+  the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+  """
+  withSigner: Boolean
+  # farcaster only supports ETH addresses currently so no need to specify a chain
+}
+
+input LensAuth {
+  address: Address!
+  """
+  signature is the signed challenge provided by a GQL request to the lens endpoint
+  """
+  signature: String @scrub
+  # lens only supports ETH addresses currently so no need to specify a chain
 }
 
 input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
@@ -1960,6 +2039,20 @@ type SomeoneAdmiredYourPostNotification implements Notification & Node & Grouped
     @goField(forceResolver: true)
 }
 
+type SomeoneAdmiredYourTokenNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  token: Token @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
+}
+
 type SomeoneCommentedOnYourPostNotification implements Notification & Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
@@ -2005,6 +2098,54 @@ type NewTokensNotification implements Notification & GroupedNotification & Node 
   count: Int
 
   token: Token @goField(forceResolver: true)
+}
+
+type SomeoneRepliedToYourCommentNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` can provide that
+  comment: Comment @goField(forceResolver: true)
+  originalComment: Comment @goField(forceResolver: true)
+}
+
+union MentionSource = Comment | Post
+
+type SomeoneMentionedYouNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` or `post` can provide that
+  mentionSource: MentionSource @goField(forceResolver: true)
+}
+
+type SomeoneMentionedYourCommunityNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` or `post` can provide that
+  mentionSource: MentionSource @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+}
+
+type SomeonePostedYourWorkNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  post: Post @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {
@@ -2153,6 +2294,17 @@ union SyncCreatedTokensForUsernamePayloadOrError =
     SyncCreatedTokensForUsernamePayload
   | ErrNotAuthorized
   | ErrSyncFailed
+
+type SyncCreatedTokensForUsernameAndExistingContractPayload {
+  message: String!
+}
+
+union SyncCreatedTokensForUsernameAndExistingContractPayloadOrError =
+    SyncCreatedTokensForUsernameAndExistingContractPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrSyncFailed
+  | ErrCommunityNotFound
 
 type BanUserFromFeedPayload {
   user: GalleryUser
@@ -2440,6 +2592,10 @@ type RemoveProfileImagePayload {
   viewer: Viewer
 }
 
+type ErrNoAvatarRecordSet implements Error {
+  message: String!
+}
+
 union SetProfileImagePayloadOrError =
     SetProfileImagePayload
   | ErrAuthenticationFailed
@@ -2447,6 +2603,7 @@ union SetProfileImagePayloadOrError =
   | ErrInvalidInput
   | ErrTokenNotFound
   | ErrNotAuthorized
+  | ErrNoAvatarRecordSet
 
 union RemoveProfileImagePayloadOrError =
     RemoveProfileImagePayload
@@ -2456,6 +2613,7 @@ union RemoveProfileImagePayloadOrError =
 input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
+  mentions: [MentionInput!]
 }
 
 type PostTokensPayload {
@@ -2463,6 +2621,21 @@ type PostTokensPayload {
 }
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
+
+input ReferralPostTokenInput {
+  token: ChainAddressTokenInput!
+  caption: String
+}
+
+type ReferralPostTokenPayload {
+  post: Post!
+}
+
+union ReferralPostTokenPayloadOrError =
+    ReferralPostTokenPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrTokenNotFound
 
 type AdmirePostPayload {
   viewer: Viewer
@@ -2499,6 +2672,27 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+input MentionInput {
+  interval: IntervalInput
+  userId: DBID
+  communityId: DBID
+}
+
+input IntervalInput {
+  start: Int!
+  length: Int!
+}
+
+input ReferralPostPreflightInput {
+  token: ChainAddressTokenInput!
+}
+
+type ReferralPostPreflightPayload {
+  accepted: Boolean!
+}
+
+union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload | ErrInvalidInput
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2532,7 +2726,7 @@ type Mutation {
   updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-  syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
+  syncTokens(chains: [Chain!], incrementally: Boolean): SyncTokensPayloadOrError @authRequired
   syncCreatedTokensForNewContracts(
     input: SyncCreatedTokensForNewContractsInput!
   ): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
@@ -2581,12 +2775,19 @@ type Mutation {
     feedEventId: DBID!
     replyToID: DBID
     comment: String!
+    mentions: [MentionInput!]
   ): CommentOnFeedEventPayloadOrError @authRequired
   removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
-  commentOnPost(postId: DBID!, replyToID: DBID, comment: String!): CommentOnPostPayloadOrError
-    @authRequired
+  commentOnPost(
+    postId: DBID!
+    replyToID: DBID
+    comment: String!
+    mentions: [MentionInput!]
+  ): CommentOnPostPayloadOrError @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
+  referralPostToken(input: ReferralPostTokenInput!): ReferralPostTokenPayloadOrError @authRequired
+  referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
@@ -2628,6 +2829,10 @@ type Mutation {
     username: String!
     chains: [Chain!]!
   ): SyncCreatedTokensForUsernamePayloadOrError @retoolAuth
+  syncCreatedTokensForUsernameAndExistingContract(
+    username: String!
+    chainAddress: ChainAddressInput!
+  ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(

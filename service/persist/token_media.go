@@ -36,9 +36,9 @@ func (m *Media) Scan(src interface{}) error {
 }
 
 type ErrMediaNotFound struct {
-	TokenID DBID
+	ID DBID
 }
 
 func (e ErrMediaNotFound) Error() string {
-	return fmt.Sprintf("no media found for tokenID %s", e.TokenID)
+	return fmt.Sprintf("no media found for ID %s", e.ID)
 }

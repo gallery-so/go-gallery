@@ -69,7 +69,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 
 	merchAddress := env.GetString("MERCH_CONTRACT_ADDRESS")
 
-	tokens, err := api.multichainProvider.GetTokensOfContractForWallet(ctx, persist.Address(merchAddress), persist.NewChainAddress(address, persist.ChainETH), 0, 0)
+	tokens, err := api.multichainProvider.GetTokensOfContractForWallet(ctx, persist.NewChainAddress(persist.Address(merchAddress), persist.ChainETH), persist.NewL1ChainAddress(address, persist.ChainETH), 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 			return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
 		}
 	} else if token.TokenMediaID != "" {
-		med, err := api.loaders.MediaByTokenID.Load(token.ID)
+		med, err := api.loaders.GetMediaByMediaIDIgnoringStatus.Load(token.TokenMediaID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load media for token %v: %w", token.TokenID, err)
 		}

@@ -22,6 +22,8 @@ type UserNonce struct {
 	LastUpdated  time.Time  `json:"last_updated"`
 	Value        NullString `json:"value"`
 	Address      Address    `json:"address"`
+	Chain        Chain      `json:"chain"`
+	L1Chain      Chain      `json:"l1_chain"`
 }
 
 // UserLoginAttempt represents a single attempt for a user to login despite the success
@@ -78,9 +80,9 @@ func (h ReqHeaders) Value() (driver.Value, error) {
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
 type ErrNonceNotFoundForAddress struct {
-	ChainAddress ChainAddress
+	L1ChainAddress L1ChainAddress
 }
 
 func (e ErrNonceNotFoundForAddress) Error() string {
-	return fmt.Sprintf("no nonce found for address: %v", e.ChainAddress)
+	return fmt.Sprintf("no nonce found for address: %v", e.L1ChainAddress)
 }

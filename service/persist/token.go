@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,6 +109,22 @@ const (
 	// point to the most recently added chain type.
 	MaxChainValue = ChainBase
 )
+
+var L1Chains = map[Chain]L1Chain{
+	ChainPOAP:     L1Chain(ChainETH),
+	ChainOptimism: L1Chain(ChainETH),
+	ChainPolygon:  L1Chain(ChainETH),
+	ChainArbitrum: L1Chain(ChainETH),
+	ChainZora:     L1Chain(ChainETH),
+	ChainBase:     L1Chain(ChainETH),
+	ChainETH:      L1Chain(ChainETH),
+	ChainTezos:    L1Chain(ChainTezos),
+}
+
+var L1ChainGroups = map[L1Chain][]Chain{
+	L1Chain(ChainETH):   EvmChains,
+	L1Chain(ChainTezos): {ChainTezos},
+}
 
 var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora, ChainBase}
 var EvmChains = util.MapKeys(evmChains)
@@ -258,6 +275,8 @@ type TokenCountType string
 // Chain represents which blockchain a token is on
 type Chain int
 
+type L1Chain Chain
+
 // TokenID represents the ID of a token
 type TokenID string
 
@@ -359,9 +378,7 @@ type TokenRepository interface {
 	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetOwnedByContract(context.Context, EthereumAddress, EthereumAddress, int64, int64) ([]Token, Contract, error)
-	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
 	GetURIByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, error)
-	GetByIdentifiers(context.Context, TokenID, EthereumAddress, EthereumAddress) (Token, error)
 	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
@@ -372,15 +389,7 @@ type TokenRepository interface {
 
 // ErrTokenNotFoundByTokenIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
 type ErrTokenNotFoundByTokenIdentifiers struct {
-	TokenID         TokenID
-	ContractAddress EthereumAddress
-}
-
-// ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address and owner address)
-type ErrTokenNotFoundByIdentifiers struct {
-	TokenID         TokenID
-	ContractAddress EthereumAddress
-	OwnerAddress    EthereumAddress
+	Token TokenIdentifiers
 }
 
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
@@ -388,11 +397,9 @@ type ErrTokenNotFoundByID struct {
 	ID DBID
 }
 
-type ErrTokenNotFoundByHolderIdentifiers struct {
-	HolderID        DBID
-	TokenID         TokenID
-	ContractAddress Address
-	Chain           Chain
+type ErrTokenNotFoundByUserTokenIdentifers struct {
+	UserID DBID
+	Token  TokenIdentifiers
 }
 
 type ErrTokensNotFoundByTokenID struct {
@@ -407,8 +414,8 @@ func (e ErrTokenNotFoundByID) Error() string {
 	return fmt.Sprintf("token not found by ID: %s", e.ID)
 }
 
-func (e ErrTokenNotFoundByHolderIdentifiers) Error() string {
-	return fmt.Sprintf("token not found by holder ID: %s, chain: %d, contract address: %s, and token ID: %s", e.HolderID, e.Chain, e.ContractAddress, e.TokenID)
+func (e ErrTokenNotFoundByUserTokenIdentifers) Error() string {
+	return fmt.Sprintf("token not found by user ID: %s and identifiers: %s", e.UserID, e.Token.String())
 }
 
 func (e ErrTokensNotFoundByTokenID) Error() string {
@@ -420,11 +427,7 @@ func (e ErrTokensNotFoundByContract) Error() string {
 }
 
 func (e ErrTokenNotFoundByTokenIdentifiers) Error() string {
-	return fmt.Sprintf("token not found with contract address %s and token ID %s", e.ContractAddress, e.TokenID)
-}
-
-func (e ErrTokenNotFoundByIdentifiers) Error() string {
-	return fmt.Sprintf("token not found with contract address %s and token ID %s and owner address %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
+	return fmt.Sprintf("token not found by identifiers: %s", e.Token.String())
 }
 
 // NormalizeAddress normalizes an address for the given chain
@@ -437,11 +440,15 @@ func (c Chain) NormalizeAddress(addr Address) string {
 
 // BaseKeywords are the keywords that are default for discovering media for a given chain
 func (c Chain) BaseKeywords() (image []string, anim []string) {
+	defaultImageKeyWords := []string{"image_url", "image"}
+	defaultAnimKeyWords := []string{"animation_url", "animation", "video"}
 	switch c {
 	case ChainTezos:
 		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}
+	case ChainBase:
+		return append(defaultImageKeyWords, "imageOriginal"), append(defaultAnimKeyWords, "mediaOriginal")
 	default:
-		return []string{"image_url", "image"}, []string{"animation_url", "animation", "video"}
+		return defaultImageKeyWords, defaultAnimKeyWords
 	}
 }
 
@@ -541,6 +548,22 @@ func (c Chain) MarshalGQL(w io.Writer) {
 	case ChainBase:
 		w.Write([]byte(`"Base"`))
 	}
+}
+
+func (c Chain) L1Chain() L1Chain {
+	lc, ok := L1Chains[c]
+	if !ok {
+		panic("l1 chain not found")
+	}
+	return lc
+}
+
+func (c Chain) L1ChainGroup() []Chain {
+	cg, ok := L1ChainGroups[c.L1Chain()]
+	if !ok {
+		panic("chain group not found")
+	}
+	return cg
 }
 
 // URL turns a token's URI into a URL
@@ -672,7 +695,7 @@ func (id *TokenID) Scan(src interface{}) error {
 
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
-	normalized := util.RemoveLeftPaddedZeros(string(id))
+	normalized := id.String()
 	if normalized == "" {
 		return big.NewInt(0)
 	}
@@ -698,6 +721,30 @@ func (id TokenID) Base10String() string {
 // ToInt returns the token ID as a base 10 integer
 func (id TokenID) ToInt() int64 {
 	return id.BigInt().Int64()
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (id *TokenID) UnmarshalGQL(v any) error {
+	if val, ok := v.(string); ok {
+		// Assume its in hexadecimal
+		if strings.HasPrefix(val, "0x") {
+			*id = TokenID(TokenID(val).String())
+			return nil
+		}
+		// Assume its in decimal
+		asInt, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("failed to convert %s; prepend with '0x' if val is in hex", val)
+		}
+		*id = TokenID(fmt.Sprintf("%x", asInt))
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (id TokenID) MarshalGQL(w io.Writer) {
+	p := "0x" + id.String()
+	w.Write([]byte(fmt.Sprintf(`"%s"`, p)))
 }
 
 func (hex HexString) String() string {

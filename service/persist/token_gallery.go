@@ -44,13 +44,16 @@ type TokenGallery struct {
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	IsCreatorToken   bool             `json:"is_creator_token"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
-	Contract         DBID             `json:"contract"`
+	Contract         ContractGallery  `json:"contract"`
 
 	ExternalURL NullString `json:"external_url"`
 
 	BlockNumber          BlockNumber `json:"block_number"`
 	IsUserMarkedSpam     *bool       `json:"is_user_marked_spam"`
 	IsProviderMarkedSpam *bool       `json:"is_provider_marked_spam"`
+
+	// this will not be persisted, only used in memory for token comparison
+	Priority *int `json:"-"`
 }
 
 func (l AddressAtBlockList) Value() (driver.Value, error) {
@@ -64,7 +67,7 @@ func (l *AddressAtBlockList) Scan(value interface{}) error {
 
 // TokenIdentifiers returns the identifiers for a token
 func (t TokenGallery) TokenIdentifiers() TokenIdentifiers {
-	return NewTokenIdentifiers(Address(t.Contract), t.TokenID, t.Chain)
+	return NewTokenIdentifiers(t.Contract.Address, t.TokenID, t.Chain)
 }
 
 // AddressAtBlock represents an address at a specific block

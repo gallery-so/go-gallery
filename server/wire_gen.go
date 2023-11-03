@@ -10,12 +10,9 @@ import (
 	"cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"database/sql"
-	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
@@ -31,6 +28,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
+	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 )
 
@@ -46,16 +44,16 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	cache := newCommunitiesCache()
 	client := task.NewClient(ctx)
 	httpClient := _wireClientValue
-	serverEthProviderList := ethProviderSet(serverEnvInit, client, httpClient)
-	serverOptimismProviderList := optimismProviderSet(httpClient)
+	serverTokenMetadataCache := newTokenMetadataCache()
+	serverEthProviderList := ethProviderSet(serverEnvInit, client, httpClient, serverTokenMetadataCache)
+	serverOptimismProviderList := optimismProviderSet(httpClient, serverTokenMetadataCache)
 	serverTezosProviderList := tezosProviderSet(serverEnvInit, httpClient)
 	serverPoapProviderList := poapProviderSet(serverEnvInit, httpClient)
 	serverZoraProviderList := zoraProviderSet(serverEnvInit, httpClient)
 	serverBaseProviderList := baseProviderSet(httpClient)
-	serverPolygonProviderList := polygonProviderSet(httpClient)
-	serverArbitrumProviderList := arbitrumProviderSet(httpClient)
+	serverPolygonProviderList := polygonProviderSet(httpClient, serverTokenMetadataCache)
+	serverArbitrumProviderList := arbitrumProviderSet(httpClient, serverTokenMetadataCache)
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
-	v2 := defaultWalletOverrides()
 	manager := tokenmanage.New(ctx, client)
 	submitUserTokensF := newManagedTokens(ctx, manager)
 	provider := &multichain.Provider{
@@ -63,7 +61,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		Queries:          queries,
 		Cache:            cache,
 		Chains:           v,
-		WalletOverrides:  v2,
 		SubmitUserTokens: submitUserTokensF,
 	}
 	return provider, func() {
@@ -77,15 +74,13 @@ var (
 )
 
 // ethProviderSet is a wire injector that creates the set of Ethereum providers
-func ethProviderSet(serverEnvInit envInit, client *cloudtasks.Client, httpClient *http.Client) ethProviderList {
+func ethProviderSet(serverEnvInit envInit, client *cloudtasks.Client, httpClient *http.Client, serverTokenMetadataCache *tokenMetadataCache) ethProviderList {
 	ethclientClient := rpc.NewEthClient()
-	provider := newIndexerProvider(serverEnvInit, httpClient, ethclientClient, client)
+	provider := eth.NewProvider(httpClient, ethclientClient, client)
 	chain := _wireChainValue
 	openseaProvider := opensea.NewProvider(ethclientClient, httpClient, chain)
-	cache := newTokenProcessingCache()
-	syncFailureFallbackProvider := ethFallbackProvider(httpClient, cache)
-	alchemyProvider := alchemy.NewProvider(chain, httpClient, cache)
-	serverEthProviderList := ethProvidersConfig(provider, openseaProvider, syncFailureFallbackProvider, alchemyProvider)
+	syncFailureFallbackProvider := ethFallbackProvider(httpClient, serverTokenMetadataCache)
+	serverEthProviderList := ethProvidersConfig(provider, openseaProvider, syncFailureFallbackProvider)
 	return serverEthProviderList
 }
 
@@ -94,34 +89,31 @@ var (
 )
 
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
-func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider, alchemyProvider *alchemy.Provider) ethProviderList {
-	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, alchemyProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
+func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider) ethProviderList {
+	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, fallbackProvider, fallbackProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
 	return serverEthProviderList
 }
 
 // tezosProviderSet is a wire injector that creates the set of Tezos providers
 func tezosProviderSet(serverEnvInit envInit, client *http.Client) tezosProviderList {
-	provider := newTzktProvider(serverEnvInit, client)
-	tezosObjktProvider := newObjktProvider(serverEnvInit)
-	syncWithContractEvalFallbackProvider := tezosFallbackProvider(client, provider, tezosObjktProvider)
+	syncWithContractEvalFallbackProvider := tezosFallbackProvider(serverEnvInit, client)
 	serverTezosProviderList := tezosProvidersConfig(syncWithContractEvalFallbackProvider)
 	return serverTezosProviderList
 }
 
 // tezosProvidersConfig is a wire injector that binds multichain interfaces to their concrete Tezos implementations
 func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackProvider) tezosProviderList {
-	serverTezosProviderList := tezosRequirements(tezosProvider, tezosProvider, tezosProvider)
+	serverTezosProviderList := tezosRequirements(tezosProvider, tezosProvider, tezosProvider, tezosProvider)
 	return serverTezosProviderList
 }
 
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
-func optimismProviderSet(client *http.Client) optimismProviderList {
-	cache := newTokenProcessingCache()
-	serverOptimismProvider := newOptimismProvider(client, cache)
-	ethclientClient := rpc.NewEthClient()
+func optimismProviderSet(client *http.Client, serverTokenMetadataCache *tokenMetadataCache) optimismProviderList {
 	chain := _wirePersistChainValue
-	provider := opensea.NewProvider(ethclientClient, client, chain)
-	serverOptimismProviderList := optimismProvidersConfig(serverOptimismProvider, provider)
+	provider := newAlchemyProvider(client, chain, serverTokenMetadataCache)
+	ethclientClient := rpc.NewEthClient()
+	openseaProvider := opensea.NewProvider(ethclientClient, client, chain)
+	serverOptimismProviderList := optimismProvidersConfig(provider, openseaProvider)
 	return serverOptimismProviderList
 }
 
@@ -130,19 +122,18 @@ var (
 )
 
 // optimismProvidersConfig is a wire injector that binds multichain interfaces to their concrete Optimism implementations
-func optimismProvidersConfig(optimismProvider2 *optimismProvider, openseaProvier *opensea.Provider) optimismProviderList {
-	serverOptimismProviderList := optimismRequirements(optimismProvider2, optimismProvider2, optimismProvider2, openseaProvier)
+func optimismProvidersConfig(alchemyProvider *alchemy.Provider, openseaProvider *opensea.Provider) optimismProviderList {
+	serverOptimismProviderList := optimismRequirements(alchemyProvider, alchemyProvider, alchemyProvider, alchemyProvider, openseaProvider)
 	return serverOptimismProviderList
 }
 
 // arbitrumProviderSet is a wire injector that creates the set of Arbitrum providers
-func arbitrumProviderSet(client *http.Client) arbitrumProviderList {
-	cache := newTokenProcessingCache()
-	serverArbitrumProvider := newArbitrumProvider(client, cache)
-	ethclientClient := rpc.NewEthClient()
+func arbitrumProviderSet(client *http.Client, serverTokenMetadataCache *tokenMetadataCache) arbitrumProviderList {
 	chain := _wireChainValue2
-	provider := opensea.NewProvider(ethclientClient, client, chain)
-	serverArbitrumProviderList := arbitrumProvidersConfig(serverArbitrumProvider, provider)
+	provider := newAlchemyProvider(client, chain, serverTokenMetadataCache)
+	ethclientClient := rpc.NewEthClient()
+	openseaProvider := opensea.NewProvider(ethclientClient, client, chain)
+	serverArbitrumProviderList := arbitrumProvidersConfig(provider, openseaProvider)
 	return serverArbitrumProviderList
 }
 
@@ -151,34 +142,34 @@ var (
 )
 
 // arbitrumProvidersConfig is a wire injector that binds multichain interfaces to their concrete Arbitrum implementations
-func arbitrumProvidersConfig(arbitrumProvider2 *arbitrumProvider, openseaProvider *opensea.Provider) arbitrumProviderList {
-	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2, arbitrumProvider2, openseaProvider)
+func arbitrumProvidersConfig(alchemyProvider *alchemy.Provider, openseaProvider *opensea.Provider) arbitrumProviderList {
+	serverArbitrumProviderList := arbitrumRequirements(alchemyProvider, alchemyProvider, alchemyProvider, alchemyProvider, openseaProvider, alchemyProvider)
 	return serverArbitrumProviderList
 }
 
 // poapProviderSet is a wire injector that creates the set of POAP providers
 func poapProviderSet(serverEnvInit envInit, client *http.Client) poapProviderList {
-	provider := newPoapProvider(serverEnvInit, client)
+	provider := poap.NewProvider(client)
 	serverPoapProviderList := poapProvidersConfig(provider)
 	return serverPoapProviderList
 }
 
 // poapProvidersConfig is a wire injector that binds multichain interfaces to their concrete POAP implementations
 func poapProvidersConfig(poapProvider *poap.Provider) poapProviderList {
-	serverPoapProviderList := poapRequirements(poapProvider, poapProvider, poapProvider, poapProvider)
+	serverPoapProviderList := poapRequirements(poapProvider, poapProvider, poapProvider, poapProvider, poapProvider)
 	return serverPoapProviderList
 }
 
 // zoraProviderSet is a wire injector that creates the set of zora providers
 func zoraProviderSet(serverEnvInit envInit, client *http.Client) zoraProviderList {
-	provider := newZoraProvider(serverEnvInit, client)
+	provider := zora.NewProvider(client)
 	serverZoraProviderList := zoraProvidersConfig(provider)
 	return serverZoraProviderList
 }
 
 // zoraProvidersConfig is a wire injector that binds multichain interfaces to their concrete zora implementations
 func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
-	serverZoraProviderList := zoraRequirements(zoraProvider, zoraProvider, zoraProvider, zoraProvider, zoraProvider)
+	serverZoraProviderList := zoraRequirements(zoraProvider, zoraProvider, zoraProvider, zoraProvider, zoraProvider, zoraProvider)
 	return serverZoraProviderList
 }
 
@@ -195,18 +186,16 @@ var (
 
 // baseProvidersConfig is a wire injector that binds multichain interfaces to their concrete base implementations
 func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
-	serverBaseProviderList := baseRequirements(baseProvider, baseProvider)
+	serverBaseProviderList := baseRequirements(baseProvider, baseProvider, baseProvider)
 	return serverBaseProviderList
 }
 
 // polygonProviderSet is a wire injector that creates the set of polygon providers
-func polygonProviderSet(client *http.Client) polygonProviderList {
-	cache := newTokenProcessingCache()
-	serverPolygonProvider := newPolygonProvider(client, cache)
-	ethclientClient := rpc.NewEthClient()
+func polygonProviderSet(client *http.Client, serverTokenMetadataCache *tokenMetadataCache) polygonProviderList {
 	chain := _wireChainValue4
-	provider := opensea.NewProvider(ethclientClient, client, chain)
-	serverPolygonProviderList := polygonProvidersConfig(serverPolygonProvider, provider)
+	provider := newAlchemyProvider(client, chain, serverTokenMetadataCache)
+	reservoirProvider := reservoir.NewProvider(chain, client)
+	serverPolygonProviderList := polygonProvidersConfig(provider, reservoirProvider)
 	return serverPolygonProviderList
 }
 
@@ -215,14 +204,14 @@ var (
 )
 
 // polygonProvidersConfig is a wire injector that binds multichain interfaces to their concrete Polygon implementations
-func polygonProvidersConfig(polygonProvider2 *polygonProvider, openseaProvider *opensea.Provider) polygonProviderList {
-	serverPolygonProviderList := polygonRequirements(polygonProvider2, polygonProvider2, openseaProvider)
+func polygonProvidersConfig(alchemyProvider *alchemy.Provider, reservoirProvider *reservoir.Provider) polygonProviderList {
+	serverPolygonProviderList := polygonRequirements(alchemyProvider, alchemyProvider, alchemyProvider, reservoirProvider)
 	return serverPolygonProviderList
 }
 
-func ethFallbackProvider(httpClient *http.Client, r *redis.Cache) multichain.SyncFailureFallbackProvider {
+func ethFallbackProvider(httpClient *http.Client, cache *tokenMetadataCache) multichain.SyncFailureFallbackProvider {
 	chain := _wireChainValue5
-	provider := alchemy.NewProvider(chain, httpClient, r)
+	provider := newAlchemyProvider(httpClient, chain, cache)
 	infuraProvider := infura.NewProvider(httpClient)
 	syncFailureFallbackProvider := multichain.SyncFailureFallbackProvider{
 		Primary:  provider,
@@ -235,11 +224,13 @@ var (
 	_wireChainValue5 = persist.ChainETH
 )
 
-func tezosFallbackProvider(httpClient *http.Client, tzktProvider *tezos.Provider, objktProvider *tezos.TezosObjktProvider) multichain.SyncWithContractEvalFallbackProvider {
+func tezosFallbackProvider(e envInit, httpClient *http.Client) multichain.SyncWithContractEvalFallbackProvider {
+	provider := tezos.NewProvider(httpClient)
+	tezosObjktProvider := tezos.NewObjktProvider()
 	v := tezosTokenEvalFunc()
 	syncWithContractEvalFallbackProvider := multichain.SyncWithContractEvalFallbackProvider{
-		Primary:  tzktProvider,
-		Fallback: objktProvider,
+		Primary:  provider,
+		Fallback: tezosObjktProvider,
 		Eval:     v,
 	}
 	return syncWithContractEvalFallbackProvider
@@ -268,11 +259,7 @@ type polygonProviderList []any
 
 type arbitrumProviderList []any
 
-type optimismProvider struct{ *alchemy.Provider }
-
-type polygonProvider struct{ *alchemy.Provider }
-
-type arbitrumProvider struct{ *alchemy.Provider }
+type tokenMetadataCache redis.Cache
 
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(
@@ -306,6 +293,7 @@ func ethRequirements(
 	v multichain.Verifier,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	cf multichain.ContractsFetcher,
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
@@ -313,74 +301,95 @@ func ethRequirements(
 	tdf multichain.TokenDescriptorsFetcher,
 	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, cf, cr, tmf, tcof, tdf, osccf}
+	return ethProviderList{nr, v, tof, toc, tiof, cf, cr, tmf, tcof, tdf, osccf}
 }
 
 // tezosRequirements is the set of provider interfaces required for Tezos
 func tezosRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 ) tezosProviderList {
-	return tezosProviderList{tof, toc, tmf}
+	return tezosProviderList{tof, tiof, toc, tmf}
 }
 
 // optimismRequirements is the set of provider interfaces required for Optimism
 func optimismRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
 
 ) optimismProviderList {
-	return optimismProviderList{tof, toc, tmf, opensea2}
+	return optimismProviderList{tof, toc, tiof, tmf, opensea2}
 }
 
 // arbitrumRequirements is the set of provider interfaces required for Arbitrum
 func arbitrumRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
 
+	tdf multichain.TokenDescriptorsFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, tmf, opensea2}
+	return arbitrumProviderList{tof, toc, tiof, tmf, opensea2, tdf}
 }
 
 // poapRequirements is the set of provider interfaces required for POAP
 func poapRequirements(
 	nr multichain.NameResolver,
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 ) poapProviderList {
-	return poapProviderList{nr, tof, toc, tmf}
+	return poapProviderList{nr, tof, tiof, toc, tmf}
 }
 
 // zoraRequirements is the set of provider interfaces required for zora
 func zoraRequirements(
 	nr multichain.ContractsFetcher,
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tcof multichain.ContractsOwnerFetcher,
 	tmf multichain.TokenMetadataFetcher,
 ) zoraProviderList {
-	return zoraProviderList{nr, tof, toc, tcof, tmf}
+	return zoraProviderList{nr, tof, tiof, toc, tcof, tmf}
 }
 
 // zoraRequirements is the set of provider interfaces required for zora
 func baseRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 ) baseProviderList {
-	return baseProviderList{tof, tdf}
+	return baseProviderList{tof, tiof, tdf}
 }
 
 // polygonRequirements is the set of provider interfaces required for Polygon
 func polygonRequirements(
 	tof multichain.TokensOwnerFetcher,
-	toc multichain.TokensContractFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
-
+	tiof multichain.TokensIncrementalOwnerFetcher,
+	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 ) polygonProviderList {
-	return polygonProviderList{tof, toc, opensea2}
+	return polygonProviderList{tof, tiof, toc, tmf}
+}
+
+// dedupe removes duplicate providers based on provider ID
+func dedupe(providers []any) []any {
+	seen := map[string]bool{}
+	deduped := []any{}
+	for _, p := range providers {
+		if id := p.(multichain.Configurer).GetBlockchainInfo().ProviderID; !seen[id] {
+			seen[id] = true
+			deduped = append(deduped, p)
+		}
+	}
+	return deduped
 }
 
 // newMultichain is a wire provider that creates a multichain provider
@@ -394,19 +403,6 @@ func newMultichainSet(
 	polygonProviders polygonProviderList,
 	arbitrumProviders arbitrumProviderList,
 ) map[persist.Chain][]any {
-
-	dedupe := func(providers []any) []any {
-		seen := map[string]bool{}
-		deduped := []any{}
-		for _, p := range providers {
-			if addr := fmt.Sprintf("%p", p); !seen[addr] {
-				seen[addr] = true
-				deduped = append(deduped, p)
-			}
-		}
-		return deduped
-	}
-
 	chainToProviders := map[persist.Chain][]any{}
 	chainToProviders[persist.ChainETH] = dedupe(ethProviders)
 	chainToProviders[persist.ChainOptimism] = dedupe(optimismProviders)
@@ -419,62 +415,31 @@ func newMultichainSet(
 	return chainToProviders
 }
 
-// defaultWalletOverrides is a wire provider for wallet overrides
-func defaultWalletOverrides() multichain.WalletOverrideMap {
-	return multichain.WalletOverrideMap{persist.ChainPOAP: persist.EvmChains, persist.ChainOptimism: persist.EvmChains, persist.ChainPolygon: persist.EvmChains, persist.ChainArbitrum: persist.EvmChains, persist.ChainETH: persist.EvmChains, persist.ChainZora: persist.EvmChains, persist.ChainBase: persist.EvmChains}
-}
-
-func newIndexerProvider(e envInit, httpClient *http.Client, ethClient *ethclient.Client, taskClient *cloudtasks.Client) *eth.Provider {
-	return eth.NewProvider(env.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)
-}
-
-func newTzktProvider(e envInit, httpClient *http.Client) *tezos.Provider {
-	return tezos.NewProvider(env.GetString("TEZOS_API_URL"), httpClient)
-}
-
-func newObjktProvider(e envInit) *tezos.TezosObjktProvider {
-	return tezos.NewObjktProvider(env.GetString("IPFS_URL"))
-}
-
 func tezosTokenEvalFunc() func(context.Context, multichain.ChainAgnosticToken) bool {
 	return func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
 		return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
 	}
 }
 
-func newPoapProvider(e envInit, c *http.Client) *poap.Provider {
-	return poap.NewProvider(c, env.GetString("POAP_API_KEY"), env.GetString("POAP_AUTH_TOKEN"))
-}
-
-func newZoraProvider(e envInit, c *http.Client) *zora.Provider {
-	return zora.NewProvider(c)
-}
-
-func newOptimismProvider(c *http.Client, r *redis.Cache) *optimismProvider {
-	return &optimismProvider{alchemy.NewProvider(persist.ChainOptimism, c, r)}
-}
-
-func newPolygonProvider(c *http.Client, r *redis.Cache) *polygonProvider {
-	return &polygonProvider{alchemy.NewProvider(persist.ChainPolygon, c, r)}
-}
-
-func newArbitrumProvider(c *http.Client, r *redis.Cache) *arbitrumProvider {
-	return &arbitrumProvider{alchemy.NewProvider(persist.ChainArbitrum, c, r)}
+func newAlchemyProvider(httpClient *http.Client, chain persist.Chain, cache *tokenMetadataCache) *alchemy.Provider {
+	c := redis.Cache(*cache)
+	return alchemy.NewProvider(chain, httpClient, util.ToPointer(c))
 }
 
 func newCommunitiesCache() *redis.Cache {
 	return redis.NewCache(redis.CommunitiesCache)
 }
 
-func newTokenProcessingCache() *redis.Cache {
-	return redis.NewCache(redis.TokenProcessingMetadataCache)
+func newTokenMetadataCache() *tokenMetadataCache {
+	cache := redis.NewCache(redis.TokenProcessingMetadataCache)
+	return util.ToPointer(tokenMetadataCache(*cache))
 }
 
 func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
 		if len(tokenIDs) == 0 {
 			return nil
 		}
-		return tm.SubmitUser(ctx, userID, tokenIDs, chains)
+		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
 	}
 }

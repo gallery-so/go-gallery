@@ -16,9 +16,10 @@ import (
 type ProcessingCause string
 
 const (
-	ProcessingCauseSync      ProcessingCause = "sync"
-	ProcessingCauseSyncRetry ProcessingCause = "sync_retry"
-	ProcessingCauseRefresh   ProcessingCause = "refresh"
+	ProcessingCauseSync          ProcessingCause = "sync"
+	ProcessingCauseSyncRetry     ProcessingCause = "sync_retry"
+	ProcessingCauseRefresh       ProcessingCause = "refresh"
+	ProcessingCausePostPreflight ProcessingCause = "post_preflight"
 )
 
 func (p ProcessingCause) String() string {

@@ -2,7 +2,6 @@ package persist
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -16,6 +15,7 @@ type ContractGallery struct {
 	LastUpdated  time.Time `json:"last_updated"`
 
 	Chain                 Chain      `json:"chain"`
+	L1Chain               L1Chain    `json:"l1_chain"`
 	Address               Address    `json:"address"`
 	Symbol                NullString `json:"symbol"`
 	Name                  NullString `json:"name"`
@@ -27,18 +27,16 @@ type ContractGallery struct {
 	BadgeURL              NullString `json:"badge_url"`
 	IsProviderMarkedSpam  bool       `json:"is_provider_marked_spam"`
 	OverrideCreatorUserID DBID       `json:"override_creator_user_id"`
-}
 
-// ErrContractNotFoundByAddress is an error type for when a contract is not found by address
-type ErrGalleryContractNotFound struct {
-	Address Address
-	Chain   Chain
+	// this will not be persisted, only used in memory for contract comparison
+	Priority *int `json:"-"`
 }
 
 // ContractGalleryRepository represents a repository for interacting with persisted contracts
 type ContractGalleryRepository interface {
 	GetByID(ctx context.Context, id DBID) (ContractGallery, error)
 	GetByAddress(context.Context, Address, Chain) (ContractGallery, error)
+	GetByTokenIDs(context.Context, DBIDList) ([]ContractGallery, error)
 	UpsertByAddress(context.Context, Address, Chain, ContractGallery) error
 	BulkUpsert(context.Context, []ContractGallery, bool) ([]ContractGallery, error)
 	GetOwnersByAddress(context.Context, Address, Chain, int, int) ([]TokenHolder, error)
@@ -46,8 +44,4 @@ type ContractGalleryRepository interface {
 
 func (c ContractGallery) ContractIdentifiers() ContractIdentifiers {
 	return NewContractIdentifiers(c.Address, c.Chain)
-}
-
-func (e ErrGalleryContractNotFound) Error() string {
-	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }

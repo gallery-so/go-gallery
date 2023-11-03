@@ -3,15 +3,13 @@ package event
 import (
 	"context"
 	"fmt"
-	"time"
-
-	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/env"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tracing"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"golang.org/x/sync/errgroup"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/feed"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -19,8 +17,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
-	"golang.org/x/sync/errgroup"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 type sendType int
@@ -46,6 +46,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionGalleryUpdated, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionGalleryInfoUpdated, feedHandler)
+	sender.addDelayedHandler(feed, persist.ActionUserPosted, slackHandler{taskClient})
 	sender.addImmediateHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToCollection, feedHandler)
@@ -57,75 +58,78 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredPost, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnPost, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionReplyToComment, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionMentionUser, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
 	ctx.Set(eventSenderContextKey, &sender)
 }
 
-func DispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
+func Dispatch(ctx context.Context, evt db.Event) error {
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	if err := v.Struct(evt); err != nil {
-		return nil, err
-	}
+	go PushEvent(ctx, evt)
+	return nil
+}
+
+func DispatchCaptioned(ctx context.Context, evt db.Event, caption *string) (*db.FeedEvent, error) {
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
 
 	if caption != nil {
 		evt.Caption = persist.StrPtrToNullStr(caption)
-		return DispatchImmediate(ctx, []db.Event{evt})
+		return dispatchImmediate(ctx, []db.Event{evt})
 	}
 
 	go PushEvent(ctx, evt)
 	return nil, nil
 }
 
-func DispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, editID *string, caption *string) (*db.FeedEvent, error) {
-
+func DispatchMany(ctx context.Context, evts []db.Event, editID *string) error {
 	if len(evts) == 0 {
-		return nil, nil
+		return nil
+	}
+
+	for i := range evts {
+		evts[i].GroupID = persist.StrPtrToNullStr(editID)
 	}
 
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	for i, evt := range evts {
-		evt.GroupID = persist.StrPtrToNullStr(editID)
-		if err := v.Struct(evt); err != nil {
-			return nil, err
-		}
-		evts[i] = evt
-	}
-
-	if caption != nil {
-		for i, evt := range evts {
-			evt.Caption = persist.StrPtrToNullStr(caption)
-			evts[i] = evt
-		}
-		return DispatchImmediate(ctx, evts)
-	}
 
 	for _, evt := range evts {
 		go PushEvent(ctx, evt)
 	}
-	return nil, nil
+
+	return nil
 }
 
 func PushEvent(ctx context.Context, evt db.Event) {
 	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 		sentryutil.SetEventContext(hub.Scope(), persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
 	}
-	if err := DispatchDelayed(ctx, evt); err != nil {
+	if err := dispatchDelayed(ctx, evt); err != nil {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
 }
 
-// DispatchDelayed sends the event to all of its registered handlers.
-func DispatchDelayed(ctx context.Context, event db.Event) error {
+// dispatchDelayed sends the event to all of its registered handlers.
+func dispatchDelayed(ctx context.Context, event db.Event) error {
 	gc := util.MustGetGinContext(ctx)
 	sender := For(gc)
+
+	// Vaidate event
+	err := sender.validate.Struct(event)
+	if err != nil {
+		return err
+	}
 
 	if _, handable := sender.registry[delayedKey][event.Action]; !handable {
 		logger.For(ctx).WithField("action", event.Action).Warn("no delayed handler configured for action")
@@ -143,12 +147,16 @@ func DispatchDelayed(ctx context.Context, event db.Event) error {
 	return eg.Wait()
 }
 
-// DispatchImmediate flushes the event immediately to its registered handlers.
-func DispatchImmediate(ctx context.Context, events []db.Event) (*db.FeedEvent, error) {
+// dispatchImmediate flushes the event immediately to its registered handlers.
+func dispatchImmediate(ctx context.Context, events []db.Event) (*db.FeedEvent, error) {
 	gc := util.MustGetGinContext(ctx)
 	sender := For(gc)
 
 	for _, e := range events {
+		// Vaidate event
+		if err := sender.validate.Struct(e); err != nil {
+			return nil, err
+		}
 		if _, handable := sender.registry[immediateKey][e.Action]; !handable {
 			logger.For(ctx).WithField("action", e.Action).Warn("no immediate handler configured for action")
 			return nil, nil
@@ -234,17 +242,17 @@ type eventSender struct {
 	registry      map[sendType]registedActions
 	queries       *db.Queries
 	eventRepo     postgres.EventRepository
+	validate      *validator.Validate
 }
 
 func newEventSender(queries *db.Queries) eventSender {
+	v := validator.New()
+	v.RegisterStructValidation(validate.EventValidator, db.Event{})
 	return eventSender{
-		registry: map[sendType]registedActions{
-			delayedKey:   {},
-			immediateKey: {},
-			groupKey:     {},
-		},
+		registry:  map[sendType]registedActions{delayedKey: {}, immediateKey: {}, groupKey: {}},
 		queries:   queries,
 		eventRepo: postgres.EventRepository{Queries: queries},
+		validate:  v,
 	}
 }
 
@@ -376,9 +384,7 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 	if !actionsToBeHandledByFeedService[persistedEvent.Action] {
 		return nil
 	}
-
-	scheduleOn := persistedEvent.CreatedAt.Add(time.Duration(env.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second)
-	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
+	return task.CreateTaskForFeed(ctx, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
 }
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
@@ -408,9 +414,7 @@ func (h feedHandler) handleGroup(ctx context.Context, groupID string, action per
 
 	if feedEvent != nil {
 		// Send event to feedbot
-		err = task.CreateTaskForFeedbot(ctx,
-			time.Now(), task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc,
-		)
+		err = task.CreateTaskForFeedbot(ctx, task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc)
 		if err != nil {
 			logger.For(ctx).Errorf("failed to create task for feedbot: %s", err.Error())
 		}
@@ -427,14 +431,19 @@ type notificationHandler struct {
 func newNotificationHandler(notifiers *notifications.NotificationHandlers, disableDataloaderCaching bool, queries *db.Queries) *notificationHandler {
 	return &notificationHandler{
 		notificationHandlers: notifiers,
-		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching),
+		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook),
 	}
 }
 
 func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
-	owner, err := h.findOwnerForNotificationFromEvent(persistedEvent)
+	owner, err := h.findOwnerForNotificationFromEvent(ctx, persistedEvent)
 	if err != nil {
 		return err
+	}
+
+	// if no gallery user found to notify, don't notify (e.g. for mentions to community creators that are not gallery users)
+	if owner == "" {
+		return nil
 	}
 
 	// Don't notify the user on self events
@@ -457,6 +466,8 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
+		ContractID:  persistedEvent.ContractID,
+		MentionID:   persistedEvent.MentionID,
 	})
 }
 
@@ -469,7 +480,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		if event.ExternalID.String != "" {
 			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
 		}
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
 		if event.ActorID.String != "" {
 			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}
@@ -482,29 +493,40 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	case persist.ActionNewTokensReceived:
 		data.NewTokenID = event.Data.NewTokenID
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
+	case persist.ActionReplyToComment:
+		data.OriginalCommentID = event.SubjectID
+	case persist.ActionUserPostedYourWork:
+		data.YourContractID = event.Data.YourContractID
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
 	return
 }
 
-func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (persist.DBID, error) {
+func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
-		gallery, err := h.dataloaders.GalleryByGalleryID.Load(event.GalleryID)
+		gallery, err := h.dataloaders.GetGalleryByIdBatch.Load(event.GalleryID)
 		if err != nil {
 			return "", err
 		}
 		return gallery.OwnerUserID, nil
 	case persist.ResourceTypeComment:
+		if event.Action == persist.ActionReplyToComment {
+			comment, err := h.dataloaders.GetCommentByCommentIDBatch.Load(event.SubjectID)
+			if err != nil {
+				return "", err
+			}
+			return comment.ActorID, nil
+		}
 		if event.FeedEventID != "" {
-			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
+			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
 			if err != nil {
 				return "", err
 			}
 			return feedEvent.OwnerID, nil
 		} else if event.PostID != "" {
-			post, err := h.dataloaders.PostByPostID.Load(event.PostID)
+			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
 			if err != nil {
 				return "", err
 			}
@@ -513,13 +535,13 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 
 	case persist.ResourceTypeAdmire:
 		if event.FeedEventID != "" {
-			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
+			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
 			if err != nil {
 				return "", err
 			}
 			return feedEvent.OwnerID, nil
 		} else if event.PostID != "" {
-			post, err := h.dataloaders.PostByPostID.Load(event.PostID)
+			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
 			if err != nil {
 				return "", err
 			}
@@ -529,7 +551,23 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		return event.SubjectID, nil
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
+	case persist.ResourceTypeContract:
+
+		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.ContractID.String())
+		if err != nil || u.CreatorUserID == "" {
+			logger.For(ctx).Warnf("error loading user by address: %s", err)
+			return "", nil
+		}
+		return u.CreatorUserID, nil
+
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)
+}
+
+// slackHandler posts events to Slack
+type slackHandler struct{ tc *cloudtasks.Client }
+
+func (s slackHandler) handleDelayed(ctx context.Context, event db.Event) error {
+	return task.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: event.PostID}, s.tc)
 }

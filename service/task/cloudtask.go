@@ -34,16 +34,13 @@ type FeedbotMessage struct {
 	Action      persist.Action `json:"action" binding:"required"`
 }
 
+type FeedbotSlackPostMessage struct {
+	PostID persist.DBID `json:"post_id" binding:"required"`
+}
+
 type TokenProcessingUserMessage struct {
 	UserID   persist.DBID   `json:"user_id" binding:"required"`
 	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
-	// TODO: chains isn't used anymore, remove once the backend is updated to stop sending it
-	Chains []persist.Chain `json:"chains" binding:"-"`
-}
-
-type TokenProcessingTokenInstanceMessage struct {
-	TokenDBID persist.DBID `json:"token_dbid" binding:"required"`
-	Attempts  int          `json:"attempts" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
@@ -51,8 +48,27 @@ type TokenProcessingContractTokensMessage struct {
 	ForceRefresh bool         `json:"force_refresh"`
 }
 
+type TokenProcessingTokenMessage struct {
+	Token    persist.TokenIdentifiers `json:"token" binding:"required"`
+	Attempts int                      `json:"attempts" binding:"required"`
+}
+
 type AddEmailToMailingListMessage struct {
 	UserID persist.DBID `json:"user_id" binding:"required"`
+}
+
+type PostPreflightMessage struct {
+	Token  persist.TokenIdentifiers `json:"token" binding:"required"`
+	UserID persist.DBID             `json:"user_id"`
+}
+
+type AutosocialProcessUsersMessage struct {
+	Users map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress `json:"users" binding:"required"`
+}
+
+type AutosocialPollFarcasterMessage struct {
+	SignerUUID string       `form:"signer_uuid" binding:"required"`
+	UserID     persist.DBID `form:"user_id" binding:"required"`
 }
 
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
@@ -116,24 +132,25 @@ func CreateTaskForPushNotification(ctx context.Context, message PushNotification
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
+func CreateTaskForFeed(ctx context.Context, message FeedMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeed")
 	defer tracing.FinishSpan(span)
 	tracing.AddEventDataToSpan(span, map[string]any{"Event ID": message.ID})
 	queue := env.GetString("GCLOUD_FEED_QUEUE")
 	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEED_URL"))
 	secret := env.GetString("FEED_SECRET")
-	return submitTask(ctx, client, queue, url, withScheduleOn(scheduleOn), withJSON(message), withTrace(span), withBasicAuth(secret))
+	delay := time.Duration(env.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second
+	return submitTask(ctx, client, queue, url, withDelay(delay), withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message FeedbotMessage, client *gcptasks.Client) error {
+func CreateTaskForFeedbot(ctx context.Context, message FeedbotMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeedbot")
 	defer tracing.FinishSpan(span)
 	tracing.AddEventDataToSpan(span, map[string]any{"Event ID": message.FeedEventID})
 	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEEDBOT_URL"))
 	secret := env.GetString("FEEDBOT_SECRET")
-	return submitTask(ctx, client, queue, url, withScheduleOn(scheduleOn), withJSON(message), withTrace(span), withBasicAuth(secret))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
@@ -163,12 +180,12 @@ func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessi
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
-func CreateTaskForTokenInstanceTokenProcessing(ctx context.Context, message TokenProcessingTokenInstanceMessage, client *gcptasks.Client, delay time.Duration) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenInstanceTokenProcessing")
+func CreateTaskForTokenTokenProcessing(ctx context.Context, message TokenProcessingTokenMessage, client *gcptasks.Client, delay time.Duration) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenTokenProcessing")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-	url := fmt.Sprintf("%s/media/process/token-id", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withScheduleOn(time.Now().Add(delay)))
+	url := fmt.Sprintf("%s/media/tokenmanage/process/token", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withDelay(delay))
 }
 
 func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage, client *gcptasks.Client) error {
@@ -188,6 +205,39 @@ func CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmail
 	url := fmt.Sprintf("%s/send/process/add-to-mailing-list", env.GetString("EMAILS_HOST"))
 	secret := env.GetString("EMAILS_TASK_SECRET")
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+}
+
+func CreateTaskForPostPreflight(ctx context.Context, message PostPreflightMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForPostPreflight")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+	url := fmt.Sprintf("%s/media/process/post-preflight", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
+}
+
+func CreateTaskForAutosocialProcessUsers(ctx context.Context, message AutosocialProcessUsersMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAutosocialProcessUsers")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("AUTOSOCIAL_QUEUE")
+	url := fmt.Sprintf("%s/process/users", env.GetString("AUTOSOCIAL_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
+}
+
+func CreateTaskForAutosocialPollFarcaster(ctx context.Context, message AutosocialPollFarcasterMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAutosocialPollFarcaster")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("AUTOSOCIAL_POLL_QUEUE")
+	url := fmt.Sprintf("%s/checkFarcasterApproval?signer_uuid=%s&user_id=%s", env.GetString("AUTOSOCIAL_URL"), message.SignerUUID, message.UserID)
+	return submitTask(ctx, client, queue, url, withTrace(span))
+}
+
+func CreateTaskForSlackPostFeedBot(ctx context.Context, message FeedbotSlackPostMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForSlackPostFeedBot")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
+	url := fmt.Sprintf("%s/tasks/slack-post", env.GetString("FEEDBOT_URL"))
+	secret := env.GetString("FEEDBOT_SECRET")
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), withDelay(2*time.Minute))
 }
 
 // NewClient returns a new task client with tracing enabled.
@@ -229,8 +279,9 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 	return client
 }
 
-func withScheduleOn(scheduleOn time.Time) func(*taskspb.Task) error {
+func withDelay(delay time.Duration) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
+		scheduleOn := time.Now().Add(delay)
 		t.ScheduleTime = timestamppb.New(scheduleOn)
 		return nil
 	}
@@ -245,7 +296,7 @@ func withDeadline(d time.Duration) func(*taskspb.Task) error {
 
 func withBasicAuth(secret string) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
-		addHeader(t.GetHttpRequest(), "Authorization", basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET")))
+		addHeader(t.GetHttpRequest(), "Authorization", basicauth.MakeHeader(nil, secret))
 		return nil
 	}
 }

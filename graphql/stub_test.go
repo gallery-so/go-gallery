@@ -37,8 +37,21 @@ func (p stubProvider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return p.Info
 }
 
-func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	return p.Tokens, p.Contracts, nil
+}
+
+func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		defer close(rec)
+		rec <- multichain.ChainAgnosticTokensAndContracts{
+			Tokens:    p.Tokens,
+			Contracts: p.Contracts,
+		}
+	}()
+	return rec, errChan
 }
 
 func (p stubProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
@@ -159,21 +172,21 @@ type sendTokensRecorder struct {
 	Tasks            []task.TokenProcessingUserMessage
 }
 
-func (r *sendTokensRecorder) Send(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
-	r.Called(ctx, userID, tokenIDs, chains)
-	r.Tasks = append(r.Tasks, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs, Chains: chains})
+func (r *sendTokensRecorder) Send(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+	r.Called(ctx, userID, tokenIDs, tokens)
+	r.Tasks = append(r.Tasks, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs})
 	return nil
 }
 
 // submitUserTokensNoop is useful when the code under test doesn't require tokenprocessing
-func submitUserTokensNoop(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
+func submitUserTokensNoop(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
 	return nil
 }
 
 // sendTokensToHTTPHandler makes an HTTP request to the passed handler
 func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
-		m := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs, Chains: chains}
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, _ []persist.TokenIdentifiers) error {
+		m := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs}
 		byt, _ := json.Marshal(m)
 		r := bytes.NewReader(byt)
 		req := httptest.NewRequest(method, endpoint, r)
@@ -189,9 +202,9 @@ func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) mult
 
 // sendTokensToTokenProcessing processes a batch of tokens synchronously through tokenprocessing
 func sendTokensToTokenProcessing(ctx context.Context, c *server.Clients, provider *multichain.Provider) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
 		h := tokenprocessing.CoreInitServer(ctx, c, provider)
-		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, userID, tokenIDs, chains)
+		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, userID, tokenIDs, tokens)
 	}
 }
 

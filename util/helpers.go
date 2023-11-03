@@ -238,20 +238,20 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
-// DedupeByKey removes duplicate elements from a slice, preserving the order of the remaining elements.
-func DedupeByKey[T any, K comparable](src []T, filterInPlace bool, keyFunc func(T) K) []T {
+// DedupeWithTranslate can be used when T is not good for comparison or there should be some other value used for comparison as opposed to golang equality check
+func DedupeWithTranslate[T any, V comparable](src []T, filterInPlace bool, translate func(T) V) []T {
 	var result []T
 	if filterInPlace {
 		result = src[:0]
 	} else {
 		result = make([]T, 0, len(src))
 	}
-	seen := make(map[K]bool)
+	seen := make(map[V]bool)
 	for _, x := range src {
-		key := keyFunc(x)
-		if !seen[key] {
+		v := translate(x)
+		if !seen[v] {
 			result = append(result, x)
-			seen[key] = true
+			seen[v] = true
 		}
 	}
 	return result
@@ -652,6 +652,13 @@ func ToNullString(s string, emptyIsNull bool) sql.NullString {
 		return sql.NullString{String: "", Valid: false}
 	}
 	return sql.NullString{String: s, Valid: true}
+}
+
+func ToNullInt32(i *int) sql.NullInt32 {
+	if i == nil {
+		return sql.NullInt32{Int32: 0, Valid: false}
+	}
+	return sql.NullInt32{Int32: int32(*i), Valid: true}
 }
 
 func ToPGJSONB[T any](v T) (pgtype.JSONB, error) {

@@ -22,6 +22,7 @@ func TestMain(t *testing.T) {
 				curB := cursors.NewTimeIDCursor()
 				err = curB.Unpack(packed)
 
+				assert.NoError(t, err)
 				assert.NoError(t, curB.Unpack(packed))
 				assert.True(t, curA.Time.Equal(curB.Time))
 				assert.Equal(t, curA.ID, curB.ID)
@@ -99,6 +100,7 @@ func TestMain(t *testing.T) {
 				curB := cursors.NewFeedPositionCursor()
 				err = curB.Unpack(packed)
 
+				assert.NoError(t, err)
 				assert.NoError(t, curB.Unpack(packed))
 				assert.Equal(t, curA.CurrentPosition, curB.CurrentPosition)
 				assert.Equal(t, curA.EntityTypes, curB.EntityTypes)
@@ -115,6 +117,7 @@ func TestMain(t *testing.T) {
 				curB := cursors.NewPositionCursor()
 				err = curB.Unpack(packed)
 
+				assert.NoError(t, err)
 				assert.NoError(t, curB.Unpack(packed))
 				assert.Equal(t, curA.CurrentPosition, curB.CurrentPosition)
 				assert.Equal(t, curA.IDs, curB.IDs)

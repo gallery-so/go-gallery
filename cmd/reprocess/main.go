@@ -144,9 +144,11 @@ func main() {
 			OwnedByWallets:   wallets,
 			OwnershipHistory: row.OwnershipHistory,
 			IsCreatorToken:   row.IsCreatorToken,
-			Contract:         row.Contract,
-			ExternalURL:      persist.NullString(row.ExternalUrl.String),
-			BlockNumber:      persist.BlockNumber(row.BlockNumber.Int64),
+			Contract: persist.ContractGallery{
+				ID: row.Contract,
+			},
+			ExternalURL: persist.NullString(row.ExternalUrl.String),
+			BlockNumber: persist.BlockNumber(row.BlockNumber.Int64),
 		}
 		contract := persist.ContractGallery{
 			Version:               persist.NullInt32(row.Version_2.Int32),
@@ -173,7 +175,12 @@ func main() {
 			defer func() {
 				logger.For(ctx).Infof("finished processing %s", token.ID)
 			}()
-			_, err = tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCauseRefresh)
+			t := persist.TokenIdentifiers{
+				Chain:           token.Chain,
+				TokenID:         token.TokenID,
+				ContractAddress: contract.Address,
+			}
+			_, err = tp.ProcessTokenPipeline(ctx, t, contract, persist.ProcessingCauseRefresh)
 			return err
 		})
 	}

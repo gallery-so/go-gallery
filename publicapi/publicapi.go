@@ -2,6 +2,8 @@ package publicapi
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/tracing"
+	"net/http"
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -59,9 +61,9 @@ type PublicAPI struct {
 	Search        *SearchAPI
 }
 
-func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
+func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell,
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, socialCache *redis.Cache, authRefreshCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
-	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
+	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	validator := validate.WithCustomValidators()
 	tokenManager := tokenmanage.New(ctx, taskClient)
 
@@ -81,12 +83,12 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Token:         &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler, manager: tokenManager},
 		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:          &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
-		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, cache: feedCache},
+		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, cache: feedCache, taskClient: taskClient, multichainProvider: multichainProvider},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 		Admin:         admin.NewAPI(repos, queries, authRefreshCache, validator, multichainProvider),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
-		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache},
+		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache, httpClient: httpClient, taskClient: taskClient},
 		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 		Search:        &SearchAPI{queries: queries, loaders: loaders, validator: validator},
 	}

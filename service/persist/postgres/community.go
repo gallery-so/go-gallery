@@ -29,7 +29,7 @@ func (c *CommunityRepository) UpsertCommunities(ctx context.Context, communities
 		Key     string
 	}
 
-	communities = util.DedupeByKey(communities, false, func(c db.Community) communityKey {
+	communities = util.DedupeWithTranslate(communities, false, func(c db.Community) communityKey {
 		return communityKey{
 			Type:    c.CommunityType,
 			Subtype: c.CommunitySubtype,

@@ -54,17 +54,20 @@ func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, htt
 type tokenProcessingJob struct {
 	tp               *tokenProcessor
 	id               persist.DBID
-	key              string
-	token            persist.TokenGallery
+	token            persist.TokenIdentifiers
 	contract         persist.ContractGallery
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
-	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image
-	// The pipeline only looks at the root level of the metadata for the key and will also not fail
-	// if the key is missing or if processing media for the key fails
+	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image.
+	// The pipeline only looks at the root level of the metadata for the key and will also not fail if the key is missing
+	// or if processing media for the key fails.
 	profileImageKey string
 	// refreshMetadata is an optional flag that indicates that the pipeline should check for new metadata when enabled
 	refreshMetadata bool
+	// tokenInstance is an already instanced token to derive data (name, description, and metadata) from when fetching fails.
+	// If the job doesn't produce active media, only tokenInstance's media is updated (as opposed to all instances of a token).
+	// If there is active media from past jobs, tokenInstance's media will reference that media instead.
+	tokenInstance *persist.TokenGallery
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -85,14 +88,21 @@ func (pOpts) WithRefreshMetadata() PipelineOption {
 	}
 }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
+func (pOpts) WithTokenInstance(t *persist.TokenGallery) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.tokenInstance = t
+	}
+}
+
+func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
 	runID := persist.GenerateID()
+
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"runID": runID})
 
 	job := &tokenProcessingJob{
 		id:               runID,
 		tp:               tp,
-		key:              persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
-		token:            t,
+		token:            token,
 		contract:         contract,
 		cause:            cause,
 		pipelineMetadata: new(persist.PipelineMetadata),
@@ -102,23 +112,12 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		opt(job)
 	}
 
-	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
-		"tokenDBID":       t.ID,
-		"tokenID":         t.TokenID,
-		"tokenID_base10":  t.TokenID.Base10String(),
-		"contractDBID":    t.Contract,
-		"contractAddress": contract.Address,
-		"chain":           t.Chain,
-		"runID":           runID,
-	})
-
-	totalTime := time.Now()
-
-	media, err := job.run(loggerCtx)
-	recordPipelineEndState(loggerCtx, tp.mr, media, err, time.Since(totalTime), cause)
+	startTime := time.Now()
+	media, err := job.run(ctx)
+	recordPipelineEndState(ctx, tp.mr, media, err, time.Since(startTime), cause)
 
 	if err != nil {
-		reportJobError(c, err, *job)
+		reportJobError(ctx, err, *job)
 	}
 
 	return media, err
@@ -141,46 +140,27 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) (coredb.TokenMedia, erro
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
-	logger.For(ctx).Infof("starting token processing pipeline for token %s (tokenDBID: %s)", tpj.key, tpj.token.ID)
+	logger.For(ctx).Infof("starting token processing pipeline for token %s", tpj.token.String())
 
-	var media coredb.TokenMedia
-	var mediaErr error
-
-	func() {
-		mediaCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
-		defer cancel()
-		result := make(chan mediaResult, 1)
-		select {
-		case result <- tpj.createMediaForToken(mediaCtx):
-			r := <-result
-			media, mediaErr = r.media, r.err
-		case <-mediaCtx.Done():
-			mediaErr = mediaCtx.Err()
-		}
-	}()
-
-	persistCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	mediaCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	if err := tpj.persistResults(persistCtx, media); err != nil {
+	media, mediaErr := tpj.createMediaForToken(mediaCtx)
+
+	if err := tpj.persistResults(ctx, media); err != nil {
 		return media, err
 	}
 
 	return media, mediaErr
 }
 
-type mediaResult struct {
-	media coredb.TokenMedia
-	err   error
-}
-
-func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaResult {
+func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 
 	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
-		ContractID:      tpj.token.Contract,
+		ContractID:      tpj.contract.ID,
 		TokenID:         tpj.token.TokenID,
 		Chain:           tpj.token.Chain,
 		Active:          true,
@@ -199,7 +179,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 		err = ErrBadToken{err}
 	}
 
-	return mediaResult{result, err}
+	return result, err
 }
 
 func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
@@ -210,7 +190,11 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	newMetadata := tpj.token.TokenMetadata
+	var newMetadata persist.TokenMetadata
+
+	if tpj.tokenInstance != nil {
+		newMetadata = tpj.tokenInstance.TokenMetadata
+	}
 
 	if len(newMetadata) == 0 || tpj.refreshMetadata {
 		i, a := tpj.contract.Chain.BaseKeywords()
@@ -247,12 +231,12 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 
 	name, description := findNameAndDescription(ctx, metadata)
 
-	if name == "" {
-		name = tpj.token.Name.String()
+	if name == "" && tpj.tokenInstance != nil {
+		name = tpj.tokenInstance.Name.String()
 	}
 
-	if description == "" {
-		description = tpj.token.Description.String()
+	if description == "" && tpj.tokenInstance != nil {
+		description = tpj.tokenInstance.Description.String()
 	}
 	return name, description
 }
@@ -393,11 +377,18 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		HasName:         tmetadata.Name != "",
 		HasDescription:  tmetadata.Description != "",
 	}
+
+	var tokenDBID persist.DBID
+
+	if tpj.tokenInstance != nil {
+		tokenDBID = tpj.tokenInstance.ID
+	}
+
 	return tpj.tp.queries.InsertTokenPipelineResults(ctx, coredb.InsertTokenPipelineResultsParams{
 		Chain:            tpj.token.Chain,
-		ContractID:       tpj.token.Contract,
+		ContractID:       tpj.contract.ID,
 		TokenID:          tpj.token.TokenID,
-		TokenDbid:        tpj.token.ID.String(),
+		TokenDbid:        tokenDBID.String(),
 		ProcessingJobID:  tpj.id,
 		TokenProperties:  p,
 		PipelineMetadata: *tpj.pipelineMetadata,
@@ -409,7 +400,7 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		Name:             tmetadata.Name,
 		Description:      tmetadata.Description,
 		Active:           tmetadata.Active,
-		CopyMediaID:      persist.GenerateID(),
+		RetiredMediaID:   persist.GenerateID(),
 	})
 }
 

@@ -14,13 +14,15 @@ import (
 	"blockwatch.cc/tzgo/tezos"
 	"github.com/gammazero/workerpool"
 	"github.com/machinebox/graphql"
+	"golang.org/x/crypto/blake2b"
+
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
-	"golang.org/x/crypto/blake2b"
 )
 
 const (
@@ -122,9 +124,9 @@ type Provider struct {
 }
 
 // NewProvider creates a new Tezos Provider
-func NewProvider(tezosAPIUrl string, httpClient *http.Client) *Provider {
+func NewProvider(httpClient *http.Client) *Provider {
 	return &Provider{
-		apiURL:     tezosAPIUrl,
+		apiURL:     env.GetString("TEZOS_API_URL"),
 		httpClient: httpClient,
 		graphQL:    graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
 	}
@@ -140,51 +142,102 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, maxLimit, startingOffset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tzAddr, err := toTzAddress(addr)
 	if err != nil {
 		return nil, nil, err
 	}
-	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
-	if limit < 1 {
-		limit = pageSize
-	}
-	offset := startingOffset
+	limit := pageSize
+	offset := 0
 	resultTokens := []tzktBalanceToken{}
 	for {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
+
+		tzktBalances, err := d.fetchBalancesByAddress(tzAddr, limit, offset)
 		if err != nil {
-			return nil, nil, err
-		}
-		resp, err := retry.RetryRequest(d.httpClient, req)
-		if err != nil {
-			return nil, nil, err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return nil, nil, util.GetErrFromResp(resp)
-		}
-		var tzktBalances []tzktBalanceToken
-		if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
 			return nil, nil, err
 		}
 
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
+		if len(tzktBalances) < limit {
 			break
 		}
 
-		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
-			// this will ensure that we don't go over the max limit
-			limit = maxLimit - len(resultTokens)
-		}
 		offset += limit
 
 		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), pageSize, offset)
 	}
 
 	return d.tzBalanceTokensToTokens(ctx, resultTokens, addr.String())
+}
+
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		defer close(rec)
+
+		tzAddr, err := toTzAddress(addr)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		limit := 100
+		offset := 0
+		for {
+			tzktBalances, err := d.fetchBalancesByAddress(tzAddr, limit, offset)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(tzktBalances), tzAddr.String(), limit, offset)
+
+			resultTokens, resultContracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, addr.String())
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			logger.For(ctx).Debugf("converted %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
+
+			if len(resultTokens) > 0 || len(resultContracts) > 0 {
+				rec <- multichain.ChainAgnosticTokensAndContracts{
+					Tokens:    resultTokens,
+					Contracts: resultContracts,
+				}
+			}
+
+			if len(tzktBalances) < limit {
+				break
+			}
+
+			offset += limit
+
+			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
+		}
+	}()
+	return rec, errChan
+}
+
+func (d *Provider) fetchBalancesByAddress(tzAddr persist.Address, limit, offset int) ([]tzktBalanceToken, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := retry.RetryRequest(d.httpClient, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, util.GetErrFromResp(resp)
+	}
+	var tzktBalances []tzktBalanceToken
+	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
+		return nil, err
+	}
+	return tzktBalances, nil
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Tezos Blockchain

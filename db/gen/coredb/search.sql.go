@@ -20,7 +20,7 @@ poap_weight as (
     -- to offset the fact that we're going to multiply all addresses by 1000000000.
     select $5::float4 / 1000000000 as weight
 )
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id from contracts left join contract_relevance on contract_relevance.id = contracts.id,
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain from contracts left join contract_relevance on contract_relevance.id = contracts.id,
      to_tsquery('simple', websearch_to_tsquery('simple', $1)::text || ':*') simple_partial_query,
      websearch_to_tsquery('simple', $1) simple_full_query,
      websearch_to_tsquery('english', $1) english_full_query,
@@ -43,11 +43,11 @@ limit $4
 `
 
 type SearchContractsParams struct {
-	Query             string  `json:"query"`
-	NameWeight        float32 `json:"name_weight"`
-	DescriptionWeight float32 `json:"description_weight"`
-	Limit             int32   `json:"limit"`
-	PoapAddressWeight float32 `json:"poap_address_weight"`
+	Query             string  `db:"query" json:"query"`
+	NameWeight        float32 `db:"name_weight" json:"name_weight"`
+	DescriptionWeight float32 `db:"description_weight" json:"description_weight"`
+	Limit             int32   `db:"limit" json:"limit"`
+	PoapAddressWeight float32 `db:"poap_address_weight" json:"poap_address_weight"`
 }
 
 func (q *Queries) SearchContracts(ctx context.Context, arg SearchContractsParams) ([]Contract, error) {
@@ -84,6 +84,7 @@ func (q *Queries) SearchContracts(ctx context.Context, arg SearchContractsParams
 			&i.IsProviderMarkedSpam,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 		); err != nil {
 			return nil, err
 		}
@@ -118,10 +119,10 @@ limit $4
 `
 
 type SearchGalleriesParams struct {
-	Query             string  `json:"query"`
-	NameWeight        float32 `json:"name_weight"`
-	DescriptionWeight float32 `json:"description_weight"`
-	Limit             int32   `json:"limit"`
+	Query             string  `db:"query" json:"query"`
+	NameWeight        float32 `db:"name_weight" json:"name_weight"`
+	DescriptionWeight float32 `db:"description_weight" json:"description_weight"`
+	Limit             int32   `db:"limit" json:"limit"`
 }
 
 func (q *Queries) SearchGalleries(ctx context.Context, arg SearchGalleriesParams) ([]Gallery, error) {
@@ -191,10 +192,10 @@ limit $4
 `
 
 type SearchUsersParams struct {
-	Query          string  `json:"query"`
-	UsernameWeight float32 `json:"username_weight"`
-	BioWeight      float32 `json:"bio_weight"`
-	Limit          int32   `json:"limit"`
+	Query          string  `db:"query" json:"query"`
+	UsernameWeight float32 `db:"username_weight" json:"username_weight"`
+	BioWeight      float32 `db:"bio_weight" json:"bio_weight"`
+	Limit          int32   `db:"limit" json:"limit"`
 }
 
 func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]User, error) {

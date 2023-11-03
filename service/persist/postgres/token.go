@@ -21,9 +21,6 @@ type TokenRepository struct {
 	getOwnedByContractPaginateStmt    *sql.Stmt
 	getByContractStmt                 *sql.Stmt
 	getByContractPaginateStmt         *sql.Stmt
-	getByTokenIdentifiersStmt         *sql.Stmt
-	getByTokenIdentifiersPaginateStmt *sql.Stmt
-	getByIdentifiersStmt              *sql.Stmt
 	getExistsByTokenIdentifiersStmt   *sql.Stmt
 	getMetadataByTokenIdentifiersStmt *sql.Stmt
 	updateOwnerUnsafeStmt             *sql.Stmt
@@ -58,15 +55,6 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	checkNoErr(err)
 
 	getByContractPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
-	checkNoErr(err)
-
-	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC;`)
-	checkNoErr(err)
-
-	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
-	checkNoErr(err)
-
-	getByIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
 	checkNoErr(err)
 
 	getExistsByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2);`)
@@ -108,8 +96,6 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		getOwnedByContractPaginateStmt:    getOwnedByContractPaginateStmt,
 		getByContractStmt:                 getByContractStmt,
 		getByContractPaginateStmt:         getByContractPaginateStmt,
-		getByTokenIdentifiersStmt:         getByTokenIdentifiersStmt,
-		getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt,
 		getMetadataByTokenIdentifiersStmt: getMetadataByTokenIdentifiersStmt,
 		updateOwnerUnsafeStmt:             updateOwnerUnsafeStmt,
 		updateBalanceUnsafeStmt:           updateBalanceUnsafeStmt,
@@ -118,7 +104,6 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		upsert1155Stmt:                    upsert1155Stmt,
 		deleteStmt:                        deleteStmt,
 		deleteByIDStmt:                    deleteByIDStmt,
-		getByIdentifiersStmt:              getByIdentifiersStmt,
 		getExistsByTokenIdentifiersStmt:   getExistsByTokenIdentifiersStmt,
 		getURIByTokenIdentifiersStmt:      getURIByTokenIdentifiersStmt,
 	}
@@ -231,40 +216,6 @@ func (t *TokenRepository) GetOwnedByContract(pCtx context.Context, pContractAddr
 
 }
 
-// GetByTokenIdentifiers gets a token by its token ID and contract address
-func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.EthereumAddress, limit int64, offset int64) ([]persist.Token, error) {
-	var rows *sql.Rows
-	var err error
-	if limit > 0 {
-		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, limit, offset)
-	} else {
-		rows, err = t.getByTokenIdentifiersStmt.QueryContext(pCtx, pTokenID, pContractAddress)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	tokens := make([]persist.Token, 0, 10)
-	for rows.Next() {
-		token := persist.Token{}
-		if err := rows.Scan(&token.ID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsSpam); err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, token)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(tokens) == 0 {
-		return nil, persist.ErrTokenNotFoundByTokenIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
-	}
-
-	return tokens, nil
-}
-
 func (t *TokenRepository) GetURIByTokenIdentifiers(pCtx context.Context, tokenID persist.TokenID, contract persist.EthereumAddress) (persist.TokenURI, error) {
 	var uri persist.TokenURI
 	err := t.getURIByTokenIdentifiersStmt.QueryRowContext(pCtx, tokenID, contract).Scan(&uri)
@@ -276,19 +227,6 @@ func (t *TokenRepository) GetURIByTokenIdentifiers(pCtx context.Context, tokenID
 	}
 
 	return uri, nil
-}
-
-// GetByIdentifiers gets a token by its token ID and contract address and owner address
-func (t *TokenRepository) GetByIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.EthereumAddress) (persist.Token, error) {
-	var token persist.Token
-	err := t.getByIdentifiersStmt.QueryRowContext(pCtx, pTokenID, pContractAddress, pOwnerAddress).Scan(&token.ID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return token, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress, OwnerAddress: pOwnerAddress}
-		}
-		return persist.Token{}, err
-	}
-	return token, nil
 }
 
 // TokenExistsByTokenIdentifiers gets a token by its token ID and contract address and owner address

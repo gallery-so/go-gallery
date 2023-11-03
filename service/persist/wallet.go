@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ type Wallet struct {
 
 	Address    Address    `json:"address"`
 	Chain      Chain      `json:"chain"`
+	L1Chain    L1Chain    `json:"l1_chain"`
 	WalletType WalletType `json:"wallet_type"`
 }
 
@@ -51,6 +53,13 @@ type ChainAddress struct {
 	chainSet   bool
 	address    Address
 	chain      Chain
+}
+
+type L1ChainAddress struct {
+	addressSet bool
+	chainSet   bool
+	address    Address
+	l1Chain    L1Chain
 }
 
 type ChainPubKey struct {
@@ -128,6 +137,105 @@ func (c *ChainAddress) GQLSetChainFromResolver(chain Chain) error {
 
 func (c ChainAddress) String() string {
 	return fmt.Sprintf("%d:%s", c.chain, c.address)
+}
+
+func (c ChainAddress) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"address": c.address.String(), "chain": int(c.chain)})
+}
+
+func (c *ChainAddress) UnmarshalJSON(data []byte) error {
+	var v map[string]any
+	err := json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+
+	if v["address"] != nil {
+		c.address = Address(v["address"].(string))
+		c.addressSet = true
+	}
+
+	if v["chain"] != nil {
+		if chain, ok := v["chain"].(int); ok {
+			c.chain = Chain(chain)
+			c.chainSet = true
+		} else if chain, ok := v["chain"].(int32); ok {
+			c.chain = Chain(chain)
+			c.chainSet = true
+		}
+	}
+
+	return nil
+}
+
+func (c ChainAddress) ToL1ChainAddress() L1ChainAddress {
+	return NewL1ChainAddress(c.Address(), c.Chain())
+}
+
+func (c *L1ChainAddress) IsGalleryUserOrAddress() {}
+
+func NewL1ChainAddress(address Address, chain Chain) L1ChainAddress {
+	ca := L1ChainAddress{
+		addressSet: true,
+		chainSet:   true,
+		address:    address,
+		l1Chain:    chain.L1Chain(),
+	}
+
+	ca.updateCasing()
+	return ca
+}
+
+func (c *L1ChainAddress) Address() Address {
+	return c.address
+}
+
+func (c *L1ChainAddress) L1Chain() L1Chain {
+	return c.l1Chain
+}
+
+func (c *L1ChainAddress) updateCasing() {
+	switch c.l1Chain {
+	// TODO: Add an IsCaseSensitive to the Chain type?
+	case L1Chain(ChainETH):
+		c.address = Address(strings.ToLower(c.address.String()))
+	}
+}
+
+func (c L1ChainAddress) String() string {
+	return fmt.Sprintf("%d:%s", c.l1Chain, c.address)
+}
+
+func (c L1ChainAddress) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"address": c.address.String(), "chain": int(c.l1Chain)})
+}
+
+func (c *L1ChainAddress) UnmarshalJSON(data []byte) error {
+	var v map[string]any
+	err := json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+
+	if v["address"] != nil {
+		c.address = Address(v["address"].(string))
+		c.addressSet = true
+	}
+
+	if v["chain"] != nil {
+		if chain, ok := v["chain"].(int); ok {
+			c.l1Chain = L1Chain(chain)
+			c.chainSet = true
+		} else if chain, ok := v["chain"].(int32); ok {
+			c.l1Chain = L1Chain(chain)
+			c.chainSet = true
+		} else if chain, ok := v["chain"].(Chain); ok {
+			c.l1Chain = L1Chain(chain)
+			c.chainSet = true
+		}
+	}
+
+	return nil
 }
 
 func NewChainPubKey(pubKey PubKey, chain Chain) ChainPubKey {
@@ -208,6 +316,10 @@ func (c ChainPubKey) ToChainAddress() ChainAddress {
 	default:
 		return NewChainAddress(Address(c.pubKey), c.chain)
 	}
+}
+
+func (c ChainPubKey) ToL1ChainAddress() L1ChainAddress {
+	return c.ToChainAddress().ToL1ChainAddress()
 }
 
 const (
@@ -316,21 +428,21 @@ func (p PubKey) String() string {
 }
 
 type ErrWalletAlreadyExists struct {
-	WalletID     DBID
-	ChainAddress ChainAddress
-	OwnerID      DBID
+	WalletID       DBID
+	L1ChainAddress L1ChainAddress
+	OwnerID        DBID
 }
 
 // ErrWalletNotFound is an error type for when a wallet is not found
 type ErrWalletNotFound struct {
-	WalletID     DBID
-	ChainAddress ChainAddress
+	WalletID       DBID
+	L1ChainAddress L1ChainAddress
 }
 
 func (e ErrWalletAlreadyExists) Error() string {
-	return fmt.Sprintf("wallet already exists: wallet ID: %s | chain address: %s | chain: %d | owner ID: %s", e.WalletID, e.ChainAddress.Address(), e.ChainAddress.Chain(), e.OwnerID)
+	return fmt.Sprintf("wallet already exists: wallet ID: %s | chain address: %s | chain: %d | owner ID: %s", e.WalletID, e.L1ChainAddress.Address(), e.L1ChainAddress.L1Chain(), e.OwnerID)
 }
 
 func (e ErrWalletNotFound) Error() string {
-	return fmt.Sprintf("wallet not found: walletID: %s | chain address: %s | chain: %d ", e.WalletID, e.ChainAddress.Address(), e.ChainAddress.Chain())
+	return fmt.Sprintf("wallet not found: walletID: %s | chain address: %s | chain: %d ", e.WalletID, e.L1ChainAddress.Address(), e.L1ChainAddress.L1Chain())
 }

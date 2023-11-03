@@ -28,11 +28,20 @@ where p.pii_email_address = lower($1)
   and p.deleted = false
   and u.deleted = false;
 
--- name: GetUserByAddressBatch :batchone
+-- name: GetUserByAddressAndL1 :one
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = sqlc.arg('chain')::int
+	and wallets.l1_chain = sqlc.arg('l1_chain')
+	and array[wallets.id] <@ users.wallets
+	and wallets.deleted = false
+	and users.deleted = false;
+
+-- name: GetUserByAddressAndL1Batch :batchone
+select users.*
+from users, wallets
+where wallets.address = sqlc.arg('address')
+	and wallets.l1_chain = sqlc.arg('l1_chain')
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
@@ -88,11 +97,20 @@ select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id wh
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
 
--- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
+-- name: GetTokenByIdIgnoreDisplayableBatch :batchone
+select * from tokens where id = $1 and deleted = false;
+
+-- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.*
 from tokens t
 join contracts c on t.contract = c.id
-where t.owner_user_id = @holder_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+
+-- name: GetTokenByUserTokenIdentifiers :one
+select t.*
+from tokens t
+join contracts c on t.contract = c.id
+where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
@@ -107,9 +125,12 @@ select t.* from collections c,
     limit sqlc.narg('limit');
 
 -- name: GetContractCreatorsByIds :many
-select o.*
-    from unnest(@contract_ids::text[]) as c(id)
-        join contract_creators o on o.contract_id = c.id;
+with keys as (
+    select unnest (@contract_ids::text[]) as id
+         , generate_subscripts(@contract_ids::text[], 1) as batch_key_index
+)
+select k.batch_key_index, sqlc.embed(c) from keys k
+    join contract_creators c on c.contract_id = k.id;
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
 with new_tokens as (
@@ -130,11 +151,8 @@ SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 -- name: GetWalletByIDBatch :batchone
 SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
--- name: GetWalletByChainAddress :one
-SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
-
--- name: GetWalletByChainAddressBatch :batchone
-SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
+-- name: GetWalletByAddressAndL1Chain :one
+SELECT wallets.* FROM wallets WHERE address = $1 AND l1_chain = $2 AND deleted = false;
 
 -- name: GetWalletsByUserID :many
 SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
@@ -153,7 +171,13 @@ order by u.primary_wallet_id = w.id desc, w.id desc;
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
 -- name: GetContractsByIDs :many
-SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
+with keys as (
+    select unnest (@contract_ids::varchar[]) as id
+         , generate_subscripts(@contract_ids::varchar[], 1) as batch_key_index
+)
+select k.batch_key_index, sqlc.embed(c) from keys k
+    join contracts c on c.id = k.id
+    where not c.deleted;
 
 -- name: GetContractsByTokenIDs :many
 select contracts.* from contracts join tokens on contracts.id = tokens.contract where tokens.id = any(@token_ids) and contracts.deleted = false;
@@ -282,7 +306,8 @@ select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media
     order by t.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
-select t.* from tokens t
+select sqlc.embed(t), sqlc.embed(c) from tokens t
+       join contracts c on c.id = t.contract
     where t.owner_user_id = @owner_user_id
       and t.deleted = false
       and t.displayable
@@ -298,7 +323,7 @@ select t.* from tokens t
     order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
 
 -- name: CreateTokenEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, sqlc.narg('gallery'), sqlc.narg('collection')) RETURNING *;
@@ -309,11 +334,17 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 -- name: CreateGalleryEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
 
+-- name: CreateContractEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
+
+-- name: CreatePostEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $5, $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $5, $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
@@ -401,7 +432,6 @@ SELECT *
 FROM feed_entities
 WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
@@ -414,23 +444,25 @@ select fe.* from feed_entities fe, follows fl
       and fl.follower = sqlc.arg('follower')
       and (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
       and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-      and (@include_posts::bool or feed_entity_type != @post_entity_type)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
 limit sqlc.arg('limit');
 
--- name: PaginateUserFeedByUserID :many
-SELECT *
-FROM feed_entities
-WHERE actor_id = sqlc.arg('owner_id')
-        AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
-ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
-LIMIT sqlc.arg('limit');
+-- name: PaginatePostsByUserID :many
+select *
+from posts
+where actor_id = sqlc.arg('user_id')
+        and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and not posts.deleted
+order by
+    case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
+    case when not sqlc.arg('paging_forward')::bool then (created_at, id) end desc
+limit sqlc.arg('limit');
+
+-- name: CountPostsByUserID :one
+select count(*) from posts where actor_id = $1 and not posts.deleted;
 
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
@@ -439,6 +471,27 @@ WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
 AND posts.deleted = false
 AND (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
 AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+ORDER BY
+    CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT sqlc.arg('limit');
+
+-- name: PaginatePostsByContractIDAndProjectID :many
+with valid_post_ids as (
+    SELECT distinct on (posts.id) posts.id
+    FROM posts
+        JOIN tokens on tokens.id = ANY(posts.token_ids)
+            and tokens.displayable
+            and tokens.deleted = false
+            and tokens.contract = sqlc.arg('contract_id')
+            and ('x' || lpad(substring(tokens.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
+    WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
+      AND posts.deleted = false
+)
+SELECT posts.* from posts
+    join valid_post_ids on posts.id = valid_post_ids.id
+WHERE (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ORDER BY
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
@@ -454,12 +507,19 @@ and posts.deleted = false;
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
 -- name: GetPostsByIds :many
-SELECT * FROM posts WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
+select posts.*
+from posts
+join unnest(@post_ids::varchar(255)[]) with ordinality t(id, pos) using(id)
+where not posts.deleted
+order by pos asc;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
 -- name: GetPostByIdBatch :batchone
+SELECT * FROM posts WHERE id = $1 AND deleted = false;
+
+-- name: GetPostByID :one
 SELECT * FROM posts WHERE id = $1 AND deleted = false;
 
 -- name: CreateFeedEvent :one
@@ -555,16 +615,16 @@ SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_a
 SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
 -- name: GetCommentByCommentID :one
-SELECT * FROM comments WHERE id = $1 AND deleted = false;
+SELECT * FROM comments WHERE id = $1 and deleted = false;
 
 -- name: GetCommentsByCommentIDs :many
-SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
+SELECT * from comments WHERE id = ANY(@comment_ids) and deleted = false;
 
 -- name: GetCommentByCommentIDBatch :batchone
-SELECT * FROM comments WHERE id = $1 AND deleted = false;
+SELECT * FROM comments WHERE id = $1 and deleted = false;
 
 -- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false
+SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -572,10 +632,18 @@ SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND delet
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByFeedEventIDBatch :batchone
-SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
+SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false;
 
 -- name: PaginateCommentsByPostIDBatch :batchmany
-SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false
+SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
+
+-- name: PaginateRepliesByCommentIDBatch :batchmany
+SELECT * FROM comments WHERE reply_to = sqlc.arg('comment_id') AND deleted = false
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -583,13 +651,10 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByPostIDBatch :batchone
-SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false;
+SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
 
--- name: GetCommentsByActorID :many
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
-
--- name: GetCommentsByActorIDBatch :batchmany
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
+-- name: CountRepliesByCommentIDBatch :batchone
+SELECT count(*) FROM comments WHERE reply_to = sqlc.arg('comment_id') AND deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
@@ -657,16 +722,25 @@ SELECT * FROM notifications
     ORDER BY created_at DESC;
 
 -- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post')) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token')) RETURNING *;
 
 -- name: CreateCommentNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6) RETURNING *;
+
+-- name: CreateContractNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
+
+-- name: CreateUserPostedYourWorkNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
 
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: CreateTokenNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amount) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+
+-- name: CreateMentionUserNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6) RETURNING *;
 
 -- name: CreateViewGalleryNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
@@ -685,7 +759,7 @@ SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
         AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
-    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
+    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.reply_to is null AND t.deleted = false
         AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
@@ -696,14 +770,14 @@ LIMIT sqlc.arg('limit');
 -- name: CountInteractionsByFeedEventIDBatch :batchmany
 SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
                                                         UNION
-SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false;
+SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.reply_to is null AND t.deleted = false;
 
 -- name: PaginateInteractionsByPostIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
         AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
-    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
+    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.reply_to is null AND t.deleted = false
         AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
@@ -714,13 +788,16 @@ LIMIT sqlc.arg('limit');
 -- name: CountInteractionsByPostIDBatch :batchmany
 SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
                                                         UNION
-SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false;
+SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.reply_to is null AND t.deleted = false;
 
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
 
 -- name: GetAdmireByActorIDAndPostID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false;
+
+-- name: GetAdmireByActorIDAndTokenID :batchone
+SELECT * FROM admires WHERE actor_id = $1 AND token_id = $2 AND deleted = false;
 
 -- name: InsertPost :one
 insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id;
@@ -793,7 +870,7 @@ update users set primary_wallet_id = @wallet_id from wallets
     and wallets.id = any(users.wallets) and wallets.deleted = false;
 
 -- name: GetUsersByChainAddresses :many
-select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
+select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.l1_chain = @l1_chain AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
 
 -- name: GetFeedEventByID :one
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
@@ -1131,7 +1208,7 @@ select * from users where array[@wallet::varchar]::varchar[] <@ wallets and dele
 update users set deleted = true where id = $1;
 
 -- name: InsertWallet :exec
-with new_wallet as (insert into wallets(id, address, chain, wallet_type) values ($1, $2, $3, $4) returning id)
+with new_wallet as (insert into wallets(id, address, chain, l1_chain, wallet_type) values ($1, $2, $3, $4, $5) returning id)
 update users set
     primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
     wallets = array_append(users.wallets, new_wallet.id)
@@ -1157,7 +1234,7 @@ with insert_job(id) as (
 insert_media_move_active_record(last_updated) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select @copy_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        select @retired_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
         from token_medias
         where contract_id = @contract_id
             and token_id = @token_id
@@ -1170,7 +1247,7 @@ insert_media_move_active_record(last_updated) as (
     returning last_updated
 ),
 -- Update the existing active record with the new media data
-insert_media_add_record(insert_id, active, is_new) as (
+insert_media_add_record(insert_id, active, replaced_current) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     values (@new_media_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, (select id from insert_job), @active,
         -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
@@ -1180,11 +1257,11 @@ insert_media_add_record(insert_id, active, is_new) as (
     on conflict (contract_id, token_id, chain) where active and not deleted do update
         set metadata = excluded.metadata,
             media = excluded.media,
-            name = excluded.name,
-            description = excluded.description,
+            name = coalesce(nullif(excluded.name, ''), token_medias.name),
+            description = coalesce(nullif(excluded.description, ''), token_medias.description),
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
-    returning id as insert_id, active, id = @new_media_id is_new
+    returning id as insert_id, active, id = @new_media_id replaced_current
 ),
 -- This will return the existing active record if it exists. If the incoming record is active,
 -- this will still return the active record before the update, and not the new record.
@@ -1204,7 +1281,7 @@ set token_media_id = (
         -- The pipeline produced active media, or didn't produce active media but no active media existed before
         else insert_medias.insert_id
     end
-)
+), name = coalesce(nullif(@name, ''), tokens.name), description = coalesce(nullif(@description, ''), tokens.description), last_updated = now() -- update the duplicate fields on the token in the meantime before we get rid of these fields
 from insert_media_add_record insert_medias
 where
     tokens.chain = @chain
@@ -1215,11 +1292,11 @@ where
         -- The case statement below handles which token instances get updated:
         case
             -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
-            when insert_medias.active and not insert_medias.is_new
+            when insert_medias.active and not insert_medias.replaced_current
             then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
 
             -- Brand new active media, update all tokens in the filter to use this media
-            when insert_medias.active and insert_medias.is_new
+            when insert_medias.active and insert_medias.replaced_current
             then 1 = 1
 
             -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
@@ -1337,10 +1414,38 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByTokenIDIgnoringStatus :batchone
-select m.*
-from token_medias m
-where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
+-- name: GetMediaByMediaIDIgnoringStatus :batchone
+select m.* from token_medias m where m.id = $1 and not m.deleted;
+
+-- name: GetMediaByUserTokenIdentifiers :one
+with contract as (
+	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
+),
+matching_media as (
+	select token_medias.*
+	from token_medias, contract
+	where token_medias.contract_id = contract.id and token_medias.chain = @chain and token_medias.token_id = @token_id and not token_medias.deleted
+	order by token_medias.active desc, token_medias.last_updated desc
+	limit 1
+),
+matched_token(id) as (
+    select tokens.id
+    from tokens, contract, matching_media
+    where tokens.contract = contract.id and tokens.chain = @chain and tokens.token_id = @token_id and not tokens.deleted
+    order by tokens.owner_user_id = @user_id desc, tokens.token_media_id = matching_media.id desc, tokens.last_updated desc
+    limit 1
+)
+select sqlc.embed(token_medias), (select id from matched_token) token_instance_id from matching_media token_medias;
+
+-- name: GetFallbackTokenByUserTokenIdentifiers :one
+with contract as (
+	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
+)
+select tokens.*
+from tokens, contract
+where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = @token_id and not tokens.deleted
+order by tokens.owner_user_id = @user_id desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
+limit 1;
 
 -- name: UpsertSession :one
 insert into sessions (id, user_id,
@@ -1362,13 +1467,13 @@ update sessions set invalidated = true, active_until = least(active_until, now()
 
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens
-    set name = @name,
-        description = @description,
-        last_updated = now()
-    where token_id = @token_id
-      and contract = @contract_id
-      and chain = @chain
-      and deleted = false;
+set name = @name,
+    description = @description,
+    last_updated = now()
+where token_id = @token_id
+    and contract = @contract_id
+    and chain = @chain
+    and deleted = false;
 
 -- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (
@@ -1445,7 +1550,7 @@ where pfp.id = @id
 		when pfp.source_type = @ens_source_type
 		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
 		when pfp.source_type = @token_source_type
-		then exists(select 1 from tokens t where t.id = pfp.token_id and t.displayable and not t.deleted)
+		then exists(select 1 from tokens t where t.id = pfp.token_id and not t.deleted)
 		else
 		0 = 1
 	end;
@@ -1487,31 +1592,6 @@ join wallets on wallets.id = any(tokens.owned_by_wallets)
 where tokens.id = $1 and tokens.displayable and not tokens.deleted and not contracts.deleted and not wallets.deleted
 group by (tokens.token_id, contracts.address, contracts.chain, tokens.quantity) limit 1;
 
--- name: GetContractCreatorsByContractIDs :many
-with contract_creators as (
-    select c.id as contract_id,
-           u.id as creator_user_id,
-           c.chain as chain,
-           coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) as creator_address,
-           w.id as creator_wallet_id
-    from contracts c
-             left join wallets w on
-                w.deleted = false and
-                w.chain = c.chain and
-                coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-             left join users u on
-                u.deleted = false and
-                (
-                        (c.override_creator_user_id is not null and c.override_creator_user_id = u.id)
-                        or
-                        (c.override_creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
-                    )
-    where c.deleted = false
-      and (u.id is not null or coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) is not null)
-)
-select * from unnest(@contract_ids::text[]) as ids
-                  join contract_creators cc on cc.contract_id = ids;
-
 -- name: GetCreatedContractsByUserID :many
 select sqlc.embed(c),
        w.id as wallet_id,
@@ -1519,8 +1599,8 @@ select sqlc.embed(c),
 from users u, contracts c, wallets w
 where u.id = @user_id
   and c.chain = any(@chains::int[])
-  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-  and c.chain = w.chain
+  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
+  and w.l1_chain = c.l1_chain
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false
@@ -1588,3 +1668,21 @@ returning *;
 
 -- name: GetUsersBySocialIDs :many
 select * from pii.user_view u where u.pii_socials->sqlc.arg('social_account_type')::varchar->>'id' = any(@social_ids::varchar[]) and not u.deleted and not u.universal;
+
+-- name: InsertCommentMention :one
+insert into mentions (id, user_id, contract_id, comment_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @comment_id, @start, @length) returning *;
+
+-- name: InsertPostMention :one
+insert into mentions (id, user_id, contract_id, post_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @post_id, @start, @length) returning *;
+
+-- name: GetMentionsByCommentID :batchmany
+select * from mentions where comment_id = @comment_id and not deleted;
+
+-- name: GetMentionsByPostID :batchmany
+select * from mentions where post_id = @post_id and not deleted;
+
+-- name: GetMentionByID :one
+select * from mentions where id = @id and not deleted;
+
+-- name: GetUsersWithoutSocials :many
+select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
