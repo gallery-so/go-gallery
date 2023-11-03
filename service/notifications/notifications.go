@@ -790,10 +790,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		if err != nil {
 			return UserFacingNotificationData{}, fmt.Errorf("failed to get user for comment actor %s: %w", comment.ActorID, err)
 		}
-		feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
-		if err != nil {
-			return UserFacingNotificationData{}, fmt.Errorf("failed to get feed event for comment %s: %w", n.FeedEventID, err)
-		}
+		feedEvent, _ := queries.GetFeedEventByID(ctx, n.FeedEventID)
 		action := "commented on your post"
 		if n.Action == persist.ActionCommentedOnFeedEvent && feedEvent.Data.CollectionID != "" {
 			collection, err := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
