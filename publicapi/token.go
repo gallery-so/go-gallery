@@ -54,12 +54,12 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 		return nil, err
 	}
 
-	token, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
+	r, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &token, nil
+	return &r.Token, nil
 }
 
 // GetTokenByIdIgnoreDisplayable returns a token by ID, ignoring the displayable flag.
@@ -71,12 +71,12 @@ func (api TokenAPI) GetTokenByIdIgnoreDisplayable(ctx context.Context, tokenID p
 		return nil, err
 	}
 
-	token, err := api.loaders.GetTokenByIdIgnoreDisplayableBatch.Load(tokenID)
+	r, err := api.loaders.GetTokenByIdIgnoreDisplayableBatch.Load(tokenID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &token, nil
+	return &r.Token, nil
 }
 
 func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, error) {
@@ -139,7 +139,7 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
 		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
-		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
+		rows, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			ID:                 contractID,
 			Limit:              params.Limit,
 			GalleryUsersOnly:   onlyGalleryUsers,
@@ -155,9 +155,9 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 			return nil, err
 		}
 
-		results := make([]interface{}, len(tokens))
-		for i, token := range tokens {
-			results[i] = token
+		results := make([]interface{}, len(rows))
+		for i, r := range rows {
+			results[i] = r.Token
 		}
 
 		return results, nil
@@ -208,10 +208,10 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {
 	tokens, errs := api.loaders.GetTokenByIdBatch.LoadAll(tokenIDs)
-	foundTokens := tokens[:0]
+	foundTokens := make([]db.Token, 0, len(tokens))
 	for i, t := range tokens {
 		if errs[i] == nil {
-			foundTokens = append(foundTokens, t)
+			foundTokens = append(foundTokens, t.Token)
 		} else if _, ok := errs[i].(persist.ErrTokenNotFoundByID); !ok {
 			return []db.Token{}, errs[i]
 		}
@@ -247,10 +247,12 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 		return nil, err
 	}
 
-	tokens, err := api.loaders.GetTokensByWalletIdsBatch.Load(persist.DBIDList{walletID})
+	r, err := api.loaders.GetTokensByWalletIdsBatch.Load(persist.DBIDList{walletID})
 	if err != nil {
 		return nil, err
 	}
+
+	tokens := util.MapWithoutError(r, func(r db.GetTokensByWalletIdsBatchRow) db.Token { return r.Token })
 
 	return tokens, nil
 }
@@ -554,23 +556,7 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 	})
 }
 
-func (api TokenAPI) GetTokenDefinitionAndMediaByTokenDefinitionID(ctx context.Context, id persist.DBID) (db.TokenDefinition, db.TokenMedia, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenDefinitionID": validate.WithTag(id, "required"),
-	}); err != nil {
-		return db.TokenDefinition{}, db.TokenMedia{}, err
-	}
-
-	tDefWMedia, err := api.loaders.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch.Load(id)
-	if err != nil {
-		return db.TokenDefinition{}, db.TokenMedia{}, err
-	}
-
-	return tDefWMedia.TokenDefinition, tDefWMedia.TokenMedia, nil
-}
-
-func (api TokenAPI) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
+func (api TokenAPI) GetMediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
@@ -578,12 +564,18 @@ func (api TokenAPI) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Con
 	}); err != nil {
 		return db.TokenDefinition{}, db.TokenMedia{}, err
 	}
-	tokenDefAndMedia, err := api.queries.GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus(ctx, db.GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusParams{
+
+	td, err := api.queries.GetTokenDefinitionByTokenIdentifiers(ctx, db.GetTokenDefinitionByTokenIdentifiersParams{
 		Chain:           tokenIdentifiers.Chain,
 		ContractAddress: tokenIdentifiers.ContractAddress,
 		TokenID:         tokenIdentifiers.TokenID,
 	})
-	return tokenDefAndMedia.TokenDefinition, tokenDefAndMedia.TokenMedia, err
+	if err != nil {
+		return db.TokenDefinition{}, db.TokenMedia{}, err
+	}
+
+	media, err := api.loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(td.TokenMediaID)
+	return td, media, err
 }
 
 func (api TokenAPI) GetMediaByMediaID(ctx context.Context, id persist.DBID) (db.TokenMedia, error) {

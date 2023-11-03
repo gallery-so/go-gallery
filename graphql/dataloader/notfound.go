@@ -144,7 +144,3 @@ func (*GetTokenDefinitionByIdBatch) getNotFoundError(key persist.DBID) error {
 func (*GetTokenDefinitionByTokenDbidBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrTokenDefinitionNotFoundByTokenDBID{ID: key}
 }
-
-func (*GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch) getNotFoundError(key persist.DBID) error {
-	panic("not implemented")
-}

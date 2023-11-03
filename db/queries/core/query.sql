@@ -89,7 +89,10 @@ SELECT c.* FROM galleries g, unnest(g.collections)
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord;
 
 -- name: GetTokenById :one
-select * from tokens where id = $1 and displayable and deleted = false;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenDefinitionById :one
 select * from token_definitions where id = $1 and not deleted;
@@ -117,22 +120,6 @@ where token_definitions.id = tokens.token_definition_id
 select *
 from token_definitions
 where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id) and not deleted;
-
--- name: GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus :one
-select sqlc.embed(token_definitions), sqlc.embed(token_medias)
-from token_definitions, token_medias
-where (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = (@chain, @contract_address, @token_id)
-    and token_definitions.token_media_id = token_medias.id
-    and not token_definitions.deleted
-    and not token_medias.deleted;
-
--- name: GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch :batchone
-select sqlc.embed(token_definitions), sqlc.embed(token_medias)
-from token_definitions, token_medias
-where token_definitions.id = $1
-    and token_definitions.token_media_id = token_medias.id
-    and not token_definitions.deleted
-    and not token_medias.deleted;
 
 -- name: GetTokenFullDetailsByUserTokenIdentifiers :one
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
@@ -174,16 +161,20 @@ with user_tokens as (select count(*) total from tokens where id = any(@token_ids
 select (select total from total_tokens) = (select total from user_tokens) owns_all;
 
 -- name: GetTokenByIdBatch :batchone
-select * from tokens where id = $1 and displayable and deleted = false;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select * from tokens where id = $1 and deleted = false;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+where t.id = $1 and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
-select sqlc.embed(t),
-    -- Fetch the definition and contract to cache since downstream queries will likely need them
-    sqlc.embed(td),
-    sqlc.embed(c)
+-- Fetch the definition and contract to cache since downstream queries will likely use them
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
 from tokens t, token_definitions td, contracts c
 where t.token_definition_id = td.token_definition_id
     and td.contract_id = c.id
@@ -197,11 +188,18 @@ where t.token_definition_id = td.token_definition_id
     and not c.deleted;
 
 -- name: GetTokenByUserTokenIdentifiers :one
-select *
-from tokens
-where owner_user_id = @owner_id and token_definition_id = (select id from token_definitions td where (td.chain, td.contract_address, td.token_id) = (@chain, @contract_address, @token_id) and not deleted)
-    and not tokens.deleted
-    and tokens.displayable;
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
+from tokens t, token_definitions td, contracts c
+where t.token_definition_id = td.token_definition_id
+    and td.contract_id = c.id
+    and t.owner_user_id = @owner_id
+    and td.token_id = @token_id
+    and td.chain = @chain
+    and td.contract_address = @contract_address
+    and t.displayable
+    and not t.deleted
+    and not td.deleted
+    and not c.deleted;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
@@ -318,17 +316,22 @@ SELECT u.* FROM follows f
     ORDER BY f.last_updated DESC;
 
 -- name: GetTokensByWalletIdsBatch :batchmany
-select * from tokens where owned_by_wallets && $1 and displayable and deleted = false
-    order by tokens.created_at desc, tokens.name desc, tokens.id desc;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join tokens td on t.token_definition_id = td.id
+where t.owned_by_wallets && $1 and t.displayable and t.deleted = false and td.deleted = false
+order by t.created_at desc, td.name desc, t.id desc;
 
 -- name: GetTokensByContractIdPaginate :many
-select t.* from tokens t
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from tokens t
+    join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
     where (c.id = $1 or c.parent_id = $1)
     and t.displayable
     and t.deleted = false
     and c.deleted = false
+    and td.deleted = false
     and (not @gallery_users_only::bool or u.universal = false)
     and (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     and (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
@@ -400,7 +403,7 @@ where t.owner_user_id = @owner_id
 order by t.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
-select sqlc.embed(t), sqlc.embed(c)
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
 join contracts c on c.id = td.contract_id
@@ -1400,40 +1403,6 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
-
--- name: GetAllTokensWithContractsByIDs :many
-select
-    tokens.*,
-    contracts.*,
-    (
-        select wallets.address
-        from wallets
-        where wallets.id = any(tokens.owned_by_wallets) and wallets.deleted = false
-        limit 1
-    ) as wallet_address
-from tokens
-join contracts on contracts.id = tokens.contract_id
-left join token_medias on token_medias.id = tokens.token_media_id
-where tokens.deleted = false
-and (tokens.token_media_id is null or token_medias.active = false)
-and tokens.id >= @start_id and tokens.id < @end_id
-order by tokens.id;
-
--- name: GetMissingThumbnailTokensByIDRange :many
-SELECT
-    tokens.*,
-    contracts.*,
-    (
-        SELECT wallets.address
-        FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
-        LIMIT 1
-    ) AS wallet_address
-FROM tokens
-JOIN contracts ON contracts.id = tokens.contract_id
-left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
-AND tokens.id >= @start_id AND tokens.id < @end_id
-ORDER BY tokens.id;
 
 -- name: GetSVGTokensWithContractsByIDs :many
 SELECT

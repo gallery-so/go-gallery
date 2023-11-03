@@ -1518,150 +1518,6 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 	return items, nil
 }
 
-const getAllTokensWithContractsByIDs = `-- name: GetAllTokensWithContractsByIDs :many
-select
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_type__deprecated, tokens.token_id__deprecated, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain__deprecated, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.token_uri__deprecated, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable,
-    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain,
-    (
-        select wallets.address
-        from wallets
-        where wallets.id = any(tokens.owned_by_wallets) and wallets.deleted = false
-        limit 1
-    ) as wallet_address
-from tokens
-join contracts on contracts.id = tokens.contract_id
-left join token_medias on token_medias.id = tokens.token_media_id
-where tokens.deleted = false
-and (tokens.token_media_id is null or token_medias.active = false)
-and tokens.id >= $1 and tokens.id < $2
-order by tokens.id
-`
-
-type GetAllTokensWithContractsByIDsParams struct {
-	StartID persist.DBID `db:"start_id" json:"start_id"`
-	EndID   persist.DBID `db:"end_id" json:"end_id"`
-}
-
-type GetAllTokensWithContractsByIDsRow struct {
-	ID                             persist.DBID      `db:"id" json:"id"`
-	Deleted                        bool              `db:"deleted" json:"deleted"`
-	Version                        sql.NullInt32     `db:"version" json:"version"`
-	CreatedAt                      time.Time         `db:"created_at" json:"created_at"`
-	LastUpdated                    time.Time         `db:"last_updated" json:"last_updated"`
-	NameDeprecated                 sql.NullString    `db:"name__deprecated" json:"name__deprecated"`
-	DescriptionDeprecated          sql.NullString    `db:"description__deprecated" json:"description__deprecated"`
-	CollectorsNote                 sql.NullString    `db:"collectors_note" json:"collectors_note"`
-	TokenTypeDeprecated            sql.NullString    `db:"token_type__deprecated" json:"token_type__deprecated"`
-	TokenIDDeprecated              sql.NullString    `db:"token_id__deprecated" json:"token_id__deprecated"`
-	Quantity                       persist.HexString `db:"quantity" json:"quantity"`
-	OwnershipHistoryDeprecated     []pgtype.JSONB    `db:"ownership_history__deprecated" json:"ownership_history__deprecated"`
-	ExternalUrlDeprecated          sql.NullString    `db:"external_url__deprecated" json:"external_url__deprecated"`
-	BlockNumber                    sql.NullInt64     `db:"block_number" json:"block_number"`
-	OwnerUserID                    persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
-	OwnedByWallets                 persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
-	ChainDeprecated                sql.NullInt32     `db:"chain__deprecated" json:"chain__deprecated"`
-	ContractID                     persist.DBID      `db:"contract_id" json:"contract_id"`
-	IsUserMarkedSpam               sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
-	IsProviderMarkedSpamDeprecated sql.NullBool      `db:"is_provider_marked_spam__deprecated" json:"is_provider_marked_spam__deprecated"`
-	LastSynced                     time.Time         `db:"last_synced" json:"last_synced"`
-	TokenUriDeprecated             sql.NullString    `db:"token_uri__deprecated" json:"token_uri__deprecated"`
-	FallbackMediaDeprecated        pgtype.JSONB      `db:"fallback_media__deprecated" json:"fallback_media__deprecated"`
-	TokenMediaIDDeprecated         sql.NullString    `db:"token_media_id__deprecated" json:"token_media_id__deprecated"`
-	IsCreatorToken                 bool              `db:"is_creator_token" json:"is_creator_token"`
-	TokenDefinitionID              persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
-	IsHolderToken                  bool              `db:"is_holder_token" json:"is_holder_token"`
-	Displayable                    bool              `db:"displayable" json:"displayable"`
-	ID_2                           persist.DBID      `db:"id_2" json:"id_2"`
-	Deleted_2                      bool              `db:"deleted_2" json:"deleted_2"`
-	Version_2                      sql.NullInt32     `db:"version_2" json:"version_2"`
-	CreatedAt_2                    time.Time         `db:"created_at_2" json:"created_at_2"`
-	LastUpdated_2                  time.Time         `db:"last_updated_2" json:"last_updated_2"`
-	Name                           sql.NullString    `db:"name" json:"name"`
-	Symbol                         sql.NullString    `db:"symbol" json:"symbol"`
-	Address                        persist.Address   `db:"address" json:"address"`
-	CreatorAddress                 persist.Address   `db:"creator_address" json:"creator_address"`
-	Chain                          persist.Chain     `db:"chain" json:"chain"`
-	ProfileBannerUrl               sql.NullString    `db:"profile_banner_url" json:"profile_banner_url"`
-	ProfileImageUrl                sql.NullString    `db:"profile_image_url" json:"profile_image_url"`
-	BadgeUrl                       sql.NullString    `db:"badge_url" json:"badge_url"`
-	Description                    sql.NullString    `db:"description" json:"description"`
-	OwnerAddress                   persist.Address   `db:"owner_address" json:"owner_address"`
-	IsProviderMarkedSpam           bool              `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
-	ParentID                       persist.DBID      `db:"parent_id" json:"parent_id"`
-	OverrideCreatorUserID          persist.DBID      `db:"override_creator_user_id" json:"override_creator_user_id"`
-	L1Chain                        persist.L1Chain   `db:"l1_chain" json:"l1_chain"`
-	WalletAddress                  persist.Address   `db:"wallet_address" json:"wallet_address"`
-}
-
-func (q *Queries) GetAllTokensWithContractsByIDs(ctx context.Context, arg GetAllTokensWithContractsByIDsParams) ([]GetAllTokensWithContractsByIDsRow, error) {
-	rows, err := q.db.Query(ctx, getAllTokensWithContractsByIDs, arg.StartID, arg.EndID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetAllTokensWithContractsByIDsRow
-	for rows.Next() {
-		var i GetAllTokensWithContractsByIDsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.NameDeprecated,
-			&i.DescriptionDeprecated,
-			&i.CollectorsNote,
-			&i.TokenTypeDeprecated,
-			&i.TokenIDDeprecated,
-			&i.Quantity,
-			&i.OwnershipHistoryDeprecated,
-			&i.ExternalUrlDeprecated,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
-			&i.ChainDeprecated,
-			&i.ContractID,
-			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpamDeprecated,
-			&i.LastSynced,
-			&i.TokenUriDeprecated,
-			&i.FallbackMediaDeprecated,
-			&i.TokenMediaIDDeprecated,
-			&i.IsCreatorToken,
-			&i.TokenDefinitionID,
-			&i.IsHolderToken,
-			&i.Displayable,
-			&i.ID_2,
-			&i.Deleted_2,
-			&i.Version_2,
-			&i.CreatedAt_2,
-			&i.LastUpdated_2,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
-			&i.L1Chain,
-			&i.WalletAddress,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getCheckablePushTickets = `-- name: GetCheckablePushTickets :many
 select id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted, status from push_notification_tickets where check_after <= now() and deleted = false limit $1
 `
@@ -2775,148 +2631,6 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 	return discount_code, err
 }
 
-const getMissingThumbnailTokensByIDRange = `-- name: GetMissingThumbnailTokensByIDRange :many
-SELECT
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_type__deprecated, tokens.token_id__deprecated, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain__deprecated, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.token_uri__deprecated, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable,
-    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain,
-    (
-        SELECT wallets.address
-        FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
-        LIMIT 1
-    ) AS wallet_address
-FROM tokens
-JOIN contracts ON contracts.id = tokens.contract_id
-left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
-AND tokens.id >= $1 AND tokens.id < $2
-ORDER BY tokens.id
-`
-
-type GetMissingThumbnailTokensByIDRangeParams struct {
-	StartID persist.DBID `db:"start_id" json:"start_id"`
-	EndID   persist.DBID `db:"end_id" json:"end_id"`
-}
-
-type GetMissingThumbnailTokensByIDRangeRow struct {
-	ID                             persist.DBID      `db:"id" json:"id"`
-	Deleted                        bool              `db:"deleted" json:"deleted"`
-	Version                        sql.NullInt32     `db:"version" json:"version"`
-	CreatedAt                      time.Time         `db:"created_at" json:"created_at"`
-	LastUpdated                    time.Time         `db:"last_updated" json:"last_updated"`
-	NameDeprecated                 sql.NullString    `db:"name__deprecated" json:"name__deprecated"`
-	DescriptionDeprecated          sql.NullString    `db:"description__deprecated" json:"description__deprecated"`
-	CollectorsNote                 sql.NullString    `db:"collectors_note" json:"collectors_note"`
-	TokenTypeDeprecated            sql.NullString    `db:"token_type__deprecated" json:"token_type__deprecated"`
-	TokenIDDeprecated              sql.NullString    `db:"token_id__deprecated" json:"token_id__deprecated"`
-	Quantity                       persist.HexString `db:"quantity" json:"quantity"`
-	OwnershipHistoryDeprecated     []pgtype.JSONB    `db:"ownership_history__deprecated" json:"ownership_history__deprecated"`
-	ExternalUrlDeprecated          sql.NullString    `db:"external_url__deprecated" json:"external_url__deprecated"`
-	BlockNumber                    sql.NullInt64     `db:"block_number" json:"block_number"`
-	OwnerUserID                    persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
-	OwnedByWallets                 persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
-	ChainDeprecated                sql.NullInt32     `db:"chain__deprecated" json:"chain__deprecated"`
-	ContractID                     persist.DBID      `db:"contract_id" json:"contract_id"`
-	IsUserMarkedSpam               sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
-	IsProviderMarkedSpamDeprecated sql.NullBool      `db:"is_provider_marked_spam__deprecated" json:"is_provider_marked_spam__deprecated"`
-	LastSynced                     time.Time         `db:"last_synced" json:"last_synced"`
-	TokenUriDeprecated             sql.NullString    `db:"token_uri__deprecated" json:"token_uri__deprecated"`
-	FallbackMediaDeprecated        pgtype.JSONB      `db:"fallback_media__deprecated" json:"fallback_media__deprecated"`
-	TokenMediaIDDeprecated         sql.NullString    `db:"token_media_id__deprecated" json:"token_media_id__deprecated"`
-	IsCreatorToken                 bool              `db:"is_creator_token" json:"is_creator_token"`
-	TokenDefinitionID              persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
-	IsHolderToken                  bool              `db:"is_holder_token" json:"is_holder_token"`
-	Displayable                    bool              `db:"displayable" json:"displayable"`
-	ID_2                           persist.DBID      `db:"id_2" json:"id_2"`
-	Deleted_2                      bool              `db:"deleted_2" json:"deleted_2"`
-	Version_2                      sql.NullInt32     `db:"version_2" json:"version_2"`
-	CreatedAt_2                    time.Time         `db:"created_at_2" json:"created_at_2"`
-	LastUpdated_2                  time.Time         `db:"last_updated_2" json:"last_updated_2"`
-	Name                           sql.NullString    `db:"name" json:"name"`
-	Symbol                         sql.NullString    `db:"symbol" json:"symbol"`
-	Address                        persist.Address   `db:"address" json:"address"`
-	CreatorAddress                 persist.Address   `db:"creator_address" json:"creator_address"`
-	Chain                          persist.Chain     `db:"chain" json:"chain"`
-	ProfileBannerUrl               sql.NullString    `db:"profile_banner_url" json:"profile_banner_url"`
-	ProfileImageUrl                sql.NullString    `db:"profile_image_url" json:"profile_image_url"`
-	BadgeUrl                       sql.NullString    `db:"badge_url" json:"badge_url"`
-	Description                    sql.NullString    `db:"description" json:"description"`
-	OwnerAddress                   persist.Address   `db:"owner_address" json:"owner_address"`
-	IsProviderMarkedSpam           bool              `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
-	ParentID                       persist.DBID      `db:"parent_id" json:"parent_id"`
-	OverrideCreatorUserID          persist.DBID      `db:"override_creator_user_id" json:"override_creator_user_id"`
-	L1Chain                        persist.L1Chain   `db:"l1_chain" json:"l1_chain"`
-	WalletAddress                  persist.Address   `db:"wallet_address" json:"wallet_address"`
-}
-
-func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg GetMissingThumbnailTokensByIDRangeParams) ([]GetMissingThumbnailTokensByIDRangeRow, error) {
-	rows, err := q.db.Query(ctx, getMissingThumbnailTokensByIDRange, arg.StartID, arg.EndID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetMissingThumbnailTokensByIDRangeRow
-	for rows.Next() {
-		var i GetMissingThumbnailTokensByIDRangeRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.NameDeprecated,
-			&i.DescriptionDeprecated,
-			&i.CollectorsNote,
-			&i.TokenTypeDeprecated,
-			&i.TokenIDDeprecated,
-			&i.Quantity,
-			&i.OwnershipHistoryDeprecated,
-			&i.ExternalUrlDeprecated,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
-			&i.ChainDeprecated,
-			&i.ContractID,
-			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpamDeprecated,
-			&i.LastSynced,
-			&i.TokenUriDeprecated,
-			&i.FallbackMediaDeprecated,
-			&i.TokenMediaIDDeprecated,
-			&i.IsCreatorToken,
-			&i.TokenDefinitionID,
-			&i.IsHolderToken,
-			&i.Displayable,
-			&i.ID_2,
-			&i.Deleted_2,
-			&i.Version_2,
-			&i.CreatedAt_2,
-			&i.LastUpdated_2,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
-			&i.L1Chain,
-			&i.WalletAddress,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id from notifications
     where owner_id = $1
@@ -3758,125 +3472,49 @@ func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (pers
 }
 
 const getTokenById = `-- name: GetTokenById :one
-select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_type__deprecated, token_id__deprecated, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain__deprecated, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, token_uri__deprecated, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, token_definition_id, is_holder_token, displayable from tokens where id = $1 and displayable and deleted = false
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_type__deprecated, t.token_id__deprecated, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain__deprecated, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.token_uri__deprecated, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false
 `
 
-func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
-	row := q.db.QueryRow(ctx, getTokenById, id)
-	var i Token
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.NameDeprecated,
-		&i.DescriptionDeprecated,
-		&i.CollectorsNote,
-		&i.TokenTypeDeprecated,
-		&i.TokenIDDeprecated,
-		&i.Quantity,
-		&i.OwnershipHistoryDeprecated,
-		&i.ExternalUrlDeprecated,
-		&i.BlockNumber,
-		&i.OwnerUserID,
-		&i.OwnedByWallets,
-		&i.ChainDeprecated,
-		&i.ContractID,
-		&i.IsUserMarkedSpam,
-		&i.IsProviderMarkedSpamDeprecated,
-		&i.LastSynced,
-		&i.TokenUriDeprecated,
-		&i.FallbackMediaDeprecated,
-		&i.TokenMediaIDDeprecated,
-		&i.IsCreatorToken,
-		&i.TokenDefinitionID,
-		&i.IsHolderToken,
-		&i.Displayable,
-	)
-	return i, err
-}
-
-const getTokenByUserTokenIdentifiers = `-- name: GetTokenByUserTokenIdentifiers :one
-select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_type__deprecated, token_id__deprecated, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain__deprecated, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, token_uri__deprecated, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, token_definition_id, is_holder_token, displayable
-from tokens
-where owner_user_id = $1 and token_definition_id = (select id from token_definitions td where (td.chain, td.contract_address, td.token_id) = ($2, $3, $4) and not deleted)
-    and not tokens.deleted
-    and tokens.displayable
-`
-
-type GetTokenByUserTokenIdentifiersParams struct {
-	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
-}
-
-func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTokenByUserTokenIdentifiersParams) (Token, error) {
-	row := q.db.QueryRow(ctx, getTokenByUserTokenIdentifiers,
-		arg.OwnerID,
-		arg.Chain,
-		arg.ContractAddress,
-		arg.TokenID,
-	)
-	var i Token
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.NameDeprecated,
-		&i.DescriptionDeprecated,
-		&i.CollectorsNote,
-		&i.TokenTypeDeprecated,
-		&i.TokenIDDeprecated,
-		&i.Quantity,
-		&i.OwnershipHistoryDeprecated,
-		&i.ExternalUrlDeprecated,
-		&i.BlockNumber,
-		&i.OwnerUserID,
-		&i.OwnedByWallets,
-		&i.ChainDeprecated,
-		&i.ContractID,
-		&i.IsUserMarkedSpam,
-		&i.IsProviderMarkedSpamDeprecated,
-		&i.LastSynced,
-		&i.TokenUriDeprecated,
-		&i.FallbackMediaDeprecated,
-		&i.TokenMediaIDDeprecated,
-		&i.IsCreatorToken,
-		&i.TokenDefinitionID,
-		&i.IsHolderToken,
-		&i.Displayable,
-	)
-	return i, err
-}
-
-const getTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus = `-- name: GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus :one
-select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
-from token_definitions, token_medias
-where (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = ($1, $2, $3)
-    and token_definitions.token_media_id = token_medias.id
-    and not token_definitions.deleted
-    and not token_medias.deleted
-`
-
-type GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusParams struct {
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
-}
-
-type GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusRow struct {
+type GetTokenByIdRow struct {
+	Token           Token           `db:"token" json:"token"`
 	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
-	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
 }
 
-func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus(ctx context.Context, arg GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusParams) (GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusRow, error) {
-	row := q.db.QueryRow(ctx, getTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus, arg.Chain, arg.ContractAddress, arg.TokenID)
-	var i GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatusRow
+func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (GetTokenByIdRow, error) {
+	row := q.db.QueryRow(ctx, getTokenById, id)
+	var i GetTokenByIdRow
 	err := row.Scan(
+		&i.Token.ID,
+		&i.Token.Deleted,
+		&i.Token.Version,
+		&i.Token.CreatedAt,
+		&i.Token.LastUpdated,
+		&i.Token.NameDeprecated,
+		&i.Token.DescriptionDeprecated,
+		&i.Token.CollectorsNote,
+		&i.Token.TokenTypeDeprecated,
+		&i.Token.TokenIDDeprecated,
+		&i.Token.Quantity,
+		&i.Token.OwnershipHistoryDeprecated,
+		&i.Token.ExternalUrlDeprecated,
+		&i.Token.BlockNumber,
+		&i.Token.OwnerUserID,
+		&i.Token.OwnedByWallets,
+		&i.Token.ChainDeprecated,
+		&i.Token.ContractID,
+		&i.Token.IsUserMarkedSpam,
+		&i.Token.IsProviderMarkedSpamDeprecated,
+		&i.Token.LastSynced,
+		&i.Token.TokenUriDeprecated,
+		&i.Token.FallbackMediaDeprecated,
+		&i.Token.TokenMediaIDDeprecated,
+		&i.Token.IsCreatorToken,
+		&i.Token.TokenDefinitionID,
+		&i.Token.IsHolderToken,
+		&i.Token.Displayable,
 		&i.TokenDefinition.ID,
 		&i.TokenDefinition.CreatedAt,
 		&i.TokenDefinition.LastUpdated,
@@ -3892,20 +3530,109 @@ func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiersIgnoringStatus(ctx
 		&i.TokenDefinition.ContractAddress,
 		&i.TokenDefinition.ContractID,
 		&i.TokenDefinition.TokenMediaID,
-		&i.TokenMedia.ID,
-		&i.TokenMedia.CreatedAt,
-		&i.TokenMedia.LastUpdated,
-		&i.TokenMedia.Version,
-		&i.TokenMedia.ContractIDDeprecated,
-		&i.TokenMedia.TokenIDDeprecated,
-		&i.TokenMedia.ChainDeprecated,
-		&i.TokenMedia.Active,
-		&i.TokenMedia.MetadataDeprecated,
-		&i.TokenMedia.Media,
-		&i.TokenMedia.NameDeprecated,
-		&i.TokenMedia.DescriptionDeprecated,
-		&i.TokenMedia.ProcessingJobID,
-		&i.TokenMedia.Deleted,
+	)
+	return i, err
+}
+
+const getTokenByUserTokenIdentifiers = `-- name: GetTokenByUserTokenIdentifiers :one
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_type__deprecated, t.token_id__deprecated, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain__deprecated, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.token_uri__deprecated, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
+from tokens t, token_definitions td, contracts c
+where t.token_definition_id = td.token_definition_id
+    and td.contract_id = c.id
+    and t.owner_user_id = $1
+    and td.token_id = $2
+    and td.chain = $3
+    and td.contract_address = $4
+    and t.displayable
+    and not t.deleted
+    and not td.deleted
+    and not c.deleted
+`
+
+type GetTokenByUserTokenIdentifiersParams struct {
+	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
+	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+}
+
+type GetTokenByUserTokenIdentifiersRow struct {
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
+}
+
+func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTokenByUserTokenIdentifiersParams) (GetTokenByUserTokenIdentifiersRow, error) {
+	row := q.db.QueryRow(ctx, getTokenByUserTokenIdentifiers,
+		arg.OwnerID,
+		arg.TokenID,
+		arg.Chain,
+		arg.ContractAddress,
+	)
+	var i GetTokenByUserTokenIdentifiersRow
+	err := row.Scan(
+		&i.Token.ID,
+		&i.Token.Deleted,
+		&i.Token.Version,
+		&i.Token.CreatedAt,
+		&i.Token.LastUpdated,
+		&i.Token.NameDeprecated,
+		&i.Token.DescriptionDeprecated,
+		&i.Token.CollectorsNote,
+		&i.Token.TokenTypeDeprecated,
+		&i.Token.TokenIDDeprecated,
+		&i.Token.Quantity,
+		&i.Token.OwnershipHistoryDeprecated,
+		&i.Token.ExternalUrlDeprecated,
+		&i.Token.BlockNumber,
+		&i.Token.OwnerUserID,
+		&i.Token.OwnedByWallets,
+		&i.Token.ChainDeprecated,
+		&i.Token.ContractID,
+		&i.Token.IsUserMarkedSpam,
+		&i.Token.IsProviderMarkedSpamDeprecated,
+		&i.Token.LastSynced,
+		&i.Token.TokenUriDeprecated,
+		&i.Token.FallbackMediaDeprecated,
+		&i.Token.TokenMediaIDDeprecated,
+		&i.Token.IsCreatorToken,
+		&i.Token.TokenDefinitionID,
+		&i.Token.IsHolderToken,
+		&i.Token.Displayable,
+		&i.TokenDefinition.ID,
+		&i.TokenDefinition.CreatedAt,
+		&i.TokenDefinition.LastUpdated,
+		&i.TokenDefinition.Deleted,
+		&i.TokenDefinition.Name,
+		&i.TokenDefinition.Description,
+		&i.TokenDefinition.TokenType,
+		&i.TokenDefinition.TokenID,
+		&i.TokenDefinition.ExternalUrl,
+		&i.TokenDefinition.Chain,
+		&i.TokenDefinition.Metadata,
+		&i.TokenDefinition.FallbackMedia,
+		&i.TokenDefinition.ContractAddress,
+		&i.TokenDefinition.ContractID,
+		&i.TokenDefinition.TokenMediaID,
+		&i.Contract.ID,
+		&i.Contract.Deleted,
+		&i.Contract.Version,
+		&i.Contract.CreatedAt,
+		&i.Contract.LastUpdated,
+		&i.Contract.Name,
+		&i.Contract.Symbol,
+		&i.Contract.Address,
+		&i.Contract.CreatorAddress,
+		&i.Contract.Chain,
+		&i.Contract.ProfileBannerUrl,
+		&i.Contract.ProfileImageUrl,
+		&i.Contract.BadgeUrl,
+		&i.Contract.Description,
+		&i.Contract.OwnerAddress,
+		&i.Contract.IsProviderMarkedSpam,
+		&i.Contract.ParentID,
+		&i.Contract.OverrideCreatorUserID,
+		&i.Contract.L1Chain,
 	)
 	return i, err
 }
@@ -4335,13 +4062,15 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_type__deprecated, t.token_id__deprecated, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain__deprecated, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.token_uri__deprecated, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable from tokens t
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_type__deprecated, t.token_id__deprecated, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain__deprecated, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.token_uri__deprecated, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from tokens t
+    join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
     where (c.id = $1 or c.parent_id = $1)
     and t.displayable
     and t.deleted = false
     and c.deleted = false
+    and td.deleted = false
     and (not $3::bool or u.universal = false)
     and (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
     and (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
@@ -4363,7 +4092,13 @@ type GetTokensByContractIdPaginateParams struct {
 	PagingForward      bool         `db:"paging_forward" json:"paging_forward"`
 }
 
-func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetTokensByContractIdPaginateParams) ([]Token, error) {
+type GetTokensByContractIdPaginateRow struct {
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
+}
+
+func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetTokensByContractIdPaginateParams) ([]GetTokensByContractIdPaginateRow, error) {
 	rows, err := q.db.Query(ctx, getTokensByContractIdPaginate,
 		arg.ID,
 		arg.Limit,
@@ -4380,38 +4115,72 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Token
+	var items []GetTokensByContractIdPaginateRow
 	for rows.Next() {
-		var i Token
+		var i GetTokensByContractIdPaginateRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.NameDeprecated,
-			&i.DescriptionDeprecated,
-			&i.CollectorsNote,
-			&i.TokenTypeDeprecated,
-			&i.TokenIDDeprecated,
-			&i.Quantity,
-			&i.OwnershipHistoryDeprecated,
-			&i.ExternalUrlDeprecated,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
-			&i.ChainDeprecated,
-			&i.ContractID,
-			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpamDeprecated,
-			&i.LastSynced,
-			&i.TokenUriDeprecated,
-			&i.FallbackMediaDeprecated,
-			&i.TokenMediaIDDeprecated,
-			&i.IsCreatorToken,
-			&i.TokenDefinitionID,
-			&i.IsHolderToken,
-			&i.Displayable,
+			&i.Token.ID,
+			&i.Token.Deleted,
+			&i.Token.Version,
+			&i.Token.CreatedAt,
+			&i.Token.LastUpdated,
+			&i.Token.NameDeprecated,
+			&i.Token.DescriptionDeprecated,
+			&i.Token.CollectorsNote,
+			&i.Token.TokenTypeDeprecated,
+			&i.Token.TokenIDDeprecated,
+			&i.Token.Quantity,
+			&i.Token.OwnershipHistoryDeprecated,
+			&i.Token.ExternalUrlDeprecated,
+			&i.Token.BlockNumber,
+			&i.Token.OwnerUserID,
+			&i.Token.OwnedByWallets,
+			&i.Token.ChainDeprecated,
+			&i.Token.ContractID,
+			&i.Token.IsUserMarkedSpam,
+			&i.Token.IsProviderMarkedSpamDeprecated,
+			&i.Token.LastSynced,
+			&i.Token.TokenUriDeprecated,
+			&i.Token.FallbackMediaDeprecated,
+			&i.Token.TokenMediaIDDeprecated,
+			&i.Token.IsCreatorToken,
+			&i.Token.TokenDefinitionID,
+			&i.Token.IsHolderToken,
+			&i.Token.Displayable,
+			&i.TokenDefinition.ID,
+			&i.TokenDefinition.CreatedAt,
+			&i.TokenDefinition.LastUpdated,
+			&i.TokenDefinition.Deleted,
+			&i.TokenDefinition.Name,
+			&i.TokenDefinition.Description,
+			&i.TokenDefinition.TokenType,
+			&i.TokenDefinition.TokenID,
+			&i.TokenDefinition.ExternalUrl,
+			&i.TokenDefinition.Chain,
+			&i.TokenDefinition.Metadata,
+			&i.TokenDefinition.FallbackMedia,
+			&i.TokenDefinition.ContractAddress,
+			&i.TokenDefinition.ContractID,
+			&i.TokenDefinition.TokenMediaID,
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.Contract.L1Chain,
 		); err != nil {
 			return nil, err
 		}

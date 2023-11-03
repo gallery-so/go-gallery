@@ -1552,7 +1552,7 @@ func newGetSharedFollowersBatchPaginate(
 
 // GetTokenByIdBatch batches and caches requests
 type GetTokenByIdBatch struct {
-	generator.Dataloader[persist.DBID, coredb.Token]
+	generator.Dataloader[persist.DBID, coredb.GetTokenByIdBatchRow]
 }
 
 // newGetTokenByIdBatch creates a new GetTokenByIdBatch with the given settings, functions, and options
@@ -1562,13 +1562,13 @@ func newGetTokenByIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetTokenByIdBatch, []persist.DBID) ([]coredb.Token, []error),
+	fetch func(context.Context, *GetTokenByIdBatch, []persist.DBID) ([]coredb.GetTokenByIdBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokenByIdBatch {
 	d := &GetTokenByIdBatch{}
 
-	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Token, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.GetTokenByIdBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokenByIdBatch")
@@ -1589,13 +1589,9 @@ func newGetTokenByIdBatch(
 	return d
 }
 
-func (*GetTokenByIdBatch) getKeyForResult(result coredb.Token) persist.DBID {
-	return result.ID
-}
-
 // GetTokenByIdIgnoreDisplayableBatch batches and caches requests
 type GetTokenByIdIgnoreDisplayableBatch struct {
-	generator.Dataloader[persist.DBID, coredb.Token]
+	generator.Dataloader[persist.DBID, coredb.GetTokenByIdIgnoreDisplayableBatchRow]
 }
 
 // newGetTokenByIdIgnoreDisplayableBatch creates a new GetTokenByIdIgnoreDisplayableBatch with the given settings, functions, and options
@@ -1605,13 +1601,13 @@ func newGetTokenByIdIgnoreDisplayableBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetTokenByIdIgnoreDisplayableBatch, []persist.DBID) ([]coredb.Token, []error),
+	fetch func(context.Context, *GetTokenByIdIgnoreDisplayableBatch, []persist.DBID) ([]coredb.GetTokenByIdIgnoreDisplayableBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokenByIdIgnoreDisplayableBatch {
 	d := &GetTokenByIdIgnoreDisplayableBatch{}
 
-	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Token, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.GetTokenByIdIgnoreDisplayableBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokenByIdIgnoreDisplayableBatch")
@@ -1630,10 +1626,6 @@ func newGetTokenByIdIgnoreDisplayableBatch(
 
 	d.Dataloader = *dataloader
 	return d
-}
-
-func (*GetTokenByIdIgnoreDisplayableBatch) getKeyForResult(result coredb.Token) persist.DBID {
-	return result.ID
 }
 
 // GetTokenByUserTokenIdentifiersBatch batches and caches requests
@@ -1664,45 +1656,6 @@ func newGetTokenByUserTokenIdentifiersBatch(
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetTokenByUserTokenIdentifiersBatch")
-		}
-
-		return results, errors
-	}
-
-	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-
-	d.Dataloader = *dataloader
-	return d
-}
-
-// GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch batches and caches requests
-type GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch struct {
-	generator.Dataloader[persist.DBID, coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow]
-}
-
-// newGetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch creates a new GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch with the given settings, functions, and options
-func newGetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch(
-	ctx context.Context,
-	maxBatchSize int,
-	batchTimeout time.Duration,
-	cacheResults bool,
-	publishResults bool,
-	fetch func(context.Context, *GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch, []persist.DBID) ([]coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow, []error),
-	preFetchHook PreFetchHook,
-	postFetchHook PostFetchHook,
-) *GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch {
-	d := &GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch{}
-
-	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatchRow, []error) {
-		// Allow the preFetchHook to modify and return a new context
-		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch")
-		}
-
-		results, errors := fetch(ctx, d, keys)
-
-		if postFetchHook != nil {
-			postFetchHook(ctx, "GetTokenDefinitionAndMediaByTokenDefinitionIdIgnoringStatusBatch")
 		}
 
 		return results, errors
@@ -1923,7 +1876,7 @@ func newGetTokensByUserIdBatch(
 
 // GetTokensByWalletIdsBatch batches and caches requests
 type GetTokensByWalletIdsBatch struct {
-	generator.Dataloader[persist.DBIDList, []coredb.Token]
+	generator.Dataloader[persist.DBIDList, []coredb.GetTokensByWalletIdsBatchRow]
 }
 
 // newGetTokensByWalletIdsBatch creates a new GetTokensByWalletIdsBatch with the given settings, functions, and options
@@ -1933,13 +1886,13 @@ func newGetTokensByWalletIdsBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetTokensByWalletIdsBatch, []persist.DBIDList) ([][]coredb.Token, []error),
+	fetch func(context.Context, *GetTokensByWalletIdsBatch, []persist.DBIDList) ([][]coredb.GetTokensByWalletIdsBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokensByWalletIdsBatch {
 	d := &GetTokensByWalletIdsBatch{}
 
-	fetchWithHooks := func(ctx context.Context, keys []persist.DBIDList) ([][]coredb.Token, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBIDList) ([][]coredb.GetTokensByWalletIdsBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokensByWalletIdsBatch")

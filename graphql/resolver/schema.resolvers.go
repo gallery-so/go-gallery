@@ -2557,7 +2557,7 @@ func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input mode
 		TokenID:         input.Token.TokenID,
 	}
 
-	td, media, err := publicapi.For(ctx).Token.GetTokenDefinitionAndMediaByTokenIdentifiers(ctx, tID)
+	td, media, err := publicapi.For(ctx).Token.GetMediaByTokenIdentifiers(ctx, tID)
 	if err != nil {
 		return nil, err
 	}
@@ -2774,7 +2774,13 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		highDef = *settings.HighDefinition
 	}
 
-	td, media, err := publicapi.For(ctx).Token.GetTokenDefinitionAndMediaByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	// The definition is likely already cached by the root dataloader that queries for the definition alongside the token instance
+	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	media, err := publicapi.For(ctx).Token.GetMediaByMediaID(ctx, td.TokenMediaID)
 	if err != nil {
 		return nil, err
 	}
