@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	poolSize  = 24  // concurrent workers to use
+	poolSize  = 64  // concurrent workers to use
 	batchSize = 100 // number of tokens to process per worker
 )
 
@@ -57,7 +57,7 @@ var saveCmd = &cobra.Command{
 		pq = createPostgresClient()
 		pq.SetMaxIdleConns(2 * poolSize)
 		defer pq.Close()
-		// saveStagingTable()
+		saveStagingTable()
 	},
 }
 
@@ -69,7 +69,7 @@ var migrateCmd = &cobra.Command{
 		pq = createPostgresClient()
 		pq.SetMaxIdleConns(2 * poolSize)
 		defer pq.Close()
-		// createTokenDefinitions(context.Background(), pq)
+		createTokenDefinitions(context.Background(), pq)
 	},
 }
 
