@@ -10,7 +10,6 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/server"
@@ -30,7 +29,6 @@ func init() {
 	rootCmd.AddCommand(migrateCmd)
 	rootCmd.PersistentFlags().StringVarP(&targetEnv, "env", "e", "local", "env to run with")
 	server.SetDefaults()
-	viper.SetDefault("POSTGRES_USER", "gallery_migrator")
 }
 
 func setEnv() {
@@ -293,12 +291,12 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 	tx, err := pq.BeginTx(ctx, nil)
 	check(err)
 
+	prepareStatements()
 	requireMustBeEmpty()
 	analyzeTokens()
 	dropTokenDefinitionConstraints()
 	lockTables(tx)
 	totalTokens := saveStagingTable()
-	prepareStatements()
 
 	wp := workerpool.New(poolSize)
 
@@ -455,7 +453,7 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 			mediaRows.Close()
 
 			insertStart := time.Now()
-			_, err := tx.Stmt(batchInsertStmt).Exec(
+			_, err := batchInsertStmt.Exec(
 				m.ID,
 				m.Name,
 				m.Description,
@@ -481,12 +479,12 @@ func createTokenDefinitions(ctx context.Context, pq *sql.DB) {
 
 	wp.StopWait()
 
-	fmt.Println("adding back constraints")
-	now := time.Now()
-	_, err = tx.Exec(addConstraints)
+	err = tx.Commit()
 	check(err)
 
-	err = tx.Commit()
+	fmt.Println("adding back constraints")
+	now := time.Now()
+	_, err = pq.Exec(addConstraints)
 	check(err)
 
 	fmt.Printf("took %s to migrate tokens; adding constaints=%s\n", time.Since(globalStart), time.Since(now))
