@@ -52,9 +52,7 @@ func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.
 
 	router.GET("/alive", util.HealthCheckHandler())
 
-	// return router
-	// Turn off handlers during migration
-	return nil
+	return router
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, socialCache *redis.Cache, authRefreshCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization) {

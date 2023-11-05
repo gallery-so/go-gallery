@@ -28,7 +28,5 @@ func handlersInitServer(router *gin.Engine, contractRepository persist.ContractR
 	contractsGroup.GET("/get", getContract(contractRepository))
 	contractsGroup.POST("/refresh", updateContractMetadata(contractRepository, ethClient, httpClient))
 
-	// Turn off handlers during migration
-	// return router
-	return nil
+	return router
 }

@@ -44,9 +44,7 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.POST("/detect-spam", detectSpamContracts(mc.Queries))
 
-	// return router
-	// Turn off handlers during migration
-	return nil
+	return router
 }
 
 func syncMaxRetries(tID persist.TokenIdentifiers) int {
