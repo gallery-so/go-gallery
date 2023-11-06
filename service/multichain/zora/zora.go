@@ -461,6 +461,7 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraToken
 const ipfsFallbackURLFormat = "https://ipfs.decentralized-content.com/ipfs/%s"
 
 func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multichain.ChainAgnosticToken, error) {
+
 	var tokenType persist.TokenType
 	standard := util.FirstNonEmptyString(token.TokenStandard, token.Mintable.Collection.TokenStandard, token.Collection.TokenStandard)
 	switch standard {
@@ -471,6 +472,11 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 	default:
 		return multichain.ChainAgnosticToken{}, fmt.Errorf("unknown token standard %s", token.TokenStandard)
 	}
+
+	if token.Metadata == nil {
+		token.Metadata = map[string]any{}
+	}
+
 	metadataName, _ := token.Metadata["name"].(string)
 	metadataDescription, _ := token.Metadata["description"].(string)
 
@@ -527,10 +533,11 @@ func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken)
 
 	return multichain.ChainAgnosticContract{
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         token.Mintable.Collection.Symbol,
-			Name:           token.Mintable.Collection.Name,
-			Description:    token.Mintable.Collection.Description,
-			CreatorAddress: persist.Address(strings.ToLower(token.Mintable.CreatorAddress)),
+			Symbol:          token.Mintable.Collection.Symbol,
+			Name:            token.Mintable.Collection.Name,
+			Description:     token.Mintable.Collection.Description,
+			CreatorAddress:  persist.Address(strings.ToLower(token.Mintable.CreatorAddress)),
+			ProfileImageURL: token.Mintable.Collection.Image,
 		},
 		Address: persist.Address(strings.ToLower(token.CollectionAddress)),
 	}

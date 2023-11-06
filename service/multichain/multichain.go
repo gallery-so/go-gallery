@@ -1834,7 +1834,7 @@ func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Ch
 		for _, wallet := range wallets {
 			if wallet.Chain == chain {
 				matches[chain] = append(matches[chain], wallet.Address)
-			} else if overrides := wallet.Chain.L1ChainGroup(); util.Contains(overrides, wallet.Chain) {
+			} else if overrides := chain.L1ChainGroup(); util.Contains(overrides, wallet.Chain) {
 				matches[chain] = append(matches[chain], wallet.Address)
 			}
 		}
