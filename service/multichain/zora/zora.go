@@ -12,6 +12,7 @@ import (
 	"github.com/machinebox/graphql"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -41,28 +42,46 @@ func (t tokenID) toBase16String() string {
 type zoraToken struct {
 	ChainName         string         `json:"chain_name"`
 	CollectionAddress string         `json:"collection_address"`
+	Collection        zoraCollection `json:"collection"`
 	TokenID           tokenID        `json:"token_id"`
 	TokenStandard     string         `json:"token_standard"`
 	Owner             string         `json:"owner"`
 	Metadata          map[string]any `json:"metadata"`
 	Mintable          struct {
-		CreatorAddress string `json:"creator_address"`
-		Collection     struct {
-			Symbol      string `json:"symbol"`
-			Name        string `json:"name"`
-			Description string `json:"description"`
-		}
+		CreatorAddress string         `json:"creator_address"`
+		Collection     zoraCollection `json:"collection"`
 	} `json:"mintable"`
 	Media struct {
-		ImagePreview struct {
-			Raw            string `json:"raw"`
-			MimeType       string `json:"mime_type"`
-			EncodedLarge   string `json:"encoded_large"`
-			EncodedPreview string `json:"encoded_preview"`
-		} `json:"image_preview"`
-		MimeType string `json:"mime_type"`
+		ImagePreview  zoraMedia   `json:"image_preview"`
+		ImageCarousel []zoraMedia `json:"image_carousel"`
+		MimeType      string      `json:"mime_type"`
 	} `json:"media"`
 }
+type zoraMedia struct {
+	Raw            string `json:"raw"`
+	MimeType       string `json:"mime_type"`
+	EncodedLarge   string `json:"encoded_large"`
+	EncodedPreview string `json:"encoded_preview"`
+}
+
+/*
+"address":"0xc25f9ec6380f5b9cd2c91054c3d7a4b7f2aef36f",
+      "name":"Orbiter Degens",
+      "symbol":"RBT",
+      "token_standard":"ERC721",
+      "description":" ",
+      "image":"ipfs://bafybeih3ufeqrz4dp2v3sbnezhhr64eaf4xxo6lwwtqwl77zyhholacf4q"
+*/
+
+type zoraCollection struct {
+	Address       string `json:"address"`
+	Name          string `json:"name"`
+	Symbol        string `json:"symbol"`
+	Description   string `json:"description"`
+	TokenStandard string `json:"token_standard"`
+	Image         string `json:"image"`
+}
+
 type zoraBalanceToken struct {
 	Balance int       `json:"balance"`
 	Token   zoraToken `json:"token"`
@@ -170,6 +189,8 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	if err != nil {
 		return nil, err
 	}
+
+	logger.For(ctx).Infof("zora token metadata retrieved: %+v", token.TokenMetadata)
 
 	return token.TokenMetadata, nil
 }
@@ -441,7 +462,8 @@ const ipfsFallbackURLFormat = "https://ipfs.decentralized-content.com/ipfs/%s"
 
 func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multichain.ChainAgnosticToken, error) {
 	var tokenType persist.TokenType
-	switch token.TokenStandard {
+	standard := util.FirstNonEmptyString(token.TokenStandard, token.Mintable.Collection.TokenStandard, token.Collection.TokenStandard)
+	switch standard {
 	case "ERC721":
 		tokenType = persist.TokenTypeERC721
 	case "ERC1155":
@@ -460,6 +482,27 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 		q.Set("url", u)
 		fallbackFormat.RawQuery = q.Encode()
 		token.Media.ImagePreview.EncodedPreview = fallbackFormat.String()
+	}
+
+	realMedia, ok := util.FindFirst(token.Media.ImageCarousel, func(media zoraMedia) bool {
+		return media.MimeType == token.Media.MimeType
+	})
+	if !ok {
+		if len(token.Media.ImageCarousel) == 0 {
+			realMedia = token.Media.ImagePreview
+		} else {
+			realMedia = token.Media.ImageCarousel[0]
+		}
+	}
+
+	mediaTypeFromContent := media.MediaFromContentType(realMedia.MimeType)
+	if mediaTypeFromContent.IsAnimationLike() {
+		token.Metadata["animation_url"] = realMedia.Raw
+		if token.Media.ImagePreview.MimeType != realMedia.MimeType {
+			token.Metadata["image"] = token.Media.ImagePreview.Raw
+		}
+	} else {
+		token.Metadata["image"] = realMedia.Raw
 	}
 
 	return multichain.ChainAgnosticToken{
