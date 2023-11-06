@@ -497,14 +497,6 @@ func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*mod
 	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
 }
 
-func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
-	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByTokenDBID(ctx, tokenID)
-	if err != nil {
-		return nil, err
-	}
-	return resolveContractByContractID(ctx, td.ContractID)
-}
-
 func resolveContractByContractID(ctx context.Context, contractID persist.DBID) (*model.Contract, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {

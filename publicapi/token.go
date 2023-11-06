@@ -420,7 +420,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		return err
 	}
 
-	td, err := api.loaders.GetTokenDefinitionByTokenDbidBatch.Load(tokenDBID)
+	td, err := api.queries.GetTokenDefinitionByTokenDbid(ctx, tokenDBID)
 	if err != nil {
 		return err
 	}
@@ -639,16 +639,6 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 // GetProcessingStateByTokenDefinitionID returns true if a token is queued for processing, or is currently being processed.
 func (api TokenAPI) GetProcessingStateByTokenDefinitionID(ctx context.Context, id persist.DBID) (bool, error) {
 	return api.manager.Processing(ctx, id), nil
-}
-
-func (api TokenAPI) GetTokenDefinitionByTokenDBID(ctx context.Context, id persist.DBID) (db.TokenDefinition, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenDBID": validate.WithTag(id, "required"),
-	}); err != nil {
-		return db.TokenDefinition{}, err
-	}
-	return api.loaders.GetTokenDefinitionByTokenDbidBatch.Load(id)
 }
 
 func (api TokenAPI) GetTokenDefinitionByID(ctx context.Context, id persist.DBID) (db.TokenDefinition, error) {

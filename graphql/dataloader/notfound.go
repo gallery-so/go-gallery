@@ -140,7 +140,3 @@ func (*GetMediaByMediaIdIgnoringStatusBatch) getNotFoundError(key persist.DBID) 
 func (*GetTokenDefinitionByIdBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrTokenDefinitionNotFoundByID{ID: key}
 }
-
-func (*GetTokenDefinitionByTokenDbidBatch) getNotFoundError(key persist.DBID) error {
-	return persist.ErrTokenDefinitionNotFoundByTokenDBID{ID: key}
-}

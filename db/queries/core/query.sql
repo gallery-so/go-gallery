@@ -108,14 +108,6 @@ where token_definitions.id = tokens.token_definition_id
     and not tokens.deleted
     and not token_definitions.deleted;
 
--- name: GetTokenDefinitionByTokenDbidBatch :batchone
-select token_definitions.*
-from token_definitions, tokens
-where token_definitions.id = tokens.token_definition_id
-    and tokens.id = $1
-    and not tokens.deleted
-    and not token_definitions.deleted;
-
 -- name: GetTokenDefinitionByTokenIdentifiers :one
 select *
 from token_definitions
