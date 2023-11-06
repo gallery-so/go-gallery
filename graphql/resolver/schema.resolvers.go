@@ -255,6 +255,9 @@ func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
 	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
+		if util.ErrorAs[persist.ErrContractCreatorNotFound](err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 

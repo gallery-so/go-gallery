@@ -126,7 +126,7 @@ func (*GetWalletByIDBatch) getNotFoundError(key persist.DBID) error {
 }
 
 func (*GetContractCreatorsByIds) getNotFoundError(key string) error {
-	return pgx.ErrNoRows
+	return persist.ErrContractCreatorNotFound{ContractID: persist.DBID(key)}
 }
 
 func (*GetContractsByIDs) getNotFoundError(key string) error {
