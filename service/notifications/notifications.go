@@ -731,18 +731,21 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 
 	switch n.Action {
 	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
-		feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
-		if err != nil {
-			return UserFacingNotificationData{}, fmt.Errorf("failed to get feed event for admire %s: %w", n.FeedEventID, err)
-		}
-		collection, _ := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
+
 		data := UserFacingNotificationData{}
-		if n.Action == persist.ActionAdmiredFeedEvent && collection.ID != "" && collection.Name.String != "" {
-			data.CollectionID = collection.ID
-			data.CollectionName = collection.Name.String
-			data.Action = "admired your additions to"
-		} else if n.Action == persist.ActionAdmiredFeedEvent {
-			data.Action = "admired your gallery update"
+		if n.Action == persist.ActionAdmiredFeedEvent {
+			feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
+			if err != nil {
+				return UserFacingNotificationData{}, fmt.Errorf("failed to get feed event for admire %s: %w", n.FeedEventID, err)
+			}
+			collection, _ := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
+			if collection.ID != "" && collection.Name.String != "" {
+				data.CollectionID = collection.ID
+				data.CollectionName = collection.Name.String
+				data.Action = "admired your additions to"
+			} else {
+				data.Action = "admired your gallery update"
+			}
 		} else {
 			data.Action = "admired your post"
 		}
@@ -787,10 +790,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		if err != nil {
 			return UserFacingNotificationData{}, fmt.Errorf("failed to get user for comment actor %s: %w", comment.ActorID, err)
 		}
-		feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
-		if err != nil {
-			return UserFacingNotificationData{}, fmt.Errorf("failed to get feed event for comment %s: %w", n.FeedEventID, err)
-		}
+		feedEvent, _ := queries.GetFeedEventByID(ctx, n.FeedEventID)
 		action := "commented on your post"
 		if n.Action == persist.ActionCommentedOnFeedEvent && feedEvent.Data.CollectionID != "" {
 			collection, err := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
@@ -927,20 +927,13 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		}, nil
 	case persist.ActionNewTokensReceived:
 		data := UserFacingNotificationData{}
-		tm, err := queries.GetTokenMediaByTokenId(ctx, n.Data.NewTokenID)
+
+		td, err := queries.GetTokenDefinitionByTokenDbid(ctx, n.Data.NewTokenID)
 		if err != nil {
 			return UserFacingNotificationData{}, err
 		}
-		name := tm.Name
-		if name == "" {
-			to, err := queries.GetTokenById(ctx, n.Data.NewTokenID)
-			if err != nil {
-				return UserFacingNotificationData{}, err
-			}
-			name = to.Name.String
-		}
 
-		name = util.TruncateWithEllipsis(name, 20)
+		name := util.TruncateWithEllipsis(td.Name.String, 20)
 
 		amount := n.Data.NewTokenQuantity
 		i := amount.BigInt().Uint64()
@@ -973,7 +966,7 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionAdmiredPost:
 		return true
 	case persist.ActionAdmiredToken:
-    return true
+		return true
 	case persist.ActionUserPostedYourWork:
 		return true
 	default:

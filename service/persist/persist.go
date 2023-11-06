@@ -37,6 +37,15 @@ func (l *DBIDList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
+var notFoundError ErrNotFound
+
+// ErrNotFound is a general error for when some entity is not found.
+// Errors should wrap this error to provide more details on what was not found (e.g. ErrUserNotFound)
+// and how it was not found (e.g. ErrUserNotFoundByID)
+type ErrNotFound struct{}
+
+func (e ErrNotFound) Error() string { return "entity not found" }
+
 // NullString represents a string that may be null in the DB
 type NullString string
 

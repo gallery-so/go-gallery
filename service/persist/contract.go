@@ -65,18 +65,17 @@ func (c *ContractOwnerMethod) Scan(src interface{}) error {
 type ContractRepository interface {
 	GetByAddress(context.Context, EthereumAddress) (Contract, error)
 	UpdateByAddress(context.Context, EthereumAddress, ContractUpdateInput) error
-	UpsertByAddress(context.Context, EthereumAddress, Contract) error
 	GetContractsOwnedByAddress(context.Context, EthereumAddress) ([]Contract, error)
 	BulkUpsert(context.Context, []Contract) error
+	MostRecentBlock(context.Context) (BlockNumber, error)
 }
 
-type ErrContractNotFoundByID struct {
-	ID DBID
-}
+var errContractNotFound ErrContractNotFound
 
-func (e ErrContractNotFoundByID) Error() string {
-	return fmt.Sprintf("contract not found by ID: %s", e.ID)
-}
+type ErrContractNotFound struct{}
+
+func (e ErrContractNotFound) Unwrap() error { return notFoundError }
+func (e ErrContractNotFound) Error() string { return "contract not found" }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
 type ErrContractNotFoundByAddress struct {
@@ -84,6 +83,7 @@ type ErrContractNotFoundByAddress struct {
 	Chain   Chain
 }
 
+func (e ErrContractNotFoundByAddress) Unwrap() error { return errContractNotFound }
 func (e ErrContractNotFoundByAddress) Error() string {
 	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }

@@ -12,8 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/everFinance/goar"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -101,41 +99,26 @@ func withTokens(tokens []multichain.ChainAgnosticToken) providerOpt {
 	}
 }
 
-// withContractTokens will generate n dummy tokens from the provided contract
-func withContractTokens(contract multichain.ChainAgnosticContract, ownerAddress string, n int) providerOpt {
+// withDummyTokenN will generate n dummy tokens from the provided contract
+func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress persist.Address, n int) providerOpt {
 	return func(p *stubProvider) {
 		tokens := []multichain.ChainAgnosticToken{}
 		for i := 0; i < n; i++ {
-			tokens = append(tokens, multichain.ChainAgnosticToken{
-				Descriptors: multichain.ChainAgnosticTokenDescriptors{
-					Name: fmt.Sprintf("%s_testToken%d", contract.Descriptors.Name, i),
-				},
-				TokenID:         persist.TokenID(fmt.Sprintf("%X", i)),
-				Quantity:        "1",
-				ContractAddress: contract.Address,
-				OwnerAddress:    persist.Address(ownerAddress),
-			})
+			tokenID := persist.TokenID(fmt.Sprintf("%X", i))
+			token := dummyTokenIDContract(ownerAddress, contract.Address, tokenID)
+			tokens = append(tokens, token)
 		}
 		withContracts([]multichain.ChainAgnosticContract{contract})(p)
 		withTokens(tokens)(p)
 	}
 }
 
-// withContractToken will generate a token with the provided token ID
-func withContractToken(contract multichain.ChainAgnosticContract, ownerAddress string, tokenID int) providerOpt {
+// withDummyTokenID will generate a token with the provided token ID
+func withDummyTokenID(ownerAddress persist.Address, tokenID persist.TokenID) providerOpt {
+	c := multichain.ChainAgnosticContract{Address: "0x123"}
 	return func(p *stubProvider) {
-		withContracts([]multichain.ChainAgnosticContract{contract})(p)
-		withTokens([]multichain.ChainAgnosticToken{
-			{
-				Descriptors: multichain.ChainAgnosticTokenDescriptors{
-					Name: fmt.Sprintf("%s_testToken%d", contract.Descriptors.Name, tokenID),
-				},
-				TokenID:         persist.TokenID(fmt.Sprintf("%X", tokenID)),
-				Quantity:        "1",
-				ContractAddress: contract.Address,
-				OwnerAddress:    persist.Address(ownerAddress),
-			},
-		})(p)
+		withContracts([]multichain.ChainAgnosticContract{c})(p)
+		withTokens([]multichain.ChainAgnosticToken{dummyTokenIDContract(ownerAddress, c.Address, tokenID)})(p)
 	}
 }
 
@@ -147,9 +130,9 @@ func withFetchMetadata(f func() (persist.TokenMetadata, error)) providerOpt {
 }
 
 // defaultStubProvider returns a stubProvider that returns dummy tokens
-func defaultStubProvider(address string) stubProvider {
+func defaultStubProvider(ownerAddress persist.Address) stubProvider {
 	contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "testContract"}}
-	return newStubProvider(withContractTokens(contract, address, 10))
+	return newStubProvider(withDummyTokenN(contract, ownerAddress, 10))
 }
 
 // newStubRecommender returns a recommender that returns a canned set of recommendations
@@ -168,25 +151,25 @@ func newStubPersonaliztion(t *testing.T) *userpref.Personalization {
 // sendTokensRecorder records tokenprocessing messages
 type sendTokensRecorder struct {
 	mock.Mock
-	SubmitUserTokens multichain.SubmitUserTokensF
-	Tasks            []task.TokenProcessingUserMessage
+	SubmitTokens multichain.SubmitTokensF
+	Tasks        []task.TokenProcessingBatchMessage
 }
 
-func (r *sendTokensRecorder) Send(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
-	r.Called(ctx, userID, tokenIDs, tokens)
-	r.Tasks = append(r.Tasks, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs})
+func (r *sendTokensRecorder) Send(ctx context.Context, tDefIDs []persist.DBID) error {
+	r.Called(ctx, tDefIDs)
+	r.Tasks = append(r.Tasks, task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs})
 	return nil
 }
 
 // submitUserTokensNoop is useful when the code under test doesn't require tokenprocessing
-func submitUserTokensNoop(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+func submitUserTokensNoop(ctx context.Context, tDefIDs []persist.DBID) error {
 	return nil
 }
 
 // sendTokensToHTTPHandler makes an HTTP request to the passed handler
-func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, _ []persist.TokenIdentifiers) error {
-		m := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs}
+func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitTokensF {
+	return func(ctx context.Context, tDefIDs []persist.DBID) error {
+		m := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
 		byt, _ := json.Marshal(m)
 		r := bytes.NewReader(byt)
 		req := httptest.NewRequest(method, endpoint, r)
@@ -201,47 +184,42 @@ func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) mult
 }
 
 // sendTokensToTokenProcessing processes a batch of tokens synchronously through tokenprocessing
-func sendTokensToTokenProcessing(ctx context.Context, c *server.Clients, provider *multichain.Provider) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+func sendTokensToTokenProcessing(ctx context.Context, c *server.Clients, provider *multichain.Provider) multichain.SubmitTokensF {
+	return func(ctx context.Context, tDefIDs []persist.DBID) error {
 		h := tokenprocessing.CoreInitServer(ctx, c, provider)
-		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, userID, tokenIDs, tokens)
+		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, tDefIDs)
 	}
-}
-
-// fetchMetadataFromDummyMetadata returns static metadata from the dummymetadata server
-func fetchMetadataFromDummyMetadata(url, endpoint string, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
-	r := httptest.NewRequest(http.MethodGet, url+endpoint, nil)
-	r.RequestURI = ""
-
-	res, err := http.DefaultClient.Do(r)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// Don't try to JSON parse base64 encoded data
-	if strings.HasPrefix(string(body), "data:application/json;base64,") {
-		body = []byte(strings.Split(string(body), ",")[1])
-		body, err = util.Base64Decode(string(body), base64.StdEncoding, base64.RawStdEncoding)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var meta persist.TokenMetadata
-	err = json.Unmarshal(body, &meta)
-
-	return meta, err
 }
 
 // fetchFromDummyEndpoint fetches metadata from the given endpoint
-func fetchFromDummyEndpoint(url, endpoint string, ipfsClient *shell.Shell, arweaveClient *goar.Client) func() (persist.TokenMetadata, error) {
+func fetchFromDummyEndpoint(url, endpoint string) func() (persist.TokenMetadata, error) {
 	return func() (persist.TokenMetadata, error) {
-		return fetchMetadataFromDummyMetadata(url, endpoint, ipfsClient, arweaveClient)
+		r := httptest.NewRequest(http.MethodGet, url+endpoint, nil)
+		r.RequestURI = ""
+
+		res, err := http.DefaultClient.Do(r)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// Don't try to JSON parse base64 encoded data
+		if strings.HasPrefix(string(body), "data:application/json;base64,") {
+			body = []byte(strings.Split(string(body), ",")[1])
+			body, err = util.Base64Decode(string(body), base64.StdEncoding, base64.RawStdEncoding)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		var meta persist.TokenMetadata
+		err = json.Unmarshal(body, &meta)
+
+		return meta, err
 	}
 }

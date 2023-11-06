@@ -1231,6 +1231,10 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		if ok {
 			t.ProfileImageURL = profile
 		}
+		scope, ok := social.Metadata["scope"].(string)
+		if ok {
+			t.Scope = scope
+		}
 		result.Twitter = t
 	case persist.SocialProviderFarcaster:
 		logger.For(ctx).Infof("found farcaster social account: %+v", social)
@@ -1255,6 +1259,14 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		if ok {
 			f.Bio = bio
 		}
+		approvalURL, ok := social.Metadata["approval_url"].(string)
+		if ok {
+			f.ApprovalURL = &approvalURL
+		}
+		signerStatus, ok := social.Metadata["signer_status"].(string)
+		if ok {
+			f.SignerStatus = &signerStatus
+		}
 		result.Farcaster = f
 	case persist.SocialProviderLens:
 		logger.For(ctx).Infof("found lens social account: %+v", social)
@@ -1278,6 +1290,10 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		bio, ok := social.Metadata["bio"].(string)
 		if ok {
 			l.Bio = bio
+		}
+		signtatureApproved, ok := social.Metadata["signature_approved"].(bool)
+		if ok {
+			l.SignatureApproved = signtatureApproved
 		}
 		result.Lens = l
 	default:
@@ -1650,8 +1666,8 @@ type EnsAvatar struct {
 	URI      string
 }
 
-// GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
-func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
+// GetPotentialENSProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
+func (api UserAPI) GetPotentialENSProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
@@ -1660,14 +1676,14 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 	}
 
 	// Check if profile images have been processed
-	pfp, err := api.queries.GetEnsProfileImagesByUserID(ctx, db.GetEnsProfileImagesByUserIDParams{
+	pfp, err := api.queries.GetPotentialENSProfileImageByUserId(ctx, db.GetPotentialENSProfileImageByUserIdParams{
 		EnsAddress: eth.EnsAddress,
 		Chain:      persist.ChainETH,
 		UserID:     userID,
 	})
 	if err == nil {
 		// Validate that the name is valid
-		domain, err := eth.NormalizeDomain(pfp.TokenMedia.Name)
+		domain, err := eth.NormalizeDomain(pfp.TokenDefinition.Name.String)
 		if err == nil {
 			return EnsAvatar{
 				WalletID: pfp.Wallet.ID,

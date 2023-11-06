@@ -86,10 +86,12 @@ type ResolverRoot interface {
 	SomeoneFollowedYouNotification() SomeoneFollowedYouNotificationResolver
 	SomeoneMentionedYouNotification() SomeoneMentionedYouNotificationResolver
 	SomeoneMentionedYourCommunityNotification() SomeoneMentionedYourCommunityNotificationResolver
+	SomeonePostedYourWorkNotification() SomeonePostedYourWorkNotificationResolver
 	SomeoneRepliedToYourCommentNotification() SomeoneRepliedToYourCommentNotificationResolver
 	SomeoneViewedYourGalleryNotification() SomeoneViewedYourGalleryNotificationResolver
 	Subscription() SubscriptionResolver
 	Token() TokenResolver
+	TokenDefinition() TokenDefinitionResolver
 	TokenHolder() TokenHolderResolver
 	TokensAddedToCollectionFeedEventData() TokensAddedToCollectionFeedEventDataResolver
 	UnfollowUserPayload() UnfollowUserPayloadResolver
@@ -534,10 +536,12 @@ type ComplexityRoot struct {
 	}
 
 	FarcasterSocialAccount struct {
+		ApprovalURL     func(childComplexity int) int
 		Bio             func(childComplexity int) int
 		Display         func(childComplexity int) int
 		Name            func(childComplexity int) int
 		ProfileImageURL func(childComplexity int) int
+		SignerStatus    func(childComplexity int) int
 		SocialID        func(childComplexity int) int
 		Type            func(childComplexity int) int
 		Username        func(childComplexity int) int
@@ -664,7 +668,6 @@ type ComplexityRoot struct {
 		SharedFollowers          func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts           func(childComplexity int) int
 		Tokens                   func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
-		TokensByChain            func(childComplexity int, chain persist.Chain) int
 		Traits                   func(childComplexity int) int
 		Universal                func(childComplexity int) int
 		Username                 func(childComplexity int) int
@@ -750,13 +753,14 @@ type ComplexityRoot struct {
 	}
 
 	LensSocialAccount struct {
-		Bio             func(childComplexity int) int
-		Display         func(childComplexity int) int
-		Name            func(childComplexity int) int
-		ProfileImageURL func(childComplexity int) int
-		SocialID        func(childComplexity int) int
-		Type            func(childComplexity int) int
-		Username        func(childComplexity int) int
+		Bio               func(childComplexity int) int
+		Display           func(childComplexity int) int
+		Name              func(childComplexity int) int
+		ProfileImageURL   func(childComplexity int) int
+		SignatureApproved func(childComplexity int) int
+		SocialID          func(childComplexity int) int
+		Type              func(childComplexity int) int
+		Username          func(childComplexity int) int
 	}
 
 	LoginPayload struct {
@@ -1266,6 +1270,16 @@ type ComplexityRoot struct {
 		UpdatedTime   func(childComplexity int) int
 	}
 
+	SomeonePostedYourWorkNotification struct {
+		Community    func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Post         func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
+	}
+
 	SomeoneRepliedToYourCommentNotification struct {
 		Comment         func(childComplexity int) int
 		CreationTime    func(childComplexity int) int
@@ -1345,6 +1359,7 @@ type ComplexityRoot struct {
 		CreationTime          func(childComplexity int) int
 		CreatorAddress        func(childComplexity int) int
 		Dbid                  func(childComplexity int) int
+		Definition            func(childComplexity int) int
 		Description           func(childComplexity int) int
 		ExternalURL           func(childComplexity int) int
 		ID                    func(childComplexity int) int
@@ -1376,6 +1391,22 @@ type ComplexityRoot struct {
 	TokenAdmiresConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
+	}
+
+	TokenDefinition struct {
+		Chain         func(childComplexity int) int
+		Community     func(childComplexity int) int
+		CreationTime  func(childComplexity int) int
+		Dbid          func(childComplexity int) int
+		Description   func(childComplexity int) int
+		ExternalURL   func(childComplexity int) int
+		ID            func(childComplexity int) int
+		LastUpdated   func(childComplexity int) int
+		Media         func(childComplexity int) int
+		Name          func(childComplexity int) int
+		TokenID       func(childComplexity int) int
+		TokenMetadata func(childComplexity int) int
+		TokenType     func(childComplexity int) int
 	}
 
 	TokenEdge struct {
@@ -1426,6 +1457,7 @@ type ComplexityRoot struct {
 		Display         func(childComplexity int) int
 		Name            func(childComplexity int) int
 		ProfileImageURL func(childComplexity int) int
+		Scope           func(childComplexity int) int
 		SocialID        func(childComplexity int) int
 		Type            func(childComplexity int) int
 		Username        func(childComplexity int) int
@@ -1752,7 +1784,6 @@ type GalleryUserResolver interface {
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
 	Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error)
-	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error)
 	FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error)
@@ -1957,6 +1988,10 @@ type SomeoneMentionedYourCommunityNotificationResolver interface {
 	MentionSource(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (model.MentionSource, error)
 	Community(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Community, error)
 }
+type SomeonePostedYourWorkNotificationResolver interface {
+	Post(ctx context.Context, obj *model.SomeonePostedYourWorkNotification) (*model.Post, error)
+	Community(ctx context.Context, obj *model.SomeonePostedYourWorkNotification) (*model.Community, error)
+}
 type SomeoneRepliedToYourCommentNotificationResolver interface {
 	Comment(ctx context.Context, obj *model.SomeoneRepliedToYourCommentNotification) (*model.Comment, error)
 	OriginalComment(ctx context.Context, obj *model.SomeoneRepliedToYourCommentNotification) (*model.Comment, error)
@@ -1971,18 +2006,30 @@ type SubscriptionResolver interface {
 	NotificationUpdated(ctx context.Context) (<-chan model.Notification, error)
 }
 type TokenResolver interface {
-	Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error)
-
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
 
+	Definition(ctx context.Context, obj *model.Token) (*model.TokenDefinition, error)
+
+	Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error)
+	ViewerAdmire(ctx context.Context, obj *model.Token) (*model.Admire, error)
+	Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error)
+	TokenType(ctx context.Context, obj *model.Token) (*model.TokenType, error)
+	Chain(ctx context.Context, obj *model.Token) (*persist.Chain, error)
+	Name(ctx context.Context, obj *model.Token) (*string, error)
+	Description(ctx context.Context, obj *model.Token) (*string, error)
+	TokenID(ctx context.Context, obj *model.Token) (*string, error)
 	TokenMetadata(ctx context.Context, obj *model.Token) (*string, error)
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
-
+	ExternalURL(ctx context.Context, obj *model.Token) (*string, error)
 	IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error)
-	Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error)
-	ViewerAdmire(ctx context.Context, obj *model.Token) (*model.Admire, error)
+}
+type TokenDefinitionResolver interface {
+	Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error)
+
+	TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error)
+	Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
@@ -3449,6 +3496,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FallbackMedia.MediaURL(childComplexity), true
 
+	case "FarcasterSocialAccount.approvalURL":
+		if e.complexity.FarcasterSocialAccount.ApprovalURL == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.ApprovalURL(childComplexity), true
+
 	case "FarcasterSocialAccount.bio":
 		if e.complexity.FarcasterSocialAccount.Bio == nil {
 			break
@@ -3476,6 +3530,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FarcasterSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "FarcasterSocialAccount.signerStatus":
+		if e.complexity.FarcasterSocialAccount.SignerStatus == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.SignerStatus(childComplexity), true
 
 	case "FarcasterSocialAccount.social_id":
 		if e.complexity.FarcasterSocialAccount.SocialID == nil {
@@ -4068,18 +4129,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Tokens(childComplexity, args["ownershipFilter"].([]persist.TokenOwnershipType)), true
 
-	case "GalleryUser.tokensByChain":
-		if e.complexity.GalleryUser.TokensByChain == nil {
-			break
-		}
-
-		args, err := ec.field_GalleryUser_tokensByChain_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.GalleryUser.TokensByChain(childComplexity, args["chain"].(persist.Chain)), true
-
 	case "GalleryUser.traits":
 		if e.complexity.GalleryUser.Traits == nil {
 			break
@@ -4429,6 +4478,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.LensSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "LensSocialAccount.signatureApproved":
+		if e.complexity.LensSocialAccount.SignatureApproved == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.SignatureApproved(childComplexity), true
 
 	case "LensSocialAccount.social_id":
 		if e.complexity.LensSocialAccount.SocialID == nil {
@@ -7195,6 +7251,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneMentionedYourCommunityNotification.UpdatedTime(childComplexity), true
 
+	case "SomeonePostedYourWorkNotification.community":
+		if e.complexity.SomeonePostedYourWorkNotification.Community == nil {
+			break
+		}
+
+		return e.complexity.SomeonePostedYourWorkNotification.Community(childComplexity), true
+
+	case "SomeonePostedYourWorkNotification.creationTime":
+		if e.complexity.SomeonePostedYourWorkNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.SomeonePostedYourWorkNotification.CreationTime(childComplexity), true
+
+	case "SomeonePostedYourWorkNotification.dbid":
+		if e.complexity.SomeonePostedYourWorkNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.SomeonePostedYourWorkNotification.Dbid(childComplexity), true
+
+	case "SomeonePostedYourWorkNotification.id":
+		if e.complexity.SomeonePostedYourWorkNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.SomeonePostedYourWorkNotification.ID(childComplexity), true
+
+	case "SomeonePostedYourWorkNotification.post":
+		if e.complexity.SomeonePostedYourWorkNotification.Post == nil {
+			break
+		}
+
+		return e.complexity.SomeonePostedYourWorkNotification.Post(childComplexity), true
+
+	case "SomeonePostedYourWorkNotification.seen":
+		if e.complexity.SomeonePostedYourWorkNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.SomeonePostedYourWorkNotification.Seen(childComplexity), true
+
+	case "SomeonePostedYourWorkNotification.updatedTime":
+		if e.complexity.SomeonePostedYourWorkNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.SomeonePostedYourWorkNotification.UpdatedTime(childComplexity), true
+
 	case "SomeoneRepliedToYourCommentNotification.comment":
 		if e.complexity.SomeoneRepliedToYourCommentNotification.Comment == nil {
 			break
@@ -7520,6 +7625,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.Dbid(childComplexity), true
 
+	case "Token.definition":
+		if e.complexity.Token.Definition == nil {
+			break
+		}
+
+		return e.complexity.Token.Definition(childComplexity), true
+
 	case "Token.description":
 		if e.complexity.Token.Description == nil {
 			break
@@ -7695,6 +7807,97 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenAdmiresConnection.PageInfo(childComplexity), true
 
+	case "TokenDefinition.chain":
+		if e.complexity.TokenDefinition.Chain == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Chain(childComplexity), true
+
+	case "TokenDefinition.community":
+		if e.complexity.TokenDefinition.Community == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Community(childComplexity), true
+
+	case "TokenDefinition.creationTime":
+		if e.complexity.TokenDefinition.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.CreationTime(childComplexity), true
+
+	case "TokenDefinition.dbid":
+		if e.complexity.TokenDefinition.Dbid == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Dbid(childComplexity), true
+
+	case "TokenDefinition.description":
+		if e.complexity.TokenDefinition.Description == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Description(childComplexity), true
+
+	case "TokenDefinition.externalUrl":
+		if e.complexity.TokenDefinition.ExternalURL == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.ExternalURL(childComplexity), true
+
+	case "TokenDefinition.id":
+		if e.complexity.TokenDefinition.ID == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.ID(childComplexity), true
+
+	case "TokenDefinition.lastUpdated":
+		if e.complexity.TokenDefinition.LastUpdated == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.LastUpdated(childComplexity), true
+
+	case "TokenDefinition.media":
+		if e.complexity.TokenDefinition.Media == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Media(childComplexity), true
+
+	case "TokenDefinition.name":
+		if e.complexity.TokenDefinition.Name == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Name(childComplexity), true
+
+	case "TokenDefinition.tokenId":
+		if e.complexity.TokenDefinition.TokenID == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.TokenID(childComplexity), true
+
+	case "TokenDefinition.tokenMetadata":
+		if e.complexity.TokenDefinition.TokenMetadata == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.TokenMetadata(childComplexity), true
+
+	case "TokenDefinition.tokenType":
+		if e.complexity.TokenDefinition.TokenType == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.TokenType(childComplexity), true
+
 	case "TokenEdge.cursor":
 		if e.complexity.TokenEdge.Cursor == nil {
 			break
@@ -7855,6 +8058,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TwitterSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "TwitterSocialAccount.scope":
+		if e.complexity.TwitterSocialAccount.Scope == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.Scope(childComplexity), true
 
 	case "TwitterSocialAccount.social_id":
 		if e.complexity.TwitterSocialAccount.SocialID == nil {
@@ -8686,7 +8896,6 @@ type GalleryUser implements Node @goEmbedHelper {
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
   tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
-  tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
   primaryWallet: Wallet @goField(forceResolver: true)
@@ -9003,32 +9212,36 @@ enum InteractionType {
   Comment
 }
 
-type Token implements Node @goEmbedHelper {
+type TokenDefinition implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
-  collectorsNote: String
   media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
   chain: Chain
   name: String
   description: String
   tokenId: String
+  tokenMetadata: String @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+  externalUrl: String
+}
+
+type Token implements Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  creationTime: Time
+  lastUpdated: Time
+  collectorsNote: String
   quantity: String # source is a hex string
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
-  ownershipHistory: [OwnerAtBlock]
+  ownershipHistory: [OwnerAtBlock] @deprecated
   ownerIsHolder: Boolean
   ownerIsCreator: Boolean
-  tokenMetadata: String @goField(forceResolver: true)
-  contract: Contract @goField(forceResolver: true)
-  community: Community @goField(forceResolver: true)
-  externalUrl: String
-  blockNumber: String # source is uint64
+  definition: TokenDefinition! @goField(forceResolver: true)
   isSpamByUser: Boolean
-  isSpamByProvider: Boolean @goField(forceResolver: true)
-
   # Returns an admires connection
   admires(
     before: String
@@ -9037,16 +9250,43 @@ type Token implements Node @goEmbedHelper {
     last: Int
     userID: DBID
   ): TokenAdmiresConnection @goField(forceResolver: true)
-
   viewerAdmire: Admire @goField(forceResolver: true)
 
-  # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
-  # struct and may ultimately end up elsewhere
+  # The following fields will be deprecated and removed in the future.
+  media: MediaSubtype
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.media instead")
+  tokenType: TokenType
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenType instead")
+  chain: Chain @goField(forceResolver: true) @deprecated(reason: "Use definition.chain instead")
+  name: String @goField(forceResolver: true) @deprecated(reason: "Use definition.name instead")
+  description: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.description instead")
+  tokenId: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenId instead")
+  tokenMetadata: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenMetadata instead")
+  contract: Contract
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.contract instead")
+  community: Community
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.community instead")
+  externalUrl: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.externalUrl instead")
+  isSpamByProvider: Boolean
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.community.contract.isSpam instead")
   creatorAddress: ChainAddress
-  openseaCollectionName: String
-
-  # temporary field while we're dependent on opensea
-  openseaId: Int
+    @deprecated(reason: "Use definition.community.creatorAddress instead")
+  openseaCollectionName: String @deprecated
+  blockNumber: String @deprecated # source is uint64
+  openseaId: Int @deprecated
 }
 
 type OwnerAtBlock {
@@ -9258,6 +9498,7 @@ type TwitterSocialAccount implements SocialAccount {
   username: String!
   profileImageURL: String!
   display: Boolean!
+  scope: String!
 }
 
 type FarcasterSocialAccount implements SocialAccount {
@@ -9268,7 +9509,10 @@ type FarcasterSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  approvalURL: String
+  signerStatus: String
 }
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -9277,6 +9521,7 @@ type LensSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  signatureApproved: Boolean!
 }
 
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
@@ -10194,7 +10439,7 @@ type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
-union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed
+union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed | ErrTokenNotFound
 
 type RefreshTokenPayload {
   token: Token
@@ -10371,11 +10616,20 @@ input TwitterAuth {
 
 input FarcasterAuth {
   address: Address!
+  """
+  withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+  the ` + "`" + `FarcasterSocialAccount` + "`" + ` type will return an ` + "`" + `approvalURL` + "`" + ` that will link the user to make the on chain transaction.
+  """
+  withSigner: Boolean
   # farcaster only supports ETH addresses currently so no need to specify a chain
 }
 
 input LensAuth {
   address: Address!
+  """
+  signature is the signed challenge provided by a GQL request to the lens endpoint
+  """
+  signature: String @scrub
   # lens only supports ETH addresses currently so no need to specify a chain
 }
 
@@ -10692,6 +10946,17 @@ type SomeoneMentionedYourCommunityNotification implements Notification & Node @g
 
   # Don't need a ` + "`" + `who` + "`" + ` here since the ` + "`" + `comment` + "`" + ` or ` + "`" + `post` + "`" + ` can provide that
   mentionSource: MentionSource @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+}
+
+type SomeonePostedYourWorkNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  post: Post @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
 }
 
@@ -12116,21 +12381,6 @@ func (ec *executionContext) field_GalleryUser_sharedFollowers_args(ctx context.C
 		}
 	}
 	args["last"] = arg3
-	return args, nil
-}
-
-func (ec *executionContext) field_GalleryUser_tokensByChain_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 persist.Chain
-	if tmp, ok := rawArgs["chain"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-		arg0, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chain"] = arg0
 	return args, nil
 }
 
@@ -14987,8 +15237,6 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -15250,8 +15498,6 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -15797,18 +16043,6 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_token(ctx context.Co
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -15821,6 +16055,26 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_token(ctx context.Co
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -15829,20 +16083,14 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_token(ctx context.Co
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -16475,8 +16723,6 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -16761,18 +17007,6 @@ func (ec *executionContext) fieldContext_ChainTokens_tokens(ctx context.Context,
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -16785,6 +17019,26 @@ func (ec *executionContext) fieldContext_ChainTokens_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -16793,20 +17047,14 @@ func (ec *executionContext) fieldContext_ChainTokens_tokens(ctx context.Context,
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -17378,8 +17626,6 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -17969,18 +18215,6 @@ func (ec *executionContext) fieldContext_CollectionToken_token(ctx context.Conte
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -17993,6 +18227,26 @@ func (ec *executionContext) fieldContext_CollectionToken_token(ctx context.Conte
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -18001,20 +18255,14 @@ func (ec *executionContext) fieldContext_CollectionToken_token(ctx context.Conte
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -18313,8 +18561,6 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -18746,8 +18992,6 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -19023,8 +19267,6 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -19484,8 +19726,6 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -23216,18 +23456,6 @@ func (ec *executionContext) fieldContext_EnsProfileImage_token(ctx context.Conte
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -23240,6 +23468,26 @@ func (ec *executionContext) fieldContext_EnsProfileImage_token(ctx context.Conte
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -23248,20 +23496,14 @@ func (ec *executionContext) fieldContext_EnsProfileImage_token(ctx context.Conte
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -25179,6 +25421,88 @@ func (ec *executionContext) fieldContext_FarcasterSocialAccount_display(ctx cont
 	return fc, nil
 }
 
+func (ec *executionContext) _FarcasterSocialAccount_approvalURL(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_approvalURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ApprovalURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_approvalURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_signerStatus(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_signerStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SignerStatus, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_signerStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FeedConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FeedConnection_edges(ctx, field)
 	if err != nil {
@@ -26339,8 +26663,6 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -26536,8 +26858,6 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -27277,8 +27597,6 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -27472,8 +27790,6 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -27790,8 +28106,6 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -28528,18 +28842,6 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -28552,6 +28854,26 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -28560,20 +28882,14 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -28588,64 +28904,6 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_GalleryUser_tokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _GalleryUser_tokensByChain(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUser().TokensByChain(rctx, obj, fc.Args["chain"].(persist.Chain))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.ChainTokens)
-	fc.Result = res
-	return ec.marshalOChainTokens2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainTokens(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_GalleryUser_tokensByChain(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "GalleryUser",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "chain":
-				return ec.fieldContext_ChainTokens_chain(ctx, field)
-			case "tokens":
-				return ec.fieldContext_ChainTokens_tokens(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ChainTokens", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_GalleryUser_tokensByChain_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -29032,8 +29290,6 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -29125,8 +29381,6 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -29827,8 +30081,6 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -31747,6 +31999,50 @@ func (ec *executionContext) _LensSocialAccount_display(ctx context.Context, fiel
 }
 
 func (ec *executionContext) fieldContext_LensSocialAccount_display(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_signatureApproved(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_signatureApproved(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SignatureApproved, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_signatureApproved(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "LensSocialAccount",
 		Field:      field,
@@ -38580,18 +38876,6 @@ func (ec *executionContext) fieldContext_NewTokensNotification_token(ctx context
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -38604,6 +38888,26 @@ func (ec *executionContext) fieldContext_NewTokensNotification_token(ctx context
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -38612,20 +38916,14 @@ func (ec *executionContext) fieldContext_NewTokensNotification_token(ctx context
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -39082,8 +39380,6 @@ func (ec *executionContext) fieldContext_OptInForRolesPayload_user(ctx context.C
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -39175,8 +39471,6 @@ func (ec *executionContext) fieldContext_OptOutForRolesPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -39977,8 +40271,6 @@ func (ec *executionContext) fieldContext_Post_author(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -40099,18 +40391,6 @@ func (ec *executionContext) fieldContext_Post_tokens(ctx context.Context, field 
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -40123,6 +40403,26 @@ func (ec *executionContext) fieldContext_Post_tokens(ctx context.Context, field 
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -40131,20 +40431,14 @@ func (ec *executionContext) fieldContext_Post_tokens(ctx context.Context, field 
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -42168,8 +42462,6 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -42645,8 +42937,6 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -44218,18 +44508,6 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -44242,6 +44520,26 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -44250,20 +44548,14 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -45137,8 +45429,6 @@ func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -45281,18 +45571,6 @@ func (ec *executionContext) fieldContext_SetSpamPreferencePayload_tokens(ctx con
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -45305,6 +45583,26 @@ func (ec *executionContext) fieldContext_SetSpamPreferencePayload_tokens(ctx con
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -45313,20 +45611,14 @@ func (ec *executionContext) fieldContext_SetSpamPreferencePayload_tokens(ctx con
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -45384,6 +45676,8 @@ func (ec *executionContext) fieldContext_SocialAccounts_twitter(ctx context.Cont
 				return ec.fieldContext_TwitterSocialAccount_profileImageURL(ctx, field)
 			case "display":
 				return ec.fieldContext_TwitterSocialAccount_display(ctx, field)
+			case "scope":
+				return ec.fieldContext_TwitterSocialAccount_scope(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TwitterSocialAccount", field.Name)
 		},
@@ -45441,6 +45735,10 @@ func (ec *executionContext) fieldContext_SocialAccounts_farcaster(ctx context.Co
 				return ec.fieldContext_FarcasterSocialAccount_bio(ctx, field)
 			case "display":
 				return ec.fieldContext_FarcasterSocialAccount_display(ctx, field)
+			case "approvalURL":
+				return ec.fieldContext_FarcasterSocialAccount_approvalURL(ctx, field)
+			case "signerStatus":
+				return ec.fieldContext_FarcasterSocialAccount_signerStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FarcasterSocialAccount", field.Name)
 		},
@@ -45498,6 +45796,8 @@ func (ec *executionContext) fieldContext_SocialAccounts_lens(ctx context.Context
 				return ec.fieldContext_LensSocialAccount_bio(ctx, field)
 			case "display":
 				return ec.fieldContext_LensSocialAccount_display(ctx, field)
+			case "signatureApproved":
+				return ec.fieldContext_LensSocialAccount_signatureApproved(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type LensSocialAccount", field.Name)
 		},
@@ -45607,8 +45907,6 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -47215,18 +47513,6 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourTokenNotification_tok
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -47239,6 +47525,26 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourTokenNotification_tok
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -47247,20 +47553,14 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourTokenNotification_tok
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -49161,6 +49461,365 @@ func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_community
 func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
+			case "tmpPostsWithProjectID":
+				return ec.fieldContext_Community_tmpPostsWithProjectID(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeonePostedYourWorkNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeonePostedYourWorkNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeonePostedYourWorkNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeonePostedYourWorkNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeonePostedYourWorkNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeonePostedYourWorkNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeonePostedYourWorkNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeonePostedYourWorkNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeonePostedYourWorkNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeonePostedYourWorkNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeonePostedYourWorkNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeonePostedYourWorkNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeonePostedYourWorkNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeonePostedYourWorkNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeonePostedYourWorkNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification_post(ctx context.Context, field graphql.CollectedField, obj *model.SomeonePostedYourWorkNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeonePostedYourWorkNotification_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeonePostedYourWorkNotification().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeonePostedYourWorkNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "mentions":
+				return ec.fieldContext_Post_mentions(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification_community(ctx context.Context, field graphql.CollectedField, obj *model.SomeonePostedYourWorkNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeonePostedYourWorkNotification_community(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeonePostedYourWorkNotification().Community(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeonePostedYourWorkNotification",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
@@ -51164,252 +51823,6 @@ func (ec *executionContext) fieldContext_Token_collectorsNote(ctx context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _Token_media(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_media(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Token().Media(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.MediaSubtype)
-	fc.Result = res
-	return ec.marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_media(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type MediaSubtype does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_tokenType(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_tokenType(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.TokenType, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.TokenType)
-	fc.Result = res
-	return ec.marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_tokenType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type TokenType does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_chain(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_chain(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Chain, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Chain)
-	fc.Result = res
-	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_chain(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Chain does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_name(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_name(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Name, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_description(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_description(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Description, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_description(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_tokenId(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_tokenId(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.TokenID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_tokenId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Token_quantity(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Token_quantity(ctx, field)
 	if err != nil {
@@ -51509,8 +51922,6 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -51728,6 +52139,478 @@ func (ec *executionContext) fieldContext_Token_ownerIsCreator(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Token_definition(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_definition(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Definition(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokenDefinition)
+	fc.Result = res
+	return ec.marshalNTokenDefinition2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenDefinition(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_definition(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TokenDefinition_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_TokenDefinition_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_TokenDefinition_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_TokenDefinition_lastUpdated(ctx, field)
+			case "media":
+				return ec.fieldContext_TokenDefinition_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_TokenDefinition_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_TokenDefinition_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_TokenDefinition_name(ctx, field)
+			case "description":
+				return ec.fieldContext_TokenDefinition_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_TokenDefinition_tokenId(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_TokenDefinition_tokenMetadata(ctx, field)
+			case "community":
+				return ec.fieldContext_TokenDefinition_community(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_TokenDefinition_externalUrl(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TokenDefinition", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_isSpamByUser(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_isSpamByUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsSpamByUser, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_isSpamByUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_admires(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_admires(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Admires(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["userID"].(*persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokenAdmiresConnection)
+	fc.Result = res
+	return ec.marshalOTokenAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenAdmiresConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_admires(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_TokenAdmiresConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_TokenAdmiresConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TokenAdmiresConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Token_admires_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_viewerAdmire(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_viewerAdmire(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().ViewerAdmire(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_viewerAdmire(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Admire_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Admire_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Admire_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Admire_lastUpdated(ctx, field)
+			case "admirer":
+				return ec.fieldContext_Admire_admirer(ctx, field)
+			case "source":
+				return ec.fieldContext_Admire_source(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_media(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_media(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Media(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.MediaSubtype)
+	fc.Result = res
+	return ec.marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_media(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MediaSubtype does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_tokenType(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_tokenType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().TokenType(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokenType)
+	fc.Result = res
+	return ec.marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_tokenType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type TokenType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_chain(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_chain(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Chain(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_chain(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Chain does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_name(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Name(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_description(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_description(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Description(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_description(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_tokenId(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_tokenId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().TokenID(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_tokenId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Token_tokenMetadata(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Token_tokenMetadata(ctx, field)
 	if err != nil {
@@ -51931,7 +52814,7 @@ func (ec *executionContext) _Token_externalUrl(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ExternalURL, nil
+		return ec.resolvers.Token().ExternalURL(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -51949,92 +52832,10 @@ func (ec *executionContext) fieldContext_Token_externalUrl(ctx context.Context, 
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_blockNumber(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_blockNumber(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.BlockNumber, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_blockNumber(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_isSpamByUser(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_isSpamByUser(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.IsSpamByUser, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_isSpamByUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -52076,119 +52877,6 @@ func (ec *executionContext) fieldContext_Token_isSpamByProvider(ctx context.Cont
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_admires(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_admires(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Token().Admires(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["userID"].(*persist.DBID))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.TokenAdmiresConnection)
-	fc.Result = res
-	return ec.marshalOTokenAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenAdmiresConnection(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_admires(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "edges":
-				return ec.fieldContext_TokenAdmiresConnection_edges(ctx, field)
-			case "pageInfo":
-				return ec.fieldContext_TokenAdmiresConnection_pageInfo(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type TokenAdmiresConnection", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Token_admires_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Token_viewerAdmire(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Token_viewerAdmire(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Token().ViewerAdmire(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Admire)
-	fc.Result = res
-	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Token_viewerAdmire(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Admire_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_Admire_dbid(ctx, field)
-			case "creationTime":
-				return ec.fieldContext_Admire_creationTime(ctx, field)
-			case "lastUpdated":
-				return ec.fieldContext_Admire_lastUpdated(ctx, field)
-			case "admirer":
-				return ec.fieldContext_Admire_admirer(ctx, field)
-			case "source":
-				return ec.fieldContext_Admire_source(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
 		},
 	}
 	return fc, nil
@@ -52270,6 +52958,47 @@ func (ec *executionContext) _Token_openseaCollectionName(ctx context.Context, fi
 }
 
 func (ec *executionContext) fieldContext_Token_openseaCollectionName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_blockNumber(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_blockNumber(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BlockNumber, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_blockNumber(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
@@ -52465,18 +53194,6 @@ func (ec *executionContext) fieldContext_TokenAdmireEdge_token(ctx context.Conte
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -52489,6 +53206,26 @@ func (ec *executionContext) fieldContext_TokenAdmireEdge_token(ctx context.Conte
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -52497,20 +53234,14 @@ func (ec *executionContext) fieldContext_TokenAdmireEdge_token(ctx context.Conte
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -52624,6 +53355,587 @@ func (ec *executionContext) fieldContext_TokenAdmiresConnection_pageInfo(ctx con
 	return fc, nil
 }
 
+func (ec *executionContext) _TokenDefinition_id(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_dbid(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_lastUpdated(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_lastUpdated(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LastUpdated, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_lastUpdated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_media(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_media(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDefinition().Media(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.MediaSubtype)
+	fc.Result = res
+	return ec.marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_media(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MediaSubtype does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_tokenType(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_tokenType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokenType)
+	fc.Result = res
+	return ec.marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_tokenType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type TokenType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_chain(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_chain(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_chain(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Chain does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_name(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_description(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_description(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_description(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_tokenId(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_tokenId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_tokenId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_tokenMetadata(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_tokenMetadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDefinition().TokenMetadata(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_tokenMetadata(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_community(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_community(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDefinition().Community(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
+			case "tmpPostsWithProjectID":
+				return ec.fieldContext_Community_tmpPostsWithProjectID(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_externalUrl(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_externalUrl(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExternalURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_externalUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TokenEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.TokenEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_TokenEdge_node(ctx, field)
 	if err != nil {
@@ -52670,18 +53982,6 @@ func (ec *executionContext) fieldContext_TokenEdge_node(ctx context.Context, fie
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -52694,6 +53994,26 @@ func (ec *executionContext) fieldContext_TokenEdge_node(ctx context.Context, fie
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -52702,20 +54022,14 @@ func (ec *executionContext) fieldContext_TokenEdge_node(ctx context.Context, fie
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -52920,8 +54234,6 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -53242,18 +54554,6 @@ func (ec *executionContext) fieldContext_TokenProfileImage_token(ctx context.Con
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -53266,6 +54566,26 @@ func (ec *executionContext) fieldContext_TokenProfileImage_token(ctx context.Con
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -53274,20 +54594,14 @@ func (ec *executionContext) fieldContext_TokenProfileImage_token(ctx context.Con
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -53396,8 +54710,6 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -53788,8 +55100,6 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -54087,6 +55397,50 @@ func (ec *executionContext) fieldContext_TwitterSocialAccount_display(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _TwitterSocialAccount_scope(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TwitterSocialAccount_scope(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Scope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TwitterSocialAccount_scope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _UnbanUserFromFeedPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.UnbanUserFromFeedPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UnbanUserFromFeedPayload_user(ctx, field)
 	if err != nil {
@@ -54145,8 +55499,6 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -54301,8 +55653,6 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -55652,18 +57002,6 @@ func (ec *executionContext) fieldContext_UpdateTokenInfoPayload_token(ctx contex
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -55676,6 +57014,26 @@ func (ec *executionContext) fieldContext_UpdateTokenInfoPayload_token(ctx contex
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -55684,20 +57042,14 @@ func (ec *executionContext) fieldContext_UpdateTokenInfoPayload_token(ctx contex
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -55973,8 +57325,6 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -56107,8 +57457,6 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -56499,8 +57847,6 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -56680,8 +58026,6 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -57467,18 +58811,6 @@ func (ec *executionContext) fieldContext_ViewTokenPayload_token(ctx context.Cont
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -57491,6 +58823,26 @@ func (ec *executionContext) fieldContext_ViewTokenPayload_token(ctx context.Cont
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -57499,20 +58851,14 @@ func (ec *executionContext) fieldContext_ViewTokenPayload_token(ctx context.Cont
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -57624,8 +58970,6 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -58400,18 +59744,6 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_lastUpdated(ctx, field)
 			case "collectorsNote":
 				return ec.fieldContext_Token_collectorsNote(ctx, field)
-			case "media":
-				return ec.fieldContext_Token_media(ctx, field)
-			case "tokenType":
-				return ec.fieldContext_Token_tokenType(ctx, field)
-			case "chain":
-				return ec.fieldContext_Token_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Token_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Token_description(ctx, field)
-			case "tokenId":
-				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "quantity":
 				return ec.fieldContext_Token_quantity(ctx, field)
 			case "owner":
@@ -58424,6 +59756,26 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
@@ -58432,20 +59784,14 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
-			case "blockNumber":
-				return ec.fieldContext_Token_blockNumber(ctx, field)
-			case "isSpamByUser":
-				return ec.fieldContext_Token_isSpamByUser(ctx, field)
 			case "isSpamByProvider":
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
-			case "admires":
-				return ec.fieldContext_Token_admires(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
 				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
 			case "openseaId":
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
@@ -61281,7 +62627,7 @@ func (ec *executionContext) unmarshalInputFarcasterAuth(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address"}
+	fieldsInOrder := [...]string{"address", "withSigner"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -61297,6 +62643,15 @@ func (ec *executionContext) unmarshalInputFarcasterAuth(ctx context.Context, obj
 				return it, err
 			}
 			it.Address = data
+		case "withSigner":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("withSigner"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WithSigner = data
 		}
 	}
 
@@ -61424,7 +62779,7 @@ func (ec *executionContext) unmarshalInputLensAuth(ctx context.Context, obj inte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address"}
+	fieldsInOrder := [...]string{"address", "signature"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -61440,6 +62795,15 @@ func (ec *executionContext) unmarshalInputLensAuth(ctx context.Context, obj inte
 				return it, err
 			}
 			it.Address = data
+		case "signature":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Signature = data
 		}
 	}
 
@@ -64862,6 +66226,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Wallet(ctx, sel, obj)
+	case model.TokenDefinition:
+		return ec._TokenDefinition(ctx, sel, &obj)
+	case *model.TokenDefinition:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._TokenDefinition(ctx, sel, obj)
 	case model.Token:
 		return ec._Token(ctx, sel, &obj)
 	case *model.Token:
@@ -65054,6 +66425,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, obj)
+	case model.SomeonePostedYourWorkNotification:
+		return ec._SomeonePostedYourWorkNotification(ctx, sel, &obj)
+	case *model.SomeonePostedYourWorkNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeonePostedYourWorkNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -65152,6 +66530,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, obj)
+	case model.SomeonePostedYourWorkNotification:
+		return ec._SomeonePostedYourWorkNotification(ctx, sel, &obj)
+	case *model.SomeonePostedYourWorkNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeonePostedYourWorkNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -65551,6 +66936,13 @@ func (ec *executionContext) _RefreshTokenPayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrSyncFailed(ctx, sel, obj)
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrTokenNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -70140,7 +71532,7 @@ func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "ReferralPostTokenPayloadOrError", "AdmireTokenPayloadOrError"}
+var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "RefreshTokenPayloadOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "ReferralPostTokenPayloadOrError", "AdmireTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrTokenNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errTokenNotFoundImplementors)
@@ -70368,6 +71760,14 @@ func (ec *executionContext) _FarcasterSocialAccount(ctx context.Context, sel ast
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "approvalURL":
+
+			out.Values[i] = ec._FarcasterSocialAccount_approvalURL(ctx, field, obj)
+
+		case "signerStatus":
+
+			out.Values[i] = ec._FarcasterSocialAccount_signerStatus(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -71255,23 +72655,6 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
-		case "tokensByChain":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._GalleryUser_tokensByChain(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "wallets":
 			field := field
 
@@ -71981,6 +73364,13 @@ func (ec *executionContext) _LensSocialAccount(ctx context.Context, sel ast.Sele
 		case "display":
 
 			out.Values[i] = ec._LensSocialAccount_display(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "signatureApproved":
+
+			out.Values[i] = ec._LensSocialAccount_signatureApproved(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -75926,6 +77316,87 @@ func (ec *executionContext) _SomeoneMentionedYourCommunityNotification(ctx conte
 	return out
 }
 
+var someonePostedYourWorkNotificationImplementors = []string{"SomeonePostedYourWorkNotification", "Notification", "Node"}
+
+func (ec *executionContext) _SomeonePostedYourWorkNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeonePostedYourWorkNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, someonePostedYourWorkNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SomeonePostedYourWorkNotification")
+		case "id":
+
+			out.Values[i] = ec._SomeonePostedYourWorkNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._SomeonePostedYourWorkNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._SomeonePostedYourWorkNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._SomeonePostedYourWorkNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._SomeonePostedYourWorkNotification_updatedTime(ctx, field, obj)
+
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeonePostedYourWorkNotification_post(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "community":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeonePostedYourWorkNotification_community(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var someoneRepliedToYourCommentNotificationImplementors = []string{"SomeoneRepliedToYourCommentNotification", "Notification", "Node"}
 
 func (ec *executionContext) _SomeoneRepliedToYourCommentNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneRepliedToYourCommentNotification) graphql.Marshaler {
@@ -76403,43 +77874,6 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			out.Values[i] = ec._Token_collectorsNote(ctx, field, obj)
 
-		case "media":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Token_media(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "tokenType":
-
-			out.Values[i] = ec._Token_tokenType(ctx, field, obj)
-
-		case "chain":
-
-			out.Values[i] = ec._Token_chain(ctx, field, obj)
-
-		case "name":
-
-			out.Values[i] = ec._Token_name(ctx, field, obj)
-
-		case "description":
-
-			out.Values[i] = ec._Token_description(ctx, field, obj)
-
-		case "tokenId":
-
-			out.Values[i] = ec._Token_tokenId(ctx, field, obj)
-
 		case "quantity":
 
 			out.Values[i] = ec._Token_quantity(ctx, field, obj)
@@ -76490,6 +77924,166 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			out.Values[i] = ec._Token_ownerIsCreator(ctx, field, obj)
 
+		case "definition":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_definition(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "isSpamByUser":
+
+			out.Values[i] = ec._Token_isSpamByUser(ctx, field, obj)
+
+		case "admires":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_admires(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "viewerAdmire":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_viewerAdmire(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "media":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_media(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tokenType":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_tokenType(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "chain":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_chain(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "name":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_name(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "description":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_description(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tokenId":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_tokenId(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokenMetadata":
 			field := field
 
@@ -76542,17 +78136,22 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			})
 		case "externalUrl":
+			field := field
 
-			out.Values[i] = ec._Token_externalUrl(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_externalUrl(ctx, field, obj)
+				return res
+			}
 
-		case "blockNumber":
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
-			out.Values[i] = ec._Token_blockNumber(ctx, field, obj)
-
-		case "isSpamByUser":
-
-			out.Values[i] = ec._Token_isSpamByUser(ctx, field, obj)
-
+			})
 		case "isSpamByProvider":
 			field := field
 
@@ -76570,40 +78169,6 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 				return innerFunc(ctx)
 
 			})
-		case "admires":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Token_admires(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "viewerAdmire":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Token_viewerAdmire(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "creatorAddress":
 
 			out.Values[i] = ec._Token_creatorAddress(ctx, field, obj)
@@ -76611,6 +78176,10 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 		case "openseaCollectionName":
 
 			out.Values[i] = ec._Token_openseaCollectionName(ctx, field, obj)
+
+		case "blockNumber":
+
+			out.Values[i] = ec._Token_blockNumber(ctx, field, obj)
 
 		case "openseaId":
 
@@ -76677,6 +78246,124 @@ func (ec *executionContext) _TokenAdmiresConnection(ctx context.Context, sel ast
 		case "pageInfo":
 
 			out.Values[i] = ec._TokenAdmiresConnection_pageInfo(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var tokenDefinitionImplementors = []string{"TokenDefinition", "Node"}
+
+func (ec *executionContext) _TokenDefinition(ctx context.Context, sel ast.SelectionSet, obj *model.TokenDefinition) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokenDefinitionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TokenDefinition")
+		case "id":
+
+			out.Values[i] = ec._TokenDefinition_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._TokenDefinition_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "creationTime":
+
+			out.Values[i] = ec._TokenDefinition_creationTime(ctx, field, obj)
+
+		case "lastUpdated":
+
+			out.Values[i] = ec._TokenDefinition_lastUpdated(ctx, field, obj)
+
+		case "media":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDefinition_media(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tokenType":
+
+			out.Values[i] = ec._TokenDefinition_tokenType(ctx, field, obj)
+
+		case "chain":
+
+			out.Values[i] = ec._TokenDefinition_chain(ctx, field, obj)
+
+		case "name":
+
+			out.Values[i] = ec._TokenDefinition_name(ctx, field, obj)
+
+		case "description":
+
+			out.Values[i] = ec._TokenDefinition_description(ctx, field, obj)
+
+		case "tokenId":
+
+			out.Values[i] = ec._TokenDefinition_tokenId(ctx, field, obj)
+
+		case "tokenMetadata":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDefinition_tokenMetadata(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "community":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDefinition_community(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "externalUrl":
+
+			out.Values[i] = ec._TokenDefinition_externalUrl(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -77072,6 +78759,13 @@ func (ec *executionContext) _TwitterSocialAccount(ctx context.Context, sel ast.S
 		case "display":
 
 			out.Values[i] = ec._TwitterSocialAccount_display(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "scope":
+
+			out.Values[i] = ec._TwitterSocialAccount_scope(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -79470,6 +81164,20 @@ func (ec *executionContext) marshalNToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgall
 	return ec._Token(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNTokenDefinition2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenDefinition(ctx context.Context, sel ast.SelectionSet, v model.TokenDefinition) graphql.Marshaler {
+	return ec._TokenDefinition(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTokenDefinition2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenDefinition(ctx context.Context, sel ast.SelectionSet, v *model.TokenDefinition) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TokenDefinition(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, v interface{}) (persist.TokenID, error) {
 	var res persist.TokenID
 	err := res.UnmarshalGQL(v)
@@ -80364,13 +82072,6 @@ func (ec *executionContext) unmarshalOChainAddressInput2ᚖgithubᚗcomᚋmikeyd
 	}
 	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOChainTokens2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainTokens(ctx context.Context, sel ast.SelectionSet, v *model.ChainTokens) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ChainTokens(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOClearAllNotificationsPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐClearAllNotificationsPayload(ctx context.Context, sel ast.SelectionSet, v *model.ClearAllNotificationsPayload) graphql.Marshaler {

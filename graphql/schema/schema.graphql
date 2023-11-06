@@ -100,7 +100,6 @@ type GalleryUser implements Node @goEmbedHelper {
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
   tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
-  tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
   primaryWallet: Wallet @goField(forceResolver: true)
@@ -417,32 +416,36 @@ enum InteractionType {
   Comment
 }
 
-type Token implements Node @goEmbedHelper {
+type TokenDefinition implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
-  collectorsNote: String
   media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
   chain: Chain
   name: String
   description: String
   tokenId: String
+  tokenMetadata: String @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+  externalUrl: String
+}
+
+type Token implements Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  creationTime: Time
+  lastUpdated: Time
+  collectorsNote: String
   quantity: String # source is a hex string
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
-  ownershipHistory: [OwnerAtBlock]
+  ownershipHistory: [OwnerAtBlock] @deprecated
   ownerIsHolder: Boolean
   ownerIsCreator: Boolean
-  tokenMetadata: String @goField(forceResolver: true)
-  contract: Contract @goField(forceResolver: true)
-  community: Community @goField(forceResolver: true)
-  externalUrl: String
-  blockNumber: String # source is uint64
+  definition: TokenDefinition! @goField(forceResolver: true)
   isSpamByUser: Boolean
-  isSpamByProvider: Boolean @goField(forceResolver: true)
-
   # Returns an admires connection
   admires(
     before: String
@@ -451,16 +454,43 @@ type Token implements Node @goEmbedHelper {
     last: Int
     userID: DBID
   ): TokenAdmiresConnection @goField(forceResolver: true)
-
   viewerAdmire: Admire @goField(forceResolver: true)
 
-  # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
-  # struct and may ultimately end up elsewhere
+  # The following fields will be deprecated and removed in the future.
+  media: MediaSubtype
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.media instead")
+  tokenType: TokenType
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenType instead")
+  chain: Chain @goField(forceResolver: true) @deprecated(reason: "Use definition.chain instead")
+  name: String @goField(forceResolver: true) @deprecated(reason: "Use definition.name instead")
+  description: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.description instead")
+  tokenId: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenId instead")
+  tokenMetadata: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenMetadata instead")
+  contract: Contract
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.contract instead")
+  community: Community
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.community instead")
+  externalUrl: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.externalUrl instead")
+  isSpamByProvider: Boolean
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.community.contract.isSpam instead")
   creatorAddress: ChainAddress
-  openseaCollectionName: String
-
-  # temporary field while we're dependent on opensea
-  openseaId: Int
+    @deprecated(reason: "Use definition.community.creatorAddress instead")
+  openseaCollectionName: String @deprecated
+  blockNumber: String @deprecated # source is uint64
+  openseaId: Int @deprecated
 }
 
 type OwnerAtBlock {
@@ -672,6 +702,7 @@ type TwitterSocialAccount implements SocialAccount {
   username: String!
   profileImageURL: String!
   display: Boolean!
+  scope: String!
 }
 
 type FarcasterSocialAccount implements SocialAccount {
@@ -682,7 +713,10 @@ type FarcasterSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  approvalURL: String
+  signerStatus: String
 }
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -691,6 +725,7 @@ type LensSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
+  signatureApproved: Boolean!
 }
 
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
@@ -1608,7 +1643,11 @@ type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
-union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed
+union RefreshTokenPayloadOrError =
+    RefreshTokenPayload
+  | ErrInvalidInput
+  | ErrSyncFailed
+  | ErrTokenNotFound
 
 type RefreshTokenPayload {
   token: Token
@@ -1785,11 +1824,20 @@ input TwitterAuth {
 
 input FarcasterAuth {
   address: Address!
+  """
+  withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+  the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+  """
+  withSigner: Boolean
   # farcaster only supports ETH addresses currently so no need to specify a chain
 }
 
 input LensAuth {
   address: Address!
+  """
+  signature is the signed challenge provided by a GQL request to the lens endpoint
+  """
+  signature: String @scrub
   # lens only supports ETH addresses currently so no need to specify a chain
 }
 
@@ -2106,6 +2154,17 @@ type SomeoneMentionedYourCommunityNotification implements Notification & Node @g
 
   # Don't need a `who` here since the `comment` or `post` can provide that
   mentionSource: MentionSource @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+}
+
+type SomeonePostedYourWorkNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  post: Post @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
 }
 

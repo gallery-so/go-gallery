@@ -98,7 +98,7 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
 	viper.SetDefault("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "notifications-email-sub")
-	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "")
+	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("ADMIN_PASS", "admin")
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
 

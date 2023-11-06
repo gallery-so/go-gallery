@@ -9,9 +9,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"golang.org/x/net/html"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -52,6 +53,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnDeletedNode:      resolveDeletedNodeByID,
 	OnSocialConnection: resolveSocialConnectionByIdentifiers,
 	OnPost:             resolvePostByPostID,
+	OnTokenDefinition:  resolveTokenDefinitionByID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -72,6 +74,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneMentionedYourCommunityNotification:   fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
 	OnSomeoneRepliedToYourCommentNotification:     fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
 	OnSomeoneAdmiredYourTokenNotification:         fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
+	OnSomeonePostedYourWorkNotification:           fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -113,9 +116,9 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUsernameNotAvailable{Message: message}
 	case util.ErrorAs[persist.ErrCollectionNotFoundByID](err):
 		mappedErr = model.ErrCollectionNotFound{Message: message}
-	case util.ErrorAs[persist.ErrTokenNotFoundByID](err) || util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err):
+	case util.ErrorAs[persist.ErrTokenNotFound](err) || util.ErrorAs[persist.ErrTokenDefinitionNotFound](err):
 		mappedErr = model.ErrTokenNotFound{Message: message}
-	case util.ErrorAs[persist.ErrContractNotFoundByAddress](err):
+	case util.ErrorAs[persist.ErrContractNotFound](err):
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case util.ErrorAs[persist.ErrAddressOwnedByUser](err):
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
@@ -212,11 +215,11 @@ func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m mod
 	}
 
 	if m.Farcaster != nil {
-		return publicapi.For(ctx).Social.NewFarcasterAuthenticator(authedUserID, m.Farcaster.Address), nil
+		return publicapi.For(ctx).Social.NewFarcasterAuthenticator(authedUserID, m.Farcaster.Address, util.FromPointer(m.Farcaster.WithSigner)), nil
 	}
 
 	if m.Lens != nil {
-		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address), nil
+		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address, util.FromPointer(m.Lens.Signature)), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -494,41 +497,19 @@ func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*mod
 	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
 }
 
-func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Community, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.Contract)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: It's probably worth revisiting "forceRefresh" to see if it still makes sense as a
-	// parameter for every call to communityToModel.
-	return communityToModel(ctx, *contract, util.ToPointer(false)), nil
-}
-
 func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
-
+	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByTokenDBID(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
-
-	return resolveContractByContractID(ctx, token.Contract)
+	return resolveContractByContractID(ctx, td.ContractID)
 }
 
 func resolveContractByContractID(ctx context.Context, contractID persist.DBID) (*model.Contract, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
-
 	if err != nil {
 		return nil, err
 	}
-
 	return contractToModel(ctx, *contract), nil
 }
 
@@ -777,6 +758,14 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 	return postToModel(post)
 }
 
+func resolveTokenDefinitionByID(ctx context.Context, dbid persist.DBID) (*model.TokenDefinition, error) {
+	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, dbid)
+	if err != nil {
+		return nil, err
+	}
+	return tokenDefinitionToModel(td), nil
+}
+
 func resolveMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]*model.Mention, error) {
 	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByCommentID(ctx, commentID)
 	if err != nil {
@@ -1005,7 +994,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		}
 		return model.SomeoneMentionedYouNotification{
 			HelperSomeoneMentionedYouNotificationData: model.HelperSomeoneMentionedYouNotificationData{
-				OwnerID:   notif.OwnerID,
+
 				PostID:    postID,
 				CommentID: commentID,
 			},
@@ -1028,7 +1017,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		}
 		return model.SomeoneMentionedYourCommunityNotification{
 			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
-				OwnerID:    notif.OwnerID,
+
 				ContractID: notif.ContractID,
 				PostID:     postID,
 				CommentID:  commentID,
@@ -1039,6 +1028,20 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			UpdatedTime:   &notif.LastUpdated,
 			Community:     nil, // handled by dedicated resolver
 			MentionSource: nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserPostedYourWork:
+		return model.SomeonePostedYourWorkNotification{
+			HelperSomeonePostedYourWorkNotificationData: model.HelperSomeonePostedYourWorkNotificationData{
+
+				ContractID: notif.ContractID,
+				PostID:     notif.PostID,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Community:    nil, // handled by dedicated resolver
+			Post:         nil, // handled by dedicated resolver
 		}, nil
 
 	default:
@@ -1958,47 +1961,54 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 	}
 }
 
+func tokenDefinitionToModel(td db.TokenDefinition) *model.TokenDefinition {
+	return &model.TokenDefinition{
+		HelperTokenDefinitionData: model.HelperTokenDefinitionData{Definition: td},
+		Dbid:                      td.ID,
+		CreationTime:              &td.CreatedAt,
+		LastUpdated:               &td.LastUpdated,
+		Media:                     nil, // handled by dedicated resolver
+		TokenType:                 util.ToPointer(model.TokenType(td.TokenType)),
+		Chain:                     &td.Chain,
+		Name:                      &td.Name.String,
+		Description:               &td.Description.String,
+		TokenID:                   util.ToPointer(td.TokenID.String()),
+		Community:                 nil, // handled by dedicated resolver
+		ExternalURL:               &td.ExternalUrl.String,
+	}
+}
+
 func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBID) *model.Token {
-	chain := token.Chain
-
-	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
-	tokenType := model.TokenType(token.TokenType.String)
-
 	var isSpamByUser *bool
 	if token.IsUserMarkedSpam.Valid {
 		isSpamByUser = &token.IsUserMarkedSpam.Bool
 	}
-
-	var isSpamByProvider *bool
-	if token.IsProviderMarkedSpam.Valid {
-		isSpamByProvider = &token.IsProviderMarkedSpam.Bool
-	}
-
 	return &model.Token{
-		HelperTokenData:  model.HelperTokenData{Token: token, CollectionID: collectionID},
-		Dbid:             token.ID,
-		CreationTime:     &token.CreatedAt,
-		LastUpdated:      &token.LastUpdated,
-		CollectorsNote:   util.ToPointer(html.UnescapeString(token.CollectorsNote.String)),
-		Media:            nil, // handled by dedicated resolver
-		TokenType:        &tokenType,
-		Chain:            &chain,
-		Name:             &token.Name.String,
-		Description:      &token.Description.String,
-		OwnedByWallets:   nil, // handled by dedicated resolver
-		TokenID:          util.ToPointer(token.TokenID.String()),
-		Quantity:         util.ToPointer(token.Quantity.String()),
-		Owner:            nil, // handled by dedicated resolver
-		OwnershipHistory: nil, // TODO: later
-		OwnerIsHolder:    &token.IsHolderToken,
-		OwnerIsCreator:   &token.IsCreatorToken,
-		Contract:         nil, // handled by dedicated resolver
-		ExternalURL:      &token.ExternalUrl.String,
-		BlockNumber:      &blockNumber, // TODO: later
-		IsSpamByUser:     isSpamByUser,
-		IsSpamByProvider: isSpamByProvider,
-
-		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
+		HelperTokenData: model.HelperTokenData{Token: token, CollectionID: collectionID},
+		Dbid:            token.ID,
+		CreationTime:    &token.CreatedAt,
+		LastUpdated:     &token.LastUpdated,
+		CollectorsNote:  util.ToPointer(html.UnescapeString(token.CollectorsNote.String)),
+		Quantity:        util.ToPointer(token.Quantity.String()),
+		Owner:           nil, // handled by dedicated resolver
+		OwnerIsHolder:   &token.IsHolderToken,
+		OwnerIsCreator:  &token.IsCreatorToken,
+		IsSpamByUser:    isSpamByUser,
+		Definition:      nil, // handled by dedicated resolver
+		// Fields to be deprecated
+		Media:                 nil, // handled by dedicated resolver
+		TokenType:             nil, // handled by dedicated resolver
+		Chain:                 nil, // handled by dedicated resolver
+		Name:                  nil, // handled by dedicated resolver
+		Description:           nil, // handled by dedicated resolver
+		TokenID:               nil, // handled by dedicated resolver
+		TokenMetadata:         nil, // handled by dedicated resolver
+		Contract:              nil, // handled by dedicated resolver
+		ExternalURL:           nil, // handled by dedicated resolver
+		IsSpamByProvider:      nil, // handled by dedicated resolver
+		OwnedByWallets:        nil, // handled by dedicated resolver
+		BlockNumber:           nil,
+		OwnershipHistory:      nil, // TODO: later
 		OpenseaCollectionName: nil, // TODO: later
 	}
 }
@@ -2070,17 +2080,17 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 	}
 }
 
-func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
+func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
 	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := strings.ToLower(token.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
-		token.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
+	if fallback := strings.ToLower(td.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
+		td.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
 	} else if strings.HasPrefix(fallback, "ar://") {
-		token.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
+		td.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
 	}
 
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2089,22 +2099,22 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
-		if inFlight, err := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); !inFlight || err != nil {
-			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
+		if inFlight, err := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, td.ID); !inFlight || err != nil {
+			if time.Since(td.CreatedAt) > time.Duration(1*time.Hour) {
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
-		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); inFlight {
+		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, td.ID); inFlight {
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
@@ -2158,9 +2168,15 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 }
 
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
+	api := publicapi.For(ctx).Token
 	// Use the token's profile image if the token exists
-	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
-		if tokenMedia, err := publicapi.For(ctx).Token.MediaByMediaID(ctx, token.TokenMediaID); err == nil {
+	if token, err := api.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
+		// This should be free because the definition is cached from the call above
+		tDef, err := api.GetTokenDefinitionByID(ctx, token.TokenDefinitionID)
+		if err != nil {
+			return nil, err
+		}
+		if tokenMedia, err := api.GetMediaByMediaID(ctx, tDef.TokenMediaID); err == nil {
 			if tokenMedia.Media.ProfileImageURL != "" {
 				url = string(tokenMedia.Media.ProfileImageURL)
 			}

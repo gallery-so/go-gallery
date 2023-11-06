@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -53,7 +52,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	})
 
 	s := rpc.NewStorageClient(context.Background())
-	tokenRepo, contractRepo := newRepos(s)
+	contractRepo := postgres.NewContractRepository(postgres.MustCreateClient())
 	iQueries := indexerdb.New(postgres.NewPgxClient())
 	bQueries := coredb.New(postgres.NewPgxClient(postgres.WithHost(env.GetString("BACKEND_POSTGRES_HOST")), postgres.WithUser(env.GetString("BACKEND_POSTGRES_USER")), postgres.WithPassword(env.GetString("BACKEND_POSTGRES_PASSWORD")), postgres.WithPort(env.GetInt("BACKEND_POSTGRES_PORT"))))
 	tClient := task.NewClient(context.Background())
@@ -65,7 +64,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, iQueries, bQueries, tClient, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, iQueries, bQueries, tClient, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -76,7 +75,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	}
 
 	logger.For(nil).Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
+	return handlersInit(router, i, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
 }
 
 func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
@@ -91,7 +90,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	})
 
 	s := rpc.NewStorageClient(context.Background())
-	tokenRepo, contractRepo := newRepos(s)
+	contractRepo := postgres.NewContractRepository(postgres.MustCreateClient())
 	iQueries := indexerdb.New(postgres.NewPgxClient())
 	bQueries := coredb.New(postgres.NewPgxClient(postgres.WithHost(env.GetString("BACKEND_POSTGRES_HOST")), postgres.WithUser(env.GetString("BACKEND_POSTGRES_USER")), postgres.WithPassword(env.GetString("BACKEND_POSTGRES_PASSWORD")), postgres.WithPort(env.GetInt("BACKEND_POSTGRES_PORT"))))
 	tClient := task.NewClient(context.Background())
@@ -116,8 +115,8 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	httpClient := &http.Client{Timeout: 10 * time.Minute, Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
-	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, iQueries, bQueries, tClient, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
-	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, httpClient, ipfsClient, arweaveClient, s, i)
+	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, iQueries, bQueries, tClient, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	return handlersInitServer(router, contractRepo, ethClient, httpClient, ipfsClient, arweaveClient, s, i)
 }
 
 func SetDefaults() {
@@ -167,11 +166,6 @@ func ValidateEnv() {
 	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 	}
-}
-
-func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository) {
-	pgClient := postgres.MustCreateClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
 }
 
 func InitSentry() {

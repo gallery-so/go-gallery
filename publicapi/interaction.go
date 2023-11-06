@@ -991,6 +991,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
 	dbMentions, err := mentionInputsToMentions(ctx, mentions, api.queries)
+	if err != nil {
+		return "", err
+	}
 
 	commentID, resultMentions, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment, dbMentions)
 	if err != nil {
@@ -1076,7 +1079,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 					MentionID:      mention.ID,
 					Action:         persist.ActionMentionCommunity,
 				})
-
+				if err != nil {
+					return "", err
+				}
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
 			}

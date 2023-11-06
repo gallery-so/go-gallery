@@ -1251,6 +1251,7 @@ type ErrTokenNotFound struct {
 func (ErrTokenNotFound) IsTokenByIDOrError()                {}
 func (ErrTokenNotFound) IsError()                           {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()      {}
+func (ErrTokenNotFound) IsRefreshTokenPayloadOrError()      {}
 func (ErrTokenNotFound) IsViewTokenPayloadOrError()         {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError()   {}
 func (ErrTokenNotFound) IsReferralPostTokenPayloadOrError() {}
@@ -1301,6 +1302,9 @@ type FallbackMedia struct {
 
 type FarcasterAuth struct {
 	Address persist.Address `json:"address"`
+	// withSigner will make a request to authenticate the user with an on chain transaction that can be approved on their warpcast app.
+	// the `FarcasterSocialAccount` type will return an `approvalURL` that will link the user to make the on chain transaction.
+	WithSigner *bool `json:"withSigner"`
 }
 
 type FarcasterSocialAccount struct {
@@ -1311,6 +1315,8 @@ type FarcasterSocialAccount struct {
 	ProfileImageURL string                 `json:"profileImageURL"`
 	Bio             string                 `json:"bio"`
 	Display         bool                   `json:"display"`
+	ApprovalURL     *string                `json:"approvalURL"`
+	SignerStatus    *string                `json:"signerStatus"`
 }
 
 func (FarcasterSocialAccount) IsSocialAccount() {}
@@ -1452,7 +1458,6 @@ type GalleryUser struct {
 	Roles                    []*persist.Role        `json:"roles"`
 	SocialAccounts           *SocialAccounts        `json:"socialAccounts"`
 	Tokens                   []*Token               `json:"tokens"`
-	TokensByChain            *ChainTokens           `json:"tokensByChain"`
 	Wallets                  []*Wallet              `json:"wallets"`
 	PrimaryWallet            *Wallet                `json:"primaryWallet"`
 	FeaturedGallery          *Gallery               `json:"featuredGallery"`
@@ -1585,16 +1590,19 @@ func (JSONMedia) IsMedia()        {}
 
 type LensAuth struct {
 	Address persist.Address `json:"address"`
+	// signature is the signed challenge provided by a GQL request to the lens endpoint
+	Signature *string `json:"signature"`
 }
 
 type LensSocialAccount struct {
-	Type            persist.SocialProvider `json:"type"`
-	SocialID        string                 `json:"social_id"`
-	Name            string                 `json:"name"`
-	Username        string                 `json:"username"`
-	ProfileImageURL string                 `json:"profileImageURL"`
-	Bio             string                 `json:"bio"`
-	Display         bool                   `json:"display"`
+	Type              persist.SocialProvider `json:"type"`
+	SocialID          string                 `json:"social_id"`
+	Name              string                 `json:"name"`
+	Username          string                 `json:"username"`
+	ProfileImageURL   string                 `json:"profileImageURL"`
+	Bio               string                 `json:"bio"`
+	Display           bool                   `json:"display"`
+	SignatureApproved bool                   `json:"signatureApproved"`
 }
 
 func (LensSocialAccount) IsSocialAccount() {}
@@ -2185,6 +2193,19 @@ type SomeoneMentionedYourCommunityNotification struct {
 func (SomeoneMentionedYourCommunityNotification) IsNotification() {}
 func (SomeoneMentionedYourCommunityNotification) IsNode()         {}
 
+type SomeonePostedYourWorkNotification struct {
+	HelperSomeonePostedYourWorkNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Post         *Post        `json:"post"`
+	Community    *Community   `json:"community"`
+}
+
+func (SomeonePostedYourWorkNotification) IsNotification() {}
+func (SomeonePostedYourWorkNotification) IsNode()         {}
+
 type SomeoneRepliedToYourCommentNotification struct {
 	HelperSomeoneRepliedToYourCommentNotificationData
 	Dbid            persist.DBID `json:"dbid"`
@@ -2290,29 +2311,30 @@ type Token struct {
 	CreationTime          *time.Time              `json:"creationTime"`
 	LastUpdated           *time.Time              `json:"lastUpdated"`
 	CollectorsNote        *string                 `json:"collectorsNote"`
-	Media                 MediaSubtype            `json:"media"`
-	TokenType             *TokenType              `json:"tokenType"`
-	Chain                 *persist.Chain          `json:"chain"`
-	Name                  *string                 `json:"name"`
-	Description           *string                 `json:"description"`
-	TokenID               *string                 `json:"tokenId"`
 	Quantity              *string                 `json:"quantity"`
 	Owner                 *GalleryUser            `json:"owner"`
 	OwnedByWallets        []*Wallet               `json:"ownedByWallets"`
 	OwnershipHistory      []*OwnerAtBlock         `json:"ownershipHistory"`
 	OwnerIsHolder         *bool                   `json:"ownerIsHolder"`
 	OwnerIsCreator        *bool                   `json:"ownerIsCreator"`
+	Definition            *TokenDefinition        `json:"definition"`
+	IsSpamByUser          *bool                   `json:"isSpamByUser"`
+	Admires               *TokenAdmiresConnection `json:"admires"`
+	ViewerAdmire          *Admire                 `json:"viewerAdmire"`
+	Media                 MediaSubtype            `json:"media"`
+	TokenType             *TokenType              `json:"tokenType"`
+	Chain                 *persist.Chain          `json:"chain"`
+	Name                  *string                 `json:"name"`
+	Description           *string                 `json:"description"`
+	TokenID               *string                 `json:"tokenId"`
 	TokenMetadata         *string                 `json:"tokenMetadata"`
 	Contract              *Contract               `json:"contract"`
 	Community             *Community              `json:"community"`
 	ExternalURL           *string                 `json:"externalUrl"`
-	BlockNumber           *string                 `json:"blockNumber"`
-	IsSpamByUser          *bool                   `json:"isSpamByUser"`
 	IsSpamByProvider      *bool                   `json:"isSpamByProvider"`
-	Admires               *TokenAdmiresConnection `json:"admires"`
-	ViewerAdmire          *Admire                 `json:"viewerAdmire"`
 	CreatorAddress        *persist.ChainAddress   `json:"creatorAddress"`
 	OpenseaCollectionName *string                 `json:"openseaCollectionName"`
+	BlockNumber           *string                 `json:"blockNumber"`
 	OpenseaID             *int                    `json:"openseaId"`
 }
 
@@ -2329,6 +2351,24 @@ type TokenAdmiresConnection struct {
 	Edges    []*TokenAdmireEdge `json:"edges"`
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
+
+type TokenDefinition struct {
+	HelperTokenDefinitionData
+	Dbid          persist.DBID   `json:"dbid"`
+	CreationTime  *time.Time     `json:"creationTime"`
+	LastUpdated   *time.Time     `json:"lastUpdated"`
+	Media         MediaSubtype   `json:"media"`
+	TokenType     *TokenType     `json:"tokenType"`
+	Chain         *persist.Chain `json:"chain"`
+	Name          *string        `json:"name"`
+	Description   *string        `json:"description"`
+	TokenID       *string        `json:"tokenId"`
+	TokenMetadata *string        `json:"tokenMetadata"`
+	Community     *Community     `json:"community"`
+	ExternalURL   *string        `json:"externalUrl"`
+}
+
+func (TokenDefinition) IsNode() {}
 
 type TokenEdge struct {
 	Node   *Token  `json:"node"`
@@ -2397,6 +2437,7 @@ type TwitterSocialAccount struct {
 	Username        string                 `json:"username"`
 	ProfileImageURL string                 `json:"profileImageURL"`
 	Display         bool                   `json:"display"`
+	Scope           string                 `json:"scope"`
 }
 
 func (TwitterSocialAccount) IsSocialAccount() {}

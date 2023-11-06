@@ -57,7 +57,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		postgres.NewRepositories,
 		dbConnSet,
 		tokenmanage.New,
-		newManagedTokens,
+		newSubmitBatch,
 		wire.Struct(new(multichain.Provider), "*"),
 		// Add additional chains here
 		newMultichainSet,
@@ -310,6 +310,7 @@ func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(zoraProvider)),
 		zoraRequirements,
 	)
 	return nil
@@ -323,8 +324,9 @@ func zoraRequirements(
 	toc multichain.TokensContractFetcher,
 	tcof multichain.ContractsOwnerFetcher,
 	tmf multichain.TokenMetadataFetcher,
+	tdf multichain.TokenDescriptorsFetcher,
 ) zoraProviderList {
-	return zoraProviderList{nr, tof, tiof, toc, tcof, tmf}
+	return zoraProviderList{nr, tof, tiof, toc, tcof, tmf, tdf}
 }
 
 func baseProviderSet(*http.Client) baseProviderList {
@@ -471,11 +473,6 @@ func newTokenMetadataCache() *tokenMetadataCache {
 	return util.ToPointer(tokenMetadataCache(*cache))
 }
 
-func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
-		if len(tokenIDs) == 0 {
-			return nil
-		}
-		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
-	}
+func newSubmitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
+	return tm.SubmitBatch
 }

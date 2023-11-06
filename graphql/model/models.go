@@ -135,15 +135,18 @@ type HelperSomeoneRepliedToYourCommentNotificationData struct {
 }
 
 type HelperSomeoneMentionedYouNotificationData struct {
-	OwnerID   persist.DBID
 	PostID    *persist.DBID
 	CommentID *persist.DBID
 }
 type HelperSomeoneMentionedYourCommunityNotificationData struct {
-	OwnerID    persist.DBID
 	ContractID persist.DBID
 	PostID     *persist.DBID
 	CommentID  *persist.DBID
+}
+
+type HelperSomeonePostedYourWorkNotificationData struct {
+	ContractID persist.DBID
+	PostID     persist.DBID
 }
 
 type HelperNotificationsConnectionData struct {
@@ -178,6 +181,10 @@ type HelperSocialConnectionData struct {
 type HelperTokenData struct {
 	Token        db.Token
 	CollectionID *persist.DBID
+}
+
+type HelperTokenDefinitionData struct {
+	Definition db.TokenDefinition
 }
 
 type HelperEnsProfileImageData struct {

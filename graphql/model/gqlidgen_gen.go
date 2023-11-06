@@ -116,6 +116,10 @@ func (r *SomeoneMentionedYourCommunityNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneMentionedYourCommunityNotification:%s", r.Dbid))
 }
 
+func (r *SomeonePostedYourWorkNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeonePostedYourWorkNotification:%s", r.Dbid))
+}
+
 func (r *SomeoneRepliedToYourCommentNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneRepliedToYourCommentNotification:%s", r.Dbid))
 }
@@ -126,6 +130,10 @@ func (r *SomeoneViewedYourGalleryNotification) ID() GqlID {
 
 func (r *Token) ID() GqlID {
 	return GqlID(fmt.Sprintf("Token:%s", r.Dbid))
+}
+
+func (r *TokenDefinition) ID() GqlID {
+	return GqlID(fmt.Sprintf("TokenDefinition:%s", r.Dbid))
 }
 
 func (r *Viewer) ID() GqlID {
@@ -170,9 +178,11 @@ type NodeFetcher struct {
 	OnSomeoneFollowedYouNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
 	OnSomeoneMentionedYouNotification             func(ctx context.Context, dbid persist.DBID) (*SomeoneMentionedYouNotification, error)
 	OnSomeoneMentionedYourCommunityNotification   func(ctx context.Context, dbid persist.DBID) (*SomeoneMentionedYourCommunityNotification, error)
+	OnSomeonePostedYourWorkNotification           func(ctx context.Context, dbid persist.DBID) (*SomeonePostedYourWorkNotification, error)
 	OnSomeoneRepliedToYourCommentNotification     func(ctx context.Context, dbid persist.DBID) (*SomeoneRepliedToYourCommentNotification, error)
 	OnSomeoneViewedYourGalleryNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
 	OnToken                                       func(ctx context.Context, dbid persist.DBID) (*Token, error)
+	OnTokenDefinition                             func(ctx context.Context, dbid persist.DBID) (*TokenDefinition, error)
 	OnViewer                                      func(ctx context.Context, userId string) (*Viewer, error)
 	OnWallet                                      func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
 }
@@ -307,6 +317,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneMentionedYourCommunityNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnSomeoneMentionedYourCommunityNotification(ctx, persist.DBID(ids[0]))
+	case "SomeonePostedYourWorkNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeonePostedYourWorkNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeonePostedYourWorkNotification(ctx, persist.DBID(ids[0]))
 	case "SomeoneRepliedToYourCommentNotification":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneRepliedToYourCommentNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -322,6 +337,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Token' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnToken(ctx, persist.DBID(ids[0]))
+	case "TokenDefinition":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'TokenDefinition' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnTokenDefinition(ctx, persist.DBID(ids[0]))
 	case "Viewer":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Viewer' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -387,12 +407,16 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneMentionedYouNotification")
 	case n.OnSomeoneMentionedYourCommunityNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneMentionedYourCommunityNotification")
+	case n.OnSomeonePostedYourWorkNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeonePostedYourWorkNotification")
 	case n.OnSomeoneRepliedToYourCommentNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneRepliedToYourCommentNotification")
 	case n.OnSomeoneViewedYourGalleryNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneViewedYourGalleryNotification")
 	case n.OnToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnToken")
+	case n.OnTokenDefinition == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnTokenDefinition")
 	case n.OnViewer == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnViewer")
 	case n.OnWallet == nil:

@@ -44,35 +44,3 @@ func contractExistsInDB(t *testing.T, a *assert.Assertions, contractRepo persist
 	a.NoError(err)
 	return contract
 }
-
-func addressHasTokensInDB(t *testing.T, a *assert.Assertions, tokenRepo persist.TokenRepository, address persist.EthereumAddress, expected int) []persist.Token {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	tokens, _, err := tokenRepo.GetByWallet(ctx, address, -1, 0)
-	a.NoError(err)
-	a.Len(tokens, expected)
-	return tokens
-}
-
-func tokenURIHasExpectedType(t *testing.T, a *assert.Assertions, err error, uri persist.TokenURI, expectedType persist.URIType) {
-	t.Helper()
-	a.NoError(err)
-	a.Equal(expectedType, uri.Type())
-}
-
-func tokenMatchesExpected(t *testing.T, a *assert.Assertions, actual persist.Token) {
-	t.Helper()
-	id := persist.NewTokenIdentifiers(persist.Address(actual.ContractAddress), actual.TokenID, actual.Chain)
-	expected, ok := expectedResults[id]
-	if !ok {
-		t.Fatalf("tokenID=%s not in expected results", id)
-	}
-	a.NotEmpty(actual.ID)
-	a.Equal(expected.BlockNumber, actual.BlockNumber)
-	a.Equal(expected.OwnerAddress, actual.OwnerAddress)
-	a.Equal(expected.ContractAddress, actual.ContractAddress)
-	a.Equal(expected.TokenType, actual.TokenType)
-	a.Equal(expected.TokenID, actual.TokenID)
-	a.Equal(expected.Quantity, actual.Quantity)
-}
