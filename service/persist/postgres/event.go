@@ -96,11 +96,15 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*db.Event, error) {
 	var feedEventID sql.NullString
 	var postID sql.NullString
+	var tokenID sql.NullString
 	if event.FeedEventID != "" {
 		feedEventID = sql.NullString{String: string(event.FeedEventID), Valid: true}
 	}
 	if event.PostID != "" {
 		postID = sql.NullString{String: string(event.PostID), Valid: true}
+	}
+	if event.TokenID != "" {
+		tokenID = sql.NullString{String: string(event.TokenID), Valid: true}
 	}
 	event, err := r.Queries.CreateAdmireEvent(ctx, db.CreateAdmireEventParams{
 		ID:             persist.GenerateID(),
@@ -110,6 +114,7 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 		AdmireID:       event.AdmireID,
 		FeedEvent:      feedEventID,
 		Post:           postID,
+		Token:          tokenID,
 		SubjectID:      event.SubjectID,
 		Data:           event.Data,
 		GroupID:        event.GroupID,
