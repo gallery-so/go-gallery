@@ -17,10 +17,3 @@ func (e ErrTokenDefinitionNotFoundByID) Unwrap() error { return errTokenDefiniti
 func (e ErrTokenDefinitionNotFoundByID) Error() string {
 	return fmt.Sprintf("tokenDefinition not found by ID=%s", e.ID)
 }
-
-type ErrTokenDefinitionNotFoundByTokenDBID struct{ ID DBID }
-
-func (e ErrTokenDefinitionNotFoundByTokenDBID) Unwrap() error { return errTokenDefinitionNotFound }
-func (e ErrTokenDefinitionNotFoundByTokenDBID) Error() string {
-	return fmt.Sprintf("tokenDefinition not found by tokenDBID=%s", e.ID)
-}

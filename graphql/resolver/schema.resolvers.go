@@ -2843,10 +2843,7 @@ func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*s
 
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
-	if obj.HelperTokenData.Token.ContractID != "" {
-		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
-	}
-	return resolveContractByTokenID(ctx, obj.Dbid)
+	return resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
 }
 
 // Community is the resolver for the community field.
@@ -2856,13 +2853,7 @@ func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model
 
 // IsSpamByProvider is the resolver for the isSpamByProvider field.
 func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
-	var c *model.Contract
-	var err error
-	if obj.Token.ContractID != "" {
-		c, err = resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
-	} else {
-		c, err = resolveContractByTokenID(ctx, obj.Dbid)
-	}
+	c, err := resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
 	if err != nil {
 		return nil, err
 	}
