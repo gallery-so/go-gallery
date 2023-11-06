@@ -1217,6 +1217,7 @@ where a.user_id = @user_a_id
   and contracts.name is not null
   and contracts.name != ''
   and contracts.name != 'Unidentified contract'
+  and not contracts.is_provider_marked_spam
   and (
     a.displayed,
     b.displayed,
@@ -1265,7 +1266,8 @@ where a.user_id = @user_a_id
   and marketplace_contracts.contract_id is null
   and contracts.name is not null
   and contracts.name != ''
-  and contracts.name != 'Unidentified contract';
+  and contracts.name != 'Unidentified contract'
+  and not contracts.is_provider_marked_spam;
 
 -- name: AddPiiAccountCreationInfo :exec
 insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())

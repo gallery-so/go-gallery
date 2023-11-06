@@ -223,6 +223,7 @@ where a.user_id = $1
   and contracts.name is not null
   and contracts.name != ''
   and contracts.name != 'Unidentified contract'
+  and not contracts.is_provider_marked_spam
 `
 
 type CountSharedContractsParams struct {
