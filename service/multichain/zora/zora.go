@@ -488,6 +488,8 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 		q.Set("url", u)
 		fallbackFormat.RawQuery = q.Encode()
 		token.Media.ImagePreview.EncodedPreview = fallbackFormat.String()
+	} else if strings.HasPrefix(token.Media.ImagePreview.Raw, "https://") {
+		token.Media.ImagePreview.EncodedPreview = token.Media.ImagePreview.Raw
 	}
 
 	realMedia, ok := util.FindFirst(token.Media.ImageCarousel, func(media zoraMedia) bool {

@@ -961,7 +961,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 				return persist.NewTokenIdentifiers(t.Definition.ContractAddress, t.Definition.TokenID, t.Definition.Chain)
 			}),
 		)
-		definitions := chainTokensToUpsertableTokenDefinitions(chainTokensForUsers[userID], contracts)
+		definitions := chainTokensToUpsertableTokenDefinitions(ctx, chainTokensForUsers[userID], contracts)
 		upsertableTokens = append(upsertableTokens, tokens...)
 		upsertableDefinitions = append(upsertableDefinitions, definitions...)
 	}
@@ -1864,7 +1864,7 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 }
 
 // chainTokensToUpsertableTokenDefinitions returns a slice of token definitions that are ready to be upserted into the database from a slice of chainTokens.
-func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existingContracts []db.Contract) []db.TokenDefinition {
+func chainTokensToUpsertableTokenDefinitions(ctx context.Context, chainTokens []chainTokens, existingContracts []db.Contract) []db.TokenDefinition {
 	definitions := make(map[persist.TokenIdentifiers]db.TokenDefinition)
 
 	// Create a lookup of contracts to their IDs
@@ -1917,10 +1917,21 @@ func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existing
 
 	tokenDefinitions := make([]db.TokenDefinition, 0, len(definitions))
 	for _, definition := range definitions {
+		go logFallbackFailure(ctx, definition)
 		tokenDefinitions = append(tokenDefinitions, definition)
 	}
 
 	return tokenDefinitions
+}
+
+func logFallbackFailure(ctx context.Context, tdef db.TokenDefinition) {
+	// make a get request to the fallback media url that disregards the response and just checks for valid statuses, logging any non-200 status codes
+	if tdef.FallbackMedia.ImageURL != "" {
+		resp, err := http.Get(tdef.FallbackMedia.ImageURL.String())
+		if err != nil || resp.StatusCode != http.StatusOK {
+			logger.For(ctx).Errorf("error making request to fallback media url for token %s: (url: %s) (err: %s) (status: %d)", tdef.ID, tdef.FallbackMedia.ImageURL, err, resp.StatusCode)
+		}
+	}
 }
 
 // chainTokensToUpsertableTokens returns a unique slice of tokens that are ready to be upserted into the database.
