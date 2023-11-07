@@ -981,7 +981,7 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 
 	pushTokens, err := queries.GetPushTokensByUserID(ctx, notif.OwnerID)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't get push tokens for userID %s: %w", notif.OwnerID, err)
 	}
 
 	// Don't try to send anything if the user doesn't have any registered push tokens
@@ -997,7 +997,7 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 			return nil
 		}
 
-		return err
+		return fmt.Errorf("couldn't create push message: %w", err)
 	}
 
 	for _, token := range pushTokens {
@@ -1005,8 +1005,9 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 		toSend.PushTokenID = token.ID
 		err = task.CreateTaskForPushNotification(ctx, toSend, taskClient)
 		if err != nil {
+			err = fmt.Errorf("failed to create task for push notification: %w", err)
 			sentryutil.ReportError(ctx, err)
-			logger.For(ctx).Errorf("failed to create task for push notification: %s", err)
+			logger.For(ctx).Error(err)
 		}
 	}
 
@@ -1021,7 +1022,9 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 
 	err = sendPushNotifications(ctx, notif, queries, taskClient, limiter)
 	if err != nil {
-		logger.For(ctx).Errorf("failed to send push notifications for notification with DBID=%s, error: %s", notif.ID, err)
+		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", notif.ID, err)
+		sentryutil.ReportError(ctx, err)
+		logger.For(ctx).Error(err)
 	}
 
 	marshalled, err := json.Marshal(newNotif)
@@ -1072,7 +1075,9 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 
 	err = sendPushNotifications(ctx, notif, queries, taskClient, limiter)
 	if err != nil {
-		logger.For(ctx).Errorf("failed to send push notifications for notification with DBID=%s, error: %s", notif.ID, err)
+		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", notif.ID, err)
+		sentryutil.ReportError(ctx, err)
+		logger.For(ctx).Error(err)
 	}
 
 	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
