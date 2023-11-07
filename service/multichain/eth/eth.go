@@ -333,9 +333,9 @@ func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnostic
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(contract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Name:           contract.Name.String(),
-			Symbol:         contract.Symbol.String(),
-			CreatorAddress: persist.Address(contract.OwnerAddress.String()),
+			Name:         contract.Name.String(),
+			Symbol:       contract.Symbol.String(),
+			OwnerAddress: persist.Address(util.FirstNonEmptyString(contract.OwnerAddress.String(), contract.CreatorAddress.String())),
 		},
 	}
 }

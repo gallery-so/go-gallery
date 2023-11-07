@@ -632,7 +632,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
 			Symbol:          contractMetadataResponse.ContractMetadata.Symbol,
 			Name:            contractMetadataResponse.ContractMetadata.Name,
-			CreatorAddress:  persist.Address(contractMetadataResponse.ContractMetadata.ContractDeployer),
+			OwnerAddress:    persist.Address(contractMetadataResponse.ContractMetadata.ContractDeployer),
 			Description:     contractMetadataResponse.ContractMetadata.OpenseaCollection.Description,
 			ProfileImageURL: contractMetadataResponse.ContractMetadata.OpenseaCollection.ImageURL,
 		},
@@ -806,9 +806,9 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 	return t, multichain.ChainAgnosticContract{
 		Address: persist.Address(token.Contract.Address),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         token.ContractMetadata.Symbol,
-			Name:           token.ContractMetadata.Name,
-			CreatorAddress: persist.Address(token.ContractMetadata.ContractDeployer),
+			Symbol:       token.ContractMetadata.Symbol,
+			Name:         token.ContractMetadata.Name,
+			OwnerAddress: persist.Address(token.ContractMetadata.ContractDeployer),
 		},
 		IsSpam: &contractSpam,
 	}

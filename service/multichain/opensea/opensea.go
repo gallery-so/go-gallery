@@ -724,7 +724,7 @@ func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainA
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
 			Symbol:          asset.Contract.Symbol,
 			Name:            asset.Contract.Name,
-			CreatorAddress:  persist.Address(asset.Collection.PayoutAddress),
+			OwnerAddress:    persist.Address(asset.Collection.PayoutAddress),
 			Description:     asset.Collection.Description,
 			ProfileImageURL: asset.Collection.ImageURL,
 		},
@@ -904,9 +904,9 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(openseaContract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         openseaContract.Symbol,
-			Name:           openseaContract.Collection.Name,
-			CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
+			Symbol:       openseaContract.Symbol,
+			Name:         openseaContract.Collection.Name,
+			OwnerAddress: persist.Address(openseaContract.Collection.PayoutAddress),
 		},
 
 		IsSpam:      &isSpam,

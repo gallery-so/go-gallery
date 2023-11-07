@@ -1867,7 +1867,10 @@ func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
 func contractToModel(ctx context.Context, contract db.Contract) *model.Contract {
 	chain := contract.Chain
 	addr := persist.NewChainAddress(contract.Address, chain)
-	creator := persist.NewChainAddress(contract.OwnerAddress, chain)
+	creatorAddress, _ := util.FindFirst([]persist.Address{contract.OwnerAddress, contract.CreatorAddress}, func(a persist.Address) bool {
+		return a != ""
+	})
+	creator := persist.NewChainAddress(creatorAddress, chain)
 
 	return &model.Contract{
 		Dbid:             contract.ID,
@@ -2030,10 +2033,12 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
 	chain := community.Chain
 
-	// TODO: Should this use CreatorAddress or OwnerAddress?
 	var creatorAddress *persist.ChainAddress
 	if community.OwnerAddress != "" {
-		chainAddress := persist.NewChainAddress(community.OwnerAddress, chain)
+		creator, _ := util.FindFirst([]persist.Address{community.OwnerAddress, community.CreatorAddress}, func(a persist.Address) bool {
+			return a != ""
+		})
+		chainAddress := persist.NewChainAddress(creator, chain)
 		creatorAddress = &chainAddress
 	}
 
