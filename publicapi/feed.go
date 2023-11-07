@@ -236,8 +236,30 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		SubjectID:      postID,
 		PostID:         postID,
 	})
+	if err != nil {
+		logger.For(ctx).Errorf("error dispatching event: %v", err)
+	}
 
-	return postID, err
+	count, err := api.queries.CountPostsByUserID(ctx, actorID)
+	if err != nil {
+		return "", err
+	}
+
+	if count == 1 {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(actorID),
+			Action:         persist.ActionUserPostedFirstPost,
+			ResourceTypeID: persist.ResourceTypePost,
+			UserID:         actorID,
+			SubjectID:      postID,
+			PostID:         postID,
+		})
+		if err != nil {
+			logger.For(ctx).Errorf("error dispatching event: %v", err)
+		}
+	}
+
+	return postID, nil
 }
 
 func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
@@ -367,8 +389,29 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		SubjectID:      postID,
 		PostID:         postID,
 	})
+	if err != nil {
+		logger.For(ctx).Errorf("error dispatching event: %v", err)
+	}
+	count, err := api.queries.CountPostsByUserID(ctx, user.ID)
+	if err != nil {
+		return "", err
+	}
 
-	return postID, err
+	if count == 1 {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(user.ID),
+			Action:         persist.ActionUserPostedFirstPost,
+			ResourceTypeID: persist.ResourceTypePost,
+			UserID:         user.ID,
+			SubjectID:      postID,
+			PostID:         postID,
+		})
+		if err != nil {
+			logger.For(ctx).Errorf("error dispatching event: %v", err)
+		}
+	}
+
+	return postID, nil
 }
 
 func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {

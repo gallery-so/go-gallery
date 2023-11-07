@@ -12,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/sourcegraph/conc/pool"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
@@ -163,6 +164,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 
 	def := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	group := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	follower := followerNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	tokenIDGrouped := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	view := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 
@@ -179,6 +181,9 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
 	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
 	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, def)
+
+	// notification actions that are grouped and inserted by follower
+	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, follower)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
@@ -275,6 +280,17 @@ type defaultNotificationHandler struct {
 
 func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
+}
+
+type followerNotificationHandler struct {
+	queries    *db.Queries
+	pubSub     *pubsub.Client
+	taskClient *cloudtasks.Client
+	limiter    *pushLimiter
+}
+
+func (h followerNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+	return insertAndPublishFollowerNotifs(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 
 type groupedNotificationHandler struct {
@@ -680,7 +696,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 
 	}
 
-	if notif.Action == persist.ActionUserPostedYourWork {
+	if notif.Action == persist.ActionUserPostedYourWork || notif.Action == persist.ActionUserPostedFirstPost {
 
 		post, err := queries.GetPostByID(ctx, notif.PostID)
 		if err != nil {
@@ -695,14 +711,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if !actor.Username.Valid {
-			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
-		}
-		contract, err := queries.GetContractByID(ctx, notif.ContractID)
-		if err != nil {
-			return task.PushNotificationMessage{}, err
-		}
-		message.Body = fmt.Sprintf("%s posted your work: %s", actor.Username.String, contract.Name.String)
 	}
 
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
@@ -946,6 +954,47 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		}
 
 		return data, nil
+	case persist.ActionUserPostedYourWork:
+		post, err := queries.GetPostByID(ctx, n.PostID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+		actor, err := queries.GetUserById(ctx, post.ActorID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+		if !actor.Username.Valid {
+			return UserFacingNotificationData{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
+		}
+		contract, err := queries.GetContractByID(ctx, n.ContractID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+		return UserFacingNotificationData{
+			Actor:          actor.Username.String,
+			Action:         "posted your work",
+			CollectionName: contract.Name.String,
+			CollectionID:   contract.ID,
+			PreviewText:    util.TruncateWithEllipsis(post.Caption.String, 20),
+		}, nil
+
+	case persist.ActionUserPostedFirstPost:
+		post, err := queries.GetPostByID(ctx, n.PostID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+		actor, err := queries.GetUserById(ctx, post.ActorID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+		if !actor.Username.Valid {
+			return UserFacingNotificationData{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
+		}
+		return UserFacingNotificationData{
+			Actor:       actor.Username.String,
+			Action:      "posted their first post",
+			PreviewText: util.TruncateWithEllipsis(post.Caption.String, 20),
+		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
 	}
@@ -972,6 +1021,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionMentionUser:
 		return true
 	case persist.ActionMentionCommunity:
+		return true
+	case persist.ActionUserPostedFirstPost:
 		return true
 	default:
 		return false
@@ -1024,9 +1075,39 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 		return fmt.Errorf("failed to create notification: %w", err)
 	}
 
-	err = sendPushNotifications(ctx, notif, queries, taskClient, limiter)
+	err = sendAndPublishPushNotifications(ctx, newNotif, queries, taskClient, limiter, ps)
 	if err != nil {
-		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", notif.ID, err)
+		return err
+	}
+
+	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
+
+	return nil
+}
+
+func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
+	notifs, err := addFollowerNotifications(ctx, notif, queries)
+	if err != nil {
+		return fmt.Errorf("failed to create notification: %w", err)
+	}
+
+	p := pool.New().WithErrors().WithContext(ctx).WithMaxGoroutines(10)
+	for _, notif := range notifs {
+		notif := notif
+		p.Go(func(ctx context.Context) error {
+			return sendAndPublishPushNotifications(ctx, notif, queries, taskClient, limiter, ps)
+		})
+	}
+
+	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
+
+	return nil
+}
+
+func sendAndPublishPushNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client, limiter *pushLimiter, ps *pubsub.Client) error {
+	err := sendPushNotifications(ctx, newNotif, queries, taskClient, limiter)
+	if err != nil {
+		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", newNotif.ID, err)
 		sentryutil.ReportError(ctx, err)
 		logger.For(ctx).Error(err)
 	}
@@ -1044,9 +1125,6 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 	if err != nil {
 		return fmt.Errorf("failed to publish new notification: %w", err)
 	}
-
-	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
-
 	return nil
 }
 
@@ -1231,6 +1309,27 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 		})
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
+	}
+}
+
+func addFollowerNotifications(ctx context.Context, notif db.Notification, queries *db.Queries) ([]db.Notification, error) {
+
+	switch notif.Action {
+	case persist.ActionUserPostedFirstPost:
+		post, err := queries.GetPostByID(ctx, notif.PostID)
+		if err != nil {
+			return nil, err
+		}
+		return queries.CreateUserPostedFirstPostNotifications(ctx, db.CreateUserPostedFirstPostNotificationsParams{
+			ID:       persist.GenerateID(),
+			Action:   notif.Action,
+			Data:     notif.Data,
+			EventIds: notif.EventIds,
+			Post:     util.ToNullString(notif.PostID.String(), true),
+			ActorID:  post.ActorID,
+		})
+	default:
+		return nil, fmt.Errorf("unknown follower notification action: %s", notif.Action)
 	}
 }
 
