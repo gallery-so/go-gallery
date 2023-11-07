@@ -95,3 +95,11 @@ func NewContractIdentifiers(pContractAddress Address, pChain Chain) ContractIden
 		Chain:           pChain,
 	}
 }
+
+type ErrContractCreatorNotFound struct {
+	ContractID DBID
+}
+
+func (e ErrContractCreatorNotFound) Error() string {
+	return fmt.Sprintf("ContractCreator not found for contractID %s", e.ContractID)
+}

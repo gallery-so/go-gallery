@@ -255,6 +255,11 @@ func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
 	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
+		if util.ErrorAs[persist.ErrContractCreatorNotFound](err) {
+			// It's normal not to find a creator for a community -- we may not have an address available.
+			// If that happens, just return nil to the frontend to signify that there is no creator.
+			return nil, nil
+		}
 		return nil, err
 	}
 
