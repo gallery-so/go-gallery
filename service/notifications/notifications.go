@@ -969,6 +969,10 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 		return true
 	case persist.ActionUserPostedYourWork:
 		return true
+	case persist.ActionMentionUser:
+		return true
+	case persist.ActionMentionCommunity:
+		return true
 	default:
 		return false
 	}
