@@ -372,7 +372,7 @@ func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti
 			Name:            c.Name,
 			ProfileImageURL: c.ImageURL,
 			Description:     c.Description,
-			CreatorAddress:  c.Creator,
+			OwnerAddress:    c.Creator,
 		}, nil
 
 }

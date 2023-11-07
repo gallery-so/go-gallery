@@ -43,6 +43,7 @@ type zoraToken struct {
 	ChainName         string         `json:"chain_name"`
 	CollectionAddress string         `json:"collection_address"`
 	Collection        zoraCollection `json:"collection"`
+	CreatorAddress    string         `json:"creator_address"`
 	TokenID           tokenID        `json:"token_id"`
 	TokenStandard     string         `json:"token_standard"`
 	Owner             string         `json:"owner"`
@@ -281,9 +282,9 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	for i, contract := range resp.ZoraCreateContracts {
 		result[i] = multichain.ChainAgnosticContract{
 			Descriptors: multichain.ChainAgnosticContractDescriptors{
-				Symbol:         contract.Symbol,
-				Name:           contract.Name,
-				CreatorAddress: persist.Address(strings.ToLower(contract.Creator)),
+				Symbol:       contract.Symbol,
+				Name:         contract.Name,
+				OwnerAddress: persist.Address(strings.ToLower(contract.Creator)),
 			},
 			Address: persist.Address(strings.ToLower(contract.Address)),
 		}
@@ -532,14 +533,14 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 }
 
 func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken) multichain.ChainAgnosticContract {
-
+	creator := util.FirstNonEmptyString(token.CreatorAddress, token.Mintable.CreatorAddress)
 	return multichain.ChainAgnosticContract{
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:          token.Mintable.Collection.Symbol,
-			Name:            token.Mintable.Collection.Name,
-			Description:     token.Mintable.Collection.Description,
-			CreatorAddress:  persist.Address(strings.ToLower(token.Mintable.CreatorAddress)),
-			ProfileImageURL: token.Mintable.Collection.Image,
+			Symbol:          token.Collection.Symbol,
+			Name:            token.Collection.Name,
+			Description:     token.Collection.Description,
+			OwnerAddress:    persist.Address(strings.ToLower(creator)),
+			ProfileImageURL: token.Collection.Image,
 		},
 		Address: persist.Address(strings.ToLower(token.CollectionAddress)),
 	}

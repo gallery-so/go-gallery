@@ -185,7 +185,7 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 					Symbol:          node.Token.Symbol,
 					Name:            node.Token.Fa.Name,
 					Description:     node.Token.Fa.Description,
-					CreatorAddress:  node.Token.Fa.Creator_Address,
+					OwnerAddress:    node.Token.Fa.Creator_Address,
 					ProfileImageURL: node.Token.Fa.Logo,
 				},
 
@@ -300,10 +300,10 @@ func (p *TezosObjktProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Cont
 	agnosticContract := multichain.ChainAgnosticContract{
 		Address: token.Fa.Contract,
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         token.Symbol,
-			Name:           token.Fa.Name,
-			Description:    token.Fa.Description,
-			CreatorAddress: token.Fa.Creator_Address,
+			Symbol:       token.Symbol,
+			Name:         token.Fa.Name,
+			Description:  token.Fa.Description,
+			OwnerAddress: token.Fa.Creator_Address,
 		},
 
 		LatestBlock: persist.BlockNumber(token.Fa.Level),
@@ -357,10 +357,10 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 	agnosticContract := multichain.ChainAgnosticContract{
 		Address: firstToken.Fa.Contract,
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         firstToken.Symbol,
-			Name:           firstToken.Name,
-			Description:    firstToken.Description,
-			CreatorAddress: firstToken.Fa.Creator_Address,
+			Symbol:       firstToken.Symbol,
+			Name:         firstToken.Name,
+			Description:  firstToken.Description,
+			OwnerAddress: firstToken.Fa.Creator_Address,
 		},
 
 		LatestBlock: persist.BlockNumber(firstToken.Fa.Level),
@@ -438,10 +438,10 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 	agnosticContract := multichain.ChainAgnosticContract{
 		Address: tokens[0].Fa.Contract,
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         tokens[0].Symbol,
-			Name:           tokens[0].Fa.Name,
-			Description:    tokens[0].Fa.Description,
-			CreatorAddress: tokens[0].Fa.Creator_Address,
+			Symbol:       tokens[0].Symbol,
+			Name:         tokens[0].Fa.Name,
+			Description:  tokens[0].Fa.Description,
+			OwnerAddress: tokens[0].Fa.Creator_Address,
 		},
 
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
@@ -521,10 +521,10 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 	agnosticContract := multichain.ChainAgnosticContract{
 		Address: tokens[0].Fa.Contract,
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         tokens[0].Symbol,
-			Name:           tokens[0].Fa.Name,
-			Description:    tokens[0].Fa.Description,
-			CreatorAddress: tokens[0].Fa.Creator_Address,
+			Symbol:       tokens[0].Symbol,
+			Name:         tokens[0].Fa.Name,
+			Description:  tokens[0].Fa.Description,
+			OwnerAddress: tokens[0].Fa.Creator_Address,
 		},
 
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),

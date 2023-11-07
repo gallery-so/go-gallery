@@ -115,7 +115,7 @@ type ChainAgnosticContractDescriptors struct {
 	Name            string          `json:"name"`
 	Description     string          `json:"description"`
 	ProfileImageURL string          `json:"profile_image_url"`
-	CreatorAddress  persist.Address `json:"creator_address"`
+	OwnerAddress    persist.Address `json:"creator_address"`
 }
 
 // ChainAgnosticIdentifiers identify tokens despite their chain
@@ -1421,8 +1421,8 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 			if contract.Symbol != "" && finalContractDescriptors.Symbol == "" {
 				finalContractDescriptors.Symbol = contract.Symbol
 			}
-			if contract.CreatorAddress != "" && finalContractDescriptors.CreatorAddress == "" {
-				finalContractDescriptors.CreatorAddress = contract.CreatorAddress
+			if contract.OwnerAddress != "" && finalContractDescriptors.OwnerAddress == "" {
+				finalContractDescriptors.OwnerAddress = contract.OwnerAddress
 			}
 			if contract.ProfileImageURL != "" && finalContractDescriptors.ProfileImageURL == "" {
 				finalContractDescriptors.ProfileImageURL = contract.ProfileImageURL
@@ -1443,7 +1443,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		Chain:           ti.Chain,
 		ProfileImageUrl: util.ToNullString(finalContractDescriptors.ProfileImageURL, true),
 		Description:     util.ToNullString(finalContractDescriptors.Description, true),
-		OwnerAddress:    finalContractDescriptors.CreatorAddress,
+		OwnerAddress:    finalContractDescriptors.OwnerAddress,
 	}, true)
 	if err != nil {
 		return db.TokenDefinition{}, err
@@ -2130,7 +2130,7 @@ func contractToMetadata(contract ChainAgnosticContract) contractMetadata {
 	return contractMetadata{
 		Symbol:          contract.Descriptors.Symbol,
 		Name:            contract.Descriptors.Name,
-		OwnerAddress:    contract.Descriptors.CreatorAddress,
+		OwnerAddress:    contract.Descriptors.OwnerAddress,
 		ProfileImageURL: contract.Descriptors.ProfileImageURL,
 		Description:     contract.Descriptors.Description,
 		IsSpam:          util.FromPointer(contract.IsSpam),
