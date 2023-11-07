@@ -21,7 +21,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select tokens.id from tokens join contracts on contracts.id = tokens.contract_id where contract_id = '23MId5JXkGORqHKzj0Z6PRwDwPE' or contract_id = '2Wv8OgRbg9VFFzCf8w8fWOjT2Ip' or (contracts.chain = 6 and (contracts.owner_address = '' or contracts.owner_address is null)) order by tokens.last_updated;")
+	rows, err := pgClient.Query("select tokens.id from tokens join contracts on contracts.id = tokens.contract_id where (contracts.chain = 0 and (contracts.owner_address = '' or contracts.owner_address is null)) order by tokens.last_updated limit 10000;")
 	if err != nil {
 		panic(err)
 	}
