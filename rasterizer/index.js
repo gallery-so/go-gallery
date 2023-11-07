@@ -4,6 +4,7 @@ const pixelmatch = require('pixelmatch');
 const express = require('express');
 const { Cluster } = require('puppeteer-cluster');
 const app = express();
+const fs = require('fs');
 
 const args = [
   '--autoplay-policy=user-gesture-required',
@@ -118,26 +119,34 @@ process.on('uncaughtException', (err, origin) => {
 async function createAnimation(page) {
   let svgDimensions = await page.evaluate(() => {
     let svg = document.querySelector('svg');
+    if (!svg) throw new Error('No SVG found');
 
-    if (svg) {
-      // If viewBox is available, use it
-      if (svg.viewBox && svg.viewBox.baseVal) {
-        return { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height };
-      }
-      // If width and height are available, use them
-      else if (svg.width && svg.height) {
-        return { width: svg.width.baseVal.value, height: svg.height.baseVal.value };
-      }
-      // If none are available, throw error
-      else {
-        throw new Error('SVG found but no viewBox, width, or height attributes available');
-      }
+    let width, height;
+
+    let viewBoxAttr = svg.getAttribute('viewBox');
+    if (viewBoxAttr) {
+      let viewBoxValues = viewBoxAttr.split(' ');
+      width = parseFloat(viewBoxValues[2]);
+      height = parseFloat(viewBoxValues[3]);
+    } else if (svg.width.baseVal && svg.height.baseVal) {
+      width = svg.width.baseVal.value;
+      height = svg.height.baseVal.value;
     } else {
-      throw new Error('No SVG found');
+      throw new Error('SVG found but no viewBox or baseVal for width/height available');
     }
+
+    const aspectRatio = width / height;
+    return {
+      width: 500 * aspectRatio,
+      height: 500, // Fixed height
+    };
   });
 
-  await page.setViewport(svgDimensions);
+  await page.setViewport({
+    width: Math.ceil(svgDimensions.width),
+    height: 500, // Fixed height
+    deviceScaleFactor: 1, // Adjust this as needed for higher resolution screenshots
+  });
 
   const frames = [];
 
@@ -187,6 +196,7 @@ async function createAnimation(page) {
   const result = [];
 
   const pngBuffer = PNG.sync.write(frames[0]);
+
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
   if (!isStatic) {
