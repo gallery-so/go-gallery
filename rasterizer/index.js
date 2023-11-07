@@ -135,16 +135,23 @@ async function createAnimation(page) {
       throw new Error('SVG found but no viewBox or baseVal for width/height available');
     }
 
-    const aspectRatio = width / height;
-    return {
-      width: 500 * aspectRatio,
-      height: 500, // Fixed height
-    };
+    if (height > 500) {
+      const aspectRatio = width / height;
+      return {
+        width: 500 * aspectRatio,
+        height: 500, // Fixed height
+      };
+    } else {
+      return {
+        width,
+        height,
+      };
+    }
   });
 
   await page.setViewport({
     width: Math.ceil(svgDimensions.width),
-    height: 500, // Fixed height
+    height: svgDimensions.height, // Fixed height
     deviceScaleFactor: 1, // Adjust this as needed for higher resolution screenshots
   });
 
@@ -196,6 +203,8 @@ async function createAnimation(page) {
   const result = [];
 
   const pngBuffer = PNG.sync.write(frames[0]);
+
+  fs.writeFileSync('test.png', pngBuffer);
 
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
