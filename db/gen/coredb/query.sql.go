@@ -3019,7 +3019,12 @@ func (q *Queries) GetPushTokenByPushToken(ctx context.Context, pushToken string)
 }
 
 const getPushTokensByIDs = `-- name: GetPushTokensByIDs :many
-select t.id, t.user_id, t.push_token, t.created_at, t.deleted from unnest($1::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false
+with keys as (
+    select unnest ($1::text[]) as id
+         , generate_subscripts($1::text[], 1) as index
+)
+select t.id, t.user_id, t.push_token, t.created_at, t.deleted from keys k join push_notification_tokens t on t.id = k.id and t.deleted = false
+    order by k.index
 `
 
 func (q *Queries) GetPushTokensByIDs(ctx context.Context, ids []string) ([]PushNotificationToken, error) {
