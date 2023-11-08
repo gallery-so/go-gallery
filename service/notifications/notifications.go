@@ -80,8 +80,8 @@ func (p *pushLimiter) tryComment(ctx context.Context, sendingUserID persist.DBID
 	}
 }
 
-func (p *pushLimiter) tryMention(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, feedEventID persist.DBID) error {
-	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), feedEventID.String())
+func (p *pushLimiter) tryMention(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, postID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), postID.String())
 	if p.isActionAllowed(ctx, p.mentions, key) {
 		return nil
 	}
@@ -90,7 +90,7 @@ func (p *pushLimiter) tryMention(ctx context.Context, sendingUserID persist.DBID
 		limiterName: p.mentions.Name(),
 		senderID:    sendingUserID,
 		receiverID:  receivingUserID,
-		feedEventID: feedEventID,
+		feedEventID: postID,
 	}
 }
 
@@ -647,7 +647,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if err = limiter.tryMention(ctx, commenter.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+		if err = limiter.tryMention(ctx, commenter.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
@@ -688,7 +688,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, fmt.Errorf("no comment or post id provided for mention notification")
 		}
 
-		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
@@ -707,7 +707,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
