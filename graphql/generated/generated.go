@@ -9613,6 +9613,8 @@ enum UserExperienceType {
   UpsellMintMemento5
   UpsellBanner
   PostsBetaAnnouncement
+  CreatorBetaFullscreenAnnouncementModal
+  CreatorBetaMicroAnnouncementModal
 }
 
 type UserExperience {
@@ -10439,7 +10441,11 @@ type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
-union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed | ErrTokenNotFound
+union RefreshTokenPayloadOrError =
+    RefreshTokenPayload
+  | ErrInvalidInput
+  | ErrSyncFailed
+  | ErrTokenNotFound
 
 type RefreshTokenPayload {
   token: Token

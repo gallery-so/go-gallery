@@ -2987,19 +2987,21 @@ func (e TokenType) MarshalGQL(w io.Writer) {
 type UserExperienceType string
 
 const (
-	UserExperienceTypeMultiGalleryAnnouncement          UserExperienceType = "MultiGalleryAnnouncement"
-	UserExperienceTypeEmailUpsell                       UserExperienceType = "EmailUpsell"
-	UserExperienceTypeMerchStoreUpsell                  UserExperienceType = "MerchStoreUpsell"
-	UserExperienceTypeMaintenanceFeb2023                UserExperienceType = "MaintenanceFeb2023"
-	UserExperienceTypeMaintenanceAug2023                UserExperienceType = "MaintenanceAug2023"
-	UserExperienceTypeTwitterConnectionOnboardingUpsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
-	UserExperienceTypeUpsellMintMemento4                UserExperienceType = "UpsellMintMemento4"
-	UserExperienceTypeUpsellGallerySelects1             UserExperienceType = "UpsellGallerySelects1"
-	UserExperienceTypeMobileUpsell1                     UserExperienceType = "MobileUpsell1"
-	UserExperienceTypeMobileBetaUpsell                  UserExperienceType = "MobileBetaUpsell"
-	UserExperienceTypeUpsellMintMemento5                UserExperienceType = "UpsellMintMemento5"
-	UserExperienceTypeUpsellBanner                      UserExperienceType = "UpsellBanner"
-	UserExperienceTypePostsBetaAnnouncement             UserExperienceType = "PostsBetaAnnouncement"
+	UserExperienceTypeMultiGalleryAnnouncement               UserExperienceType = "MultiGalleryAnnouncement"
+	UserExperienceTypeEmailUpsell                            UserExperienceType = "EmailUpsell"
+	UserExperienceTypeMerchStoreUpsell                       UserExperienceType = "MerchStoreUpsell"
+	UserExperienceTypeMaintenanceFeb2023                     UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeMaintenanceAug2023                     UserExperienceType = "MaintenanceAug2023"
+	UserExperienceTypeTwitterConnectionOnboardingUpsell      UserExperienceType = "TwitterConnectionOnboardingUpsell"
+	UserExperienceTypeUpsellMintMemento4                     UserExperienceType = "UpsellMintMemento4"
+	UserExperienceTypeUpsellGallerySelects1                  UserExperienceType = "UpsellGallerySelects1"
+	UserExperienceTypeMobileUpsell1                          UserExperienceType = "MobileUpsell1"
+	UserExperienceTypeMobileBetaUpsell                       UserExperienceType = "MobileBetaUpsell"
+	UserExperienceTypeUpsellMintMemento5                     UserExperienceType = "UpsellMintMemento5"
+	UserExperienceTypeUpsellBanner                           UserExperienceType = "UpsellBanner"
+	UserExperienceTypePostsBetaAnnouncement                  UserExperienceType = "PostsBetaAnnouncement"
+	UserExperienceTypeCreatorBetaFullscreenAnnouncementModal UserExperienceType = "CreatorBetaFullscreenAnnouncementModal"
+	UserExperienceTypeCreatorBetaMicroAnnouncementModal      UserExperienceType = "CreatorBetaMicroAnnouncementModal"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -3016,11 +3018,13 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeUpsellMintMemento5,
 	UserExperienceTypeUpsellBanner,
 	UserExperienceTypePostsBetaAnnouncement,
+	UserExperienceTypeCreatorBetaFullscreenAnnouncementModal,
+	UserExperienceTypeCreatorBetaMicroAnnouncementModal,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeMaintenanceAug2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5, UserExperienceTypeUpsellBanner, UserExperienceTypePostsBetaAnnouncement:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeMaintenanceAug2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5, UserExperienceTypeUpsellBanner, UserExperienceTypePostsBetaAnnouncement, UserExperienceTypeCreatorBetaFullscreenAnnouncementModal, UserExperienceTypeCreatorBetaMicroAnnouncementModal:
 		return true
 	}
 	return false

@@ -549,19 +549,21 @@ func (v *UpdateUserExperienceInput) GetExperienced() bool { return v.Experienced
 type UserExperienceType string
 
 const (
-	UserExperienceTypeMultigalleryannouncement          UserExperienceType = "MultiGalleryAnnouncement"
-	UserExperienceTypeEmailupsell                       UserExperienceType = "EmailUpsell"
-	UserExperienceTypeMerchstoreupsell                  UserExperienceType = "MerchStoreUpsell"
-	UserExperienceTypeMaintenancefeb2023                UserExperienceType = "MaintenanceFeb2023"
-	UserExperienceTypeMaintenanceaug2023                UserExperienceType = "MaintenanceAug2023"
-	UserExperienceTypeTwitterconnectiononboardingupsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
-	UserExperienceTypeUpsellmintmemento4                UserExperienceType = "UpsellMintMemento4"
-	UserExperienceTypeUpsellgalleryselects1             UserExperienceType = "UpsellGallerySelects1"
-	UserExperienceTypeMobileupsell1                     UserExperienceType = "MobileUpsell1"
-	UserExperienceTypeMobilebetaupsell                  UserExperienceType = "MobileBetaUpsell"
-	UserExperienceTypeUpsellmintmemento5                UserExperienceType = "UpsellMintMemento5"
-	UserExperienceTypeUpsellbanner                      UserExperienceType = "UpsellBanner"
-	UserExperienceTypePostsbetaannouncement             UserExperienceType = "PostsBetaAnnouncement"
+	UserExperienceTypeMultigalleryannouncement               UserExperienceType = "MultiGalleryAnnouncement"
+	UserExperienceTypeEmailupsell                            UserExperienceType = "EmailUpsell"
+	UserExperienceTypeMerchstoreupsell                       UserExperienceType = "MerchStoreUpsell"
+	UserExperienceTypeMaintenancefeb2023                     UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeMaintenanceaug2023                     UserExperienceType = "MaintenanceAug2023"
+	UserExperienceTypeTwitterconnectiononboardingupsell      UserExperienceType = "TwitterConnectionOnboardingUpsell"
+	UserExperienceTypeUpsellmintmemento4                     UserExperienceType = "UpsellMintMemento4"
+	UserExperienceTypeUpsellgalleryselects1                  UserExperienceType = "UpsellGallerySelects1"
+	UserExperienceTypeMobileupsell1                          UserExperienceType = "MobileUpsell1"
+	UserExperienceTypeMobilebetaupsell                       UserExperienceType = "MobileBetaUpsell"
+	UserExperienceTypeUpsellmintmemento5                     UserExperienceType = "UpsellMintMemento5"
+	UserExperienceTypeUpsellbanner                           UserExperienceType = "UpsellBanner"
+	UserExperienceTypePostsbetaannouncement                  UserExperienceType = "PostsBetaAnnouncement"
+	UserExperienceTypeCreatorbetafullscreenannouncementmodal UserExperienceType = "CreatorBetaFullscreenAnnouncementModal"
+	UserExperienceTypeCreatorbetamicroannouncementmodal      UserExperienceType = "CreatorBetaMicroAnnouncementModal"
 )
 
 // __addUserWalletMutationInput is used internally by genqlient
