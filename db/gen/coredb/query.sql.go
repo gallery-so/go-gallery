@@ -3078,7 +3078,12 @@ func (q *Queries) GetPushTokenByPushToken(ctx context.Context, pushToken string)
 }
 
 const getPushTokensByIDs = `-- name: GetPushTokensByIDs :many
-select t.id, t.user_id, t.push_token, t.created_at, t.deleted from unnest($1::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false
+with keys as (
+    select unnest ($1::text[]) as id
+         , generate_subscripts($1::text[], 1) as index
+)
+select t.id, t.user_id, t.push_token, t.created_at, t.deleted from keys k join push_notification_tokens t on t.id = k.id and t.deleted = false
+    order by k.index
 `
 
 func (q *Queries) GetPushTokensByIDs(ctx context.Context, ids []string) ([]PushNotificationToken, error) {
@@ -3597,7 +3602,7 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (GetTokenBy
 const getTokenByUserTokenIdentifiers = `-- name: GetTokenByUserTokenIdentifiers :one
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_type__deprecated, t.token_id__deprecated, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain__deprecated, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.token_uri__deprecated, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
 from tokens t, token_definitions td, contracts c
-where t.token_definition_id = td.token_definition_id
+where t.token_definition_id = td.id
     and td.contract_id = c.id
     and t.owner_user_id = $1
     and td.token_id = $2
@@ -6221,7 +6226,7 @@ with valid_post_ids as (
         JOIN tokens on tokens.id = ANY(posts.token_ids)
             and tokens.displayable
             and tokens.deleted = false
-        JOIN token_definitions on token_definitions.id = tokens.token_definitions_id
+        JOIN token_definitions on token_definitions.id = tokens.token_definition_id
             and token_definitions.contract_id = $7
             and ('x' || lpad(substring(token_definitions.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = $8::int
             and token_definitions.deleted = false

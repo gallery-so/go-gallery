@@ -9668,6 +9668,8 @@ enum UserExperienceType {
   UpsellMintMemento5
   UpsellBanner
   PostsBetaAnnouncement
+  CreatorBetaFullscreenAnnouncementModal
+  CreatorBetaMicroAnnouncementModal
 }
 
 type UserExperience {

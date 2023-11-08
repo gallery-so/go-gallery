@@ -1929,7 +1929,11 @@ func logFallbackFailure(ctx context.Context, tdef db.TokenDefinition) {
 	if tdef.FallbackMedia.ImageURL != "" {
 		resp, err := http.Get(tdef.FallbackMedia.ImageURL.String())
 		if err != nil || resp.StatusCode != http.StatusOK {
-			logger.For(ctx).Errorf("error making request to fallback media url for token %s: (url: %s) (err: %s) (status: %d)", tdef.ID, tdef.FallbackMedia.ImageURL, err, resp.StatusCode)
+			msg := fmt.Sprintf("error making request to fallback media url for token %s: (url: %s) (err: %s)", tdef.ID, tdef.FallbackMedia.ImageURL, err)
+			if resp != nil {
+				msg += fmt.Sprintf(" (status: %d)", resp.StatusCode)
+			}
+			logger.For(ctx).Error(msg)
 		}
 	}
 }

@@ -168,7 +168,7 @@ where t.id = $1 and t.deleted = false and td.deleted = false;
 -- Fetch the definition and contract to cache since downstream queries will likely use them
 select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
 from tokens t, token_definitions td, contracts c
-where t.token_definition_id = td.token_definition_id
+where t.token_definition_id = td.id
     and td.contract_id = c.id
     and t.owner_user_id = @owner_id
     and td.token_id = @token_id
@@ -182,7 +182,7 @@ where t.token_definition_id = td.token_definition_id
 -- name: GetTokenByUserTokenIdentifiers :one
 select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
 from tokens t, token_definitions td, contracts c
-where t.token_definition_id = td.token_definition_id
+where t.token_definition_id = td.id
     and td.contract_id = c.id
     and t.owner_user_id = @owner_id
     and td.token_id = @token_id
@@ -568,7 +568,7 @@ with valid_post_ids as (
         JOIN tokens on tokens.id = ANY(posts.token_ids)
             and tokens.displayable
             and tokens.deleted = false
-        JOIN token_definitions on token_definitions.id = tokens.token_definitions_id
+        JOIN token_definitions on token_definitions.id = tokens.token_definition_id
             and token_definitions.contract_id = sqlc.arg('contract_id')
             and ('x' || lpad(substring(token_definitions.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
             and token_definitions.deleted = false
@@ -1378,7 +1378,12 @@ update push_notification_tokens set deleted = true where id = any(@ids) and dele
 select * from push_notification_tokens where user_id = @user_id and deleted = false;
 
 -- name: GetPushTokensByIDs :many
-select t.* from unnest(@ids::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false;
+with keys as (
+    select unnest (@ids::text[]) as id
+         , generate_subscripts(@ids::text[], 1) as index
+)
+select t.* from keys k join push_notification_tokens t on t.id = k.id and t.deleted = false
+    order by k.index;
 
 -- name: CreatePushTickets :exec
 insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
