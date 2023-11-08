@@ -7,6 +7,7 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -17,9 +18,12 @@ import (
 
 const defaultSyncMaxRetries = 4
 
-var contractSpecificRetries = map[persist.ContractIdentifiers]int{
-	persist.NewContractIdentifiers("0x47a91457a3a1f700097199fd63c039c4784384ab", persist.ChainArbitrum): 24, // Prohibition
-}
+var (
+	prohibitionContract = persist.NewContractIdentifiers("0x47a91457a3a1f700097199fd63c039c4784384ab", persist.ChainArbitrum)
+	ensContract         = persist.NewContractIdentifiers(eth.EnsAddress, persist.ChainETH)
+)
+
+var contractSpecificRetries = map[persist.ContractIdentifiers]int{prohibitionContract: 24}
 
 func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *cloudtasks.Client) *gin.Engine {
 	// Retry tokens that failed during syncs, but don't retry tokens that failed during manual refreshes

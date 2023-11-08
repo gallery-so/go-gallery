@@ -25,7 +25,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/api/googleapi"
 
 	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/storage"
@@ -67,7 +66,7 @@ type errStoreObjectFailed struct {
 }
 
 func (e errNoDataFromReader) Error() string {
-	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
+	return fmt.Sprintf("no data from reader: %w (url: %s)", e.err, e.url)
 }
 
 func (e errNoDataFromReader) Unwrap() error {
@@ -79,7 +78,7 @@ func (e errNotCacheable) Error() string {
 }
 
 func (e errInvalidMedia) Error() string {
-	return fmt.Sprintf("invalid media: %s (url: %s)", e.err, e.URL)
+	return fmt.Sprintf("invalid media: %w (url: %s)", e.err, e.URL)
 }
 
 func (e errInvalidMedia) Unwrap() error {
@@ -87,7 +86,11 @@ func (e errInvalidMedia) Unwrap() error {
 }
 
 func (e errNoDataFromOpensea) Error() string {
-	return fmt.Sprintf("no data from opensea: %s", e.err)
+	msg := "no data from opensea"
+	if e.err == nil {
+		return msg
+	}
+	return fmt.Sprintf("%s: %w", msg, e.err)
 }
 
 func (e errNoDataFromOpensea) Unwrap() error {
@@ -112,86 +115,6 @@ type cachePipelineMetadata struct {
 	StoreGCP                     *persist.PipelineStepStatus
 	ThumbnailGCP                 *persist.PipelineStepStatus
 	LiveRenderGCP                *persist.PipelineStepStatus
-}
-
-func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, job *tokenProcessingJob) chan cacheResult {
-	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
-	runMetadata := &cachePipelineMetadata{
-		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ImageContentHeaderValueRetrieval,
-		ReaderRetrieval:              &job.pipelineMetadata.ImageReaderRetrieval,
-		OpenseaFallback:              &job.pipelineMetadata.ImageOpenseaFallback,
-		DetermineMediaTypeWithReader: &job.pipelineMetadata.ImageDetermineMediaTypeWithReader,
-		AnimationGzip:                &job.pipelineMetadata.ImageAnimationGzip,
-		SVGRasterize:                 &job.pipelineMetadata.ImageSVGRasterize,
-		StoreGCP:                     &job.pipelineMetadata.ImageStoreGCP,
-		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
-		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
-	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.httpClient, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
-}
-
-func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL, job *tokenProcessingJob) chan cacheResult {
-	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
-	runMetadata := &cachePipelineMetadata{
-		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AnimationContentHeaderValueRetrieval,
-		ReaderRetrieval:              &job.pipelineMetadata.AnimationReaderRetrieval,
-		OpenseaFallback:              &job.pipelineMetadata.AnimationOpenseaFallback,
-		DetermineMediaTypeWithReader: &job.pipelineMetadata.AnimationDetermineMediaTypeWithReader,
-		AnimationGzip:                &job.pipelineMetadata.AnimationAnimationGzip,
-		SVGRasterize:                 &job.pipelineMetadata.AnimationSVGRasterize,
-		StoreGCP:                     &job.pipelineMetadata.AnimationStoreGCP,
-		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
-		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
-	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.httpClient, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
-}
-
-func cacheProfileImageObjects(ctx context.Context, job *tokenProcessingJob, metadata persist.TokenMetadata) (chan cacheResult, error) {
-	// Validate
-	if metadata[job.profileImageKey] == nil {
-		return nil, fmt.Errorf("key %s not found in metadata", job.profileImageKey)
-	}
-	urlStr, ok := metadata[job.profileImageKey].(string)
-	if !ok {
-		return nil, errors.New("url value is not a string")
-	}
-	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
-	runMetadata := &cachePipelineMetadata{
-		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ProfileImageContentHeaderValueRetrieval,
-		ReaderRetrieval:              &job.pipelineMetadata.ProfileImageReaderRetrieval,
-		OpenseaFallback:              &job.pipelineMetadata.ProfileImageOpenseaFallback,
-		DetermineMediaTypeWithReader: &job.pipelineMetadata.ProfileImageDetermineMediaTypeWithReader,
-		AnimationGzip:                &job.pipelineMetadata.ProfileImageAnimationGzip,
-		SVGRasterize:                 &job.pipelineMetadata.ProfileImageSVGRasterize,
-		StoreGCP:                     &job.pipelineMetadata.ProfileImageStoreGCP,
-		ThumbnailGCP:                 &job.pipelineMetadata.ProfileImageThumbnailGCP,
-		LiveRenderGCP:                &job.pipelineMetadata.ProfileImageLiveRenderGCP,
-	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.httpClient, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeProfileImage, urlStr, job.tp.tokenBucket, runMetadata), nil
-}
-
-func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
-	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
-	runMetadata := &cachePipelineMetadata{
-		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AlternateContentHeaderValueRetrieval,
-		ReaderRetrieval:              &job.pipelineMetadata.AlternateReaderRetrieval,
-		OpenseaFallback:              &job.pipelineMetadata.AlternateOpenseaFallback,
-		DetermineMediaTypeWithReader: &job.pipelineMetadata.AlternateDetermineMediaTypeWithReader,
-		AnimationGzip:                &job.pipelineMetadata.AlternateAnimationGzip,
-		SVGRasterize:                 &job.pipelineMetadata.AlternateSVGRasterize,
-		StoreGCP:                     &job.pipelineMetadata.AlternateStoreGCP,
-		ThumbnailGCP:                 &job.pipelineMetadata.AlternateThumbnailGCP,
-		LiveRenderGCP:                &job.pipelineMetadata.AlternateLiveRenderGCP,
-	}
-	return cacheObjectsFromOpensea(ctx, tids, objectTypeImage, job.tp.httpClient, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
-}
-
-func isCacheResultValid(err error, numObjects int) bool {
-	var notCacheableErr errNotCacheable
-	if errors.As(err, &notCacheableErr) {
-		return true
-	}
-	return err == nil && numObjects > 0
 }
 
 func createRawMedia(pCtx context.Context, tids persist.TokenIdentifiers, mediaType persist.MediaType, tokenBucket, animURL, imgURL string, objects []cachedMediaObject) persist.Media {
@@ -308,35 +231,13 @@ type cacheResult struct {
 	err           error
 }
 
-func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers, httpClient *http.Client, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, defaultObjectType objectType, mediaURL, bucket string, subMeta *cachePipelineMetadata) chan cacheResult {
-	resultCh := make(chan cacheResult)
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
-		"tokenURIType":      persist.TokenURI(mediaURL).Type(),
-		"defaultObjectType": defaultObjectType,
-		"mediaURL":          mediaURL,
-	})
-
-	go func() {
-		cachedObjects, err := cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta, false)
-		if err == nil {
-			resultCh <- cacheResult{cachedObjects, err}
-			return
-		}
-
-		switch caught := err.(type) {
-		case *googleapi.Error:
-			if caught.Code == http.StatusTooManyRequests {
-				logger.For(ctx).Infof("rate limited by google, retrying in 30 seconds")
-				time.Sleep(time.Second * 30)
-				cachedObjects, err = cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
-			}
-			resultCh <- cacheResult{cachedObjects, err}
-		default:
-			resultCh <- cacheResult{cachedObjects, err}
-		}
-	}()
-
-	return resultCh
+// IsSuccess returns true either if objects were cached and no error occurred or if the error is errNotCacheable
+// The value of IsSuccess for the zero value of cacheResult is false
+func (c cacheResult) IsSuccess() bool {
+	if util.ErrorAs[errNotCacheable](c.err) {
+		return true
+	}
+	return c.err == nil && len(c.cachedObjects) > 0
 }
 
 type svgDimensions struct {
@@ -534,6 +435,18 @@ func findImageAndAnimationURLs(ctx context.Context, contractAddress persist.Addr
 	}
 
 	return imgURL, vURL, err
+}
+
+func findProfileImageURL(metadata persist.TokenMetadata, profileImageKey string) media.ImageURL {
+	k := metadata[profileImageKey]
+	if k == nil {
+		return ""
+	}
+	urlStr, ok := k.(string)
+	if !ok {
+		return ""
+	}
+	return media.ImageURL(urlStr)
 }
 
 func findNameAndDescription(metadata persist.TokenMetadata) (string, string) {
@@ -921,7 +834,7 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	return obj, nil
 }
 
-func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata, isRecursive bool) ([]cachedMediaObject, error) {
+func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
@@ -953,7 +866,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	}
 
 	timeBeforeDataReader := time.Now()
-	reader, retryOpensea, err := func() (*util.FileHeaderReader, bool, error) {
+	reader, err := func() (*util.FileHeaderReader, error) {
 		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")
 		defer traceCallback()
 		var reader *util.FileHeaderReader
@@ -962,36 +875,24 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		if err != nil {
 			persist.FailStep(subMeta.ReaderRetrieval)
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return reader, false, err
+				return reader, err
 			}
 			// the reader is and always will be invalid
 			switch caught := err.(type) {
 			case util.ErrHTTP:
-				if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError {
-					return reader, false, errInvalidMedia{URL: mediaURL, err: err}
+				// We may want to support redirects in the future
+				if caught.Status < 200 || caught.Status < 299 {
+					return reader, errInvalidMedia{URL: mediaURL, err: err}
 				}
 			case *net.DNSError, *url.Error:
-				return reader, false, errInvalidMedia{URL: mediaURL, err: err}
+				return reader, errInvalidMedia{URL: mediaURL, err: err}
+			default:
+				logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
+				return reader, errNoDataFromReader{err: err, url: mediaURL}
 			}
-
-			// if we're not already recursive, try opensea for ethereum tokens
-			if !isRecursive && tids.Chain == persist.ChainETH {
-				return reader, true, err
-			}
-
-			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
-			return reader, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
-		return reader, false, nil
+		return reader, nil
 	}()
-
-	if retryOpensea {
-		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.OpenseaFallback, "OpenseaFallback")
-		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
-		defer traceCallback()
-
-		return cacheObjectsFromOpensea(pCtx, tids, oType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
-	}
 
 	if err != nil {
 		return nil, err
@@ -1083,30 +984,6 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	}
 
 	return result, nil
-}
-
-func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
-	assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
-	if err != nil || len(assets) == 0 {
-		return nil, errNoDataFromOpensea{err: err}
-	}
-
-	for _, asset := range assets {
-
-		firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
-			return s != ""
-		})
-		if !ok {
-			continue
-		}
-
-		objects, err := cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
-		if err != nil {
-			continue
-		}
-		return objects, nil
-	}
-	return nil, errNoDataFromOpensea{err: err}
 }
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
