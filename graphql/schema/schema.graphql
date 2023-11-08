@@ -2168,6 +2168,17 @@ type SomeonePostedYourWorkNotification implements Notification & Node @goEmbedHe
   community: Community @goField(forceResolver: true)
 }
 
+type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & Node
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  post: Post @goField(forceResolver: true)
+}
+
 type ClearAllNotificationsPayload {
   notifications: [Notification]
 }

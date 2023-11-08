@@ -2235,6 +2235,18 @@ func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
 
+type SomeoneYouFollowPostedTheirFirstPostNotification struct {
+	HelperSomeoneYouFollowPostedTheirFirstPostNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Post         *Post        `json:"post"`
+}
+
+func (SomeoneYouFollowPostedTheirFirstPostNotification) IsNotification() {}
+func (SomeoneYouFollowPostedTheirFirstPostNotification) IsNode()         {}
+
 type SyncCreatedTokensForExistingContractInput struct {
 	ContractID persist.DBID `json:"contractId"`
 }

@@ -89,6 +89,7 @@ type ResolverRoot interface {
 	SomeonePostedYourWorkNotification() SomeonePostedYourWorkNotificationResolver
 	SomeoneRepliedToYourCommentNotification() SomeoneRepliedToYourCommentNotificationResolver
 	SomeoneViewedYourGalleryNotification() SomeoneViewedYourGalleryNotificationResolver
+	SomeoneYouFollowPostedTheirFirstPostNotification() SomeoneYouFollowPostedTheirFirstPostNotificationResolver
 	Subscription() SubscriptionResolver
 	Token() TokenResolver
 	TokenDefinition() TokenDefinitionResolver
@@ -1302,6 +1303,15 @@ type ComplexityRoot struct {
 		UserViewers        func(childComplexity int, before *string, after *string, first *int, last *int) int
 	}
 
+	SomeoneYouFollowPostedTheirFirstPostNotification struct {
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Post         func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
+	}
+
 	Subscription struct {
 		NewNotification     func(childComplexity int) int
 		NotificationUpdated func(childComplexity int) int
@@ -2000,6 +2010,9 @@ type SomeoneViewedYourGalleryNotificationResolver interface {
 	UserViewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
 
 	Gallery(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.Gallery, error)
+}
+type SomeoneYouFollowPostedTheirFirstPostNotificationResolver interface {
+	Post(ctx context.Context, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (*model.Post, error)
 }
 type SubscriptionResolver interface {
 	NewNotification(ctx context.Context) (<-chan model.Notification, error)
@@ -7417,6 +7430,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneViewedYourGalleryNotification.UserViewers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "SomeoneYouFollowPostedTheirFirstPostNotification.creationTime":
+		if e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.CreationTime(childComplexity), true
+
+	case "SomeoneYouFollowPostedTheirFirstPostNotification.dbid":
+		if e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.Dbid(childComplexity), true
+
+	case "SomeoneYouFollowPostedTheirFirstPostNotification.id":
+		if e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.ID(childComplexity), true
+
+	case "SomeoneYouFollowPostedTheirFirstPostNotification.post":
+		if e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.Post == nil {
+			break
+		}
+
+		return e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.Post(childComplexity), true
+
+	case "SomeoneYouFollowPostedTheirFirstPostNotification.seen":
+		if e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.Seen(childComplexity), true
+
+	case "SomeoneYouFollowPostedTheirFirstPostNotification.updatedTime":
+		if e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.UpdatedTime(childComplexity), true
+
 	case "Subscription.newNotification":
 		if e.complexity.Subscription.NewNotification == nil {
 			break
@@ -10439,7 +10494,11 @@ type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
-union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed | ErrTokenNotFound
+union RefreshTokenPayloadOrError =
+    RefreshTokenPayload
+  | ErrInvalidInput
+  | ErrSyncFailed
+  | ErrTokenNotFound
 
 type RefreshTokenPayload {
   token: Token
@@ -10958,6 +11017,17 @@ type SomeonePostedYourWorkNotification implements Notification & Node @goEmbedHe
 
   post: Post @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
+}
+
+type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & Node
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  post: Post @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {
@@ -50625,6 +50695,282 @@ func (ec *executionContext) fieldContext_SomeoneViewedYourGalleryNotification_ga
 	return fc, nil
 }
 
+func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneYouFollowPostedTheirFirstPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneYouFollowPostedTheirFirstPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneYouFollowPostedTheirFirstPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneYouFollowPostedTheirFirstPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneYouFollowPostedTheirFirstPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification_post(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneYouFollowPostedTheirFirstPostNotification().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneYouFollowPostedTheirFirstPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "mentions":
+				return ec.fieldContext_Post_mentions(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription_newNotification(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	fc, err := ec.fieldContext_Subscription_newNotification(ctx, field)
 	if err != nil {
@@ -66432,6 +66778,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeonePostedYourWorkNotification(ctx, sel, obj)
+	case model.SomeoneYouFollowPostedTheirFirstPostNotification:
+		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, &obj)
+	case *model.SomeoneYouFollowPostedTheirFirstPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -66537,6 +66890,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeonePostedYourWorkNotification(ctx, sel, obj)
+	case model.SomeoneYouFollowPostedTheirFirstPostNotification:
+		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, &obj)
+	case *model.SomeoneYouFollowPostedTheirFirstPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -77549,6 +77909,70 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Co
 					}
 				}()
 				res = ec._SomeoneViewedYourGalleryNotification_gallery(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var someoneYouFollowPostedTheirFirstPostNotificationImplementors = []string{"SomeoneYouFollowPostedTheirFirstPostNotification", "Notification", "Node"}
+
+func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, someoneYouFollowPostedTheirFirstPostNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SomeoneYouFollowPostedTheirFirstPostNotification")
+		case "id":
+
+			out.Values[i] = ec._SomeoneYouFollowPostedTheirFirstPostNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._SomeoneYouFollowPostedTheirFirstPostNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._SomeoneYouFollowPostedTheirFirstPostNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._SomeoneYouFollowPostedTheirFirstPostNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._SomeoneYouFollowPostedTheirFirstPostNotification_updatedTime(ctx, field, obj)
+
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneYouFollowPostedTheirFirstPostNotification_post(ctx, field, obj)
 				return res
 			}
 
