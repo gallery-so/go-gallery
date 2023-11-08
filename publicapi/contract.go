@@ -13,7 +13,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/task"
 
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -27,7 +26,7 @@ type ContractAPI struct {
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
-	taskClient         *gcptasks.Client
+	taskClient         *task.Client
 }
 
 func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.DBID) (*db.Contract, error) {
@@ -187,7 +186,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 		ContractID:   contractID,
 		ForceRefresh: forceRefresh,
 	}
-	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
+	return api.taskClient.CreateTaskForContractOwnerProcessing(ctx, in)
 }
 
 func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.User, PageInfo, error) {

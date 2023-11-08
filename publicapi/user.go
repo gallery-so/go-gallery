@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/mikeydub/go-gallery/service/task"
 
 	"cloud.google.com/go/storage"
@@ -59,7 +58,7 @@ type UserAPI struct {
 	arweaveClient      *goar.Client
 	storageClient      *storage.Client
 	multichainProvider *multichain.Provider
-	taskClient         *gcptasks.Client
+	taskClient         *task.Client
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -431,14 +430,14 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+	err = api.taskClient.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
 		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
 			userID: {
 				persist.SocialProviderFarcaster: []persist.ChainAddress{chainAddress},
 				persist.SocialProviderLens:      []persist.ChainAddress{chainAddress},
 			},
 		},
-	}, api.taskClient)
+	})
 	if err != nil {
 		logger.For(ctx).WithError(err).Error("failed to create task for autosocial process users")
 	}
@@ -468,7 +467,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 			WalletIDs: removedIDs,
 		}
 
-		if err := task.CreateTaskForWalletRemoval(ctx, walletRemovalMessage, api.taskClient); err != nil {
+		if err := api.taskClient.CreateTaskForWalletRemoval(ctx, walletRemovalMessage); err != nil {
 			// Just log the error here. No need to return it -- the actual wallet removal DID succeed,
 			// but tokens owned by the affected wallets won't be updated until the user's next sync.
 			logger.For(ctx).WithError(err).Error("failed to create task to process wallet removal")
@@ -567,7 +566,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	}
 
 	if createUserParams.EmailStatus == persist.EmailVerificationStatusVerified {
-		if err := task.CreateTaskForAddingEmailToMailingList(ctx, task.AddEmailToMailingListMessage{UserID: userID}, api.taskClient); err != nil {
+		if err := api.taskClient.CreateTaskForAddingEmailToMailingList(ctx, task.AddEmailToMailingListMessage{UserID: userID}); err != nil {
 			// Report error to Sentry since there's not another way to subscribe the user to the mailing list
 			sentryutil.ReportError(ctx, err)
 			logger.For(ctx).Warnf("failed to send mailing list subscription task: %s", err)
@@ -587,14 +586,14 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		logger.For(ctx).Errorf("failed to dispatch event: %s", err)
 	}
 
-	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+	err = api.taskClient.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
 		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
 			userID: {
 				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
 				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
 			},
 		},
-	}, api.taskClient)
+	})
 	if err != nil {
 		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
 	}

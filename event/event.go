@@ -6,7 +6,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/tracing"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"golang.org/x/sync/errgroup"
@@ -34,7 +33,7 @@ const (
 )
 
 // Register specific event handlers
-func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *cloudtasks.Client) {
+func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *task.Client) {
 	sender := newEventSender(queries)
 
 	feed := newEventDispatcher()
@@ -365,10 +364,10 @@ type groupHandler interface {
 type feedHandler struct {
 	queries      *db.Queries
 	eventBuilder *feed.EventBuilder
-	tc           *cloudtasks.Client
+	tc           *task.Client
 }
 
-func newFeedHandler(queries *db.Queries, taskClient *cloudtasks.Client) feedHandler {
+func newFeedHandler(queries *db.Queries, taskClient *task.Client) feedHandler {
 	return feedHandler{
 		queries:      queries,
 		eventBuilder: feed.NewEventBuilder(queries),
@@ -385,7 +384,7 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 	if !actionsToBeHandledByFeedService[persistedEvent.Action] {
 		return nil
 	}
-	return task.CreateTaskForFeed(ctx, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
+	return h.tc.CreateTaskForFeed(ctx, task.FeedMessage{ID: persistedEvent.ID})
 }
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
@@ -415,7 +414,7 @@ func (h feedHandler) handleGroup(ctx context.Context, groupID string, action per
 
 	if feedEvent != nil {
 		// Send event to feedbot
-		err = task.CreateTaskForFeedbot(ctx, task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc)
+		err = h.tc.CreateTaskForFeedbot(ctx, task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action})
 		if err != nil {
 			logger.For(ctx).Errorf("failed to create task for feedbot: %s", err.Error())
 		}
@@ -566,8 +565,8 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 }
 
 // slackHandler posts events to Slack
-type slackHandler struct{ tc *cloudtasks.Client }
+type slackHandler struct{ tc *task.Client }
 
 func (s slackHandler) handleDelayed(ctx context.Context, event db.Event) error {
-	return task.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: event.PostID}, s.tc)
+	return s.tc.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: event.PostID})
 }

@@ -7,7 +7,6 @@
 package server
 
 import (
-	"cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"database/sql"
 	"github.com/google/wire"
@@ -74,7 +73,7 @@ var (
 )
 
 // ethProviderSet is a wire injector that creates the set of Ethereum providers
-func ethProviderSet(serverEnvInit envInit, client *cloudtasks.Client, httpClient *http.Client, serverTokenMetadataCache *tokenMetadataCache) ethProviderList {
+func ethProviderSet(serverEnvInit envInit, client *task.Client, httpClient *http.Client, serverTokenMetadataCache *tokenMetadataCache) ethProviderList {
 	ethclientClient := rpc.NewEthClient()
 	provider := eth.NewProvider(httpClient, ethclientClient, client)
 	chain := _wireChainValue

@@ -17,7 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
@@ -72,7 +71,7 @@ type Clients struct {
 	IPFSClient      *shell.Shell
 	ArweaveClient   *goar.Client
 	StorageClient   *storage.Client
-	TaskClient      *cloudtasks.Client
+	TaskClient      *task.Client
 	SecretClient    *secretmanager.Client
 	PubSubClient    *pubsub.Client
 	MagicLinkClient *magicclient.API
