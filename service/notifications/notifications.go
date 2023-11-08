@@ -703,6 +703,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 		message.Body = fmt.Sprintf("%s posted your work: %s", actor.Username.String, contract.Name.String)
+		return message, nil
 	}
 
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
