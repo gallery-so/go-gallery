@@ -811,7 +811,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				Action:         "commented on your additions to",
 				CollectionName: collection.Name.String,
 				CollectionID:   collection.ID,
-				PreviewText:    util.TruncateWithEllipsis(comment.Comment, 20),
+				PreviewText:    util.TruncateWithEllipsis(comment.Comment, 40),
 			}, nil
 
 		} else if n.Action == persist.ActionCommentedOnFeedEvent {
@@ -821,7 +821,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		return UserFacingNotificationData{
 			Actor:       userActor.Username.String,
 			Action:      action,
-			PreviewText: util.TruncateWithEllipsis(comment.Comment, 20),
+			PreviewText: util.TruncateWithEllipsis(comment.Comment, 40),
 		}, nil
 	case persist.ActionViewedGallery:
 		if len(n.Data.AuthedViewerIDs)+len(n.Data.UnauthedViewerIDs) > 1 {
@@ -865,7 +865,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				return UserFacingNotificationData{}, err
 			}
 
-			preview = util.TruncateWithEllipsis(comment.Comment, 20)
+			preview = util.TruncateWithEllipsis(comment.Comment, 40)
 
 			actor, err = queries.GetUserById(ctx, comment.ActorID)
 			if err != nil {
@@ -880,7 +880,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				return UserFacingNotificationData{}, err
 			}
 
-			preview = util.TruncateWithEllipsis(post.Caption.String, 20)
+			preview = util.TruncateWithEllipsis(post.Caption.String, 40)
 
 			actor, err = queries.GetUserById(ctx, post.ActorID)
 			if err != nil {
@@ -931,7 +931,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		return UserFacingNotificationData{
 			Actor:       commenter.Username.String,
 			Action:      "replied to your comment",
-			PreviewText: util.TruncateWithEllipsis(comment.Comment, 20),
+			PreviewText: util.TruncateWithEllipsis(comment.Comment, 40),
 		}, nil
 	case persist.ActionNewTokensReceived:
 		data := UserFacingNotificationData{}
@@ -941,7 +941,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			return UserFacingNotificationData{}, err
 		}
 
-		name := util.TruncateWithEllipsis(td.Name.String, 20)
+		name := util.TruncateWithEllipsis(td.Name.String, 40)
 
 		amount := n.Data.NewTokenQuantity
 		i := amount.BigInt().Uint64()
@@ -975,7 +975,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			Action:         "posted your work",
 			CollectionName: contract.Name.String,
 			CollectionID:   contract.ID,
-			PreviewText:    util.TruncateWithEllipsis(post.Caption.String, 20),
+			PreviewText:    util.TruncateWithEllipsis(post.Caption.String, 40),
 		}, nil
 
 	case persist.ActionUserPostedFirstPost:
@@ -993,7 +993,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		return UserFacingNotificationData{
 			Actor:       actor.Username.String,
 			Action:      "posted their first post",
-			PreviewText: util.TruncateWithEllipsis(post.Caption.String, 20),
+			PreviewText: util.TruncateWithEllipsis(post.Caption.String, 40),
 		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
