@@ -1374,7 +1374,12 @@ update push_notification_tokens set deleted = true where id = any(@ids) and dele
 select * from push_notification_tokens where user_id = @user_id and deleted = false;
 
 -- name: GetPushTokensByIDs :many
-select t.* from unnest(@ids::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false;
+with keys as (
+    select unnest (@ids::text[]) as id
+         , generate_subscripts(@ids::text[], 1) as index
+)
+select t.* from keys k join push_notification_tokens t on t.id = k.id and t.deleted = false
+    order by k.index;
 
 -- name: CreatePushTickets :exec
 insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
