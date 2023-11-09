@@ -939,10 +939,10 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		amount := n.Data.NewTokenQuantity
 		i := amount.BigInt().Uint64()
 		if i > 1 {
-			data.Actor = "you"
+			data.Actor = "You"
 			data.Action = fmt.Sprintf("just collected %d new %s. Tap to share now.", i, name)
 		} else {
-			data.Actor = "you"
+			data.Actor = "You"
 			data.Action = fmt.Sprintf("just collected %s. Tap to share now.", name)
 		}
 
