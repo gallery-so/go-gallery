@@ -783,7 +783,6 @@ func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption)
 
 // addContractRunOptions adds pipeline options for specific contracts
 func addContractRunOptions(contract persist.ContractIdentifiers) (opts []PipelineOption) {
-	// Process PFPs from ENS tokens
 	if contract == ensContract {
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}

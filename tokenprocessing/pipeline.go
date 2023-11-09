@@ -66,7 +66,7 @@ type tokenProcessingJob struct {
 	defaultMetadata persist.TokenMetadata
 	// isSpamJob indicates that the job is processing a spam token. It's currently used to exclude events from Sentry.
 	isSpamJob bool
-	// requireImage indicates that the pipeline should be marked as failed if an image URL is present but the image is not cached.
+	// requireImage indicates that the pipeline should return an error if an image URL is present but an image wasn't cached.
 	requireImage bool
 }
 
@@ -110,7 +110,19 @@ type ErrImageResultRequired struct{ Err error }
 
 func (e ErrImageResultRequired) Unwrap() error { return e.Err }
 func (e ErrImageResultRequired) Error() string {
-	return fmt.Sprintf("failed to process required image: %w", e.Err)
+	msg := "failed to process required image"
+	if e.Err != nil {
+		msg += ": " + e.Err.Error()
+	}
+	return msg
+}
+
+// ErrBadToken is an error indicating that there is an issue with the token itself
+type ErrBadToken struct{ Err error }
+
+func (e ErrBadToken) Unwrap() error { return e.Err }
+func (m ErrBadToken) Error() string {
+	return fmt.Sprintf("issue with token: %s", m.Err)
 }
 
 func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractIdentifiers, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
@@ -142,19 +154,6 @@ func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persis
 	return media, err
 }
 
-// ErrBadToken is an error indicating that there is an issue with the token itself
-type ErrBadToken struct {
-	Err error
-}
-
-func (m ErrBadToken) Error() string {
-	return fmt.Sprintf("issue with token: %s", m.Err)
-}
-
-func (e ErrBadToken) Unwrap() error {
-	return e.Err
-}
-
 // Run runs the pipeline, returning the media that was created by the run.
 func (tpj *tokenProcessingJob) Run(ctx context.Context) (coredb.TokenMedia, error) {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
@@ -167,7 +166,7 @@ func (tpj *tokenProcessingJob) Run(ctx context.Context) (coredb.TokenMedia, erro
 
 	media, metadata, mediaErr := tpj.createMediaForToken(mediaCtx)
 
-	saved, err := tpj.saveMediaToDB(ctx, media, metadata)
+	saved, err := tpj.persistResults(ctx, media, metadata)
 	if err != nil {
 		return saved, err
 	}
@@ -175,44 +174,41 @@ func (tpj *tokenProcessingJob) Run(ctx context.Context) (coredb.TokenMedia, erro
 	return saved, mediaErr
 }
 
-// sourceURLs finds URLs to download content from
-func sourceURLs(ctx context.Context, tpj *tokenProcessingJob, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
+func findURLsToDownloadFrom(ctx context.Context, tpj *tokenProcessingJob, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
 	pfpURL = findProfileImageURL(metadata, tpj.profileImageKey)
 	imgURL, animURL, err = findImageAndAnimationURLs(ctx, tpj.token.ContractAddress, tpj.token.Chain, metadata, tpj.pipelineMetadata)
 	return imgURL, pfpURL, animURL, err
 }
 
-func wrapBadTokenError(err error) error {
+func wrapWithBadTokenErr(err error) error {
 	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorAs[errInvalidMedia](err) || util.ErrorAs[errNoDataFromReader](err) {
-		err = ErrBadToken{err}
+		err = ErrBadToken{Err: err}
 	}
 	return err
 }
 
-func cacheResultsToError(animResult cacheResult, imageRequired bool, imgResult cacheResult) error {
-	// Fail if image is required and not cached
+func cacheResultsToErr(animResult cacheResult, imgResult cacheResult, imageRequired bool) error {
 	if imageRequired && !imgResult.IsSuccess() {
-		return ErrImageResultRequired{wrapBadTokenError(imgResult.err)}
+		return ErrImageResultRequired{Err: wrapWithBadTokenErr(imgResult.err)}
 	}
-	// Success if either an image or animation is cached
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
 		return nil
 	}
 	if imgResult.err != nil {
-		return wrapBadTokenError(imgResult.err)
+		return wrapWithBadTokenErr(imgResult.err)
 	}
-	return wrapBadTokenError(animResult.err)
+	return wrapWithBadTokenErr(animResult.err)
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist.Media, persist.TokenMetadata, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 	metadata := tpj.retrieveMetadata(ctx)
-	imgURL, pfpURL, animURL, err := sourceURLs(ctx, tpj, metadata)
+	imgURL, pfpURL, animURL, err := findURLsToDownloadFrom(ctx, tpj, metadata)
 	if err != nil {
 		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, err
 	}
-	newMedia, err := tpj.cacheMediaObjects(ctx, imgURL, pfpURL, animURL)
+	newMedia, err := tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL)
 	return newMedia, metadata, err
 }
 
@@ -255,7 +251,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	return newMetadata
 }
 
-func (tpj *tokenProcessingJob) cacheContentFromURL(ctx context.Context, tids persist.TokenIdentifiers, defaultObjectType objectType, mediaURL string, subMeta *cachePipelineMetadata) chan cacheResult {
+func (tpj *tokenProcessingJob) cacheFromURL(ctx context.Context, tids persist.TokenIdentifiers, defaultObjectType objectType, mediaURL string, subMeta *cachePipelineMetadata) chan cacheResult {
 	resultCh := make(chan cacheResult)
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenURIType":      persist.TokenURI(mediaURL).Type(),
@@ -285,7 +281,7 @@ func (tpj *tokenProcessingJob) cacheContentFromURL(ctx context.Context, tids per
 	return resultCh
 }
 
-func (tpj *tokenProcessingJob) cacheMediaFromPrimarySources(ctx context.Context, imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL) (imgResult, pfpResult, animResult cacheResult) {
+func (tpj *tokenProcessingJob) cacheMediaFromOriginalURLs(ctx context.Context, imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL) (imgResult, pfpResult, animResult cacheResult) {
 	imgRunMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &tpj.pipelineMetadata.ImageContentHeaderValueRetrieval,
 		ReaderRetrieval:              &tpj.pipelineMetadata.ImageReaderRetrieval,
@@ -322,11 +318,12 @@ func (tpj *tokenProcessingJob) cacheMediaFromPrimarySources(ctx context.Context,
 	return tpj.cacheMediaSources(ctx, imgURL, pfpURL, animURL, imgRunMetadata, pfpRunMetadata, animRunMetadata)
 }
 
-func (tpj *tokenProcessingJob) cacheMediaFromOpenSea(ctx context.Context) (imgResult, animResult cacheResult) {
+func (tpj *tokenProcessingJob) cacheMediaFromOpenSeaAssetURLs(ctx context.Context) (imgResult, animResult cacheResult) {
 	tID := persist.NewTokenIdentifiers(tpj.token.ContractAddress, tpj.token.TokenID, tpj.token.Chain)
 	assets, err := opensea.FetchAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(tID.ContractAddress), opensea.TokenID(tID.TokenID.Base10String()))
-	if err != nil {
-		return imgResult, animResult
+	if err != nil || len(assets) == 0 {
+		result := cacheResult{err: errNoDataFromOpensea{err}}
+		return result, result
 	}
 	imgRunMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &tpj.pipelineMetadata.AlternateImageContentHeaderValueRetrieval,
@@ -359,7 +356,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromOpenSea(ctx context.Context) (imgRe
 			asset.ImageOriginalURL,
 			asset.ImageThumbnailURL,
 		))
-		imgResult, _, animResult := tpj.cacheMediaSources(ctx, imgURL, "", animURL, imgRunMetadata, nil, animRunMetadata)
+		imgResult, _, animResult = tpj.cacheMediaSources(ctx, imgURL, "", animURL, imgRunMetadata, nil, animRunMetadata)
 		if animResult.IsSuccess() || imgResult.IsSuccess() {
 			return imgResult, animResult
 		}
@@ -376,20 +373,16 @@ func (tpj *tokenProcessingJob) cacheMediaSources(
 	pfpRunMetadata *cachePipelineMetadata,
 	animRunMetadata *cachePipelineMetadata,
 ) (imgResult, pfpResult, animResult cacheResult) {
-	var (
-		imgCh  chan cacheResult
-		pfpCh  chan cacheResult
-		animCh chan cacheResult
-	)
+	var imgCh, pfpCh, animCh chan cacheResult
 
 	if imgURL != "" {
-		imgCh = tpj.cacheContentFromURL(ctx, tpj.token, objectTypeImage, string(imgURL), imgRunMetadata)
+		imgCh = tpj.cacheFromURL(ctx, tpj.token, objectTypeImage, string(imgURL), imgRunMetadata)
 	}
 	if pfpURL != "" {
-		pfpCh = tpj.cacheContentFromURL(ctx, tpj.token, objectTypeProfileImage, string(pfpURL), pfpRunMetadata)
+		pfpCh = tpj.cacheFromURL(ctx, tpj.token, objectTypeProfileImage, string(pfpURL), pfpRunMetadata)
 	}
 	if animURL != "" {
-		animCh = tpj.cacheContentFromURL(ctx, tpj.token, objectTypeAnimation, string(animURL), animRunMetadata)
+		animCh = tpj.cacheFromURL(ctx, tpj.token, objectTypeAnimation, string(animURL), animRunMetadata)
 	}
 
 	if imgCh != nil {
@@ -408,47 +401,37 @@ func (tpj *tokenProcessingJob) cacheMediaSources(
 	return imgResult, pfpResult, animResult
 }
 
-func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, imgURL, pfpURL media.ImageURL, animURL media.AnimationURL) (m persist.Media, err error) {
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"imgURL": imgURL, "pfpURL": pfpURL, "animURL": animURL})
-	imgResult, pfpResult, animResult := tpj.cacheMediaFromPrimarySources(ctx, imgURL, pfpURL, animURL)
+func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, pfpURL media.ImageURL, animURL media.AnimationURL) (m persist.Media, err error) {
+	imgRequired := tpj.requireImage && imgURL != ""
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"imgURL": imgURL, "pfpURL": pfpURL, "animURL": animURL, "imgRequired": imgRequired})
 
-	imageRequired := tpj.requireImage && imgURL != ""
+	imgResult, pfpResult, animResult := tpj.cacheMediaFromOriginalURLs(ctx, imgURL, pfpURL, animURL)
 
-	// We have at least one successful download, so we can create media from it.
-	// The result of the PFP is not used in determining if the job was successful
-	if animResult.IsSuccess() || imgResult.IsSuccess() {
-		err = cacheResultsToError(animResult, imageRequired, imgResult)
-		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
+	if !imgRequired && animResult.IsSuccess() {
+		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), cacheResultsToErr(animResult, imgResult, imgRequired)
 	}
 
-	// OpenSea provider only supports Ethereum currently
+	if imgResult.IsSuccess() {
+		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), cacheResultsToErr(animResult, imgResult, imgRequired)
+	}
+
+	// OpenSea provider only supports Ethereum currently. If we do use OpenSea, we prioritize our results over theirs.
 	if tpj.token.Chain == persist.ChainETH {
-		imgResult, animResult = tpj.cacheMediaFromOpenSea(ctx)
-		if animResult.IsSuccess() || imgResult.IsSuccess() {
-			err = cacheResultsToError(animResult, imageRequired, imgResult)
-			return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
-		}
+		osImgResult, osAnimResult := tpj.cacheMediaFromOpenSeaAssetURLs(ctx)
+		animResult, _ = util.FindFirst([]cacheResult{animResult, osAnimResult}, func(r cacheResult) bool { return r.IsSuccess() })
+		imgResult, _ = util.FindFirst([]cacheResult{imgResult, osImgResult}, func(r cacheResult) bool { return r.IsSuccess() })
+	}
+
+	// Check if we got any result back from OpenSea
+	if animResult.IsSuccess() || imgResult.IsSuccess() {
+		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), cacheResultsToErr(animResult, imgResult, imgRequired)
 	}
 
 	closeNothingCachedWithErrors, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
 	defer closeNothingCachedWithErrors()
 
 	// At this point we don't have a way to make media so we return an error
-	err = cacheResultsToError(animResult, imageRequired, imgResult)
-	if util.ErrorAs[errInvalidMedia](err) {
-		invalidErr := err.(errInvalidMedia)
-		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}, err
-	}
-	if err != nil {
-		return persist.Media{MediaType: persist.MediaTypeUnknown}, err
-	}
-
-	// We somehow didn't cache media without getting an error anywhere
-	closeNothingCachedWithoutErrors, _ := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
-	// Fail NothingCachedWithErrors because we didn't get any errors
-	persist.FailStep(&tpj.pipelineMetadata.NothingCachedWithErrors)
-	closeNothingCachedWithoutErrors()
-	panic("failed to cache media, and no error occurred in the process")
+	return mustCreateMediaFromErr(ctx, err, tpj), cacheResultsToErr(animResult, imgResult, imgRequired)
 }
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []cachedMediaObject) persist.Media {
@@ -492,7 +475,7 @@ func toJSONB(v any) (pgtype.JSONB, error) {
 	return j, err
 }
 
-func (tpj *tokenProcessingJob) saveMediaToDB(ctx context.Context, media persist.Media, metadata persist.TokenMetadata) (coredb.TokenMedia, error) {
+func (tpj *tokenProcessingJob) persistResults(ctx context.Context, media persist.Media, metadata persist.TokenMetadata) (coredb.TokenMedia, error) {
 	newMedia, err := toJSONB(media)
 	if err != nil {
 		return coredb.TokenMedia{}, err

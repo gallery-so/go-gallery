@@ -23,7 +23,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
-	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/sirupsen/logrus"
 
 	"cloud.google.com/go/compute/metadata"
@@ -66,7 +65,7 @@ type errStoreObjectFailed struct {
 }
 
 func (e errNoDataFromReader) Error() string {
-	return fmt.Sprintf("no data from reader: %w (url: %s)", e.err, e.url)
+	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
 }
 
 func (e errNoDataFromReader) Unwrap() error {
@@ -78,7 +77,7 @@ func (e errNotCacheable) Error() string {
 }
 
 func (e errInvalidMedia) Error() string {
-	return fmt.Sprintf("invalid media: %w (url: %s)", e.err, e.URL)
+	return fmt.Sprintf("invalid media: %s (url: %s)", e.err, e.URL)
 }
 
 func (e errInvalidMedia) Unwrap() error {
@@ -87,10 +86,10 @@ func (e errInvalidMedia) Unwrap() error {
 
 func (e errNoDataFromOpensea) Error() string {
 	msg := "no data from opensea"
-	if e.err == nil {
-		return msg
+	if e.err != nil {
+		msg += ": " + e.err.Error()
 	}
-	return fmt.Sprintf("%s: %w", msg, e.err)
+	return msg
 }
 
 func (e errNoDataFromOpensea) Unwrap() error {
@@ -132,6 +131,22 @@ func createUncachedMedia(ctx context.Context, job *tokenProcessingJob, url strin
 		return job.createRawMedia(ctx, mediaType, url, first.storageURL(job.tp.tokenBucket), objects)
 	}
 	return persist.Media{MediaType: mediaType, MediaURL: persist.NullString(url)}
+}
+
+func mustCreateMediaFromErr(ctx context.Context, err error, job *tokenProcessingJob) persist.Media {
+	if util.ErrorAs[errInvalidMedia](err) {
+		invalidErr := err.(errInvalidMedia)
+		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}
+	}
+	if err != nil {
+		return persist.Media{MediaType: persist.MediaTypeUnknown}
+	}
+	// We somehow didn't cache media without getting an error anywhere
+	closing, _ := persist.TrackStepStatus(ctx, &job.pipelineMetadata.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
+	// Fail NothingCachedWithErrors because we didn't get any errors
+	persist.FailStep(&job.pipelineMetadata.NothingCachedWithErrors)
+	closing()
+	panic("failed to cache media, and no error occurred in the process")
 }
 
 func createMediaFromResults(ctx context.Context, job *tokenProcessingJob, animResult, imgResult, pfpResult cacheResult) persist.Media {
@@ -231,8 +246,8 @@ type cacheResult struct {
 	err           error
 }
 
-// IsSuccess returns true either if objects were cached and no error occurred or if the error is errNotCacheable
-// The value of IsSuccess for the zero value of cacheResult is false
+// IsSuccess returns true if objects were cached and no error occurred or if the error is errNotCacheable
+// IsSuccess evaluates to false for the zero value of cacheResult
 func (c cacheResult) IsSuccess() bool {
 	if util.ErrorAs[errNotCacheable](c.err) {
 		return true
@@ -834,6 +849,35 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	return obj, nil
 }
 
+func readerFromURL(ctx context.Context, mediaURL string, mediaType persist.MediaType, ipfsClient *shell.Shell, arweaveClient *goar.Client, subMeta *cachePipelineMetadata) (*util.FileHeaderReader, persist.MediaType, error) {
+	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.ReaderRetrieval, "ReaderRetrieval")
+	defer traceCallback()
+
+	reader, mediaType, err := rpc.GetDataFromURIAsReader(ctx, persist.TokenURI(mediaURL), mediaType, ipfsClient, arweaveClient, util.MB, time.Minute, true)
+	if err == nil {
+		return reader, mediaType, nil
+	}
+
+	persist.FailStep(subMeta.ReaderRetrieval)
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return reader, mediaType, err
+	}
+
+	// The reader is and always will be invalid
+	switch caught := err.(type) {
+	case util.ErrHTTP:
+		// We might want to support redirects later
+		if caught.Status < 200 || caught.Status < 299 {
+			return reader, mediaType, errInvalidMedia{URL: mediaURL, err: err}
+		}
+	case *net.DNSError, *url.Error:
+		return reader, mediaType, errInvalidMedia{URL: mediaURL, err: err}
+	}
+
+	logger.For(ctx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
+	return reader, mediaType, errNoDataFromReader{err: err, url: mediaURL}
+}
+
 func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 
 	asURI := persist.TokenURI(mediaURL)
@@ -866,34 +910,8 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	}
 
 	timeBeforeDataReader := time.Now()
-	reader, err := func() (*util.FileHeaderReader, error) {
-		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")
-		defer traceCallback()
-		var reader *util.FileHeaderReader
-		var err error
-		reader, mediaType, err = rpc.GetDataFromURIAsReader(pCtx, asURI, mediaType, ipfsClient, arweaveClient, util.MB, time.Minute, true)
-		if err != nil {
-			persist.FailStep(subMeta.ReaderRetrieval)
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return reader, err
-			}
-			// the reader is and always will be invalid
-			switch caught := err.(type) {
-			case util.ErrHTTP:
-				// We may want to support redirects in the future
-				if caught.Status < 200 || caught.Status < 299 {
-					return reader, errInvalidMedia{URL: mediaURL, err: err}
-				}
-			case *net.DNSError, *url.Error:
-				return reader, errInvalidMedia{URL: mediaURL, err: err}
-			default:
-				logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
-				return reader, errNoDataFromReader{err: err, url: mediaURL}
-			}
-		}
-		return reader, nil
-	}()
 
+	reader, mediaType, err := readerFromURL(pCtx, mediaURL, mediaType, ipfsClient, arweaveClient, subMeta)
 	if err != nil {
 		return nil, err
 	}
