@@ -25,6 +25,7 @@ import (
 
 type Client struct {
 	gcpClient *gcptasks.Client
+	sendFunc  func(ctx context.Context, queue string, task *taskspb.Task) error
 }
 
 // FeedMessage is the input message to the feed service
@@ -133,7 +134,7 @@ func (c *Client) CreateTaskForPushNotification(ctx context.Context, message Push
 	queue := env.GetString("GCLOUD_PUSH_NOTIFICATIONS_QUEUE")
 	url := fmt.Sprintf("%s/tasks/send-push-notification", env.GetString("PUSH_NOTIFICATIONS_URL"))
 	secret := env.GetString("PUSH_NOTIFICATIONS_SECRET")
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func (c *Client) CreateTaskForFeed(ctx context.Context, message FeedMessage) error {
@@ -144,7 +145,7 @@ func (c *Client) CreateTaskForFeed(ctx context.Context, message FeedMessage) err
 	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEED_URL"))
 	secret := env.GetString("FEED_SECRET")
 	delay := time.Duration(env.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second
-	return submitTask(ctx, c.gcpClient, queue, url, withDelay(delay), withJSON(message), withTrace(span), withBasicAuth(secret))
+	return c.submitTask(ctx, queue, url, withDelay(delay), withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func (c *Client) CreateTaskForFeedbot(ctx context.Context, message FeedbotMessage) error {
@@ -154,7 +155,7 @@ func (c *Client) CreateTaskForFeedbot(ctx context.Context, message FeedbotMessag
 	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEEDBOT_URL"))
 	secret := env.GetString("FEEDBOT_SECRET")
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func (c *Client) CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingBatchMessage) error {
@@ -162,7 +163,7 @@ func (c *Client) CreateTaskForTokenProcessing(ctx context.Context, message Token
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, c.gcpClient, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))
+	return c.submitTask(ctx, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))
 }
 
 func (c *Client) CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProcessingContractTokensMessage) error {
@@ -171,7 +172,7 @@ func (c *Client) CreateTaskForContractOwnerProcessing(ctx context.Context, messa
 	tracing.AddEventDataToSpan(span, map[string]any{"Contract ID": message.ContractID})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/owners/process/contract", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
 func (c *Client) CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessingUserTokensMessage) error {
@@ -180,7 +181,7 @@ func (c *Client) CreateTaskForUserTokenProcessing(ctx context.Context, message T
 	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
 func (c *Client) CreateTaskForTokenTokenProcessing(ctx context.Context, message TokenProcessingTokenMessage, delay time.Duration) error {
@@ -188,7 +189,7 @@ func (c *Client) CreateTaskForTokenTokenProcessing(ctx context.Context, message 
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/tokenmanage/process/token", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span), withDelay(delay))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withDelay(delay))
 }
 
 func (c *Client) CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage) error {
@@ -197,7 +198,7 @@ func (c *Client) CreateTaskForWalletRemoval(ctx context.Context, message TokenPr
 	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID, "Wallet IDs": message.WalletIDs})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/owners/process/wallet-removal", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
 func (c *Client) CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmailToMailingListMessage) error {
@@ -207,7 +208,7 @@ func (c *Client) CreateTaskForAddingEmailToMailingList(ctx context.Context, mess
 	queue := env.GetString("EMAILS_QUEUE")
 	url := fmt.Sprintf("%s/send/process/add-to-mailing-list", env.GetString("EMAILS_HOST"))
 	secret := env.GetString("EMAILS_TASK_SECRET")
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func (c *Client) CreateTaskForPostPreflight(ctx context.Context, message PostPreflightMessage) error {
@@ -215,7 +216,7 @@ func (c *Client) CreateTaskForPostPreflight(ctx context.Context, message PostPre
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process/post-preflight", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
 func (c *Client) CreateTaskForAutosocialProcessUsers(ctx context.Context, message AutosocialProcessUsersMessage) error {
@@ -223,7 +224,7 @@ func (c *Client) CreateTaskForAutosocialProcessUsers(ctx context.Context, messag
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("AUTOSOCIAL_QUEUE")
 	url := fmt.Sprintf("%s/process/users", env.GetString("AUTOSOCIAL_URL"))
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
 func (c *Client) CreateTaskForAutosocialPollFarcaster(ctx context.Context, message AutosocialPollFarcasterMessage) error {
@@ -231,7 +232,7 @@ func (c *Client) CreateTaskForAutosocialPollFarcaster(ctx context.Context, messa
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("AUTOSOCIAL_POLL_QUEUE")
 	url := fmt.Sprintf("%s/checkFarcasterApproval?signer_uuid=%s&user_id=%s", env.GetString("AUTOSOCIAL_URL"), message.SignerUUID, message.UserID)
-	return submitTask(ctx, c.gcpClient, queue, url, withTrace(span))
+	return c.submitTask(ctx, queue, url, withTrace(span))
 }
 
 func (c *Client) CreateTaskForSlackPostFeedBot(ctx context.Context, message FeedbotSlackPostMessage) error {
@@ -240,14 +241,30 @@ func (c *Client) CreateTaskForSlackPostFeedBot(ctx context.Context, message Feed
 	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	url := fmt.Sprintf("%s/tasks/slack-post", env.GetString("FEEDBOT_URL"))
 	secret := env.GetString("FEEDBOT_SECRET")
-	return submitTask(ctx, c.gcpClient, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), withDelay(2*time.Minute))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), withDelay(2*time.Minute))
+}
+
+func withSendFunc(sendFunc func(ctx context.Context, queue string, task *taskspb.Task) error) func(*Client) {
+	return func(c *Client) {
+		c.sendFunc = sendFunc
+	}
 }
 
 // NewClient returns a new task client with tracing enabled.
-func NewClient(ctx context.Context) *Client {
-	return &Client{
-		gcpClient: newGCPClient(ctx),
+func NewClient(ctx context.Context, opts ...func(*Client)) *Client {
+	gcpClient := newGCPClient(ctx)
+	client := &Client{
+		gcpClient: gcpClient,
+		sendFunc: func(ctx context.Context, queue string, task *taskspb.Task) error {
+			return sendToTaskQueue(ctx, gcpClient, queue, task)
+		},
 	}
+
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	return client
 }
 
 func newGCPClient(ctx context.Context) *gcptasks.Client {
@@ -336,7 +353,7 @@ func addHeader(r *taskspb.HttpRequest, key, value string) {
 	r.Headers[key] = value
 }
 
-func submitTask(ctx context.Context, c *gcptasks.Client, queue, url string, opts ...func(*taskspb.Task) error) error {
+func (c *Client) submitTask(ctx context.Context, queue, url string, opts ...func(*taskspb.Task) error) error {
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
@@ -350,6 +367,11 @@ func submitTask(ctx context.Context, c *gcptasks.Client, queue, url string, opts
 			return err
 		}
 	}
-	_, err := c.CreateTask(ctx, &taskspb.CreateTaskRequest{Parent: queue, Task: task})
+
+	return c.sendFunc(ctx, queue, task)
+}
+
+func sendToTaskQueue(ctx context.Context, gcpClient *gcptasks.Client, queue string, task *taskspb.Task) error {
+	_, err := gcpClient.CreateTask(ctx, &taskspb.CreateTaskRequest{Parent: queue, Task: task})
 	return err
 }
