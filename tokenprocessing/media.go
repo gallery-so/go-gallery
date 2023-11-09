@@ -134,6 +134,9 @@ func createUncachedMedia(ctx context.Context, job *tokenProcessingJob, url strin
 }
 
 func mustCreateMediaFromErr(ctx context.Context, err error, job *tokenProcessingJob) persist.Media {
+	if bErr, ok := err.(ErrBadToken); ok {
+		return mustCreateMediaFromErr(ctx, bErr.Unwrap(), job)
+	}
 	if util.ErrorAs[errInvalidMedia](err) {
 		invalidErr := err.(errInvalidMedia)
 		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}

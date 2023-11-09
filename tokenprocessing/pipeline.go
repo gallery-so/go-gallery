@@ -121,9 +121,7 @@ func (e ErrImageResultRequired) Error() string {
 type ErrBadToken struct{ Err error }
 
 func (e ErrBadToken) Unwrap() error { return e.Err }
-func (m ErrBadToken) Error() string {
-	return fmt.Sprintf("issue with token: %s", m.Err)
-}
+func (m ErrBadToken) Error() string { return fmt.Sprintf("issue with token: %s", m.Err) }
 
 func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractIdentifiers, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
 	runID := persist.GenerateID()
@@ -407,31 +405,35 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 
 	imgResult, pfpResult, animResult := tpj.cacheMediaFromOriginalURLs(ctx, imgURL, pfpURL, animURL)
 
-	if !imgRequired && animResult.IsSuccess() {
-		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), cacheResultsToErr(animResult, imgResult, imgRequired)
+	if (!imgRequired && animResult.IsSuccess()) || imgResult.IsSuccess() {
+		err = cacheResultsToErr(animResult, imgResult, imgRequired)
+		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
-	if imgResult.IsSuccess() {
-		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), cacheResultsToErr(animResult, imgResult, imgRequired)
-	}
-
-	// OpenSea provider only supports Ethereum currently. If we do use OpenSea, we prioritize our results over theirs.
+	// Our OpenSea provider only supports Ethereum currently. If we do use OpenSea, we prioritize our results over theirs.
+	// If OpenSea also fails, then we keep our results so we can report on the original error.
 	if tpj.token.Chain == persist.ChainETH {
 		osImgResult, osAnimResult := tpj.cacheMediaFromOpenSeaAssetURLs(ctx)
-		animResult, _ = util.FindFirst([]cacheResult{animResult, osAnimResult}, func(r cacheResult) bool { return r.IsSuccess() })
-		imgResult, _ = util.FindFirst([]cacheResult{imgResult, osImgResult}, func(r cacheResult) bool { return r.IsSuccess() })
+		if !imgResult.IsSuccess() && osImgResult.IsSuccess() {
+			imgResult = osImgResult
+		}
+		if !animResult.IsSuccess() && osAnimResult.IsSuccess() {
+			animResult = osAnimResult
+		}
 	}
 
-	// Check if we got any result back from OpenSea
+	// Now check if we got any result from OpenSea
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
-		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), cacheResultsToErr(animResult, imgResult, imgRequired)
+		err = cacheResultsToErr(animResult, imgResult, imgRequired)
+		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
-	closeNothingCachedWithErrors, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
-	defer closeNothingCachedWithErrors()
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
+	defer traceCallback()
 
 	// At this point we don't have a way to make media so we return an error
-	return mustCreateMediaFromErr(ctx, err, tpj), cacheResultsToErr(animResult, imgResult, imgRequired)
+	err = cacheResultsToErr(animResult, imgResult, imgRequired)
+	return mustCreateMediaFromErr(ctx, err, tpj), err
 }
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []cachedMediaObject) persist.Media {
