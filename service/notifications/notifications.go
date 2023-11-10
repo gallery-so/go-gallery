@@ -731,7 +731,7 @@ func (u UserFacingNotificationData) String() string {
 func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (UserFacingNotificationData, error) {
 
 	switch n.Action {
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
 
 		data := UserFacingNotificationData{}
 		if n.Action == persist.ActionAdmiredFeedEvent {
@@ -744,11 +744,11 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				data.CollectionID = collection.ID
 				data.CollectionName = collection.Name.String
 				data.Action = "admired your additions to"
-			} else {
-				data.Action = "admired your gallery update"
 			}
-		} else {
+		} else if n.Action == persist.ActionAdmiredPost {
 			data.Action = "admired your post"
+		} else {
+			data.Action = "admired your token"
 		}
 		if len(n.Data.AdmirerIDs) > 1 {
 			data.Actor = fmt.Sprintf("%d collectors", len(n.Data.AdmirerIDs))

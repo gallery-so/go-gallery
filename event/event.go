@@ -546,6 +546,12 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 				return "", err
 			}
 			return post.ActorID, nil
+		} else if event.TokenID != "" {
+			token, err := h.dataloaders.GetTokenByIdBatch.Load(event.TokenID)
+			if err != nil {
+				return "", err
+			}
+			return token.Token.OwnerUserID, nil
 		}
 	case persist.ResourceTypeUser:
 		return event.SubjectID, nil

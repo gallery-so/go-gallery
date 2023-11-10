@@ -426,7 +426,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6, $7, $8, $9) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
