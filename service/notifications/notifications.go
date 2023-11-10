@@ -744,6 +744,8 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				data.CollectionID = collection.ID
 				data.CollectionName = collection.Name.String
 				data.Action = "admired your additions to"
+			} else {
+				data.Action = "admired your gallery update"
 			}
 		} else if n.Action == persist.ActionAdmiredPost {
 			data.Action = "admired your post"
