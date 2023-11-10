@@ -857,28 +857,20 @@ func readerFromURL(ctx context.Context, mediaURL string, mediaType persist.Media
 	defer traceCallback()
 
 	reader, mediaType, err := rpc.GetDataFromURIAsReader(ctx, persist.TokenURI(mediaURL), mediaType, ipfsClient, arweaveClient, util.MB, time.Minute, true)
-	if err == nil {
-		return reader, mediaType, nil
-	}
-
-	persist.FailStep(subMeta.ReaderRetrieval)
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return reader, mediaType, err
-	}
-
-	// The reader is and always will be invalid
-	switch caught := err.(type) {
-	case util.ErrHTTP:
-		// We might want to support redirects later
-		if caught.Status < 200 || caught.Status > 299 {
+	if err != nil {
+		persist.FailStep(subMeta.ReaderRetrieval)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return reader, mediaType, err
+		}
+		// The reader is and always will be invalid
+		if util.ErrorAs[util.ErrHTTP](err) || util.ErrorAs[*net.DNSError](err) || util.ErrorAs[*url.Error](err) {
 			return reader, mediaType, errInvalidMedia{URL: mediaURL, err: err}
 		}
-	case *net.DNSError, *url.Error:
-		return reader, mediaType, errInvalidMedia{URL: mediaURL, err: err}
+		logger.For(ctx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
+		return reader, mediaType, errNoDataFromReader{err: err, url: mediaURL}
 	}
 
-	logger.For(ctx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
-	return reader, mediaType, errNoDataFromReader{err: err, url: mediaURL}
+	return reader, mediaType, nil
 }
 
 func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
