@@ -870,7 +870,7 @@ func readerFromURL(ctx context.Context, mediaURL string, mediaType persist.Media
 	switch caught := err.(type) {
 	case util.ErrHTTP:
 		// We might want to support redirects later
-		if caught.Status < 200 || caught.Status < 299 {
+		if caught.Status < 200 || caught.Status > 299 {
 			return reader, mediaType, errInvalidMedia{URL: mediaURL, err: err}
 		}
 	case *net.DNSError, *url.Error:
