@@ -185,7 +185,7 @@ func wrapWithBadTokenErr(err error) error {
 	return err
 }
 
-func cacheResultsToErr(animResult cacheResult, imgResult cacheResult, imageRequired bool) error {
+func createErrFromResults(animResult cacheResult, imgResult cacheResult, imageRequired bool) error {
 	if imageRequired && !imgResult.IsSuccess() {
 		return ErrImageResultRequired{Err: wrapWithBadTokenErr(imgResult.err)}
 	}
@@ -406,7 +406,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 	imgResult, pfpResult, animResult := tpj.cacheMediaFromOriginalURLs(ctx, imgURL, pfpURL, animURL)
 
 	if (!imgRequired && animResult.IsSuccess()) || imgResult.IsSuccess() {
-		err = cacheResultsToErr(animResult, imgResult, imgRequired)
+		err = createErrFromResults(animResult, imgResult, imgRequired)
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
@@ -424,7 +424,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 
 	// Now check if we got any result from OpenSea
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
-		err = cacheResultsToErr(animResult, imgResult, imgRequired)
+		err = createErrFromResults(animResult, imgResult, imgRequired)
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
@@ -432,7 +432,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 	defer traceCallback()
 
 	// At this point we don't have a way to make media so we return an error
-	err = cacheResultsToErr(animResult, imgResult, imgRequired)
+	err = createErrFromResults(animResult, imgResult, imgRequired)
 	return mustCreateMediaFromErr(ctx, err, tpj), err
 }
 
