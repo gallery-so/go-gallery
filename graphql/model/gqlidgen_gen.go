@@ -128,6 +128,10 @@ func (r *SomeoneViewedYourGalleryNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneViewedYourGalleryNotification:%s", r.Dbid))
 }
 
+func (r *SomeoneYouFollowPostedTheirFirstPostNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneYouFollowPostedTheirFirstPostNotification:%s", r.Dbid))
+}
+
 func (r *Token) ID() GqlID {
 	return GqlID(fmt.Sprintf("Token:%s", r.Dbid))
 }
@@ -154,37 +158,38 @@ func (r *Wallet) ID() GqlID {
 }
 
 type NodeFetcher struct {
-	OnAdmire                                      func(ctx context.Context, dbid persist.DBID) (*Admire, error)
-	OnCollection                                  func(ctx context.Context, dbid persist.DBID) (*Collection, error)
-	OnCollectionToken                             func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
-	OnComment                                     func(ctx context.Context, dbid persist.DBID) (*Comment, error)
-	OnCommunity                                   func(ctx context.Context, dbid persist.DBID) (*Community, error)
-	OnContract                                    func(ctx context.Context, dbid persist.DBID) (*Contract, error)
-	OnDeletedNode                                 func(ctx context.Context, dbid persist.DBID) (*DeletedNode, error)
-	OnFeedEvent                                   func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
-	OnGallery                                     func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
-	OnGalleryUser                                 func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
-	OnMembershipTier                              func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
-	OnMerchToken                                  func(ctx context.Context, tokenId string) (*MerchToken, error)
-	OnNewTokensNotification                       func(ctx context.Context, dbid persist.DBID) (*NewTokensNotification, error)
-	OnPost                                        func(ctx context.Context, dbid persist.DBID) (*Post, error)
-	OnSocialConnection                            func(ctx context.Context, socialId string, socialType persist.SocialProvider) (*SocialConnection, error)
-	OnSomeoneAdmiredYourFeedEventNotification     func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourFeedEventNotification, error)
-	OnSomeoneAdmiredYourPostNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourPostNotification, error)
-	OnSomeoneAdmiredYourTokenNotification         func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourTokenNotification, error)
-	OnSomeoneCommentedOnYourFeedEventNotification func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourFeedEventNotification, error)
-	OnSomeoneCommentedOnYourPostNotification      func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourPostNotification, error)
-	OnSomeoneFollowedYouBackNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouBackNotification, error)
-	OnSomeoneFollowedYouNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
-	OnSomeoneMentionedYouNotification             func(ctx context.Context, dbid persist.DBID) (*SomeoneMentionedYouNotification, error)
-	OnSomeoneMentionedYourCommunityNotification   func(ctx context.Context, dbid persist.DBID) (*SomeoneMentionedYourCommunityNotification, error)
-	OnSomeonePostedYourWorkNotification           func(ctx context.Context, dbid persist.DBID) (*SomeonePostedYourWorkNotification, error)
-	OnSomeoneRepliedToYourCommentNotification     func(ctx context.Context, dbid persist.DBID) (*SomeoneRepliedToYourCommentNotification, error)
-	OnSomeoneViewedYourGalleryNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
-	OnToken                                       func(ctx context.Context, dbid persist.DBID) (*Token, error)
-	OnTokenDefinition                             func(ctx context.Context, dbid persist.DBID) (*TokenDefinition, error)
-	OnViewer                                      func(ctx context.Context, userId string) (*Viewer, error)
-	OnWallet                                      func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
+	OnAdmire                                           func(ctx context.Context, dbid persist.DBID) (*Admire, error)
+	OnCollection                                       func(ctx context.Context, dbid persist.DBID) (*Collection, error)
+	OnCollectionToken                                  func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
+	OnComment                                          func(ctx context.Context, dbid persist.DBID) (*Comment, error)
+	OnCommunity                                        func(ctx context.Context, dbid persist.DBID) (*Community, error)
+	OnContract                                         func(ctx context.Context, dbid persist.DBID) (*Contract, error)
+	OnDeletedNode                                      func(ctx context.Context, dbid persist.DBID) (*DeletedNode, error)
+	OnFeedEvent                                        func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
+	OnGallery                                          func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
+	OnGalleryUser                                      func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
+	OnMembershipTier                                   func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
+	OnMerchToken                                       func(ctx context.Context, tokenId string) (*MerchToken, error)
+	OnNewTokensNotification                            func(ctx context.Context, dbid persist.DBID) (*NewTokensNotification, error)
+	OnPost                                             func(ctx context.Context, dbid persist.DBID) (*Post, error)
+	OnSocialConnection                                 func(ctx context.Context, socialId string, socialType persist.SocialProvider) (*SocialConnection, error)
+	OnSomeoneAdmiredYourFeedEventNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourFeedEventNotification, error)
+	OnSomeoneAdmiredYourPostNotification               func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourPostNotification, error)
+	OnSomeoneAdmiredYourTokenNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourTokenNotification, error)
+	OnSomeoneCommentedOnYourFeedEventNotification      func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourFeedEventNotification, error)
+	OnSomeoneCommentedOnYourPostNotification           func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourPostNotification, error)
+	OnSomeoneFollowedYouBackNotification               func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouBackNotification, error)
+	OnSomeoneFollowedYouNotification                   func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
+	OnSomeoneMentionedYouNotification                  func(ctx context.Context, dbid persist.DBID) (*SomeoneMentionedYouNotification, error)
+	OnSomeoneMentionedYourCommunityNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneMentionedYourCommunityNotification, error)
+	OnSomeonePostedYourWorkNotification                func(ctx context.Context, dbid persist.DBID) (*SomeonePostedYourWorkNotification, error)
+	OnSomeoneRepliedToYourCommentNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneRepliedToYourCommentNotification, error)
+	OnSomeoneViewedYourGalleryNotification             func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
+	OnSomeoneYouFollowPostedTheirFirstPostNotification func(ctx context.Context, dbid persist.DBID) (*SomeoneYouFollowPostedTheirFirstPostNotification, error)
+	OnToken                                            func(ctx context.Context, dbid persist.DBID) (*Token, error)
+	OnTokenDefinition                                  func(ctx context.Context, dbid persist.DBID) (*TokenDefinition, error)
+	OnViewer                                           func(ctx context.Context, userId string) (*Viewer, error)
+	OnWallet                                           func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
 }
 
 func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
@@ -332,6 +337,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneViewedYourGalleryNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnSomeoneViewedYourGalleryNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneYouFollowPostedTheirFirstPostNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneYouFollowPostedTheirFirstPostNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneYouFollowPostedTheirFirstPostNotification(ctx, persist.DBID(ids[0]))
 	case "Token":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Token' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -413,6 +423,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneRepliedToYourCommentNotification")
 	case n.OnSomeoneViewedYourGalleryNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneViewedYourGalleryNotification")
+	case n.OnSomeoneYouFollowPostedTheirFirstPostNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneYouFollowPostedTheirFirstPostNotification")
 	case n.OnToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnToken")
 	case n.OnTokenDefinition == nil:

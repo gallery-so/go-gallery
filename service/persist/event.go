@@ -22,6 +22,7 @@ const (
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
 	ActionUserPosted                      Action = "UserPosted"
 	ActionUserPostedYourWork              Action = "UserPostedYourWork"
+	ActionUserPostedFirstPost             Action = "UserPostedFirstPost"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
 	ActionCollectionCreated               Action = "CollectionCreated"
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"

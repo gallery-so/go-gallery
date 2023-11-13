@@ -62,19 +62,20 @@ var nodeFetcher = model.NodeFetcher{
 	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
 		return resolveCommunityByID(ctx, dbid)
 	},
-	OnSomeoneAdmiredYourFeedEventNotification:     fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
-	OnSomeoneCommentedOnYourFeedEventNotification: fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
-	OnSomeoneAdmiredYourPostNotification:          fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
-	OnSomeoneCommentedOnYourPostNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourPostNotification],
-	OnSomeoneFollowedYouBackNotification:          fetchNotificationByID[model.SomeoneFollowedYouBackNotification],
-	OnSomeoneFollowedYouNotification:              fetchNotificationByID[model.SomeoneFollowedYouNotification],
-	OnSomeoneViewedYourGalleryNotification:        fetchNotificationByID[model.SomeoneViewedYourGalleryNotification],
-	OnNewTokensNotification:                       fetchNotificationByID[model.NewTokensNotification],
-	OnSomeoneMentionedYouNotification:             fetchNotificationByID[model.SomeoneMentionedYouNotification],
-	OnSomeoneMentionedYourCommunityNotification:   fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
-	OnSomeoneRepliedToYourCommentNotification:     fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
-	OnSomeoneAdmiredYourTokenNotification:         fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
-	OnSomeonePostedYourWorkNotification:           fetchNotificationByID[model.SomeonePostedYourWorkNotification],
+	OnSomeoneAdmiredYourFeedEventNotification:          fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
+	OnSomeoneCommentedOnYourFeedEventNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
+	OnSomeoneAdmiredYourPostNotification:               fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
+	OnSomeoneCommentedOnYourPostNotification:           fetchNotificationByID[model.SomeoneCommentedOnYourPostNotification],
+	OnSomeoneFollowedYouBackNotification:               fetchNotificationByID[model.SomeoneFollowedYouBackNotification],
+	OnSomeoneFollowedYouNotification:                   fetchNotificationByID[model.SomeoneFollowedYouNotification],
+	OnSomeoneViewedYourGalleryNotification:             fetchNotificationByID[model.SomeoneViewedYourGalleryNotification],
+	OnNewTokensNotification:                            fetchNotificationByID[model.NewTokensNotification],
+	OnSomeoneMentionedYouNotification:                  fetchNotificationByID[model.SomeoneMentionedYouNotification],
+	OnSomeoneMentionedYourCommunityNotification:        fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
+	OnSomeoneRepliedToYourCommentNotification:          fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
+	OnSomeoneAdmiredYourTokenNotification:              fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
+	OnSomeonePostedYourWorkNotification:                fetchNotificationByID[model.SomeonePostedYourWorkNotification],
+	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -1033,6 +1034,17 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CreationTime: &notif.CreatedAt,
 			UpdatedTime:  &notif.LastUpdated,
 			Community:    nil, // handled by dedicated resolver
+			Post:         nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserPostedFirstPost:
+		return model.SomeoneYouFollowPostedTheirFirstPostNotification{
+			HelperSomeoneYouFollowPostedTheirFirstPostNotificationData: model.HelperSomeoneYouFollowPostedTheirFirstPostNotificationData{
+				PostID: notif.PostID,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
 			Post:         nil, // handled by dedicated resolver
 		}, nil
 

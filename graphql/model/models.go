@@ -87,6 +87,7 @@ type HelperSomeoneViewedYourGalleryNotificationData struct {
 	GalleryID        persist.DBID
 	NotificationData persist.NotificationData
 }
+
 type HelperSomeoneFollowedYouBackNotificationData struct {
 	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
@@ -147,6 +148,10 @@ type HelperSomeoneMentionedYourCommunityNotificationData struct {
 type HelperSomeonePostedYourWorkNotificationData struct {
 	ContractID persist.DBID
 	PostID     persist.DBID
+}
+
+type HelperSomeoneYouFollowPostedTheirFirstPostNotificationData struct {
+	PostID persist.DBID
 }
 
 type HelperNotificationsConnectionData struct {

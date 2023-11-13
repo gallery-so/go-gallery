@@ -57,6 +57,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 
 	notifications := newEventDispatcher()
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
+	followerNotificationHandler := newFollowerNotificationHandler(notif, disableDataloaderCaching, queries)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
@@ -69,6 +70,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, followerNotificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
@@ -471,38 +473,6 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		MentionID:   persistedEvent.MentionID,
 	})
 }
-
-func (h notificationHandler) createNotificationDataForEvent(event db.Event) (data persist.NotificationData) {
-	switch event.Action {
-	case persist.ActionViewedGallery:
-		if event.ActorID.String != "" {
-			data.AuthedViewerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
-		}
-		if event.ExternalID.String != "" {
-			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
-		}
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
-		if event.ActorID.String != "" {
-			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
-		}
-	case persist.ActionUserFollowedUsers:
-		if event.ActorID.String != "" {
-			data.FollowerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
-		}
-		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
-		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)
-	case persist.ActionNewTokensReceived:
-		data.NewTokenID = event.Data.NewTokenID
-		data.NewTokenQuantity = event.Data.NewTokenQuantity
-	case persist.ActionReplyToComment:
-		data.OriginalCommentID = event.SubjectID
-
-	default:
-		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
-	}
-	return
-}
-
 func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
@@ -563,6 +533,65 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)
+}
+
+func (h notificationHandler) createNotificationDataForEvent(event db.Event) (data persist.NotificationData) {
+	switch event.Action {
+	case persist.ActionViewedGallery:
+		if event.ActorID.String != "" {
+			data.AuthedViewerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
+		}
+		if event.ExternalID.String != "" {
+			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
+		}
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
+		if event.ActorID.String != "" {
+			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
+		}
+	case persist.ActionUserFollowedUsers:
+		if event.ActorID.String != "" {
+			data.FollowerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
+		}
+		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
+		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)
+	case persist.ActionNewTokensReceived:
+		data.NewTokenID = event.Data.NewTokenID
+		data.NewTokenQuantity = event.Data.NewTokenQuantity
+	case persist.ActionReplyToComment:
+		data.OriginalCommentID = event.SubjectID
+
+	default:
+		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
+	}
+	return
+}
+
+// followerNotificationHandler handles events for consumption as notifications.
+type followerNotificationHandler struct {
+	dataloaders          *dataloader.Loaders
+	notificationHandlers *notifications.NotificationHandlers
+}
+
+func newFollowerNotificationHandler(notifiers *notifications.NotificationHandlers, disableDataloaderCaching bool, queries *db.Queries) *followerNotificationHandler {
+	return &followerNotificationHandler{
+		notificationHandlers: notifiers,
+		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook),
+	}
+}
+
+func (h followerNotificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
+	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
+		// no owner or data for follower notifications
+		Action:      persistedEvent.Action,
+		EventIds:    persist.DBIDList{persistedEvent.ID},
+		GalleryID:   persistedEvent.GalleryID,
+		FeedEventID: persistedEvent.FeedEventID,
+		PostID:      persistedEvent.PostID,
+		CommentID:   persistedEvent.CommentID,
+		TokenID:     persistedEvent.TokenID,
+		ContractID:  persistedEvent.ContractID,
+		MentionID:   persistedEvent.MentionID,
+	})
 }
 
 // slackHandler posts events to Slack

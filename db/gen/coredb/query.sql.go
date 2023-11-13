@@ -1232,6 +1232,65 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 	return i, err
 }
 
+const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) select $1, follows.follower, $2, $3, $4, $5 from follows where follows.followee = $6 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+`
+
+type CreateUserPostedFirstPostNotificationsParams struct {
+	ID       persist.DBID             `db:"id" json:"id"`
+	Action   persist.Action           `db:"action" json:"action"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	Post     sql.NullString           `db:"post" json:"post"`
+	ActorID  persist.DBID             `db:"actor_id" json:"actor_id"`
+}
+
+func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, arg CreateUserPostedFirstPostNotificationsParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, createUserPostedFirstPostNotifications,
+		arg.ID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.Post,
+		arg.ActorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+			&i.PostID,
+			&i.TokenID,
+			&i.ContractID,
+			&i.MentionID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createUserPostedYourWorkNotification = `-- name: CreateUserPostedYourWorkNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, $7, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
