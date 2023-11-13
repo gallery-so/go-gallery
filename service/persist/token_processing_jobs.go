@@ -98,52 +98,58 @@ func (p PipelineStepStatus) MarshalJSON() ([]byte, error) {
 }
 
 type PipelineMetadata struct {
-	MetadataRetrieval                        PipelineStepStatus `json:"metadata_retrieval,omitempty"`
-	TokenInfoRetrieval                       PipelineStepStatus `json:"token_info_retrieval,omitempty"`
-	MediaURLsRetrieval                       PipelineStepStatus `json:"media_urls_retrieval,omitempty"`
-	AnimationContentHeaderValueRetrieval     PipelineStepStatus `json:"animation_content_header_value_retrieval,omitempty"`
-	AnimationReaderRetrieval                 PipelineStepStatus `json:"animation_reader_retrieval,omitempty"`
-	AnimationOpenseaFallback                 PipelineStepStatus `json:"animation_opensea_fallback,omitempty"`
-	AnimationDetermineMediaTypeWithReader    PipelineStepStatus `json:"animation_determine_media_type_with_reader,omitempty"`
-	AnimationAnimationGzip                   PipelineStepStatus `json:"animation_animation_gzip,omitempty"`
-	AnimationSVGRasterize                    PipelineStepStatus `json:"animation_svg_rasterize,omitempty"`
-	AnimationStoreGCP                        PipelineStepStatus `json:"animation_store_gcp,omitempty"`
-	AnimationThumbnailGCP                    PipelineStepStatus `json:"animation_thumbnail_gcp,omitempty"`
-	AnimationLiveRenderGCP                   PipelineStepStatus `json:"animation_live_render_gcp,omitempty"`
-	ImageContentHeaderValueRetrieval         PipelineStepStatus `json:"image_content_header_value_retrieval,omitempty"`
-	ImageReaderRetrieval                     PipelineStepStatus `json:"image_reader_retrieval,omitempty"`
-	ImageOpenseaFallback                     PipelineStepStatus `json:"image_opensea_fallback,omitempty"`
-	ImageDetermineMediaTypeWithReader        PipelineStepStatus `json:"image_determine_media_type_with_reader,omitempty"`
-	ImageAnimationGzip                       PipelineStepStatus `json:"image_animation_gzip,omitempty"`
-	ImageSVGRasterize                        PipelineStepStatus `json:"image_svg_rasterize,omitempty"`
-	ImageStoreGCP                            PipelineStepStatus `json:"image_store_gcp,omitempty"`
-	ImageThumbnailGCP                        PipelineStepStatus `json:"image_thumbnail_gcp,omitempty"`
-	ImageLiveRenderGCP                       PipelineStepStatus `json:"image_live_render_gcp,omitempty"`
-	AlternateContentHeaderValueRetrieval     PipelineStepStatus `json:"alternate_content_header_value_retrieval,omitempty"`
-	AlternateReaderRetrieval                 PipelineStepStatus `json:"alternate_reader_retrieval,omitempty"`
-	AlternateOpenseaFallback                 PipelineStepStatus `json:"alternate_opensea_fallback,omitempty"`
-	AlternateDetermineMediaTypeWithReader    PipelineStepStatus `json:"alternate_determine_media_type_with_reader,omitempty"`
-	AlternateAnimationGzip                   PipelineStepStatus `json:"alternate_animation_gzip,omitempty"`
-	AlternateSVGRasterize                    PipelineStepStatus `json:"alternate_svg_rasterize,omitempty"`
-	AlternateStoreGCP                        PipelineStepStatus `json:"alternate_store_gcp,omitempty"`
-	AlternateThumbnailGCP                    PipelineStepStatus `json:"alternate_thumbnail_gcp,omitempty"`
-	AlternateLiveRenderGCP                   PipelineStepStatus `json:"alternate_live_render_gcp,omitempty"`
-	ProfileImageContentHeaderValueRetrieval  PipelineStepStatus `json:"pfp_content_header_value_retrieval,omitempty"`
-	ProfileImageReaderRetrieval              PipelineStepStatus `json:"pfp_reader_retrieval,omitempty"`
-	ProfileImageOpenseaFallback              PipelineStepStatus `json:"pfp_opensea_fallback,omitempty"`
-	ProfileImageDetermineMediaTypeWithReader PipelineStepStatus `json:"pfp_determine_media_type_with_reader,omitempty"`
-	ProfileImageAnimationGzip                PipelineStepStatus `json:"pfp_animation_gzip,omitempty"`
-	ProfileImageSVGRasterize                 PipelineStepStatus `json:"pfp_svg_rasterize,omitempty"`
-	ProfileImageStoreGCP                     PipelineStepStatus `json:"pfp_store_gcp,omitempty"`
-	ProfileImageThumbnailGCP                 PipelineStepStatus `json:"pfp_thumbnail_gcp,omitempty"`
-	ProfileImageLiveRenderGCP                PipelineStepStatus `json:"pfp_live_render_gcp,omitempty"`
-	NothingCachedWithErrors                  PipelineStepStatus `json:"nothing_cached_errors,omitempty"`
-	NothingCachedWithoutErrors               PipelineStepStatus `json:"nothing_cached_no_errors,omitempty"`
-	CreateMedia                              PipelineStepStatus `json:"create_media,omitempty"`
-	CreateMediaFromCachedObjects             PipelineStepStatus `json:"create_media_from_cached_objects,omitempty"`
-	CreateRawMedia                           PipelineStepStatus `json:"create_raw_media,omitempty"`
-	SetUnknownMediaType                      PipelineStepStatus `json:"set_default_media_type,omitempty"`
-	MediaResultComparison                    PipelineStepStatus `json:"media_result_comparison,omitempty"`
+	MetadataRetrieval                              PipelineStepStatus `json:"metadata_retrieval,omitempty"`
+	TokenInfoRetrieval                             PipelineStepStatus `json:"token_info_retrieval,omitempty"`
+	MediaURLsRetrieval                             PipelineStepStatus `json:"media_urls_retrieval,omitempty"`
+	AnimationContentHeaderValueRetrieval           PipelineStepStatus `json:"animation_content_header_value_retrieval,omitempty"`
+	AnimationReaderRetrieval                       PipelineStepStatus `json:"animation_reader_retrieval,omitempty"`
+	AnimationOpenseaFallback                       PipelineStepStatus `json:"animation_opensea_fallback,omitempty"`
+	AnimationDetermineMediaTypeWithReader          PipelineStepStatus `json:"animation_determine_media_type_with_reader,omitempty"`
+	AnimationAnimationGzip                         PipelineStepStatus `json:"animation_animation_gzip,omitempty"`
+	AnimationSVGRasterize                          PipelineStepStatus `json:"animation_svg_rasterize,omitempty"`
+	AnimationStoreGCP                              PipelineStepStatus `json:"animation_store_gcp,omitempty"`
+	AnimationThumbnailGCP                          PipelineStepStatus `json:"animation_thumbnail_gcp,omitempty"`
+	AnimationLiveRenderGCP                         PipelineStepStatus `json:"animation_live_render_gcp,omitempty"`
+	ImageContentHeaderValueRetrieval               PipelineStepStatus `json:"image_content_header_value_retrieval,omitempty"`
+	ImageReaderRetrieval                           PipelineStepStatus `json:"image_reader_retrieval,omitempty"`
+	ImageOpenseaFallback                           PipelineStepStatus `json:"image_opensea_fallback,omitempty"`
+	ImageDetermineMediaTypeWithReader              PipelineStepStatus `json:"image_determine_media_type_with_reader,omitempty"`
+	ImageAnimationGzip                             PipelineStepStatus `json:"image_animation_gzip,omitempty"`
+	ImageSVGRasterize                              PipelineStepStatus `json:"image_svg_rasterize,omitempty"`
+	ImageStoreGCP                                  PipelineStepStatus `json:"image_store_gcp,omitempty"`
+	ImageThumbnailGCP                              PipelineStepStatus `json:"image_thumbnail_gcp,omitempty"`
+	ImageLiveRenderGCP                             PipelineStepStatus `json:"image_live_render_gcp,omitempty"`
+	AlternateAnimationContentHeaderValueRetrieval  PipelineStepStatus `json:"alternate_animation_content_header_value_retrieval,omitempty"`
+	AlternateAnimationReaderRetrieval              PipelineStepStatus `json:"alternate_animation_reader_retrieval,omitempty"`
+	AlternateAnimationDetermineMediaTypeWithReader PipelineStepStatus `json:"alternate_animation_determine_media_type_with_reader,omitempty"`
+	AlternateAnimationAnimationGzip                PipelineStepStatus `json:"alternate_animation_animation_gzip,omitempty"`
+	AlternateAnimationSVGRasterize                 PipelineStepStatus `json:"alternate_animation_svg_rasterize,omitempty"`
+	AlternateAnimationStoreGCP                     PipelineStepStatus `json:"alternate_animation_store_gcp,omitempty"`
+	AlternateAnimationThumbnailGCP                 PipelineStepStatus `json:"alternate_animation_thumbnail_gcp,omitempty"`
+	AlternateAnimationLiveRenderGCP                PipelineStepStatus `json:"alternate_animation_live_render_gcp,omitempty"`
+	AlternateImageContentHeaderValueRetrieval      PipelineStepStatus `json:"alternate_image_content_header_value_retrieval,omitempty"`
+	AlternateImageReaderRetrieval                  PipelineStepStatus `json:"alternate_image_reader_retrieval,omitempty"`
+	AlternateImageDetermineMediaTypeWithReader     PipelineStepStatus `json:"alternate_image_determine_media_type_with_reader,omitempty"`
+	AlternateImageAnimationGzip                    PipelineStepStatus `json:"alternate_image_animation_gzip,omitempty"`
+	AlternateImageSVGRasterize                     PipelineStepStatus `json:"alternate_image_svg_rasterize,omitempty"`
+	AlternateImageStoreGCP                         PipelineStepStatus `json:"alternate_image_store_gcp,omitempty"`
+	AlternateImageThumbnailGCP                     PipelineStepStatus `json:"alternate_image_thumbnail_gcp,omitempty"`
+	AlternateImageLiveRenderGCP                    PipelineStepStatus `json:"alternate_image_live_render_gcp,omitempty"`
+	ProfileImageContentHeaderValueRetrieval        PipelineStepStatus `json:"pfp_content_header_value_retrieval,omitempty"`
+	ProfileImageReaderRetrieval                    PipelineStepStatus `json:"pfp_reader_retrieval,omitempty"`
+	ProfileImageOpenseaFallback                    PipelineStepStatus `json:"pfp_opensea_fallback,omitempty"`
+	ProfileImageDetermineMediaTypeWithReader       PipelineStepStatus `json:"pfp_determine_media_type_with_reader,omitempty"`
+	ProfileImageAnimationGzip                      PipelineStepStatus `json:"pfp_animation_gzip,omitempty"`
+	ProfileImageSVGRasterize                       PipelineStepStatus `json:"pfp_svg_rasterize,omitempty"`
+	ProfileImageStoreGCP                           PipelineStepStatus `json:"pfp_store_gcp,omitempty"`
+	ProfileImageThumbnailGCP                       PipelineStepStatus `json:"pfp_thumbnail_gcp,omitempty"`
+	ProfileImageLiveRenderGCP                      PipelineStepStatus `json:"pfp_live_render_gcp,omitempty"`
+	NothingCachedWithErrors                        PipelineStepStatus `json:"nothing_cached_errors,omitempty"`
+	NothingCachedWithoutErrors                     PipelineStepStatus `json:"nothing_cached_no_errors,omitempty"`
+	CreateMedia                                    PipelineStepStatus `json:"create_media,omitempty"`
+	CreateMediaFromCachedObjects                   PipelineStepStatus `json:"create_media_from_cached_objects,omitempty"`
+	CreateRawMedia                                 PipelineStepStatus `json:"create_raw_media,omitempty"`
+	MediaResultComparison                          PipelineStepStatus `json:"media_result_comparison,omitempty"`
 }
 
 func (p PipelineMetadata) Value() (driver.Value, error) {
@@ -192,7 +198,7 @@ func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name strin
 	return func() {
 		defer tracing.FinishSpan(span)
 		if *status == PipelineStepStatusError {
-			logger.For(ctx).Infof("failed [%s] (took: %s)", name, time.Since(startTime))
+			logger.For(ctx).Errorf("failed [%s] (took: %s)", name, time.Since(startTime))
 			return
 		}
 		*status = PipelineStepStatusSuccess
