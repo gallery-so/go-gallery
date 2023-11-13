@@ -1021,8 +1021,8 @@ select tm.*
 from galleries g, collections c, tokens t, token_medias tm, token_definitions td
 where
 	g.id = $1
-	and c.id = any(g.collections[:8])
-	and t.id = any(c.nfts[:8])
+	and c.id = any(g.collections)
+	and t.id = any(c.nfts)
     and t.owner_user_id = g.owner_user_id
     and t.displayable
     and t.token_definition_id = td.id
@@ -1032,8 +1032,10 @@ where
 	and not c.deleted
 	and not t.deleted
 	and not tm.deleted
-	and tm.active
-	and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
+	and (
+		tm.media->>'thumbnail_url' is not null
+		or (tm.media->>'media_type' = 'image' and tm.media->>'media_url' is not null)
+	)
 order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
 limit 4;
 
