@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -224,6 +225,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 			ContractID:     creator.ContractID,
 		})
 		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 			logger.For(ctx).Errorf("error dispatching event: %v", err)
 		}
 	}
@@ -237,6 +239,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		PostID:         postID,
 	})
 	if err != nil {
+		sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 		logger.For(ctx).Errorf("error dispatching event: %v", err)
 	}
 
@@ -255,6 +258,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 			PostID:         postID,
 		})
 		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 			logger.For(ctx).Errorf("error dispatching event: %v", err)
 		}
 	}
@@ -323,6 +327,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 				ContractID:     creator.ContractID,
 			})
 			if err != nil {
+				sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 				logger.For(ctx).Errorf("error dispatching event: %v", err)
 			}
 		}
@@ -377,6 +382,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			ContractID:     creator.ContractID,
 		})
 		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 			logger.For(ctx).Errorf("error dispatching event: %v", err)
 		}
 	}
@@ -390,6 +396,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		PostID:         postID,
 	})
 	if err != nil {
+		sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 		logger.For(ctx).Errorf("error dispatching event: %v", err)
 	}
 	count, err := api.queries.CountPostsByUserID(ctx, user.ID)
@@ -407,6 +414,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			PostID:         postID,
 		})
 		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 			logger.For(ctx).Errorf("error dispatching event: %v", err)
 		}
 	}

@@ -47,22 +47,22 @@ type NotificationHandlers struct {
 }
 
 type pushLimiter struct {
-	comments *limiters.KeyRateLimiter
-	admires  *limiters.KeyRateLimiter
-	follows  *limiters.KeyRateLimiter
-	tokens   *limiters.KeyRateLimiter
-	mentions *limiters.KeyRateLimiter
+	comments     *limiters.KeyRateLimiter
+	admires      *limiters.KeyRateLimiter
+	follows      *limiters.KeyRateLimiter
+	tokens       *limiters.KeyRateLimiter
+	feedEntities *limiters.KeyRateLimiter
 }
 
 func newPushLimiter() *pushLimiter {
 	cache := redis.NewCache(redis.PushNotificationRateLimitersCache)
 	ctx := context.Background()
 	return &pushLimiter{
-		comments: limiters.NewKeyRateLimiter(ctx, cache, "comments", 5, time.Minute),
-		admires:  limiters.NewKeyRateLimiter(ctx, cache, "admires", 1, time.Minute*10),
-		follows:  limiters.NewKeyRateLimiter(ctx, cache, "follows", 1, time.Minute*10),
-		tokens:   limiters.NewKeyRateLimiter(ctx, cache, "tokens", 1, time.Minute*10),
-		mentions: limiters.NewKeyRateLimiter(ctx, cache, "mentions", 5, time.Minute),
+		comments:     limiters.NewKeyRateLimiter(ctx, cache, "comments", 5, time.Minute),
+		admires:      limiters.NewKeyRateLimiter(ctx, cache, "admires", 1, time.Minute*10),
+		follows:      limiters.NewKeyRateLimiter(ctx, cache, "follows", 1, time.Minute*10),
+		tokens:       limiters.NewKeyRateLimiter(ctx, cache, "tokens", 1, time.Minute*10),
+		feedEntities: limiters.NewKeyRateLimiter(ctx, cache, "feedEntities", 5, time.Minute),
 	}
 }
 
@@ -80,14 +80,14 @@ func (p *pushLimiter) tryComment(ctx context.Context, sendingUserID persist.DBID
 	}
 }
 
-func (p *pushLimiter) tryMention(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, postID persist.DBID) error {
+func (p *pushLimiter) tryFeedEntity(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, postID persist.DBID) error {
 	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), postID.String())
-	if p.isActionAllowed(ctx, p.mentions, key) {
+	if p.isActionAllowed(ctx, p.feedEntities, key) {
 		return nil
 	}
 
 	return errRateLimited{
-		limiterName: p.mentions.Name(),
+		limiterName: p.feedEntities.Name(),
 		senderID:    sendingUserID,
 		receiverID:  receivingUserID,
 		feedEventID: postID,
@@ -647,7 +647,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if err = limiter.tryMention(ctx, commenter.ID, notif.OwnerID, notif.PostID); err != nil {
+		if err = limiter.tryFeedEntity(ctx, commenter.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
@@ -688,7 +688,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, fmt.Errorf("no comment or post id provided for mention notification")
 		}
 
-		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
+		if err := limiter.tryFeedEntity(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
@@ -707,10 +707,11 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
+		if err := limiter.tryFeedEntity(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
+		return message, nil
 	}
 
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
@@ -1075,7 +1076,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 		return fmt.Errorf("failed to create notification: %w", err)
 	}
 
-	err = sendAndPublishPushNotifications(ctx, newNotif, queries, taskClient, limiter, ps)
+	err = sendNotifications(ctx, newNotif, queries, taskClient, limiter, ps)
 	if err != nil {
 		return err
 	}
@@ -1095,7 +1096,7 @@ func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, 
 	for _, notif := range notifs {
 		notif := notif
 		p.Go(func(ctx context.Context) error {
-			return sendAndPublishPushNotifications(ctx, notif, queries, taskClient, limiter, ps)
+			return sendNotifications(ctx, notif, queries, taskClient, limiter, ps)
 		})
 	}
 
@@ -1104,7 +1105,7 @@ func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, 
 	return nil
 }
 
-func sendAndPublishPushNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client, limiter *pushLimiter, ps *pubsub.Client) error {
+func sendNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client, limiter *pushLimiter, ps *pubsub.Client) error {
 	err := sendPushNotifications(ctx, newNotif, queries, taskClient, limiter)
 	if err != nil {
 		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", newNotif.ID, err)
