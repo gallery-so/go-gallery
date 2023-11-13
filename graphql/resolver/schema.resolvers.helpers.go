@@ -2091,7 +2091,7 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 
 func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
 	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := strings.ToLower(td.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
+	if fallback := td.FallbackMedia.ImageURL.String(); strings.HasPrefix(fallback, "ipfs://") {
 		td.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
 	} else if strings.HasPrefix(fallback, "ar://") {
 		td.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
