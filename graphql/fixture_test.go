@@ -2,12 +2,12 @@ package graphql_test
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/env"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mikeydub/go-gallery/autosocial"
@@ -18,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -86,37 +85,16 @@ func useRedis(t *testing.T) {
 	t.Cleanup(func() { r.Close() })
 }
 
-// useTokenQueue is a fixture that creates a dummy queue for token processing
-func useTokenQueue(t *testing.T) {
+// useCloudTasksDirectDispatch is a fixture that sends tasks directly to their targets instead of using the Cloud Tasks emulator
+func useCloudTasksDirectDispatch(t *testing.T) {
 	t.Helper()
-	useCloudTasks(t)
-	ctx := context.Background()
-	client := task.NewClient(ctx)
-	defer client.Close()
-	queue, err := client.CreateQueue(ctx, &cloudtaskspb.CreateQueueRequest{
-		Parent: "projects/gallery-test/locations/here",
-		Queue: &cloudtaskspb.Queue{
-			Name: "projects/gallery-test/locations/here/queues/token-processing-" + persist.GenerateID().String(),
-		},
-	})
-	require.NoError(t, err)
-	t.Setenv("TOKEN_PROCESSING_QUEUE", queue.Name)
-}
 
-func useAutosocialQueue(t *testing.T) {
-	t.Helper()
-	useCloudTasks(t)
-	ctx := context.Background()
-	client := task.NewClient(ctx)
-	defer client.Close()
-	queue, err := client.CreateQueue(ctx, &cloudtaskspb.CreateQueueRequest{
-		Parent: "projects/gallery-test/locations/here",
-		Queue: &cloudtaskspb.Queue{
-			Name: "projects/gallery-test/locations/here/queues/autosocial-" + persist.GenerateID().String(),
-		},
-	})
-	require.NoError(t, err)
-	t.Setenv("AUTOSOCIAL_QUEUE", queue.Name)
+	// Skip these queues -- don't dispatch their tasks at all
+	t.Setenv("CLOUD_TASKS_SKIP_QUEUES", strings.Join([]string{
+		env.GetString("AUTOSOCIAL_QUEUE"),
+	}, ","))
+
+	t.Setenv("CLOUD_TASKS_DIRECT_DISPATCH_ENABLED", "true")
 }
 
 // useNotificationTopics is a fixture that creates dummy PubSub topics for notifications
