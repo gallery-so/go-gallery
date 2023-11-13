@@ -1,9 +1,11 @@
 package task
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -24,8 +26,8 @@ import (
 )
 
 type Client struct {
-	gcpClient *gcptasks.Client
-	sendFunc  func(ctx context.Context, queue string, task *taskspb.Task) error
+	skipQueues map[string]bool
+	sendFunc   func(ctx context.Context, queue string, task *taskspb.Task) error
 }
 
 // FeedMessage is the input message to the feed service
@@ -244,27 +246,39 @@ func (c *Client) CreateTaskForSlackPostFeedBot(ctx context.Context, message Feed
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), withDelay(2*time.Minute))
 }
 
-func withSendFunc(sendFunc func(ctx context.Context, queue string, task *taskspb.Task) error) func(*Client) {
-	return func(c *Client) {
-		c.sendFunc = sendFunc
+// NewClient returns a new task client with tracing enabled.
+func NewClient(ctx context.Context) *Client {
+	skipQueues := make(map[string]bool)
+	for _, q := range env.GetStringSlice("CLOUD_TASKS_SKIP_QUEUES") {
+		skipQueues[q] = true
+	}
+
+	if env.GetBool("CLOUD_TASKS_DIRECT_DISPATCH_ENABLED") {
+		return &Client{skipQueues: skipQueues, sendFunc: useDirectDispatch(ctx)}
+	} else {
+		return &Client{skipQueues: skipQueues, sendFunc: useCloudTasks(ctx, newGCPClient(ctx))}
 	}
 }
 
-// NewClient returns a new task client with tracing enabled.
-func NewClient(ctx context.Context, opts ...func(*Client)) *Client {
-	gcpClient := newGCPClient(ctx)
-	client := &Client{
-		gcpClient: gcpClient,
-		sendFunc: func(ctx context.Context, queue string, task *taskspb.Task) error {
-			return sendToTaskQueue(ctx, gcpClient, queue, task)
-		},
+func useDirectDispatch(ctx context.Context) func(ctx context.Context, queue string, task *taskspb.Task) error {
+	logger.For(ctx).Info("Initializing task client with direct dispatch")
+	httpClient := &http.Client{}
+	return func(ctx context.Context, queue string, task *taskspb.Task) error {
+		go func() {
+			err := sendToTaskTarget(ctx, httpClient, queue, task)
+			if err != nil {
+				logger.For(ctx).WithError(err).Errorf("failed to direct dispatch task to queue: %s", queue)
+			}
+		}()
+		return nil
 	}
+}
 
-	for _, opt := range opts {
-		opt(client)
+func useCloudTasks(ctx context.Context, gcpClient *gcptasks.Client) func(ctx context.Context, queue string, task *taskspb.Task) error {
+	logger.For(ctx).Info("Initializing task client with cloud tasks")
+	return func(ctx context.Context, queue string, task *taskspb.Task) error {
+		return sendToTaskQueue(ctx, gcpClient, queue, task)
 	}
-
-	return client
 }
 
 func newGCPClient(ctx context.Context) *gcptasks.Client {
@@ -354,6 +368,11 @@ func addHeader(r *taskspb.HttpRequest, key, value string) {
 }
 
 func (c *Client) submitTask(ctx context.Context, queue, url string, opts ...func(*taskspb.Task) error) error {
+	if c.skipQueues[queue] {
+		logger.For(ctx).Infof("skipping task for queue: %s", queue)
+		return nil
+	}
+
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
@@ -374,4 +393,45 @@ func (c *Client) submitTask(ctx context.Context, queue, url string, opts ...func
 func sendToTaskQueue(ctx context.Context, gcpClient *gcptasks.Client, queue string, task *taskspb.Task) error {
 	_, err := gcpClient.CreateTask(ctx, &taskspb.CreateTaskRequest{Parent: queue, Task: task})
 	return err
+}
+
+func sendToTaskTarget(ctx context.Context, client *http.Client, queue string, task *taskspb.Task) error {
+	method := task.GetHttpRequest().GetHttpMethod().String()
+	url := task.GetHttpRequest().GetUrl()
+	headers := task.GetHttpRequest().GetHeaders()
+	body := bytes.NewReader(task.GetHttpRequest().GetBody())
+
+	if task.ScheduleTime != nil {
+		scheduleAt := task.ScheduleTime.AsTime()
+		time.Sleep(time.Until(scheduleAt))
+	}
+
+	if task.DispatchDeadline != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, time.Now().Add(task.DispatchDeadline.AsDuration()))
+		defer cancel()
+	}
+
+	// Create a new HTTP request
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return err
+	}
+
+	// Add headers to the request
+	for key, value := range headers {
+		req.Header.Add(key, value)
+	}
+
+	// Dispatch the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp != nil {
+		resp.Body.Close() // Always close the response body
+	}
+
+	return nil
 }

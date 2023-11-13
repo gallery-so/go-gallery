@@ -40,12 +40,12 @@ func TestMain(t *testing.T) {
 		{
 			title:    "test GraphQL",
 			run:      testGraphQL,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useAutosocialQueue, useAutosocial, useNotificationTopics},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasksDirectDispatch, useAutosocial, useNotificationTopics},
 		},
 		{
 			title:    "test syncing tokens",
 			run:      testTokenSyncs,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useAutosocialQueue, useAutosocial, useTokenProcessing},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasksDirectDispatch, useAutosocial, useTokenProcessing},
 		},
 	}
 	for _, test := range tests {
