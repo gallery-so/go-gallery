@@ -584,15 +584,14 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
+		if admirer.Username.String == "" {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", admirer.ID)
+		}
+
 		if err = limiter.tryAdmireToken(ctx, admirer.ID, notif.OwnerID, notif.TokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
-		if !admirer.Username.Valid {
-			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", admirer.ID)
-		}
-
-		message.Body = fmt.Sprintf("%s admired your token", admirer.Username.String)
 		return message, nil
 	}
 
@@ -739,8 +738,7 @@ func (u UserFacingNotificationData) String() string {
 func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (UserFacingNotificationData, error) {
 
 	switch n.Action {
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
-
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
 		data := UserFacingNotificationData{}
 		if n.Action == persist.ActionAdmiredFeedEvent {
 			feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
@@ -755,6 +753,8 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			} else {
 				data.Action = "admired your gallery update"
 			}
+		} else if n.Action == persist.ActionAdmiredToken {
+			data.Action = "admired your token"
 		} else {
 			data.Action = "admired your post"
 		}
