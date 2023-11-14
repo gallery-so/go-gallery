@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/service/tracing"
-
+	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"golang.org/x/sync/errgroup"
@@ -19,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -26,8 +26,9 @@ import (
 type sendType int
 
 const (
-	eventSenderContextKey          = "event.eventSender"
-	delayedKey            sendType = iota
+	eventSenderContextKey           = "event.eventSender"
+	sentryEventContextName          = "event context"
+	delayedKey             sendType = iota
 	immediateKey
 	groupKey
 )
@@ -56,6 +57,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 
 	notifications := newEventDispatcher()
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
+	followerNotificationHandler := newFollowerNotificationHandler(notif, disableDataloaderCaching, queries)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
@@ -68,6 +70,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, followerNotificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
@@ -111,13 +114,21 @@ func DispatchMany(ctx context.Context, evts []db.Event, editID *string) error {
 }
 
 func PushEvent(ctx context.Context, evt db.Event) {
-	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-		sentryutil.SetEventContext(hub.Scope(), persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
+	err := dispatchDelayed(ctx, evt)
+	if err != nil {
+		sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
+			logger.For(ctx).Error(err)
+			setEventContext(scope, persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
+		})
 	}
-	if err := dispatchDelayed(ctx, evt); err != nil {
-		logger.For(ctx).Error(err)
-		sentryutil.ReportError(ctx, err)
-	}
+}
+
+func setEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, action persist.Action) {
+	scope.SetContext(sentryEventContextName, sentry.Context{
+		"ActorID":   actorID,
+		"SubjectID": subjectID,
+		"Action":    action,
+	})
 }
 
 // dispatchDelayed sends the event to all of its registered handlers.
@@ -470,6 +481,73 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		MentionID:   persistedEvent.MentionID,
 	})
 }
+func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
+	switch event.ResourceTypeID {
+	case persist.ResourceTypeGallery:
+		gallery, err := h.dataloaders.GetGalleryByIdBatch.Load(event.GalleryID)
+		if err != nil {
+			return "", err
+		}
+		return gallery.OwnerUserID, nil
+	case persist.ResourceTypeComment:
+		if event.Action == persist.ActionReplyToComment {
+			comment, err := h.dataloaders.GetCommentByCommentIDBatch.Load(event.SubjectID)
+			if err != nil {
+				return "", err
+			}
+			return comment.ActorID, nil
+		}
+		if event.FeedEventID != "" {
+			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
+			if err != nil {
+				return "", err
+			}
+			return feedEvent.OwnerID, nil
+		} else if event.PostID != "" {
+			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
+			if err != nil {
+				return "", err
+			}
+			return post.ActorID, nil
+		}
+
+	case persist.ResourceTypeAdmire:
+		if event.Action == persist.ActionAdmiredToken {
+			token, err := h.dataloaders.GetTokenByIdBatch.Load(event.SubjectID)
+			if err != nil {
+				return "", err
+			}
+			return token.Token.OwnerUserID, nil
+		} else if event.FeedEventID != "" {
+			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
+			if err != nil {
+				return "", err
+			}
+			return feedEvent.OwnerID, nil
+		} else if event.PostID != "" {
+			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
+			if err != nil {
+				return "", err
+			}
+			return post.ActorID, nil
+		}
+	case persist.ResourceTypeUser:
+		return event.SubjectID, nil
+	case persist.ResourceTypeToken:
+		return persist.DBID(event.ActorID.String), nil
+	case persist.ResourceTypeContract:
+
+		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.ContractID.String())
+		if err != nil || u.CreatorUserID == "" {
+			logger.For(ctx).Warnf("error loading user by address: %s", err)
+			return "", nil
+		}
+		return u.CreatorUserID, nil
+
+	}
+
+	return "", fmt.Errorf("no owner found for event: %s", event.Action)
+}
 
 func (h notificationHandler) createNotificationDataForEvent(event db.Event) (data persist.NotificationData) {
 	switch event.Action {
@@ -502,66 +580,32 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	return
 }
 
-func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
-	switch event.ResourceTypeID {
-	case persist.ResourceTypeGallery:
-		gallery, err := h.dataloaders.GetGalleryByIdBatch.Load(event.GalleryID)
-		if err != nil {
-			return "", err
-		}
-		return gallery.OwnerUserID, nil
-	case persist.ResourceTypeComment:
-		if event.Action == persist.ActionReplyToComment {
-			comment, err := h.dataloaders.GetCommentByCommentIDBatch.Load(event.SubjectID)
-			if err != nil {
-				return "", err
-			}
-			return comment.ActorID, nil
-		}
-		if event.FeedEventID != "" {
-			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
-			if err != nil {
-				return "", err
-			}
-			return feedEvent.OwnerID, nil
-		} else if event.PostID != "" {
-			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
-			if err != nil {
-				return "", err
-			}
-			return post.ActorID, nil
-		}
+// followerNotificationHandler handles events for consumption as notifications.
+type followerNotificationHandler struct {
+	dataloaders          *dataloader.Loaders
+	notificationHandlers *notifications.NotificationHandlers
+}
 
-	case persist.ResourceTypeAdmire:
-		if event.FeedEventID != "" {
-			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
-			if err != nil {
-				return "", err
-			}
-			return feedEvent.OwnerID, nil
-		} else if event.PostID != "" {
-			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
-			if err != nil {
-				return "", err
-			}
-			return post.ActorID, nil
-		}
-	case persist.ResourceTypeUser:
-		return event.SubjectID, nil
-	case persist.ResourceTypeToken:
-		return persist.DBID(event.ActorID.String), nil
-	case persist.ResourceTypeContract:
-
-		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.ContractID.String())
-		if err != nil || u.CreatorUserID == "" {
-			logger.For(ctx).Warnf("error loading user by address: %s", err)
-			return "", nil
-		}
-		return u.CreatorUserID, nil
-
+func newFollowerNotificationHandler(notifiers *notifications.NotificationHandlers, disableDataloaderCaching bool, queries *db.Queries) *followerNotificationHandler {
+	return &followerNotificationHandler{
+		notificationHandlers: notifiers,
+		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook),
 	}
+}
 
-	return "", fmt.Errorf("no owner found for event: %s", event.Action)
+func (h followerNotificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
+	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
+		// no owner or data for follower notifications
+		Action:      persistedEvent.Action,
+		EventIds:    persist.DBIDList{persistedEvent.ID},
+		GalleryID:   persistedEvent.GalleryID,
+		FeedEventID: persistedEvent.FeedEventID,
+		PostID:      persistedEvent.PostID,
+		CommentID:   persistedEvent.CommentID,
+		TokenID:     persistedEvent.TokenID,
+		ContractID:  persistedEvent.ContractID,
+		MentionID:   persistedEvent.MentionID,
+	})
 }
 
 // slackHandler posts events to Slack

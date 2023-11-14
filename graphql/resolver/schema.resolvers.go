@@ -2768,6 +2768,11 @@ func (r *someoneViewedYourGalleryNotificationResolver) Gallery(ctx context.Conte
 	return resolveGalleryByGalleryID(ctx, obj.GalleryID)
 }
 
+// Post is the resolver for the post field.
+func (r *someoneYouFollowPostedTheirFirstPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.PostID)
+}
+
 // NewNotification is the resolver for the newNotification field.
 func (r *subscriptionResolver) NewNotification(ctx context.Context) (<-chan model.Notification, error) {
 	return resolveNewNotificationSubscription(ctx), nil
@@ -3370,6 +3375,11 @@ func (r *Resolver) SomeoneViewedYourGalleryNotification() generated.SomeoneViewe
 	return &someoneViewedYourGalleryNotificationResolver{r}
 }
 
+// SomeoneYouFollowPostedTheirFirstPostNotification returns generated.SomeoneYouFollowPostedTheirFirstPostNotificationResolver implementation.
+func (r *Resolver) SomeoneYouFollowPostedTheirFirstPostNotification() generated.SomeoneYouFollowPostedTheirFirstPostNotificationResolver {
+	return &someoneYouFollowPostedTheirFirstPostNotificationResolver{r}
+}
+
 // Subscription returns generated.SubscriptionResolver implementation.
 func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
 
@@ -3473,6 +3483,7 @@ type someoneMentionedYourCommunityNotificationResolver struct{ *Resolver }
 type someonePostedYourWorkNotificationResolver struct{ *Resolver }
 type someoneRepliedToYourCommentNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
+type someoneYouFollowPostedTheirFirstPostNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenDefinitionResolver struct{ *Resolver }

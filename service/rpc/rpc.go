@@ -537,7 +537,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 			// query unescape asString first
 			asString, err := url.QueryUnescape(asString)
 			if err != nil {
-				logger.For(ctx).Errorf("error unescaping uri: %s", err)
+				logger.For(ctx).Warnf("error unescaping uri: %s", err)
 				asString = turi.String()
 			}
 			if strings.HasPrefix(asString, "data:") {

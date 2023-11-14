@@ -19,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -159,11 +158,7 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm
 			return
 		}
 
-		_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
-		if err != nil {
-			// Only log the error, because tokenmanage will handle reprocessing
-			logger.For(c).Errorf("error processing token: %s", err)
-		}
+		runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -716,11 +711,10 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 				return
 			}
 
-			_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0, addIsSpamJobOption(contract))
-			if err != nil {
-				// Only log the error, because tokenmanage will handle reprocessing
-				logger.For(c).Errorf("error in preflight: error processing token: %s", err)
-			}
+			runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
+				addIsSpamJobOption(contract),
+				PipelineOpts.WithRequireImage(), // Require an image if available
+			)
 		}
 
 		// Try to sync the user's token if a user is provided
@@ -754,6 +748,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 		"tokenID_base10":      td.TokenID.Base10String(),
 		"contractAddress":     td.ContractAddress,
 		"chain":               td.Chain,
+		"cause":               cause,
 	})
 	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
 	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
@@ -780,7 +775,7 @@ func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption)
 
 // addContractRunOptions adds pipeline options for specific contracts
 func addContractRunOptions(contract persist.ContractIdentifiers) (opts []PipelineOption) {
-	if contract.Chain == persist.ChainETH && contract.ContractAddress == eth.EnsAddress {
+	if contract == ensContract {
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts

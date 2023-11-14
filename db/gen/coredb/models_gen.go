@@ -492,34 +492,23 @@ type SpamUserScore struct {
 }
 
 type Token struct {
-	ID                             persist.DBID      `db:"id" json:"id"`
-	Deleted                        bool              `db:"deleted" json:"deleted"`
-	Version                        sql.NullInt32     `db:"version" json:"version"`
-	CreatedAt                      time.Time         `db:"created_at" json:"created_at"`
-	LastUpdated                    time.Time         `db:"last_updated" json:"last_updated"`
-	NameDeprecated                 sql.NullString    `db:"name__deprecated" json:"name__deprecated"`
-	DescriptionDeprecated          sql.NullString    `db:"description__deprecated" json:"description__deprecated"`
-	CollectorsNote                 sql.NullString    `db:"collectors_note" json:"collectors_note"`
-	TokenTypeDeprecated            sql.NullString    `db:"token_type__deprecated" json:"token_type__deprecated"`
-	TokenIDDeprecated              sql.NullString    `db:"token_id__deprecated" json:"token_id__deprecated"`
-	Quantity                       persist.HexString `db:"quantity" json:"quantity"`
-	OwnershipHistoryDeprecated     []pgtype.JSONB    `db:"ownership_history__deprecated" json:"ownership_history__deprecated"`
-	ExternalUrlDeprecated          sql.NullString    `db:"external_url__deprecated" json:"external_url__deprecated"`
-	BlockNumber                    sql.NullInt64     `db:"block_number" json:"block_number"`
-	OwnerUserID                    persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
-	OwnedByWallets                 persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
-	ChainDeprecated                sql.NullInt32     `db:"chain__deprecated" json:"chain__deprecated"`
-	ContractID                     persist.DBID      `db:"contract_id" json:"contract_id"`
-	IsUserMarkedSpam               sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
-	IsProviderMarkedSpamDeprecated sql.NullBool      `db:"is_provider_marked_spam__deprecated" json:"is_provider_marked_spam__deprecated"`
-	LastSynced                     time.Time         `db:"last_synced" json:"last_synced"`
-	TokenUriDeprecated             sql.NullString    `db:"token_uri__deprecated" json:"token_uri__deprecated"`
-	FallbackMediaDeprecated        pgtype.JSONB      `db:"fallback_media__deprecated" json:"fallback_media__deprecated"`
-	TokenMediaIDDeprecated         sql.NullString    `db:"token_media_id__deprecated" json:"token_media_id__deprecated"`
-	IsCreatorToken                 bool              `db:"is_creator_token" json:"is_creator_token"`
-	TokenDefinitionID              persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
-	IsHolderToken                  bool              `db:"is_holder_token" json:"is_holder_token"`
-	Displayable                    bool              `db:"displayable" json:"displayable"`
+	ID                persist.DBID      `db:"id" json:"id"`
+	Deleted           bool              `db:"deleted" json:"deleted"`
+	Version           sql.NullInt32     `db:"version" json:"version"`
+	CreatedAt         time.Time         `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time         `db:"last_updated" json:"last_updated"`
+	CollectorsNote    sql.NullString    `db:"collectors_note" json:"collectors_note"`
+	Quantity          persist.HexString `db:"quantity" json:"quantity"`
+	BlockNumber       sql.NullInt64     `db:"block_number" json:"block_number"`
+	OwnerUserID       persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
+	OwnedByWallets    persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
+	ContractID        persist.DBID      `db:"contract_id" json:"contract_id"`
+	IsUserMarkedSpam  sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
+	LastSynced        time.Time         `db:"last_synced" json:"last_synced"`
+	IsCreatorToken    bool              `db:"is_creator_token" json:"is_creator_token"`
+	TokenDefinitionID persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
+	IsHolderToken     bool              `db:"is_holder_token" json:"is_holder_token"`
+	Displayable       bool              `db:"displayable" json:"displayable"`
 }
 
 type TokenDefinition struct {
@@ -541,20 +530,14 @@ type TokenDefinition struct {
 }
 
 type TokenMedia struct {
-	ID                    persist.DBID   `db:"id" json:"id"`
-	CreatedAt             time.Time      `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time      `db:"last_updated" json:"last_updated"`
-	Version               int32          `db:"version" json:"version"`
-	ContractIDDeprecated  sql.NullString `db:"contract_id__deprecated" json:"contract_id__deprecated"`
-	TokenIDDeprecated     sql.NullString `db:"token_id__deprecated" json:"token_id__deprecated"`
-	ChainDeprecated       sql.NullInt32  `db:"chain__deprecated" json:"chain__deprecated"`
-	Active                bool           `db:"active" json:"active"`
-	MetadataDeprecated    pgtype.JSONB   `db:"metadata__deprecated" json:"metadata__deprecated"`
-	Media                 persist.Media  `db:"media" json:"media"`
-	NameDeprecated        sql.NullString `db:"name__deprecated" json:"name__deprecated"`
-	DescriptionDeprecated sql.NullString `db:"description__deprecated" json:"description__deprecated"`
-	ProcessingJobID       persist.DBID   `db:"processing_job_id" json:"processing_job_id"`
-	Deleted               bool           `db:"deleted" json:"deleted"`
+	ID              persist.DBID  `db:"id" json:"id"`
+	CreatedAt       time.Time     `db:"created_at" json:"created_at"`
+	LastUpdated     time.Time     `db:"last_updated" json:"last_updated"`
+	Version         int32         `db:"version" json:"version"`
+	Active          bool          `db:"active" json:"active"`
+	Media           persist.Media `db:"media" json:"media"`
+	ProcessingJobID persist.DBID  `db:"processing_job_id" json:"processing_job_id"`
+	Deleted         bool          `db:"deleted" json:"deleted"`
 }
 
 type TokenMediasActive struct {
@@ -590,36 +573,6 @@ type TokenProcessingJob struct {
 	ProcessingCause  persist.ProcessingCause  `db:"processing_cause" json:"processing_cause"`
 	ProcessorVersion string                   `db:"processor_version" json:"processor_version"`
 	Deleted          bool                     `db:"deleted" json:"deleted"`
-}
-
-type TokensBackup struct {
-	ID                   persist.DBID   `db:"id" json:"id"`
-	Deleted              bool           `db:"deleted" json:"deleted"`
-	Version              sql.NullInt32  `db:"version" json:"version"`
-	CreatedAt            time.Time      `db:"created_at" json:"created_at"`
-	LastUpdated          time.Time      `db:"last_updated" json:"last_updated"`
-	Name                 sql.NullString `db:"name" json:"name"`
-	Description          sql.NullString `db:"description" json:"description"`
-	CollectorsNote       sql.NullString `db:"collectors_note" json:"collectors_note"`
-	TokenUri             sql.NullString `db:"token_uri" json:"token_uri"`
-	TokenType            sql.NullString `db:"token_type" json:"token_type"`
-	TokenID              persist.DBID   `db:"token_id" json:"token_id"`
-	Quantity             sql.NullString `db:"quantity" json:"quantity"`
-	OwnershipHistory     []pgtype.JSONB `db:"ownership_history" json:"ownership_history"`
-	ExternalUrl          sql.NullString `db:"external_url" json:"external_url"`
-	BlockNumber          sql.NullInt64  `db:"block_number" json:"block_number"`
-	OwnerUserID          persist.DBID   `db:"owner_user_id" json:"owner_user_id"`
-	OwnedByWallets       []string       `db:"owned_by_wallets" json:"owned_by_wallets"`
-	Chain                persist.Chain  `db:"chain" json:"chain"`
-	Contract             sql.NullString `db:"contract" json:"contract"`
-	IsUserMarkedSpam     sql.NullBool   `db:"is_user_marked_spam" json:"is_user_marked_spam"`
-	IsProviderMarkedSpam sql.NullBool   `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
-	LastSynced           time.Time      `db:"last_synced" json:"last_synced"`
-	FallbackMedia        pgtype.JSONB   `db:"fallback_media" json:"fallback_media"`
-	TokenMediaID         persist.DBID   `db:"token_media_id" json:"token_media_id"`
-	IsCreatorToken       bool           `db:"is_creator_token" json:"is_creator_token"`
-	IsHolderToken        bool           `db:"is_holder_token" json:"is_holder_token"`
-	Displayable          bool           `db:"displayable" json:"displayable"`
 }
 
 type TopRecommendedUser struct {

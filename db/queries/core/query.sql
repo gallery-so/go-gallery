@@ -426,7 +426,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6, $7, $8, $9) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
@@ -820,6 +820,12 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 -- name: CreateUserPostedYourWorkNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
 
+-- name: CountFollowersByUserID :one
+SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
+
+-- name: CreateUserPostedFirstPostNotifications :many
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) select unnest(sqlc.arg('ids')::varchar[]), follows.follower, $1, $2, $3, sqlc.narg('post') from follows where follows.followee = @actor_id RETURNING *;
+
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
@@ -1021,8 +1027,8 @@ select tm.*
 from galleries g, collections c, tokens t, token_medias tm, token_definitions td
 where
 	g.id = $1
-	and c.id = any(g.collections[:8])
-	and t.id = any(c.nfts[:8])
+	and c.id = any(g.collections)
+	and t.id = any(c.nfts)
     and t.owner_user_id = g.owner_user_id
     and t.displayable
     and t.token_definition_id = td.id
@@ -1032,8 +1038,10 @@ where
 	and not c.deleted
 	and not t.deleted
 	and not tm.deleted
-	and tm.active
-	and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
+	and (
+		tm.media->>'thumbnail_url' is not null
+		or (tm.media->>'media_type' = 'image' and tm.media->>'media_url' is not null)
+	)
 order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
 limit 4;
 
