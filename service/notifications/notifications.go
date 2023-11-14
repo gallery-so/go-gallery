@@ -1327,10 +1327,12 @@ func addFollowerNotifications(ctx context.Context, notif db.Notification, querie
 			return nil, err
 		}
 
-		ids := util.MapWithoutError(make([]any, followerCount), func(i any) string {
-			return persist.GenerateID().String()
-		})
-		return queries.CreateUserPostedFirstPostNotifications(ctx, db.CreateUserPostedFirstPostNotificationsParams{
+		var ids []string
+		for i := 0; i < int(followerCount); i++ {
+			ids = append(ids, persist.GenerateID().String())
+		}
+
+		notifs, err := queries.CreateUserPostedFirstPostNotifications(ctx, db.CreateUserPostedFirstPostNotificationsParams{
 			Ids:      ids,
 			Action:   notif.Action,
 			Data:     notif.Data,
@@ -1338,6 +1340,11 @@ func addFollowerNotifications(ctx context.Context, notif db.Notification, querie
 			Post:     util.ToNullString(notif.PostID.String(), true),
 			ActorID:  post.ActorID,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create follower notifications: %w", err)
+		}
+
+		return notifs, nil
 	default:
 		return nil, fmt.Errorf("unknown follower notification action: %s", notif.Action)
 	}
