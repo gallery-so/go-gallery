@@ -820,9 +820,11 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 -- name: CreateUserPostedYourWorkNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
 
--- name: CreateUserPostedFirstPostNotifications :many
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) select $1, follows.follower, $2, $3, $4, sqlc.narg('post') from follows where follows.followee = @actor_id RETURNING *;
+-- name: CountFollowersByUserID :one
+SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
 
+-- name: CreateUserPostedFirstPostNotifications :many
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) select unnest(sqlc.arg('ids')::varchar[]), follows.follower, $1, $2, $3, sqlc.narg('post') from follows where follows.followee = @actor_id RETURNING *;
 
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;

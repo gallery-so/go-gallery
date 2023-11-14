@@ -1321,8 +1321,17 @@ func addFollowerNotifications(ctx context.Context, notif db.Notification, querie
 		if err != nil {
 			return nil, err
 		}
+
+		followerCount, err := queries.CountFollowersByUserID(ctx, post.ActorID)
+		if err != nil {
+			return nil, err
+		}
+
+		ids := util.MapWithoutError(make([]any, followerCount), func(i any) string {
+			return persist.GenerateID().String()
+		})
 		return queries.CreateUserPostedFirstPostNotifications(ctx, db.CreateUserPostedFirstPostNotificationsParams{
-			ID:       persist.GenerateID(),
+			Ids:      ids,
 			Action:   notif.Action,
 			Data:     notif.Data,
 			EventIds: notif.EventIds,

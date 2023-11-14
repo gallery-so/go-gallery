@@ -164,6 +164,17 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countFollowersByUserID = `-- name: CountFollowersByUserID :one
+SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false
+`
+
+func (q *Queries) CountFollowersByUserID(ctx context.Context, followee persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countFollowersByUserID, followee)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 select count(distinct users.id) from users, tokens, contracts
     where (contracts.id = $1 or contracts.parent_id = $1)
@@ -1233,24 +1244,24 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 }
 
 const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) select $1, follows.follower, $2, $3, $4, $5 from follows where follows.followee = $6 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) select unnest($4::varchar[]), follows.follower, $1, $2, $3, $5 from follows where follows.followee = $6 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateUserPostedFirstPostNotificationsParams struct {
-	ID       persist.DBID             `db:"id" json:"id"`
 	Action   persist.Action           `db:"action" json:"action"`
 	Data     persist.NotificationData `db:"data" json:"data"`
 	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	Ids      []string                 `db:"ids" json:"ids"`
 	Post     sql.NullString           `db:"post" json:"post"`
 	ActorID  persist.DBID             `db:"actor_id" json:"actor_id"`
 }
 
 func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, arg CreateUserPostedFirstPostNotificationsParams) ([]Notification, error) {
 	rows, err := q.db.Query(ctx, createUserPostedFirstPostNotifications,
-		arg.ID,
 		arg.Action,
 		arg.Data,
 		arg.EventIds,
+		arg.Ids,
 		arg.Post,
 		arg.ActorID,
 	)
