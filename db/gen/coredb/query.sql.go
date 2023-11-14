@@ -1246,7 +1246,11 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 }
 
 const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) select unnest($4::varchar[]), follows.follower, $1, $2, $3, $5 from follows where follows.followee = $6 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) 
+SELECT DISTINCT ON (unnest($4::varchar[])) unnest($4::varchar[]), follows.follower, $1, $2, $3, $5 
+FROM follows 
+WHERE follows.followee = $6 AND follows.deleted = false 
+RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateUserPostedFirstPostNotificationsParams struct {
