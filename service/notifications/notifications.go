@@ -284,7 +284,7 @@ func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notific
 type followerNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
-	taskClient *cloudtasks.Client
+	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
@@ -1085,7 +1085,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 	return nil
 }
 
-func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
+func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *task.Client, limiter *pushLimiter) error {
 	notifs, err := addFollowerNotifications(ctx, notif, queries)
 	if err != nil {
 		return fmt.Errorf("failed to create notification: %w", err)
@@ -1104,7 +1104,7 @@ func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, 
 	return nil
 }
 
-func sendNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client, limiter *pushLimiter, ps *pubsub.Client) error {
+func sendNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *task.Client, limiter *pushLimiter, ps *pubsub.Client) error {
 	err := sendPushNotifications(ctx, newNotif, queries, taskClient, limiter)
 	if err != nil {
 		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", newNotif.ID, err)
