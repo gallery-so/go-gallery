@@ -17,6 +17,7 @@ type CommentRepository struct {
 	createStmt        *sql.Stmt
 	createMentionStmt *sql.Stmt
 	deleteStmt        *sql.Stmt
+	ancestorsStmt     *sql.Stmt
 }
 
 // NewCommentRepository creates a new postgres repository for interacting with comments
@@ -24,7 +25,7 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, COMMENT) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, REPLY_ANCESTORS, COMMENT) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`)
 	checkNoErr(err)
 
 	createMentionStmt, err := db.PrepareContext(ctx, `INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
@@ -33,12 +34,25 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;`)
 	checkNoErr(err)
 
+	ancestorsStmt, err := db.PrepareContext(ctx, `WITH RECURSIVE comment_thread AS (
+    SELECT *
+    FROM comments
+    WHERE comments.id = $1
+    UNION ALL
+    SELECT c.* 
+    FROM comments c
+    INNER JOIN comment_thread ct ON c.id = ct.reply_to
+)
+SELECT id FROM comment_thread;`)
+	checkNoErr(err)
+
 	return &CommentRepository{
 		db:                db,
 		queries:           queries,
 		createStmt:        createStmt,
 		createMentionStmt: createMentionStmt,
 		deleteStmt:        deleteStmt,
+		ancestorsStmt:     ancestorsStmt,
 	}
 }
 
@@ -66,8 +80,28 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 	}
 	defer tx.Rollback()
 
+	var ancestors []persist.DBID
+	if replyToID != nil {
+		rows, err := tx.StmtContext(ctx, a.ancestorsStmt).QueryContext(ctx, replyToID)
+		if err != nil {
+			return "", nil, err
+		}
+		for rows.Next() {
+			var ancestor persist.DBID
+			err = rows.Scan(&ancestor)
+			if err != nil {
+				return "", nil, err
+			}
+
+			ancestors = append(ancestors, ancestor)
+		}
+		if err = rows.Err(); err != nil {
+			return "", nil, err
+		}
+	}
+
 	var resultID persist.DBID
-	err = tx.StmtContext(ctx, a.createStmt).QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, comment).Scan(&resultID)
+	err = tx.StmtContext(ctx, a.createStmt).QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, ancestors, comment).Scan(&resultID)
 	if err != nil {
 		return "", nil, err
 	}
