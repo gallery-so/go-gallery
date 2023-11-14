@@ -265,6 +265,10 @@ func useDirectDispatch(ctx context.Context) func(ctx context.Context, queue stri
 	httpClient := &http.Client{}
 	return func(ctx context.Context, queue string, task *taskspb.Task) error {
 		go func() {
+			// Ignore the passed-in context. We're likely creating a task in response to a gin request,
+			// but gin cancels its context as soon as the request ends, and our async dispatcher needs to
+			// persist long enough to send the task.
+			ctx = context.Background()
 			err := sendToTaskTarget(ctx, httpClient, queue, task)
 			if err != nil {
 				logger.For(ctx).WithError(err).Errorf("failed to direct dispatch task to queue: %s", queue)
@@ -396,6 +400,7 @@ func sendToTaskQueue(ctx context.Context, gcpClient *gcptasks.Client, queue stri
 }
 
 func sendToTaskTarget(ctx context.Context, client *http.Client, queue string, task *taskspb.Task) error {
+	name := task.GetName()
 	method := task.GetHttpRequest().GetHttpMethod().String()
 	url := task.GetHttpRequest().GetUrl()
 	headers := task.GetHttpRequest().GetHeaders()
@@ -422,6 +427,12 @@ func sendToTaskTarget(ctx context.Context, client *http.Client, queue string, ta
 	for key, value := range headers {
 		req.Header.Add(key, value)
 	}
+
+	// Our task handlers expect these to be set
+	if name == "" {
+		req.Header.Add("X-CloudTasks-TaskName", "direct-dispatch-task-"+persist.GenerateID().String())
+	}
+	req.Header.Add("X-CloudTasks-QueueName", queue)
 
 	// Dispatch the request
 	resp, err := client.Do(req)

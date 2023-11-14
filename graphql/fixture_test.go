@@ -2,10 +2,15 @@ package graphql_test
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/pushnotifications"
+	"github.com/mikeydub/go-gallery/pushnotifications/expo"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -278,4 +283,64 @@ func newUserWithFeedEntitiesFixture(t *testing.T) userWithFeedEntititesFixture {
 	feedEvents := globalFeedEvents(t, ctx, c, 4, true)
 	require.Len(t, feedEvents, 4)
 	return userWithFeedEntititesFixture{user, feedEvents, []persist.DBID{postOne, postTwo, postThree}}
+}
+
+type pushNotificationServiceFixture struct {
+	SentNotificationBodies []string
+	Errors                 []error
+	mu                     sync.Mutex
+}
+
+func (p *pushNotificationServiceFixture) appendNotificationBody(title string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.SentNotificationBodies = append(p.SentNotificationBodies, title)
+}
+
+func (p *pushNotificationServiceFixture) appendError(err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Errors = append(p.Errors, err)
+}
+
+// newPushNotificationServiceFixture creates a mock push notification service that records the bodies of messages that would be sent
+func newPushNotificationServiceFixture(t *testing.T) *pushNotificationServiceFixture {
+	t.Helper()
+	ctx := context.Background()
+	service := &pushNotificationServiceFixture{}
+
+	expoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var messages []expo.PushMessage
+		if err := json.NewDecoder(r.Body).Decode(&messages); err != nil {
+			service.appendError(err)
+			return
+		}
+
+		response := expo.SendMessagesResponse{}
+		for _, message := range messages {
+			service.appendNotificationBody(message.Body)
+			response.Data = append(response.Data, expo.PushTicket{
+				TicketID: persist.GenerateID().String(),
+				Status:   expo.StatusOK,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK) // HTTP 200
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			service.appendError(err)
+			return
+		}
+	}))
+	t.Setenv("EXPO_PUSH_API_URL", expoServer.URL)
+
+	pushServer := httptest.NewServer(pushnotifications.CoreInitServer(ctx))
+	t.Setenv("PUSH_NOTIFICATIONS_URL", pushServer.URL)
+
+	t.Cleanup(func() {
+		pushServer.Close()
+		expoServer.Close()
+	})
+
+	return service
 }

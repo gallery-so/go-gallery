@@ -742,6 +742,14 @@ type __publishGalleryMutationInput struct {
 // GetInput returns __publishGalleryMutationInput.Input, and is useful for accessing the field via an interface.
 func (v *__publishGalleryMutationInput) GetInput() PublishGalleryInput { return v.Input }
 
+// __registerPushTokenMutationInput is used internally by genqlient
+type __registerPushTokenMutationInput struct {
+	PushToken string `json:"pushToken"`
+}
+
+// GetPushToken returns __registerPushTokenMutationInput.PushToken, and is useful for accessing the field via an interface.
+func (v *__registerPushTokenMutationInput) GetPushToken() string { return v.PushToken }
+
 // __removeUserWalletsMutationInput is used internally by genqlient
 type __removeUserWalletsMutationInput struct {
 	WalletIds []persist.DBID `json:"walletIds"`
@@ -5437,6 +5445,193 @@ func (v *moveCollectionToGalleryResponse) __premarshalJSON() (*__premarshalmoveC
 	return &retval, nil
 }
 
+// notificationsForViewerQueryResponse is returned by notificationsForViewerQuery on success.
+type notificationsForViewerQueryResponse struct {
+	Viewer *notificationsForViewerQueryViewerViewerOrError `json:"-"`
+}
+
+// GetViewer returns notificationsForViewerQueryResponse.Viewer, and is useful for accessing the field via an interface.
+func (v *notificationsForViewerQueryResponse) GetViewer() *notificationsForViewerQueryViewerViewerOrError {
+	return v.Viewer
+}
+
+func (v *notificationsForViewerQueryResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*notificationsForViewerQueryResponse
+		Viewer json.RawMessage `json:"viewer"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.notificationsForViewerQueryResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.Viewer
+		src := firstPass.Viewer
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(notificationsForViewerQueryViewerViewerOrError)
+			err = __unmarshalnotificationsForViewerQueryViewerViewerOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal notificationsForViewerQueryResponse.Viewer: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalnotificationsForViewerQueryResponse struct {
+	Viewer json.RawMessage `json:"viewer"`
+}
+
+func (v *notificationsForViewerQueryResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *notificationsForViewerQueryResponse) __premarshalJSON() (*__premarshalnotificationsForViewerQueryResponse, error) {
+	var retval __premarshalnotificationsForViewerQueryResponse
+
+	{
+
+		dst := &retval.Viewer
+		src := v.Viewer
+		if src != nil {
+			var err error
+			*dst, err = __marshalnotificationsForViewerQueryViewerViewerOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal notificationsForViewerQueryResponse.Viewer: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// notificationsForViewerQueryViewer includes the requested fields of the GraphQL type Viewer.
+type notificationsForViewerQueryViewer struct {
+	Typename *string `json:"__typename"`
+	// Returns a list of notifications in reverse chronological order.
+	// Seen notifications come after unseen notifications
+	Notifications *notificationsForViewerQueryViewerNotificationsNotificationsConnection `json:"notifications"`
+}
+
+// GetTypename returns notificationsForViewerQueryViewer.Typename, and is useful for accessing the field via an interface.
+func (v *notificationsForViewerQueryViewer) GetTypename() *string { return v.Typename }
+
+// GetNotifications returns notificationsForViewerQueryViewer.Notifications, and is useful for accessing the field via an interface.
+func (v *notificationsForViewerQueryViewer) GetNotifications() *notificationsForViewerQueryViewerNotificationsNotificationsConnection {
+	return v.Notifications
+}
+
+// notificationsForViewerQueryViewerErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type notificationsForViewerQueryViewerErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns notificationsForViewerQueryViewerErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *notificationsForViewerQueryViewerErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns notificationsForViewerQueryViewerErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *notificationsForViewerQueryViewerErrNotAuthorized) GetMessage() string { return v.Message }
+
+// notificationsForViewerQueryViewerNotificationsNotificationsConnection includes the requested fields of the GraphQL type NotificationsConnection.
+type notificationsForViewerQueryViewerNotificationsNotificationsConnection struct {
+	UnseenCount *int `json:"unseenCount"`
+}
+
+// GetUnseenCount returns notificationsForViewerQueryViewerNotificationsNotificationsConnection.UnseenCount, and is useful for accessing the field via an interface.
+func (v *notificationsForViewerQueryViewerNotificationsNotificationsConnection) GetUnseenCount() *int {
+	return v.UnseenCount
+}
+
+// notificationsForViewerQueryViewerViewerOrError includes the requested fields of the GraphQL interface ViewerOrError.
+//
+// notificationsForViewerQueryViewerViewerOrError is implemented by the following types:
+// notificationsForViewerQueryViewerErrNotAuthorized
+// notificationsForViewerQueryViewer
+type notificationsForViewerQueryViewerViewerOrError interface {
+	implementsGraphQLInterfacenotificationsForViewerQueryViewerViewerOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *notificationsForViewerQueryViewerErrNotAuthorized) implementsGraphQLInterfacenotificationsForViewerQueryViewerViewerOrError() {
+}
+func (v *notificationsForViewerQueryViewer) implementsGraphQLInterfacenotificationsForViewerQueryViewerViewerOrError() {
+}
+
+func __unmarshalnotificationsForViewerQueryViewerViewerOrError(b []byte, v *notificationsForViewerQueryViewerViewerOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ErrNotAuthorized":
+		*v = new(notificationsForViewerQueryViewerErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "Viewer":
+		*v = new(notificationsForViewerQueryViewer)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing ViewerOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for notificationsForViewerQueryViewerViewerOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalnotificationsForViewerQueryViewerViewerOrError(v *notificationsForViewerQueryViewerViewerOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *notificationsForViewerQueryViewerErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*notificationsForViewerQueryViewerErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *notificationsForViewerQueryViewer:
+		typename = "Viewer"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*notificationsForViewerQueryViewer
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for notificationsForViewerQueryViewerViewerOrError: "%T"`, v)
+	}
+}
+
 // postTokensPostTokensErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
 type postTokensPostTokensErrInvalidInput struct {
 	Typename *string `json:"__typename"`
@@ -5857,6 +6052,241 @@ func (v *publishGalleryMutationResponse) __premarshalJSON() (*__premarshalpublis
 			if err != nil {
 				return nil, fmt.Errorf(
 					"unable to marshal publishGalleryMutationResponse.PublishGallery: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// registerPushTokenMutationRegisterUserPushTokenErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type registerPushTokenMutationRegisterUserPushTokenErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns registerPushTokenMutationRegisterUserPushTokenErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationRegisterUserPushTokenErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns registerPushTokenMutationRegisterUserPushTokenErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationRegisterUserPushTokenErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized) GetMessage() string {
+	return v.Message
+}
+
+// registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser includes the requested fields of the GraphQL type ErrPushTokenBelongsToAnotherUser.
+type registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser.Typename, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser.Message, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser) GetMessage() string {
+	return v.Message
+}
+
+// registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload includes the requested fields of the GraphQL type RegisterUserPushTokenPayload.
+type registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload struct {
+	Typename *string `json:"__typename"`
+}
+
+// GetTypename returns registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload.Typename, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError includes the requested fields of the GraphQL interface RegisterUserPushTokenPayloadOrError.
+//
+// registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError is implemented by the following types:
+// registerPushTokenMutationRegisterUserPushTokenErrInvalidInput
+// registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized
+// registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser
+// registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload
+type registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError interface {
+	implementsGraphQLInterfaceregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *registerPushTokenMutationRegisterUserPushTokenErrInvalidInput) implementsGraphQLInterfaceregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError() {
+}
+func (v *registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized) implementsGraphQLInterfaceregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError() {
+}
+func (v *registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser) implementsGraphQLInterfaceregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError() {
+}
+func (v *registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload) implementsGraphQLInterfaceregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError() {
+}
+
+func __unmarshalregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError(b []byte, v *registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ErrInvalidInput":
+		*v = new(registerPushTokenMutationRegisterUserPushTokenErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrPushTokenBelongsToAnotherUser":
+		*v = new(registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser)
+		return json.Unmarshal(b, *v)
+	case "RegisterUserPushTokenPayload":
+		*v = new(registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing RegisterUserPushTokenPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError(v *registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *registerPushTokenMutationRegisterUserPushTokenErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*registerPushTokenMutationRegisterUserPushTokenErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*registerPushTokenMutationRegisterUserPushTokenErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser:
+		typename = "ErrPushTokenBelongsToAnotherUser"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*registerPushTokenMutationRegisterUserPushTokenErrPushTokenBelongsToAnotherUser
+		}{typename, v}
+		return json.Marshal(result)
+	case *registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload:
+		typename = "RegisterUserPushTokenPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError: "%T"`, v)
+	}
+}
+
+// registerPushTokenMutationResponse is returned by registerPushTokenMutation on success.
+type registerPushTokenMutationResponse struct {
+	RegisterUserPushToken *registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError `json:"-"`
+}
+
+// GetRegisterUserPushToken returns registerPushTokenMutationResponse.RegisterUserPushToken, and is useful for accessing the field via an interface.
+func (v *registerPushTokenMutationResponse) GetRegisterUserPushToken() *registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError {
+	return v.RegisterUserPushToken
+}
+
+func (v *registerPushTokenMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*registerPushTokenMutationResponse
+		RegisterUserPushToken json.RawMessage `json:"registerUserPushToken"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.registerPushTokenMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.RegisterUserPushToken
+		src := firstPass.RegisterUserPushToken
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(registerPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError)
+			err = __unmarshalregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal registerPushTokenMutationResponse.RegisterUserPushToken: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalregisterPushTokenMutationResponse struct {
+	RegisterUserPushToken json.RawMessage `json:"registerUserPushToken"`
+}
+
+func (v *registerPushTokenMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *registerPushTokenMutationResponse) __premarshalJSON() (*__premarshalregisterPushTokenMutationResponse, error) {
+	var retval __premarshalregisterPushTokenMutationResponse
+
+	{
+
+		dst := &retval.RegisterUserPushToken
+		src := v.RegisterUserPushToken
+		if src != nil {
+			var err error
+			*dst, err = __marshalregisterPushTokenMutationRegisterUserPushTokenRegisterUserPushTokenPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal registerPushTokenMutationResponse.RegisterUserPushToken: %w", err)
 			}
 		}
 	}
@@ -11749,6 +12179,46 @@ func moveCollectionToGallery(
 	return &data, err
 }
 
+// The query or mutation executed by notificationsForViewerQuery.
+const notificationsForViewerQuery_Operation = `
+query notificationsForViewerQuery {
+	viewer {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on Viewer {
+			notifications(last: 1, before: null) {
+				unseenCount
+			}
+		}
+	}
+}
+`
+
+func notificationsForViewerQuery(
+	ctx context.Context,
+	client graphql.Client,
+) (*notificationsForViewerQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "notificationsForViewerQuery",
+		Query:  notificationsForViewerQuery_Operation,
+	}
+	var err error
+
+	var data notificationsForViewerQueryResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 // The query or mutation executed by postTokens.
 const postTokens_Operation = `
 mutation postTokens ($input: PostTokensInput!) {
@@ -11826,6 +12296,48 @@ func publishGalleryMutation(
 	var err error
 
 	var data publishGalleryMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+// The query or mutation executed by registerPushTokenMutation.
+const registerPushTokenMutation_Operation = `
+mutation registerPushTokenMutation ($pushToken: String!) {
+	registerUserPushToken(pushToken: $pushToken) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on RegisterUserPushTokenPayload {
+			__typename
+		}
+	}
+}
+`
+
+func registerPushTokenMutation(
+	ctx context.Context,
+	client graphql.Client,
+	pushToken string,
+) (*registerPushTokenMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "registerPushTokenMutation",
+		Query:  registerPushTokenMutation_Operation,
+		Variables: &__registerPushTokenMutationInput{
+			PushToken: pushToken,
+		},
+	}
+	var err error
+
+	var data registerPushTokenMutationResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(

@@ -81,6 +81,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should connect social account", run: testConnectSocialAccount},
 		{title: "should view a token", run: testViewToken},
 		{title: "should admire a token", run: testAdmireToken},
+		{title: "should send notifications", run: testSendNotifications, fixtures: []fixture{usePostgres, useRedis}},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -803,6 +804,39 @@ func testViewToken(t *testing.T) {
 	assert.NotEmpty(t, responseBobViewToken)
 }
 
+func testSendNotifications(t *testing.T) {
+	ctx := context.Background()
+	pushService := newPushNotificationServiceFixture(t)
+	userF := newUserWithFeedEntitiesFixture(t)
+	alice := newUserFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+	c2 := authedHandlerClient(t, alice.ID)
+	registerPushToken(t, ctx, c)
+
+	admirePost(t, ctx, c2, userF.PostIDs[0])
+	commentOnPost(t, ctx, c2, userF.PostIDs[0], "post comment 1")
+	commentOnPost(t, ctx, c2, userF.PostIDs[0], "post comment 2")
+	admireFeedEvent(t, ctx, c2, userF.FeedEventIDs[0])
+	commentOnFeedEvent(t, ctx, c2, userF.FeedEventIDs[0], "feed event comment")
+
+	require.Eventuallyf(t, func() bool {
+		return len(pushService.SentNotificationBodies) == 5
+	}, time.Second*30, time.Second, "expected 5 push notifications to be sent, got %d", len(pushService.SentNotificationBodies))
+
+	assert.Empty(t, pushService.Errors)
+	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s admired your post", alice.Username))
+	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s commented on your post: post comment 1", alice.Username))
+	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s commented on your post: post comment 2", alice.Username))
+	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s admired your gallery update", alice.Username))
+	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s commented on your gallery update: feed event comment", alice.Username))
+
+	response, err := notificationsForViewerQuery(ctx, c)
+	require.NoError(t, err)
+	payload := (*response.GetViewer()).(*notificationsForViewerQueryViewer)
+	require.NotNil(t, payload)
+	assert.Equal(t, 5, *(payload.GetNotifications().GetUnseenCount()))
+}
+
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
@@ -1331,6 +1365,13 @@ func newNonce(t *testing.T, ctx context.Context, c genql.Client, w wallet) strin
 	require.NoError(t, err)
 	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
 	return *payload.Nonce
+}
+
+// registerPushtoken makes a GraphQL request to register a push token for an authenticated user
+func registerPushToken(t *testing.T, ctx context.Context, c genql.Client) {
+	t.Helper()
+	_, err := registerPushTokenMutation(ctx, c, persist.GenerateID().String())
+	require.NoError(t, err)
 }
 
 // newUser makes a GraphQL request to generate a new user
