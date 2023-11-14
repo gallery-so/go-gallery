@@ -866,7 +866,6 @@ func readerFromURL(ctx context.Context, mediaURL string, mediaType persist.Media
 		if util.ErrorAs[util.ErrHTTP](err) || util.ErrorAs[*net.DNSError](err) || util.ErrorAs[*url.Error](err) {
 			return reader, mediaType, errInvalidMedia{URL: mediaURL, err: err}
 		}
-		logger.For(ctx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 		return reader, mediaType, errNoDataFromReader{err: err, url: mediaURL}
 	}
 

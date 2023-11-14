@@ -158,11 +158,7 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm
 			return
 		}
 
-		_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
-		if err != nil {
-			// Only log the error, because tokenmanage will handle reprocessing
-			logger.For(c).Errorf("error processing token: %s", err)
-		}
+		runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -715,14 +711,10 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 				return
 			}
 
-			_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
+			runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
 				addIsSpamJobOption(contract),
 				PipelineOpts.WithRequireImage(), // Require an image if available
 			)
-			if err != nil {
-				// Only log the error, because tokenmanage will handle reprocessing
-				logger.For(c).Errorf("error in preflight: error processing token: %s", err)
-			}
 		}
 
 		// Try to sync the user's token if a user is provided
