@@ -235,18 +235,17 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	}
 
 	newMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain, fieldRequests)
+	if err == nil && len(newMetadata) > 0 {
+		return newMetadata
+	}
+
 	if err != nil {
 		logger.For(ctx).Warnf("error getting metadata from chain: %s", err)
-		persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
-	} else if len(newMetadata) > 0 {
-		logger.For(ctx).Infof("got metadata from chain: %v", newMetadata)
 	}
 
-	if len(newMetadata) == 0 {
-		persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
-	}
-
-	return newMetadata
+	// Return the original metadata if we can't get new metadata
+	persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
+	return tpj.defaultMetadata
 }
 
 func (tpj *tokenProcessingJob) cacheFromURL(ctx context.Context, tids persist.TokenIdentifiers, defaultObjectType objectType, mediaURL string, subMeta *cachePipelineMetadata) chan cacheResult {

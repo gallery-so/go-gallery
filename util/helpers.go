@@ -748,7 +748,9 @@ func (f FileHeaderReader) Headers() ([]byte, error) {
 	}
 
 	byt, err := f.Peek(512)
-	if err != nil && err != io.EOF {
+
+	// Use what bytes were read as the header
+	if err != nil && err != io.EOF && err != bufio.ErrBufferFull {
 		return nil, err
 	}
 
