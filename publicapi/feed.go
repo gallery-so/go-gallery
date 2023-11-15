@@ -16,7 +16,6 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 
@@ -47,7 +46,7 @@ type FeedAPI struct {
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	cache              *redis.Cache
-	taskClient         *gcptasks.Client
+	taskClient         *task.Client
 	multichainProvider *multichain.Provider
 }
 
@@ -431,7 +430,7 @@ func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIde
 		return err
 	}
 	userID, _ := getAuthenticatedUserID(ctx)
-	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
+	return api.taskClient.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID})
 }
 
 func insertMentionsForPost(ctx context.Context, mentions []*model.MentionInput, postID persist.DBID, q *db.Queries) ([]db.Mention, error) {

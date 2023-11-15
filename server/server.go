@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"net/http"
 	"os"
 	"time"
@@ -17,7 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
@@ -72,7 +72,7 @@ type Clients struct {
 	IPFSClient      *shell.Shell
 	ArweaveClient   *goar.Client
 	StorageClient   *storage.Client
-	TaskClient      *cloudtasks.Client
+	TaskClient      *task.Client
 	SecretClient    *secretmanager.Client
 	PubSubClient    *pubsub.Client
 	MagicLinkClient *magicclient.API
@@ -84,8 +84,9 @@ func (c *Clients) Close() {
 }
 
 func ClientInit(ctx context.Context) *Clients {
-	pq := postgres.MustCreateClient()
-	pgx := postgres.NewPgxClient()
+	retries := retry.Retry{Base: 2, Cap: 4, Tries: 3}
+	pq := postgres.MustCreateClient(postgres.WithRetries(retries))
+	pgx := postgres.NewPgxClient(postgres.WithRetries(retries))
 	return &Clients{
 		Repos:           postgres.NewRepositories(pq, pgx),
 		Queries:         db.New(pgx),

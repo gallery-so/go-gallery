@@ -680,3 +680,29 @@ query tokenByIdQuery($id: DBID!) {
     }
   }
 }
+
+mutation registerPushTokenMutation($pushToken: String!) {
+  registerUserPushToken(pushToken: $pushToken) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on RegisterUserPushTokenPayload {
+      __typename
+    }
+  }
+}
+
+query notificationsForViewerQuery {
+  viewer {
+    ... on Error {
+      __typename
+      message
+    }
+    ...on Viewer {
+      notifications(last:1, before:null) {
+        unseenCount
+      }
+    }
+  }
+}

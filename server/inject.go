@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"net/http"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 
@@ -100,7 +99,7 @@ func newQueries(p *pgxpool.Pool) *db.Queries {
 }
 
 // ethProviderSet is a wire injector that creates the set of Ethereum providers
-func ethProviderSet(envInit, *cloudtasks.Client, *http.Client, *tokenMetadataCache) ethProviderList {
+func ethProviderSet(envInit, *task.Client, *http.Client, *tokenMetadataCache) ethProviderList {
 	wire.Build(
 		rpc.NewEthClient,
 		ethProvidersConfig,
