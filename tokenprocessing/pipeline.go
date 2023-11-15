@@ -202,10 +202,12 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 	metadata := tpj.retrieveMetadata(ctx)
+
 	imgURL, pfpURL, animURL, err := findURLsToDownloadFrom(ctx, tpj, metadata)
 	if err != nil {
-		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, err
+		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, wrapWithBadTokenErr(err)
 	}
+
 	newMedia, err := tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL)
 	return newMedia, metadata, err
 }
