@@ -2702,6 +2702,112 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 	return discount_code, err
 }
 
+const getMostActiveUsers = `-- name: GetMostActiveUsers :many
+WITH ag AS (
+    SELECT actor_id, COUNT(*) AS admire_given
+    FROM admires
+    WHERE created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY actor_id
+),
+ar AS (
+    SELECT p.actor_id, COUNT(*) AS admire_received
+    FROM posts p
+    JOIN admires a ON p.id = a.post_id
+    WHERE a.created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY p.actor_id
+),
+cm AS (
+    SELECT actor_id, COUNT(id) AS comments_made
+    FROM comments
+    WHERE created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY actor_id
+),
+cr AS (
+    SELECT p.actor_id, COUNT(c.id) AS comments_received
+    FROM posts p
+    JOIN comments c ON p.id = c.post_id
+    WHERE p.created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY p.actor_id
+),
+scores AS (
+    SELECT 
+        u.username,
+        ((COALESCE(ar.admire_received, 0) * $2::int) + 
+        (COALESCE(ag.admire_given, 0) * $3::int) + 
+        (COALESCE(cm.comments_made, 0) * $4::int) + 
+        (COALESCE(cr.comments_received, 0) * $5::int)) AS score,
+        COALESCE(nullif(ag.actor_id,''), nullif(ar.actor_id,''), nullif(cm.actor_id,''), nullif(cr.actor_id,'')) AS actor_id,
+        COALESCE(ag.admire_given, 0) AS admires_given,
+        COALESCE(ar.admire_received, 0) AS admires_received,
+        COALESCE(cm.comments_made, 0) AS comments_made,
+        COALESCE(cr.comments_received, 0) AS comments_received
+        
+    FROM users u
+    FULL OUTER JOIN ag ON u.id = ag.actor_id
+    FULL OUTER JOIN ar ON u.id = ar.actor_id
+    FULL OUTER JOIN cm ON u.id = cm.actor_id
+    FULL OUTER JOIN cr ON u.id = cr.actor_id
+    WHERE u.deleted = false AND u.universal = false
+)
+SELECT actor_id, username, admires_given, admires_received, comments_made, comments_received, score
+FROM scores
+WHERE actor_id IS NOT NULL AND score > 0
+ORDER BY scores.score DESC
+LIMIT $1
+`
+
+type GetMostActiveUsersParams struct {
+	Limit                  int32 `db:"limit" json:"limit"`
+	AdmireReceivedWeight   int32 `db:"admire_received_weight" json:"admire_received_weight"`
+	AdmireGivenWeight      int32 `db:"admire_given_weight" json:"admire_given_weight"`
+	CommentsMadeWeight     int32 `db:"comments_made_weight" json:"comments_made_weight"`
+	CommentsReceivedWeight int32 `db:"comments_received_weight" json:"comments_received_weight"`
+}
+
+type GetMostActiveUsersRow struct {
+	ActorID          persist.DBID   `db:"actor_id" json:"actor_id"`
+	Username         sql.NullString `db:"username" json:"username"`
+	AdmiresGiven     int64          `db:"admires_given" json:"admires_given"`
+	AdmiresReceived  int64          `db:"admires_received" json:"admires_received"`
+	CommentsMade     int64          `db:"comments_made" json:"comments_made"`
+	CommentsReceived int64          `db:"comments_received" json:"comments_received"`
+	Score            int32          `db:"score" json:"score"`
+}
+
+func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsersParams) ([]GetMostActiveUsersRow, error) {
+	rows, err := q.db.Query(ctx, getMostActiveUsers,
+		arg.Limit,
+		arg.AdmireReceivedWeight,
+		arg.AdmireGivenWeight,
+		arg.CommentsMadeWeight,
+		arg.CommentsReceivedWeight,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMostActiveUsersRow
+	for rows.Next() {
+		var i GetMostActiveUsersRow
+		if err := rows.Scan(
+			&i.ActorID,
+			&i.Username,
+			&i.AdmiresGiven,
+			&i.AdmiresReceived,
+			&i.CommentsMade,
+			&i.CommentsReceived,
+			&i.Score,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id from notifications
     where owner_id = $1
@@ -6791,6 +6897,22 @@ type UpdateTokensAsUserMarkedSpamParams struct {
 
 func (q *Queries) UpdateTokensAsUserMarkedSpam(ctx context.Context, arg UpdateTokensAsUserMarkedSpamParams) error {
 	_, err := q.db.Exec(ctx, updateTokensAsUserMarkedSpam, arg.IsUserMarkedSpam, arg.OwnerUserID, arg.TokenIds)
+	return err
+}
+
+const updateTop100Users = `-- name: UpdateTop100Users :exec
+UPDATE users
+SET traits = CASE 
+                WHEN id = ANY($1) THEN 
+                    COALESCE(traits, '{}'::jsonb) || '{"top_100": true}'::jsonb
+                ELSE 
+                    traits - 'top_100'
+             END
+WHERE id = ANY($1) OR traits ? 'top_100'
+`
+
+func (q *Queries) UpdateTop100Users(ctx context.Context, top100UserIds persist.DBIDList) error {
+	_, err := q.db.Exec(ctx, updateTop100Users, top100UserIds)
 	return err
 }
 

@@ -1700,3 +1700,66 @@ select * from mentions where id = @id and not deleted;
 
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
+
+-- name: GetMostActiveUsers :many
+WITH ag AS (
+    SELECT actor_id, COUNT(*) AS admire_given
+    FROM admires
+    WHERE created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY actor_id
+),
+ar AS (
+    SELECT p.actor_id, COUNT(*) AS admire_received
+    FROM posts p
+    JOIN admires a ON p.id = a.post_id
+    WHERE a.created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY p.actor_id
+),
+cm AS (
+    SELECT actor_id, COUNT(id) AS comments_made
+    FROM comments
+    WHERE created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY actor_id
+),
+cr AS (
+    SELECT p.actor_id, COUNT(c.id) AS comments_received
+    FROM posts p
+    JOIN comments c ON p.id = c.post_id
+    WHERE p.created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY p.actor_id
+),
+scores AS (
+    SELECT 
+        u.username,
+        ((COALESCE(ar.admire_received, 0) * @admire_received_weight::int) + 
+        (COALESCE(ag.admire_given, 0) * @admire_given_weight::int) + 
+        (COALESCE(cm.comments_made, 0) * @comments_made_weight::int) + 
+        (COALESCE(cr.comments_received, 0) * @comments_received_weight::int)) AS score,
+        COALESCE(nullif(ag.actor_id,''), nullif(ar.actor_id,''), nullif(cm.actor_id,''), nullif(cr.actor_id,'')) AS actor_id,
+        COALESCE(ag.admire_given, 0) AS admires_given,
+        COALESCE(ar.admire_received, 0) AS admires_received,
+        COALESCE(cm.comments_made, 0) AS comments_made,
+        COALESCE(cr.comments_received, 0) AS comments_received
+        
+    FROM users u
+    FULL OUTER JOIN ag ON u.id = ag.actor_id
+    FULL OUTER JOIN ar ON u.id = ar.actor_id
+    FULL OUTER JOIN cm ON u.id = cm.actor_id
+    FULL OUTER JOIN cr ON u.id = cr.actor_id
+    WHERE u.deleted = false AND u.universal = false
+)
+SELECT actor_id, username, admires_given, admires_received, comments_made, comments_received, score
+FROM scores
+WHERE actor_id IS NOT NULL AND score > 0
+ORDER BY scores.score DESC
+LIMIT $1;
+
+-- name: UpdateTop100Users :exec
+UPDATE users
+SET traits = CASE 
+                WHEN id = ANY(@top_100_user_ids) THEN 
+                    COALESCE(traits, '{}'::jsonb) || '{"top_100": true}'::jsonb
+                ELSE 
+                    traits - 'top_100'
+             END
+WHERE id = ANY(@top_100_user_ids) OR traits ? 'top_100';
