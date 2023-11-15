@@ -74,13 +74,21 @@ where contract_id not in (
 -- name: GetFeedEntityScores :many
 with refreshed as (
   select greatest((select last_updated from feed_entity_scores limit 1), @window_end::timestamptz) last_updated
+), gallery_user as (
+  select id from users where username_idempotent = 'gallery' and not deleted and not universal
 )
-select sqlc.embed(feed_entity_scores), sqlc.embed(posts)
+select
+  sqlc.embed(feed_entity_scores),
+  sqlc.embed(posts),
+  posts.actor_id = (select id from gallery_user) is_gallery_post
 from feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 where feed_entity_scores.created_at > @window_end::timestamptz and not posts.deleted
 union
-select sqlc.embed(feed_entity_scores), sqlc.embed(posts)
+select
+  sqlc.embed(feed_entity_scores),
+  sqlc.embed(posts),
+  posts.actor_id = (select id from gallery_user) is_gallery_post
 from feed_entity_score_view feed_entity_scores
-join posts on feed_entity_scores.id = posts.id
+join posts on feed_entity_scores.id = posts.id, gallery_user
 where feed_entity_scores.created_at > (select last_updated from refreshed limit 1) and not posts.deleted;
