@@ -730,9 +730,18 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null
     LIMIT sqlc.arg('limit');
 
 -- name: PaginateRepliesByCommentIDBatch :batchmany
-SELECT * FROM comments WHERE sqlc.arg('comment_id') = any(reply_ancestors)
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+SELECT * FROM comments WHERE 
+    ( 
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    )
+    AND (comments.created_at, comments.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (comments.created_at, comments.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -741,7 +750,16 @@ SELECT * FROM comments WHERE sqlc.arg('comment_id') = any(reply_ancestors)
 SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null;
 
 -- name: CountRepliesByCommentIDBatch :batchone
-SELECT count(*) FROM comments WHERE sqlc.arg('comment_id') = any(reply_ancestors);
+SELECT count(*) FROM comments WHERE 
+    ( 
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    );
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false

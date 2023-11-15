@@ -1702,7 +1702,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 }
 
 const getCommentByCommentID = `-- name: GetCommentByCommentID :one
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, reply_ancestors FROM comments WHERE id = $1
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id FROM comments WHERE id = $1
 `
 
 func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (Comment, error) {
@@ -1720,13 +1720,13 @@ func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (C
 		&i.LastUpdated,
 		&i.PostID,
 		&i.Removed,
-		&i.ReplyAncestors,
+		&i.TopLevelCommentID,
 	)
 	return i, err
 }
 
 const getCommentsByCommentIDs = `-- name: GetCommentsByCommentIDs :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, reply_ancestors from comments WHERE id = ANY($1)
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id from comments WHERE id = ANY($1)
 `
 
 func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {
@@ -1750,7 +1750,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 			&i.LastUpdated,
 			&i.PostID,
 			&i.Removed,
-			&i.ReplyAncestors,
+			&i.TopLevelCommentID,
 		); err != nil {
 			return nil, err
 		}

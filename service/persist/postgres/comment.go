@@ -7,6 +7,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -17,7 +18,7 @@ type CommentRepository struct {
 	createStmt        *sql.Stmt
 	createMentionStmt *sql.Stmt
 	deleteStmt        *sql.Stmt
-	ancestorsStmt     *sql.Stmt
+	topAncestorStmt   *sql.Stmt
 }
 
 // NewCommentRepository creates a new postgres repository for interacting with comments
@@ -25,7 +26,7 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, REPLY_ANCESTORS, COMMENT) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, TOP_LEVEL_COMMENT_ID, COMMENT) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`)
 	checkNoErr(err)
 
 	createMentionStmt, err := db.PrepareContext(ctx, `INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
@@ -34,7 +35,7 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;`)
 	checkNoErr(err)
 
-	ancestorsStmt, err := db.PrepareContext(ctx, `WITH RECURSIVE comment_thread AS (
+	topAncestorStmt, err := db.PrepareContext(ctx, `WITH RECURSIVE comment_thread AS (
     SELECT *
     FROM comments
     WHERE comments.id = $1
@@ -43,7 +44,7 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
     FROM comments c
     INNER JOIN comment_thread ct ON c.id = ct.reply_to
 )
-SELECT id FROM comment_thread;`)
+SELECT id FROM comment_thread where reply_to is null limit 1;`)
 	checkNoErr(err)
 
 	return &CommentRepository{
@@ -52,7 +53,7 @@ SELECT id FROM comment_thread;`)
 		createStmt:        createStmt,
 		createMentionStmt: createMentionStmt,
 		deleteStmt:        deleteStmt,
-		ancestorsStmt:     ancestorsStmt,
+		topAncestorStmt:   topAncestorStmt,
 	}
 }
 
@@ -80,28 +81,16 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 	}
 	defer tx.Rollback()
 
-	var ancestors []persist.DBID
+	var topLevelComment *persist.DBID
 	if replyToID != nil {
-		rows, err := tx.StmtContext(ctx, a.ancestorsStmt).QueryContext(ctx, replyToID)
+		tx.StmtContext(ctx, a.topAncestorStmt).QueryRowContext(ctx, replyToID).Scan(&topLevelComment)
 		if err != nil {
-			return "", nil, err
-		}
-		for rows.Next() {
-			var ancestor persist.DBID
-			err = rows.Scan(&ancestor)
-			if err != nil {
-				return "", nil, err
-			}
-
-			ancestors = append(ancestors, ancestor)
-		}
-		if err = rows.Err(); err != nil {
-			return "", nil, err
+			logger.For(ctx).Errorf("error getting top level comment: %v", err)
 		}
 	}
 
 	var resultID persist.DBID
-	err = tx.StmtContext(ctx, a.createStmt).QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, ancestors, comment).Scan(&resultID)
+	err = tx.StmtContext(ctx, a.createStmt).QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, topLevelComment, comment).Scan(&resultID)
 	if err != nil {
 		return "", nil, err
 	}

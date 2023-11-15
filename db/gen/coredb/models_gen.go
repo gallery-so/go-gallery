@@ -49,18 +49,18 @@ type Collection struct {
 }
 
 type Comment struct {
-	ID             persist.DBID `db:"id" json:"id"`
-	Version        int32        `db:"version" json:"version"`
-	FeedEventID    persist.DBID `db:"feed_event_id" json:"feed_event_id"`
-	ActorID        persist.DBID `db:"actor_id" json:"actor_id"`
-	ReplyTo        persist.DBID `db:"reply_to" json:"reply_to"`
-	Comment        string       `db:"comment" json:"comment"`
-	Deleted        bool         `db:"deleted" json:"deleted"`
-	CreatedAt      time.Time    `db:"created_at" json:"created_at"`
-	LastUpdated    time.Time    `db:"last_updated" json:"last_updated"`
-	PostID         persist.DBID `db:"post_id" json:"post_id"`
-	Removed        bool         `db:"removed" json:"removed"`
-	ReplyAncestors []string     `db:"reply_ancestors" json:"reply_ancestors"`
+	ID                persist.DBID `db:"id" json:"id"`
+	Version           int32        `db:"version" json:"version"`
+	FeedEventID       persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+	ActorID           persist.DBID `db:"actor_id" json:"actor_id"`
+	ReplyTo           persist.DBID `db:"reply_to" json:"reply_to"`
+	Comment           string       `db:"comment" json:"comment"`
+	Deleted           bool         `db:"deleted" json:"deleted"`
+	CreatedAt         time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time    `db:"last_updated" json:"last_updated"`
+	PostID            persist.DBID `db:"post_id" json:"post_id"`
+	Removed           bool         `db:"removed" json:"removed"`
+	TopLevelCommentID persist.DBID `db:"top_level_comment_id" json:"top_level_comment_id"`
 }
 
 type Contract struct {
