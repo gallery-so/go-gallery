@@ -3,8 +3,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -12,33 +12,15 @@ import (
 
 // CommentRepository represents an comment repository in the postgres database
 type CommentRepository struct {
-	db                *sql.DB
-	queries           *db.Queries
-	createStmt        *sql.Stmt
-	createMentionStmt *sql.Stmt
-	deleteStmt        *sql.Stmt
+	pgx     *pgxpool.Pool
+	queries *db.Queries
 }
 
 // NewCommentRepository creates a new postgres repository for interacting with comments
-func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, COMMENT) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
-	checkNoErr(err)
-
-	createMentionStmt, err := db.PrepareContext(ctx, `INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
-	checkNoErr(err)
-
-	deleteStmt, err := db.PrepareContext(ctx, `UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;`)
-	checkNoErr(err)
-
+func NewCommentRepository(queries *db.Queries, pgx *pgxpool.Pool) *CommentRepository {
 	return &CommentRepository{
-		db:                db,
-		queries:           queries,
-		createStmt:        createStmt,
-		createMentionStmt: createMentionStmt,
-		deleteStmt:        deleteStmt,
+		queries: queries,
+		pgx:     pgx,
 	}
 }
 
@@ -60,20 +42,37 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 		}
 	}
 
-	tx, err := a.db.BeginTx(ctx, nil)
+	var replyToString sql.NullString
+	if replyToID != nil {
+		replyToString = sql.NullString{
+			String: replyToID.String(),
+			Valid:  true,
+		}
+	}
+
+	qtx, err := a.pgx.Begin(ctx)
 	if err != nil {
 		return "", nil, err
 	}
-	defer tx.Rollback()
 
-	var resultID persist.DBID
-	err = tx.StmtContext(ctx, a.createStmt).QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, comment).Scan(&resultID)
+	defer qtx.Rollback(ctx)
+
+	qs := a.queries.WithTx(qtx)
+
+	resultID, err := qs.InsertComment(ctx, db.InsertCommentParams{
+		ID:        persist.GenerateID(),
+		FeedEvent: feedEventString,
+		Post:      postString,
+		ActorID:   actorID,
+		Reply:     replyToString,
+		Comment:   comment,
+	})
 	if err != nil {
 		return "", nil, err
 	}
 
 	ms := make([]db.Mention, len(mentions))
-	cm := tx.StmtContext(ctx, a.createMentionStmt)
+
 	for i, m := range mentions {
 		var userID, contractID sql.NullString
 		if m.UserID != "" {
@@ -87,8 +86,14 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 				Valid:  true,
 			}
 		}
-		var mid persist.DBID
-		err = cm.QueryRowContext(ctx, persist.GenerateID(), resultID, userID, contractID, m.Start, m.Length).Scan(&mid)
+		mid, err := qs.InsertMention(ctx, db.InsertMentionParams{
+			ID:        persist.GenerateID(),
+			CommentID: resultID,
+			Start:     m.Start,
+			Length:    m.Length,
+			User:      userID,
+			Contract:  contractID,
+		})
 		if err != nil {
 			return "", nil, err
 		}
@@ -96,15 +101,10 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 		ms[i] = m
 	}
 
-	err = tx.Commit()
+	err = qtx.Commit(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 
 	return resultID, ms, nil
-}
-
-func (a *CommentRepository) RemoveComment(ctx context.Context, commentID persist.DBID) error {
-	_, err := a.deleteStmt.ExecContext(ctx, commentID)
-	return err
 }
