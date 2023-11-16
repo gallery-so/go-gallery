@@ -36,7 +36,6 @@ import (
 )
 
 const (
-	tHalf4Hours  = 4 * 60.0
 	tHalf6Hours  = 6 * 60.0
 	tHalf10Hours = 10 * 60.0
 )
@@ -793,7 +792,6 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 			engagementScores[e.Post.ID] = decayRate(e.Post.CreatedAt, now, e.IsGalleryPost) * freshnessFactor(e.Post.CreatedAt, now)
 			personalizationScores[e.Post.ID] = engagementScores[e.Post.ID]
 			engagementScores[e.Post.ID] *= engagementFactor(int(e.FeedEntityScore.Interactions))
-			// Weigh relevance if post isn't from Gallery
 			if !e.IsGalleryPost {
 				personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(userID, e.FeedEntityScore)
 			}
@@ -1066,15 +1064,16 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 func decayRate(t0, t1 time.Time, isGalleryPost bool) float64 {
 	age := t1.Sub(t0).Minutes()
 	if isGalleryPost {
-		p := math.Pow(2, -(age / lerp(tHalf4Hours, tHalf10Hours, age)))
-		return p
+		h := lerp(tHalf6Hours, tHalf10Hours, age, 4*24*60)
+		return math.Pow(2, -(age / h))
 	}
 	return math.Pow(2, -(age / tHalf6Hours))
 }
 
-// lerp returns a linear interpolation between s and e based on age
-func lerp(s, e, age float64) float64 {
-	return math.Min(e, s+((e-s)/3600)*age)
+// lerp returns a linear interpolation between s and e (clamped to e) based on age
+// period controls the time it takes to reach e from s
+func lerp(s, e, age, period float64) float64 {
+	return math.Min(e, s+((e-s)/period)*age)
 }
 
 // freshnessFactor returns a scaling factor for a post based on how recently it was made.

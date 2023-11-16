@@ -106,7 +106,7 @@ select
   posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted,
   posts.actor_id = (select id from gallery_user) is_gallery_post
 from feed_entity_score_view feed_entity_scores
-join posts on feed_entity_scores.id = posts.id, gallery_user
+join posts on feed_entity_scores.id = posts.id
 where feed_entity_scores.created_at > (select last_updated from refreshed limit 1) and not posts.deleted
 `
 
