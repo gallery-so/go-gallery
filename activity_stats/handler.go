@@ -70,7 +70,7 @@ func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgx
 			return r.ActorID
 		})
 
-		err = qtx.UpdateTop100Users(c, userIDs)
+		err = qtx.UpdateTopActiveUsers(c, userIDs)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

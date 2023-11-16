@@ -6977,19 +6977,19 @@ func (q *Queries) UpdateTokensAsUserMarkedSpam(ctx context.Context, arg UpdateTo
 	return err
 }
 
-const updateTop100Users = `-- name: UpdateTop100Users :exec
+const updateTopActiveUsers = `-- name: UpdateTopActiveUsers :exec
 UPDATE users
 SET traits = CASE 
                 WHEN id = ANY($1) THEN 
-                    COALESCE(traits, '{}'::jsonb) || '{"top_100": true}'::jsonb
+                    COALESCE(traits, '{}'::jsonb) || '{"top_activity": true}'::jsonb
                 ELSE 
-                    traits - 'top_100'
+                    traits - 'top_activity'
              END
-WHERE id = ANY($1) OR traits ? 'top_100'
+WHERE id = ANY($1) OR traits ? 'top_activity'
 `
 
-func (q *Queries) UpdateTop100Users(ctx context.Context, top100UserIds persist.DBIDList) error {
-	_, err := q.db.Exec(ctx, updateTop100Users, top100UserIds)
+func (q *Queries) UpdateTopActiveUsers(ctx context.Context, topUserIds persist.DBIDList) error {
+	_, err := q.db.Exec(ctx, updateTopActiveUsers, topUserIds)
 	return err
 }
 

@@ -1760,15 +1760,15 @@ WHERE actor_id IS NOT NULL AND score > 0
 ORDER BY scores.score DESC
 LIMIT $1;
 
--- name: UpdateTop100Users :exec
+-- name: UpdateTopActiveUsers :exec
 UPDATE users
 SET traits = CASE 
-                WHEN id = ANY(@top_100_user_ids) THEN 
-                    COALESCE(traits, '{}'::jsonb) || '{"top_100": true}'::jsonb
+                WHEN id = ANY(@top_user_ids) THEN 
+                    COALESCE(traits, '{}'::jsonb) || '{"top_activity": true}'::jsonb
                 ELSE 
-                    traits - 'top_100'
+                    traits - 'top_activity'
              END
-WHERE id = ANY(@top_100_user_ids) OR traits ? 'top_100';
+WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 -- name: InsertMention :one
 INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
 
