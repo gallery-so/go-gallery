@@ -90,13 +90,21 @@ func (q *Queries) GetExternalFollowGraphSource(ctx context.Context) ([]GetExtern
 const getFeedEntityScores = `-- name: GetFeedEntityScores :many
 with refreshed as (
   select greatest((select last_updated from feed_entity_scores limit 1), $1::timestamptz) last_updated
+), gallery_user as (
+  select id from users where username_idempotent = 'gallery' and not deleted and not universal
 )
-select feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated, posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+select
+  feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated,
+  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted,
+  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
 from feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 where feed_entity_scores.created_at > $1::timestamptz and not posts.deleted
 union
-select feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated, posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+select
+  feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated,
+  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted,
+  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
 from feed_entity_score_view feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 where feed_entity_scores.created_at > (select last_updated from refreshed limit 1) and not posts.deleted
@@ -105,6 +113,7 @@ where feed_entity_scores.created_at > (select last_updated from refreshed limit 
 type GetFeedEntityScoresRow struct {
 	FeedEntityScore FeedEntityScore `db:"feedentityscore" json:"feedentityscore"`
 	Post            Post            `db:"post" json:"post"`
+	IsGalleryPost   bool            `db:"is_gallery_post" json:"is_gallery_post"`
 }
 
 func (q *Queries) GetFeedEntityScores(ctx context.Context, windowEnd time.Time) ([]GetFeedEntityScoresRow, error) {
@@ -134,6 +143,7 @@ func (q *Queries) GetFeedEntityScores(ctx context.Context, windowEnd time.Time) 
 			&i.Post.CreatedAt,
 			&i.Post.LastUpdated,
 			&i.Post.Deleted,
+			&i.IsGalleryPost,
 		); err != nil {
 			return nil, err
 		}
