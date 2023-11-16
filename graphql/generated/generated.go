@@ -825,7 +825,7 @@ type ComplexityRoot struct {
 		AdmireFeedEvent                                 func(childComplexity int, feedEventID persist.DBID) int
 		AdmirePost                                      func(childComplexity int, postID persist.DBID) int
 		AdmireToken                                     func(childComplexity int, tokenID persist.DBID) int
-		BanUserFromFeed                                 func(childComplexity int, username string, action string) int
+		BanUserFromFeed                                 func(childComplexity int, username string, reason *string) int
 		ClearAllNotifications                           func(childComplexity int) int
 		CommentOnFeedEvent                              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) int
 		CommentOnPost                                   func(childComplexity int, postID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) int
@@ -1890,7 +1890,7 @@ type MutationResolver interface {
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
 	SyncCreatedTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncCreatedTokensForUsernamePayloadOrError, error)
 	SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, chainAddress persist.ChainAddress) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error)
-	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
+	BanUserFromFeed(ctx context.Context, username string, reason *string) (model.BanUserFromFeedPayloadOrError, error)
 	UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error)
 	MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error)
 	SetCommunityOverrideCreator(ctx context.Context, communityID persist.DBID, creatorUserID *persist.DBID) (model.SetCommunityOverrideCreatorPayloadOrError, error)
@@ -4778,7 +4778,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.BanUserFromFeed(childComplexity, args["username"].(string), args["action"].(string)), true
+		return e.complexity.Mutation.BanUserFromFeed(childComplexity, args["username"].(string), args["reason"].(*string)), true
 
 	case "Mutation.clearAllNotifications":
 		if e.complexity.Mutation.ClearAllNotifications == nil {
@@ -11769,7 +11769,7 @@ type Mutation {
     username: String!
     chainAddress: ChainAddressInput!
   ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
-  banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
+  banUserFromFeed(username: String!, reason: String): BanUserFromFeedPayloadOrError @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
@@ -12643,15 +12643,15 @@ func (ec *executionContext) field_Mutation_banUserFromFeed_args(ctx context.Cont
 		}
 	}
 	args["username"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["action"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("action"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg1 *string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["action"] = arg1
+	args["reason"] = arg1
 	return args, nil
 }
 
@@ -38007,7 +38007,7 @@ func (ec *executionContext) _Mutation_banUserFromFeed(ctx context.Context, field
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().BanUserFromFeed(rctx, fc.Args["username"].(string), fc.Args["action"].(string))
+			return ec.resolvers.Mutation().BanUserFromFeed(rctx, fc.Args["username"].(string), fc.Args["reason"].(*string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {

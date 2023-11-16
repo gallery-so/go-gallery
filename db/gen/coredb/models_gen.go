@@ -147,10 +147,11 @@ type ExternalSocialConnection struct {
 type FeedBlocklist struct {
 	ID          persist.DBID   `db:"id" json:"id"`
 	UserID      persist.DBID   `db:"user_id" json:"user_id"`
-	Action      persist.Action `db:"action" json:"action"`
 	LastUpdated time.Time      `db:"last_updated" json:"last_updated"`
 	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
 	Deleted     bool           `db:"deleted" json:"deleted"`
+	Reason      sql.NullString `db:"reason" json:"reason"`
+	Active      sql.NullBool   `db:"active" json:"active"`
 }
 
 type FeedEntity struct {

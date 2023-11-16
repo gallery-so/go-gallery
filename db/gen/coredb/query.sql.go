@@ -90,17 +90,18 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 }
 
 const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
-INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
+insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, $3, true)
+on conflict(user_id) where not deleted and active do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active=true, last_updated = now()
 `
 
 type BlockUserFromFeedParams struct {
 	ID     persist.DBID   `db:"id" json:"id"`
 	UserID persist.DBID   `db:"user_id" json:"user_id"`
-	Action persist.Action `db:"action" json:"action"`
+	Reason sql.NullString `db:"reason" json:"reason"`
 }
 
 func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedParams) error {
-	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Action)
+	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Reason)
 	return err
 }
 
@@ -4628,6 +4629,17 @@ func (q *Queries) GetUserExperiencesByUserID(ctx context.Context, id persist.DBI
 	return user_experiences, err
 }
 
+const getUserIsBlockedFromFeed = `-- name: GetUserIsBlockedFromFeed :one
+select exists(select 1 from feed_blocklist where user_id = $1 and not deleted and active)
+`
+
+func (q *Queries) GetUserIsBlockedFromFeed(ctx context.Context, userID persist.DBID) (bool, error) {
+	row := q.db.QueryRow(ctx, getUserIsBlockedFromFeed, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getUserNotifications = `-- name: GetUserNotifications :many
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
@@ -6205,22 +6217,6 @@ func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.Nul
 	return exists, err
 }
 
-const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false)
-`
-
-type IsFeedUserActionBlockedParams struct {
-	UserID persist.DBID   `db:"user_id" json:"user_id"`
-	Action persist.Action `db:"action" json:"action"`
-}
-
-func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserActionBlockedParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isFeedUserActionBlocked, arg.UserID, arg.Action)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
 with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = $2)
 select exists(
@@ -6702,7 +6698,7 @@ func (q *Queries) SetProfileImageToToken(ctx context.Context, arg SetProfileImag
 }
 
 const unblockUserFromFeed = `-- name: UnblockUserFromFeed :exec
-UPDATE feed_blocklist SET deleted = true WHERE user_id = $1
+update feed_blocklist set active = false where user_id = $1 and not deleted
 `
 
 func (q *Queries) UnblockUserFromFeed(ctx context.Context, userID persist.DBID) error {

@@ -647,14 +647,15 @@ select * from feed_events where deleted = false
     order by event_time desc
     limit 1;
 
--- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false);
+-- name: GetUserIsBlockedFromFeed :one
+select exists(select 1 from feed_blocklist where user_id = $1 and not deleted and active);
 
 -- name: BlockUserFromFeed :exec
-INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3);
+insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, sqlc.narg('reason'), true)
+on conflict(user_id) where not deleted and active do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active=true, last_updated = now();
 
 -- name: UnblockUserFromFeed :exec
-UPDATE feed_blocklist SET deleted = true WHERE user_id = $1;
+update feed_blocklist set active = false where user_id = $1 and not deleted;
 
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;

@@ -53,37 +53,28 @@ type FeedAPI struct {
 	multichainProvider *multichain.Provider
 }
 
-func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
+func (api FeedAPI) BanUser(ctx context.Context, userId persist.DBID, reason *string) error {
 	// Validate
-	err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userId": validate.WithTag(userId, "required"),
-		"action": validate.WithTag(action, "required"),
-	})
-
+	err := validate.ValidateFields(api.validator, validate.ValidationMap{"userId": validate.WithTag(userId, "required")})
 	if err != nil {
 		return err
 	}
-
-	return api.queries.BlockUserFromFeed(ctx, db.BlockUserFromFeedParams{
-		ID:     persist.GenerateID(),
-		UserID: userId,
-		Action: action,
-	})
-
+	p := db.BlockUserFromFeedParams{ID: persist.GenerateID(), UserID: userId}
+	if reason != nil {
+		p.Reason = util.ToNullString(*reason, true)
+	}
+	return api.queries.BlockUserFromFeed(ctx, p)
 }
 
-func (api FeedAPI) UnBlockUser(ctx context.Context, userId persist.DBID) error {
+func (api FeedAPI) UnbanUser(ctx context.Context, userId persist.DBID) error {
 	// Validate
 	err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userId": validate.WithTag(userId, "required"),
 	})
-
 	if err != nil {
 		return err
 	}
-
 	return api.queries.UnblockUserFromFeed(ctx, userId)
-
 }
 
 func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
