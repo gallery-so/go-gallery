@@ -702,16 +702,16 @@ SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_a
 SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
 -- name: GetCommentByCommentID :one
-SELECT * FROM comments WHERE id = $1;
+SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
 -- name: GetCommentsByCommentIDs :many
-SELECT * from comments WHERE id = ANY(@comment_ids);
+SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
 
 -- name: GetCommentByCommentIDBatch :batchone
-SELECT * FROM comments WHERE id = $1;
+SELECT * FROM comments WHERE id = $1 AND deleted = false; 
 
 -- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null
+SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -719,10 +719,10 @@ SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByFeedEventIDBatch :batchone
-SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null;
+SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false;
 
 -- name: PaginateCommentsByPostIDBatch :batchmany
-SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null
+SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -731,15 +731,9 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null
 
 -- name: PaginateRepliesByCommentIDBatch :batchmany
 SELECT * FROM comments WHERE 
-    ( 
-        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
-        AND top_level_comment_id = sqlc.arg('comment_id') 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
-        AND reply_to = sqlc.arg('comment_id') 
-    )
+    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
+        or 
+        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false
     AND (comments.created_at, comments.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (comments.created_at, comments.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -747,19 +741,13 @@ SELECT * FROM comments WHERE
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByPostIDBatch :batchone
-SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null;
+SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
 
 -- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
-    ( 
-        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
-        AND top_level_comment_id = sqlc.arg('comment_id') 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NOT NULL 
-        AND reply_to = sqlc.arg('comment_id') 
-    );
+    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
+        or 
+        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
@@ -1714,3 +1702,24 @@ select * from mentions where id = @id and not deleted;
 
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
+
+-- name: InsertMention :one
+INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
+
+-- name: InsertComment :one
+INSERT INTO comments 
+(ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, TOP_LEVEL_COMMENT_ID, COMMENT) 
+VALUES 
+($1, sqlc.narg('feed_event'), sqlc.narg('post'), $2, sqlc.narg('reply'), 
+    (CASE 
+        WHEN sqlc.narg('reply') IS NOT NULL THEN
+            (SELECT COALESCE(c.top_level_comment_id, sqlc.narg('reply')) 
+             FROM comments c 
+             WHERE c.id = sqlc.narg('reply'))
+        ELSE NULL 
+    END), 
+$3) 
+RETURNING ID;
+
+-- name: RemoveComment :exec
+UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;
