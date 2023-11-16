@@ -14,7 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-const top100ConfFile = "100_activity_badges.json"
+const topConfFileName = "top_activity_badges.json"
 
 type TopActivityConfiguration struct {
 	AdmiresGivenWeight     int32 `json:"admires_given_weight"`
@@ -26,7 +26,7 @@ type TopActivityConfiguration struct {
 
 func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		confR, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(top100ConfFile).NewReader(c)
+		confR, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(topConfFileName).NewReader(c)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -94,7 +94,7 @@ func updateTopActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 			return
 		}
 
-		confW := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(top100ConfFile).NewWriter(c)
+		confW := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(topConfFileName).NewWriter(c)
 		if err := json.NewEncoder(confW).Encode(&conf); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -111,7 +111,7 @@ func updateTopActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 
 func getTopActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		confR, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(top100ConfFile).NewReader(c)
+		confR, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(topConfFileName).NewReader(c)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
