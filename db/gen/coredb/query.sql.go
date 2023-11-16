@@ -6243,14 +6243,16 @@ func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommuni
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
-SELECT id, feed_entity_type, created_at, actor_id
-FROM feed_entities
-WHERE (created_at, id) < ($1, $2)
-        AND (created_at, id) > ($3, $4)
-ORDER BY 
-    CASE WHEN $5::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $5::bool THEN (created_at, id) END DESC
-LIMIT $6
+select fe.id, fe.feed_entity_type, fe.created_at, fe.actor_id
+from feed_entities fe
+left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fe.created_at, fe.id) < ($1, $2)
+        and (fe.created_at, fe.id) > ($3, $4)
+        and fb.user_id is null
+order by
+    case when $5::bool then (fe.created_at, fe.id) end asc,
+    case when not $5::bool then (fe.created_at, fe.id) end desc
+limit $6
 `
 
 type PaginateGlobalFeedParams struct {

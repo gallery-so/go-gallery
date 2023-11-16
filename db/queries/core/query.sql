@@ -513,14 +513,16 @@ select exists(
 );
 
 -- name: PaginateGlobalFeed :many
-SELECT *
-FROM feed_entities
-WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
-LIMIT sqlc.arg('limit');
+select fe.*
+from feed_entities fe
+left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and fb.user_id is null
+order by
+    case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
+    case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
+limit sqlc.arg('limit');
 
 -- name: PaginatePersonalFeedByUserID :many
 select fe.* from feed_entities fe, follows fl
