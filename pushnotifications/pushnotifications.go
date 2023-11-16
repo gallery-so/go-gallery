@@ -28,12 +28,13 @@ func init() {
 
 func InitServer() {
 	setDefaults()
-	router := coreInitServer()
+	ctx := context.Background()
+	router := CoreInitServer(ctx)
 	logger.For(nil).Info("Starting push notifications server...")
 	http.Handle("/", router)
 }
 
-func coreInitServer() *gin.Engine {
+func CoreInitServer(ctx context.Context) *gin.Engine {
 	initSentry()
 	logger.InitWithGCPDefaults()
 
@@ -54,8 +55,6 @@ func coreInitServer() *gin.Engine {
 
 	taskGroup := router.Group("/tasks", basicAuthHandler, middleware.TaskRequired())
 	jobGroup := router.Group("/jobs", basicAuthHandler)
-
-	ctx := context.Background()
 
 	pgx := postgres.NewPgxClient()
 	queries := db.New(pgx)

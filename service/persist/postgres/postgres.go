@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ type connectionParams struct {
 	dbname   string
 	host     string
 	port     int
+	retry    *retry.Retry
 }
 
 func (c *connectionParams) toConnectionString() string {
@@ -88,6 +90,9 @@ func newConnectionParamsFromEnv() connectionParams {
 		dbname:   env.GetString("POSTGRES_DB"),
 		host:     env.GetString("POSTGRES_HOST"),
 		port:     env.GetInt("POSTGRES_PORT"),
+
+		// Retry connections by default
+		retry: &retry.Retry{Base: 2, Cap: 4, Tries: 3},
 	}
 }
 
@@ -123,7 +128,20 @@ func WithPort(port int) ConnectionOption {
 	}
 }
 
-// MustCreateClient panics when it fails to create a new database connection
+func WithRetries(r retry.Retry) ConnectionOption {
+	return func(params *connectionParams) {
+		params.retry = &r
+	}
+}
+
+func WithNoRetries() ConnectionOption {
+	return func(params *connectionParams) {
+		params.retry = nil
+	}
+}
+
+// MustCreateClient panics when it fails to create a new database connection. By default, it will try to
+// connect 3 times before returning an error.
 func MustCreateClient(opts ...ConnectionOption) *sql.DB {
 	db, err := NewClient(opts...)
 	if err != nil {
@@ -132,8 +150,9 @@ func MustCreateClient(opts ...ConnectionOption) *sql.DB {
 	return db
 }
 
+// NewClient creates a new Postgres client. By default, it will try to connect 3 times before returning an error.
 func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
 	params := newConnectionParamsFromEnv()
@@ -141,14 +160,29 @@ func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
 		opt(&params)
 	}
 
-	db, err := sql.Open("pgx", params.toConnectionString())
-	if err != nil {
-		return nil, err
+	var db *sql.DB
+
+	connectF := func(ctx context.Context) error {
+		var err error
+		db, err = sql.Open("pgx", params.toConnectionString())
+		return err
+	}
+
+	if params.retry != nil {
+		err := retry.RetryFunc(ctx, connectF, func(err error) bool { return true }, *params.retry)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := connectF(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	db.SetMaxOpenConns(50)
 
-	err = db.PingContext(ctx)
+	err := db.PingContext(ctx)
 	if err != nil && strings.Contains(err.Error(), fmt.Sprintf("role \"%s\" does not exist", params.user)) {
 		return nil, ErrRoleDoesNotExist{params.user}
 	}
@@ -158,7 +192,7 @@ func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
 	return db, nil
 }
 
-// NewPgxClient creates a new postgres client via pgx
+// NewPgxClient creates a new Postgres client via pgx. By default, it will try to connect 3 times before returning an error.
 func NewPgxClient(opts ...ConnectionOption) *pgxpool.Pool {
 	ctx := context.Background()
 
@@ -175,7 +209,20 @@ func NewPgxClient(opts ...ConnectionOption) *pgxpool.Pool {
 
 	config.ConnConfig.Logger = &pgxTracer{continueOnly: true}
 
-	db, err := pgxpool.ConnectConfig(ctx, config)
+	var db *pgxpool.Pool
+
+	connectF := func(ctx context.Context) error {
+		var err error
+		db, err = pgxpool.ConnectConfig(ctx, config)
+		return err
+	}
+
+	if params.retry != nil {
+		err = retry.RetryFunc(ctx, connectF, func(err error) bool { return true }, *params.retry)
+	} else {
+		err = connectF(ctx)
+	}
+
 	if err != nil {
 		logger.For(nil).WithError(err).Fatal("could not open database connection")
 		panic(err)

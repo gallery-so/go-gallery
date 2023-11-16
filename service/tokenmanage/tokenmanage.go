@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
-
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -19,7 +17,7 @@ type MaxRetryF func(tID persist.TokenIdentifiers) int
 type Manager struct {
 	cache           *redis.Cache
 	processRegistry *registry
-	taskClient      *cloudtasks.Client
+	taskClient      *task.Client
 	throttle        *throttle.Locker
 	// delayer sets the linear delay for retrying tokens up to MaxRetries
 	delayer *limiters.KeyRateLimiter
@@ -27,7 +25,7 @@ type Manager struct {
 	maxRetryF MaxRetryF
 }
 
-func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
+func New(ctx context.Context, taskClient *task.Client) *Manager {
 	cache := redis.NewCache(redis.TokenManageCache)
 	return &Manager{
 		cache:           cache,
@@ -37,7 +35,7 @@ func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetryF MaxRetryF) *Manager {
+func NewWithRetries(ctx context.Context, taskClient *task.Client, maxRetryF MaxRetryF) *Manager {
 	m := New(ctx, taskClient)
 	m.maxRetryF = maxRetryF
 	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
@@ -96,7 +94,7 @@ func (m Manager) SubmitBatch(ctx context.Context, tDefIDs []persist.DBID) error 
 	m.processRegistry.setManyEnqueue(ctx, tDefIDs)
 	message := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
 	logger.For(ctx).WithField("batchID", message.BatchID).Infof("enqueued batch: %s (size=%d)", message.BatchID, len(tDefIDs))
-	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
+	return m.taskClient.CreateTaskForTokenProcessing(ctx, message)
 }
 
 func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, err error, attempts int) error {
@@ -113,7 +111,7 @@ func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.
 
 	m.processRegistry.setEnqueue(ctx, tDefID)
 	message := task.TokenProcessingTokenMessage{TokenDefinitionID: tDefID, Attempts: attempts + 1}
-	return task.CreateTaskForTokenTokenProcessing(ctx, message, m.taskClient, delay)
+	return m.taskClient.CreateTaskForTokenTokenProcessing(ctx, message, delay)
 }
 
 type registry struct{ c *redis.Cache }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/lens"
@@ -68,7 +67,7 @@ func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResu
 type FarcasterAuthenticator struct {
 	Queries    *coredb.Queries
 	HTTPClient *http.Client
-	TaskClient *cloudtasks.Client
+	TaskClient *task.Client
 
 	UserID     persist.DBID
 	Address    persist.Address
@@ -145,10 +144,10 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 
 		res.Metadata["signer_status"] = signer.Status
 		res.Metadata["approval_url"] = signer.SignerApprovalURL
-		err = task.CreateTaskForAutosocialPollFarcaster(ctx, task.AutosocialPollFarcasterMessage{
+		err = a.TaskClient.CreateTaskForAutosocialPollFarcaster(ctx, task.AutosocialPollFarcasterMessage{
 			SignerUUID: signer.SignerUUID,
 			UserID:     a.UserID,
-		}, a.TaskClient)
+		})
 		if err != nil {
 			return nil, fmt.Errorf("create task for autosocial poll farcaster: %w", err)
 		}

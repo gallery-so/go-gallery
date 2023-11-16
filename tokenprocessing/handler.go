@@ -2,9 +2,9 @@ package tokenprocessing
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/task"
 	"time"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/service/eth"
@@ -25,7 +25,7 @@ var (
 
 var contractSpecificRetries = map[persist.ContractIdentifiers]int{prohibitionContract: 24}
 
-func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *cloudtasks.Client) *gin.Engine {
+func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *task.Client) *gin.Engine {
 	// Retry tokens that failed during syncs, but don't retry tokens that failed during manual refreshes
 	noRetryManager := tokenmanage.New(ctx, taskClient)
 	retryManager := tokenmanage.NewWithRetries(ctx, taskClient, syncMaxRetries)

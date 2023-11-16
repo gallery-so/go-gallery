@@ -14,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sourcegraph/conc/pool"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
 	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
@@ -158,7 +157,7 @@ func (p *pushLimiter) isActionAllowed(ctx context.Context, limiter *limiters.Key
 }
 
 // New registers specific notification handlers
-func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client, lock *redislock.Client) *NotificationHandlers {
+func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock *redislock.Client) *NotificationHandlers {
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
 	limiter := newPushLimiter()
 
@@ -274,7 +273,7 @@ func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notifica
 type defaultNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
-	taskClient *cloudtasks.Client
+	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
@@ -285,7 +284,7 @@ func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notific
 type followerNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
-	taskClient *cloudtasks.Client
+	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
@@ -296,7 +295,7 @@ func (h followerNotificationHandler) Handle(ctx context.Context, notif db.Notifi
 type groupedNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
-	taskClient *cloudtasks.Client
+	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
@@ -327,7 +326,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 type tokenIDGroupedNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
-	taskClient *cloudtasks.Client
+	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
@@ -359,7 +358,7 @@ func (h tokenIDGroupedNotificationHandler) Handle(ctx context.Context, notif db.
 type viewedNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
-	taskClient *cloudtasks.Client
+	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
@@ -1030,7 +1029,7 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	}
 }
 
-func sendPushNotifications(ctx context.Context, notif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
+func sendPushNotifications(ctx context.Context, notif db.Notification, queries *db.Queries, taskClient *task.Client, limiter *pushLimiter) error {
 	if !actionSupportsPushNotifications(notif.Action) {
 		return nil
 	}
@@ -1059,7 +1058,7 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 	for _, token := range pushTokens {
 		toSend := message
 		toSend.PushTokenID = token.ID
-		err = task.CreateTaskForPushNotification(ctx, toSend, taskClient)
+		err = taskClient.CreateTaskForPushNotification(ctx, toSend)
 		if err != nil {
 			err = fmt.Errorf("failed to create task for push notification: %w", err)
 			sentryutil.ReportError(ctx, err)
@@ -1070,7 +1069,7 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 	return nil
 }
 
-func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
+func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *task.Client, limiter *pushLimiter) error {
 	newNotif, err := addNotification(ctx, notif, queries)
 	if err != nil {
 		return fmt.Errorf("failed to create notification: %w", err)
@@ -1086,7 +1085,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 	return nil
 }
 
-func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
+func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *task.Client, limiter *pushLimiter) error {
 	notifs, err := addFollowerNotifications(ctx, notif, queries)
 	if err != nil {
 		return fmt.Errorf("failed to create notification: %w", err)
@@ -1105,7 +1104,7 @@ func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, 
 	return nil
 }
 
-func sendNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client, limiter *pushLimiter, ps *pubsub.Client) error {
+func sendNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *task.Client, limiter *pushLimiter, ps *pubsub.Client) error {
 	err := sendPushNotifications(ctx, newNotif, queries, taskClient, limiter)
 	if err != nil {
 		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", newNotif.ID, err)
@@ -1129,7 +1128,7 @@ func sendNotifications(ctx context.Context, newNotif db.Notification, queries *d
 	return nil
 }
 
-func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
+func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *task.Client, limiter *pushLimiter) error {
 	var amount = notif.Amount
 	resultData := mostRecentNotif.Data.Concat(notif.Data)
 	switch notif.Action {
