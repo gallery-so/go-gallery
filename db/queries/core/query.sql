@@ -825,7 +825,7 @@ SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
 
 -- name: CreateUserPostedFirstPostNotifications :many
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) 
-SELECT DISTINCT ON (unnest(sqlc.arg('ids')::varchar[])) unnest(sqlc.arg('ids')::varchar[]), follows.follower, $1, $2, $3, sqlc.narg('post') 
+SELECT DISTINCT ON (follows.follower) unnest(sqlc.arg('ids')::varchar[]), follows.follower, $1, $2, $3, sqlc.narg('post') 
 FROM follows 
 WHERE follows.followee = @actor_id AND follows.deleted = false 
 RETURNING *;
