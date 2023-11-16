@@ -91,7 +91,6 @@ type GalleryUser implements Node @goEmbedHelper {
   profileImage: ProfileImage @goField(forceResolver: true)
   potentialEnsProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
-  traits: String
   universal: Boolean
   roles: [Role] @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)

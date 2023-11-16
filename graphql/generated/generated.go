@@ -669,7 +669,6 @@ type ComplexityRoot struct {
 		SharedFollowers          func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts           func(childComplexity int) int
 		Tokens                   func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
-		Traits                   func(childComplexity int) int
 		Universal                func(childComplexity int) int
 		Username                 func(childComplexity int) int
 		Wallets                  func(childComplexity int) int
@@ -4141,13 +4140,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Tokens(childComplexity, args["ownershipFilter"].([]persist.TokenOwnershipType)), true
-
-	case "GalleryUser.traits":
-		if e.complexity.GalleryUser.Traits == nil {
-			break
-		}
-
-		return e.complexity.GalleryUser.Traits(childComplexity), true
 
 	case "GalleryUser.universal":
 		if e.complexity.GalleryUser.Universal == nil {
@@ -8942,7 +8934,6 @@ type GalleryUser implements Node @goEmbedHelper {
   profileImage: ProfileImage @goField(forceResolver: true)
   potentialEnsProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
-  traits: String
   universal: Boolean
   roles: [Role] @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)
@@ -15299,8 +15290,6 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -15560,8 +15549,6 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -16785,8 +16772,6 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -17688,8 +17673,6 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -18623,8 +18606,6 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -19054,8 +19035,6 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -19329,8 +19308,6 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -19788,8 +19765,6 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -26725,8 +26700,6 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -26920,8 +26893,6 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -27659,8 +27630,6 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -27852,8 +27821,6 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -28168,8 +28135,6 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -28684,47 +28649,6 @@ func (ec *executionContext) _GalleryUser_bio(ctx context.Context, field graphql.
 }
 
 func (ec *executionContext) fieldContext_GalleryUser_bio(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "GalleryUser",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _GalleryUser_traits(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_GalleryUser_traits(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Traits, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_GalleryUser_traits(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "GalleryUser",
 		Field:      field,
@@ -29352,8 +29276,6 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -29443,8 +29365,6 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -30143,8 +30063,6 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -39442,8 +39360,6 @@ func (ec *executionContext) fieldContext_OptInForRolesPayload_user(ctx context.C
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -39533,8 +39449,6 @@ func (ec *executionContext) fieldContext_OptOutForRolesPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -40333,8 +40247,6 @@ func (ec *executionContext) fieldContext_Post_author(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -42524,8 +42436,6 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -42999,8 +42909,6 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -45491,8 +45399,6 @@ func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -45969,8 +45875,6 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -52260,8 +52164,6 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -54572,8 +54474,6 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55048,8 +54948,6 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55438,8 +55336,6 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55837,8 +55733,6 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55991,8 +55885,6 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -57663,8 +57555,6 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -57795,8 +57685,6 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -58185,8 +58073,6 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -58364,8 +58250,6 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -59308,8 +59192,6 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -72957,10 +72839,6 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 		case "bio":
 
 			out.Values[i] = ec._GalleryUser_bio(ctx, field, obj)
-
-		case "traits":
-
-			out.Values[i] = ec._GalleryUser_traits(ctx, field, obj)
 
 		case "universal":
 

@@ -1453,7 +1453,6 @@ type GalleryUser struct {
 	ProfileImage             ProfileImage           `json:"profileImage"`
 	PotentialEnsProfileImage *EnsProfileImage       `json:"potentialEnsProfileImage"`
 	Bio                      *string                `json:"bio"`
-	Traits                   *string                `json:"traits"`
 	Universal                *bool                  `json:"universal"`
 	Roles                    []*persist.Role        `json:"roles"`
 	SocialAccounts           *SocialAccounts        `json:"socialAccounts"`

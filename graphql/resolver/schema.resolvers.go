@@ -610,7 +610,7 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 
 // Badges is the resolver for the badges field.
 func (r *galleryUserResolver) Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error) {
-	return resolveBadgesByUserID(ctx, obj.Dbid)
+	return resolveBadgesByUserID(ctx, obj.Dbid, obj.Traits)
 }
 
 // Followers is the resolver for the followers field.

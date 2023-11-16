@@ -261,9 +261,10 @@ func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.G
 	return models, nil
 }
 
-func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
-	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
+const top100ActivityImageURL = "https://storage.googleapis.com/prod-token-content/top_100.png"
 
+func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits persist.Traits) ([]*model.Badge, error) {
+	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -271,6 +272,13 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.B
 	var result []*model.Badge
 	for _, contract := range contracts {
 		result = append(result, contractToBadgeModel(ctx, contract))
+	}
+
+	if _, ok := traits[persist.TraitTypeTop100ActiveUser]; ok {
+		result = append(result, &model.Badge{
+			Name:     util.ToPointer("Top 100 Active User"),
+			ImageURL: top100ActivityImageURL,
+		})
 	}
 
 	return result, nil
