@@ -275,6 +275,7 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits pers
 	}
 
 	if _, ok := traits[persist.TraitTypeTop100ActiveUser]; ok {
+
 		result = append(result, &model.Badge{
 			Name:     util.ToPointer("Top 100 Active User"),
 			ImageURL: top100ActivityImageURL,
@@ -1771,10 +1772,14 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
+	var traits persist.Traits
+	user.Traits.AssignTo(&traits)
+
 	return &model.GalleryUser{
 		HelperGalleryUserData: model.HelperGalleryUserData{
 			UserID:            user.ID,
 			FeaturedGalleryID: user.FeaturedGallery,
+			Traits:            traits,
 		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
