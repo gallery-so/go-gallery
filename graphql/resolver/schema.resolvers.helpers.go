@@ -35,6 +35,8 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
+const top100ActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
+
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
 var nodeFetcher = model.NodeFetcher{
@@ -260,8 +262,6 @@ func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.G
 
 	return models, nil
 }
-
-const top100ActivityImageURL = "https://storage.googleapis.com/prod-token-content/top_100.png"
 
 func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits persist.Traits) ([]*model.Badge, error) {
 	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
