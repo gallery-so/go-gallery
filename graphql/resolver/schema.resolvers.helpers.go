@@ -78,6 +78,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneAdmiredYourTokenNotification:              fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
 	OnSomeonePostedYourWorkNotification:                fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
+	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -1055,6 +1056,14 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CreationTime: &notif.CreatedAt,
 			UpdatedTime:  &notif.LastUpdated,
 			Post:         nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionTopActivityBadgeReceived:
+		return model.YouReceivedTopActivityBadgeNotification{
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Threshold:    notif.Data.ActivityBadgeThreshold,
 		}, nil
 
 	default:

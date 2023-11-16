@@ -7,17 +7,24 @@ import (
 	"os"
 	"strings"
 
+	"cloud.google.com/go/pubsub"
+	"github.com/bsm/redislock"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"google.golang.org/api/idtoken"
@@ -43,8 +50,11 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 	pgx := postgres.NewPgxClient()
 	queries := coredb.New(pgx)
 	stg := rpc.NewStorageClient(ctx)
+	pub := gcp.NewClient(ctx)
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	tc := task.NewClient(ctx)
 
-	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger(), useEventHandler(queries, pub, tc, lock))
 	router.POST("/calculate_activity_badges", cloudSchedulerMiddleware, calculateTopActivityBadges(queries, stg, pgx))
 	router.POST("/update_top_conf", retoolMiddleware, updateTopActivityConfiguration(stg))
 	router.GET("/get_top_conf", retoolMiddleware, getTopActivityConfiguration(stg))
@@ -54,6 +64,7 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 
 func setDefaults() {
 	viper.SetDefault("ENV", "local")
+	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "gallery_backend")
@@ -66,6 +77,12 @@ func setDefaults() {
 	viper.SetDefault("CONFIGURATION_BUCKET", "gallery-dev-configurations")
 	viper.SetDefault("SCHEDULER_AUDIENCE", "")
 	viper.SetDefault("RETOOL_AUTH_TOKEN", "")
+	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
+	viper.SetDefault("PUBSUB_EMULATOR_HOST", "[::1]:8085")
+	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
+	viper.SetDefault("GCLOUD_PUSH_NOTIFICATIONS_QUEUE", "projects/gallery-local/locations/here/queues/push-notifications")
+	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
+	viper.SetDefault("PUSH_NOTIFICATIONS_URL", "http://localhost:8000")
 
 	viper.AutomaticEnv()
 
@@ -187,4 +204,11 @@ func getServiceAccountEmail() (string, error) {
 	}
 
 	return string(body), nil
+}
+
+func useEventHandler(q *coredb.Queries, p *pubsub.Client, t *task.Client, l *redislock.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		event.AddTo(c, false, notifications.New(q, p, t, l), q, t)
+		c.Next()
+	}
 }

@@ -2821,6 +2821,17 @@ type Wallet struct {
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
 
+type YouReceivedTopActivityBadgeNotification struct {
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Threshold    int          `json:"threshold"`
+}
+
+func (YouReceivedTopActivityBadgeNotification) IsNotification() {}
+func (YouReceivedTopActivityBadgeNotification) IsNode()         {}
+
 type TopCollectionsForCommunityInput struct {
 	ChainAddress *persist.ChainAddress `json:"chainAddress"`
 }
