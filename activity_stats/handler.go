@@ -87,7 +87,7 @@ func calculateTop100ActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *
 
 func updateTop100ActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		conf := Top100ActivityConfiguration{}
+		var conf Top100ActivityConfiguration
 		if err := c.ShouldBindJSON(&conf); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -104,6 +104,7 @@ func updateTop100ActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 			return
 		}
 
+		c.JSON(http.StatusOK, conf)
 	}
 }
 
