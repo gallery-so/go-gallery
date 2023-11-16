@@ -1106,7 +1106,7 @@ func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.D
 		return "", "", ErrOnlyRemoveOwnComment
 	}
 
-	return comment.FeedEventID, comment.PostID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
+	return comment.FeedEventID, comment.PostID, api.queries.RemoveComment(ctx, commentID)
 }
 
 func (api InteractionAPI) GetMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]db.Mention, error) {

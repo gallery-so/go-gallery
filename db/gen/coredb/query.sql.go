@@ -1247,7 +1247,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 
 const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) 
-SELECT DISTINCT ON (unnest($4::varchar[])) unnest($4::varchar[]), follows.follower, $1, $2, $3, $5 
+SELECT DISTINCT ON (follows.follower) unnest($4::varchar[]), follows.follower, $1, $2, $3, $5 
 FROM follows 
 WHERE follows.followee = $6 AND follows.deleted = false 
 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
@@ -1706,7 +1706,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 }
 
 const getCommentByCommentID = `-- name: GetCommentByCommentID :one
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed FROM comments WHERE id = $1 and deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id FROM comments WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (Comment, error) {
@@ -1724,12 +1724,13 @@ func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (C
 		&i.LastUpdated,
 		&i.PostID,
 		&i.Removed,
+		&i.TopLevelCommentID,
 	)
 	return i, err
 }
 
 const getCommentsByCommentIDs = `-- name: GetCommentsByCommentIDs :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed from comments WHERE id = ANY($1) and deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id from comments WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {
@@ -1753,6 +1754,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 			&i.LastUpdated,
 			&i.PostID,
 			&i.Removed,
+			&i.TopLevelCommentID,
 		); err != nil {
 			return nil, err
 		}
@@ -5612,6 +5614,45 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	return exists, err
 }
 
+const insertComment = `-- name: InsertComment :one
+INSERT INTO comments 
+(ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, TOP_LEVEL_COMMENT_ID, COMMENT) 
+VALUES 
+($1, $2::varchar, $3::varchar, $4, $5::varchar, 
+    (CASE 
+        WHEN $5::varchar IS NOT NULL THEN
+            (SELECT COALESCE(c.top_level_comment_id, $5::varchar) 
+             FROM comments c 
+             WHERE c.id = $5::varchar)
+        ELSE NULL 
+    END), 
+$6::varchar) 
+RETURNING ID
+`
+
+type InsertCommentParams struct {
+	ID        persist.DBID   `db:"id" json:"id"`
+	FeedEvent sql.NullString `db:"feed_event" json:"feed_event"`
+	Post      sql.NullString `db:"post" json:"post"`
+	ActorID   persist.DBID   `db:"actor_id" json:"actor_id"`
+	Reply     sql.NullString `db:"reply" json:"reply"`
+	Comment   string         `db:"comment" json:"comment"`
+}
+
+func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, insertComment,
+		arg.ID,
+		arg.FeedEvent,
+		arg.Post,
+		arg.ActorID,
+		arg.Reply,
+		arg.Comment,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertCommentMention = `-- name: InsertCommentMention :one
 insert into mentions (id, user_id, contract_id, comment_id, start, length) values ($1, $2, $3, $4, $5, $6) returning id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted
 `
@@ -5696,6 +5737,33 @@ func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, ar
 		return nil, err
 	}
 	return items, nil
+}
+
+const insertMention = `-- name: InsertMention :one
+INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, $5, $6, $3, $4) RETURNING ID
+`
+
+type InsertMentionParams struct {
+	ID        persist.DBID   `db:"id" json:"id"`
+	CommentID persist.DBID   `db:"comment_id" json:"comment_id"`
+	Start     sql.NullInt32  `db:"start" json:"start"`
+	Length    sql.NullInt32  `db:"length" json:"length"`
+	User      sql.NullString `db:"user" json:"user"`
+	Contract  sql.NullString `db:"contract" json:"contract"`
+}
+
+func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, insertMention,
+		arg.ID,
+		arg.CommentID,
+		arg.Start,
+		arg.Length,
+		arg.User,
+		arg.Contract,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertPost = `-- name: InsertPost :one
@@ -6398,6 +6466,15 @@ type RemoveCollectionFromGalleryParams struct {
 
 func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCollectionFromGalleryParams) error {
 	_, err := q.db.Exec(ctx, removeCollectionFromGallery, arg.CollectionID, arg.GalleryID)
+	return err
+}
+
+const removeComment = `-- name: RemoveComment :exec
+UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1
+`
+
+func (q *Queries) RemoveComment(ctx context.Context, id persist.DBID) error {
+	_, err := q.db.Exec(ctx, removeComment, id)
 	return err
 }
 
