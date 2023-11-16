@@ -80,7 +80,7 @@ with refreshed as (
 select
   sqlc.embed(feed_entity_scores),
   sqlc.embed(posts),
-  posts.actor_id = (select id from gallery_user) is_gallery_post
+  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
 from feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 where feed_entity_scores.created_at > @window_end::timestamptz and not posts.deleted
@@ -88,7 +88,7 @@ union
 select
   sqlc.embed(feed_entity_scores),
   sqlc.embed(posts),
-  posts.actor_id = (select id from gallery_user) is_gallery_post
+  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
 from feed_entity_score_view feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 where feed_entity_scores.created_at > (select last_updated from refreshed limit 1) and not posts.deleted;
