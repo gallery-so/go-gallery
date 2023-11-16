@@ -699,7 +699,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 			scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
 			scored := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 {
-				return decayRate(e.CreatedAt, now, postScores[e.ID].IsGalleryPost) * freshnessFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+				return decayRate(e.CreatedAt, now, postScores[e.ID].IsGalleryPost) * engagementFactor(int(e.Interactions))
 			})
 
 			postIDs := make([]persist.DBID, len(scored))
