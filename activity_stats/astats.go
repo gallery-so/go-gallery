@@ -65,6 +65,7 @@ func setDefaults() {
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("CONFIGURATION_BUCKET", "gallery-dev-configurations")
 	viper.SetDefault("SCHEDULER_AUDIENCE", "")
+	viper.SetDefault("RETOOL_AUTH_TOKEN", "")
 
 	viper.AutomaticEnv()
 
