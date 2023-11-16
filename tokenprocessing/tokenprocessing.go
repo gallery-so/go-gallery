@@ -52,7 +52,7 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	notificationsHandler := notifications.New(clients.Queries, clients.PubSubClient, clients.TaskClient, redis.NewLockClient(redis.NewCache(redis.NotificationLockCache)))
+	notificationsHandler := notifications.New(clients.Queries, clients.PubSubClient, clients.TaskClient, redis.NewLockClient(redis.NewCache(redis.NotificationLockCache)), false)
 
 	router.Use(func(c *gin.Context) {
 		event.AddTo(c, false, notificationsHandler, clients.Queries, clients.TaskClient)

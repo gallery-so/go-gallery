@@ -171,7 +171,7 @@ func (p *pushLimiter) isActionAllowed(ctx context.Context, limiter *limiters.Key
 }
 
 // New registers specific notification handlers
-func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock *redislock.Client) *NotificationHandlers {
+func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock *redislock.Client, listen bool) *NotificationHandlers {
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
 	limiter := newPushLimiter()
 
@@ -209,7 +209,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	updated := map[persist.DBID]chan db.Notification{}
 
 	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher, UserNewNotifications: new, UserUpdatedNotifications: updated, pubSub: pub}
-	if pub != nil {
+	if pub != nil && listen {
 		go notificationHandlers.receiveNewNotificationsFromPubSub()
 		go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
 	} else {

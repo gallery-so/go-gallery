@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/task"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/task"
 
 	"cloud.google.com/go/pubsub"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
@@ -123,7 +124,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, httpClien
 		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, mp, taskClient, throttler, secrets, apqCache, feedCache, socialCache, authRefreshCache, magicClient)
 	}
 
-	notificationsHandler := notifications.New(queries, pub, taskClient, lock)
+	notificationsHandler := notifications.New(queries, pub, taskClient, lock, true)
 
 	h.AroundFields(graphql.MutationCachingHandler(newPublicAPI))
 
