@@ -101,7 +101,9 @@ func RetryFunc(ctx context.Context, f func(ctx context.Context) error, shouldRet
 			return err
 		}
 
-		r.Sleep(i)
+		if i != r.Tries-1 {
+			r.Sleep(i)
+		}
 	}
 	return ErrOutOfRetries{Err: err, Retry: r}
 }

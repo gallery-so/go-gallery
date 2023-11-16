@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/util/retry"
 	"net/http"
 	"os"
 	"time"
@@ -84,9 +83,8 @@ func (c *Clients) Close() {
 }
 
 func ClientInit(ctx context.Context) *Clients {
-	retries := retry.Retry{Base: 2, Cap: 4, Tries: 3}
-	pq := postgres.MustCreateClient(postgres.WithRetries(retries))
-	pgx := postgres.NewPgxClient(postgres.WithRetries(retries))
+	pq := postgres.MustCreateClient()
+	pgx := postgres.NewPgxClient()
 	return &Clients{
 		Repos:           postgres.NewRepositories(pq, pgx),
 		Queries:         db.New(pgx),
