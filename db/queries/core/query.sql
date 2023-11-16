@@ -1711,27 +1711,27 @@ select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcast
 WITH ag AS (
     SELECT actor_id, COUNT(*) AS admire_given
     FROM admires
-    WHERE created_at >= NOW() - INTERVAL '7 days'
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false
     GROUP BY actor_id
 ),
 ar AS (
     SELECT p.actor_id, COUNT(*) AS admire_received
     FROM posts p
     JOIN admires a ON p.id = a.post_id
-    WHERE a.created_at >= NOW() - INTERVAL '7 days'
+    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND deleted = false
     GROUP BY p.actor_id
 ),
 cm AS (
     SELECT actor_id, COUNT(id) AS comments_made
     FROM comments
-    WHERE created_at >= NOW() - INTERVAL '7 days'
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
     GROUP BY actor_id
 ),
 cr AS (
     SELECT p.actor_id, COUNT(c.id) AS comments_received
     FROM posts p
     JOIN comments c ON p.id = c.post_id
-    WHERE p.created_at >= NOW() - INTERVAL '7 days'
+    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
     GROUP BY p.actor_id
 ),
 scores AS (
