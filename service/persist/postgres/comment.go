@@ -67,6 +67,9 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 		Reply:     replyToString,
 		Comment:   comment,
 	})
+	if err != nil {
+		return "", nil, err
+	}
 
 	ms := make([]db.Mention, len(mentions))
 

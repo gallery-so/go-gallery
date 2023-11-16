@@ -1710,15 +1710,15 @@ INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUE
 INSERT INTO comments 
 (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, TOP_LEVEL_COMMENT_ID, COMMENT) 
 VALUES 
-($1, sqlc.narg('feed_event'), sqlc.narg('post'), $2, sqlc.narg('reply'), 
+(sqlc.arg('id'), sqlc.narg('feed_event')::varchar, sqlc.narg('post')::varchar, sqlc.arg('actor_id'), sqlc.narg('reply')::varchar, 
     (CASE 
-        WHEN sqlc.narg('reply') IS NOT NULL THEN
-            (SELECT COALESCE(c.top_level_comment_id, sqlc.narg('reply')) 
+        WHEN sqlc.narg('reply')::varchar IS NOT NULL THEN
+            (SELECT COALESCE(c.top_level_comment_id, sqlc.narg('reply')::varchar) 
              FROM comments c 
-             WHERE c.id = sqlc.narg('reply'))
+             WHERE c.id = sqlc.narg('reply')::varchar)
         ELSE NULL 
     END), 
-$3) 
+sqlc.arg('comment')::varchar) 
 RETURNING ID;
 
 -- name: RemoveComment :exec

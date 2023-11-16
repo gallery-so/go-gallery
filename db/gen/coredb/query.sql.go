@@ -5508,35 +5508,35 @@ const insertComment = `-- name: InsertComment :one
 INSERT INTO comments 
 (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, TOP_LEVEL_COMMENT_ID, COMMENT) 
 VALUES 
-($1, $4, $5, $2, $6, 
+($1, $2::varchar, $3::varchar, $4, $5::varchar, 
     (CASE 
-        WHEN $6 IS NOT NULL THEN
-            (SELECT COALESCE(c.top_level_comment_id, $6) 
+        WHEN $5::varchar IS NOT NULL THEN
+            (SELECT COALESCE(c.top_level_comment_id, $5::varchar) 
              FROM comments c 
-             WHERE c.id = $6)
+             WHERE c.id = $5::varchar)
         ELSE NULL 
     END), 
-$3) 
+$6::varchar) 
 RETURNING ID
 `
 
 type InsertCommentParams struct {
 	ID        persist.DBID   `db:"id" json:"id"`
-	ActorID   persist.DBID   `db:"actor_id" json:"actor_id"`
-	Comment   string         `db:"comment" json:"comment"`
 	FeedEvent sql.NullString `db:"feed_event" json:"feed_event"`
 	Post      sql.NullString `db:"post" json:"post"`
+	ActorID   persist.DBID   `db:"actor_id" json:"actor_id"`
 	Reply     sql.NullString `db:"reply" json:"reply"`
+	Comment   string         `db:"comment" json:"comment"`
 }
 
 func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (persist.DBID, error) {
 	row := q.db.QueryRow(ctx, insertComment,
 		arg.ID,
-		arg.ActorID,
-		arg.Comment,
 		arg.FeedEvent,
 		arg.Post,
+		arg.ActorID,
 		arg.Reply,
+		arg.Comment,
 	)
 	var id persist.DBID
 	err := row.Scan(&id)
