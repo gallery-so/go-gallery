@@ -45,9 +45,9 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 	stg := rpc.NewStorageClient(ctx)
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
-	router.POST("/calculate_activity_badges", cloudSchedulerMiddleware, calculateTop100ActivityBadges(queries, stg, pgx))
-	router.POST("/update_top_100_conf", retoolMiddleware, updateTop100ActivityConfiguration(stg))
-	router.GET("/get_top_100_conf", retoolMiddleware, getTop100ActivityConfiguration(stg))
+	router.POST("/calculate_activity_badges", cloudSchedulerMiddleware, calculateTopActivityBadges(queries, stg, pgx))
+	router.POST("/update_top_conf", retoolMiddleware, updateTopActivityConfiguration(stg))
+	router.GET("/get_top_conf", retoolMiddleware, getTopActivityConfiguration(stg))
 
 	return router
 }

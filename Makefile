@@ -264,14 +264,14 @@ $(DEPLOY)-%-autosocial-process-users         : CRON_FLAGS     = --oidc-service-a
 $(DEPLOY)-%-autosocial-process-users         : CRON_METHOD    := POST
 $(DEPLOY)-$(DEV)-autosocial-process-users    : URI_NAME       := autosocial-orchestrator
 $(DEPLOY)-$(PROD)-autosocial-process-users   : URI_NAME       := autosocial-orchestrator
-$(DEPLOY)-%-activity-stats-top-100           : CRON_PREFIX    := activitystats_100
-$(DEPLOY)-%-activity-stats-top-100           : CRON_LOCATION  := $(DEPLOY_REGION)
-$(DEPLOY)-%-activity-stats-top-100           : CRON_SCHEDULE  := '0 0 * * *'
-$(DEPLOY)-%-activity-stats-top-100           : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/calculate_activity_badges
-$(DEPLOY)-%-activity-stats-top-100           : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
-$(DEPLOY)-%-activity-stats-top-100           : CRON_METHOD    := POST
-$(DEPLOY)-$(DEV)-activity-stats-top-100      : URI_NAME       := activitystats 
-$(DEPLOY)-$(PROD)-activity-stats-top-100     : URI_NAME       := activitystats
+$(DEPLOY)-%-activity-stats-top           : CRON_PREFIX    := activitystats_100
+$(DEPLOY)-%-activity-stats-top           : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-activity-stats-top           : CRON_SCHEDULE  := '0 0 * * *'
+$(DEPLOY)-%-activity-stats-top           : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/calculate_activity_badges
+$(DEPLOY)-%-activity-stats-top           : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
+$(DEPLOY)-%-activity-stats-top           : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-activity-stats-top      : URI_NAME       := activitystats 
+$(DEPLOY)-$(PROD)-activity-stats-top     : URI_NAME       := activitystats
 
 # Cloud Jobs
 $(DEPLOY)-%-userpref-upload            : JOB_NAME       := userpref-upload
@@ -437,7 +437,7 @@ $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alc
 $(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 $(DEPLOY)-$(DEV)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 $(DEPLOY)-$(DEV)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
-$(DEPLOY)-$(DEV)-activity-stats-top-100 : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top-100 _$(CRON)-$(PAUSE)-activity-stats-top-100
+$(DEPLOY)-$(DEV)-activity-stats-top : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
@@ -462,7 +462,7 @@ $(DEPLOY)-$(PROD)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-al
 $(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 $(DEPLOY)-$(PROD)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 $(DEPLOY)-$(PROD)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
-$(DEPLOY)-$(PROD)-activity-stats-top-100 : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top-100 _$(CRON)-$(PAUSE)-activity-stats-top-100
+$(DEPLOY)-$(PROD)-activity-stats-top : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:

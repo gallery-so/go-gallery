@@ -16,14 +16,15 @@ import (
 
 const top100ConfFile = "100_activity_badges.json"
 
-type Top100ActivityConfiguration struct {
+type TopActivityConfiguration struct {
 	AdmiresGivenWeight     int32 `json:"admires_given_weight"`
 	AdmiresReceivedWeight  int32 `json:"admires_received_weight"`
 	CommentsMadeWeight     int32 `json:"comments_made_weight"`
 	CommentsReceivedWeight int32 `json:"comments_received_weight"`
+	Total                  int32 `json:"total"`
 }
 
-func calculateTop100ActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgxpool.Pool) gin.HandlerFunc {
+func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		confR, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(top100ConfFile).NewReader(c)
 		if err != nil {
@@ -31,7 +32,7 @@ func calculateTop100ActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *
 			return
 		}
 
-		var conf Top100ActivityConfiguration
+		var conf TopActivityConfiguration
 		if err := json.NewDecoder(confR).Decode(&conf); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -46,8 +47,8 @@ func calculateTop100ActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *
 
 		qtx := q.WithTx(tx)
 
-		top100, err := qtx.GetMostActiveUsers(c, coredb.GetMostActiveUsersParams{
-			Limit:                  100,
+		top, err := qtx.GetMostActiveUsers(c, coredb.GetMostActiveUsersParams{
+			Limit:                  conf.Total,
 			AdmireReceivedWeight:   conf.AdmiresReceivedWeight,
 			AdmireGivenWeight:      conf.AdmiresGivenWeight,
 			CommentsMadeWeight:     conf.CommentsMadeWeight,
@@ -59,13 +60,13 @@ func calculateTop100ActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *
 		}
 
 		// filter out empties
-		top100 = util.Filter(top100, func(r coredb.GetMostActiveUsersRow) bool {
+		top = util.Filter(top, func(r coredb.GetMostActiveUsersRow) bool {
 			return r.ActorID != "" && r.Score > 0
 		}, false)
 
-		logger.For(c).Debugf("top100: %d %+v", len(top100), top100)
+		logger.For(c).Debugf("top: %d %+v", len(top), top)
 
-		userIDs := util.MapWithoutError(top100, func(r coredb.GetMostActiveUsersRow) persist.DBID {
+		userIDs := util.MapWithoutError(top, func(r coredb.GetMostActiveUsersRow) persist.DBID {
 			return r.ActorID
 		})
 
@@ -81,13 +82,13 @@ func calculateTop100ActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *
 			return
 		}
 
-		c.JSON(http.StatusOK, top100)
+		c.JSON(http.StatusOK, top)
 	}
 }
 
-func updateTop100ActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
+func updateTopActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var conf Top100ActivityConfiguration
+		var conf TopActivityConfiguration
 		if err := c.ShouldBindJSON(&conf); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -108,7 +109,7 @@ func updateTop100ActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 	}
 }
 
-func getTop100ActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
+func getTopActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		confR, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(top100ConfFile).NewReader(c)
 		if err != nil {
@@ -116,7 +117,7 @@ func getTop100ActivityConfiguration(stg *storage.Client) gin.HandlerFunc {
 			return
 		}
 
-		var conf Top100ActivityConfiguration
+		var conf TopActivityConfiguration
 		if err := json.NewDecoder(confR).Decode(&conf); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
