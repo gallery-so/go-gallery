@@ -1246,10 +1246,27 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 }
 
 const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) 
-SELECT DISTINCT ON (follows.follower) unnest($4::varchar[]), follows.follower, $1, $2, $3, $5 
-FROM follows 
-WHERE follows.followee = $6 AND follows.deleted = false 
+WITH 
+id_with_row_number AS (
+    SELECT unnest($5::varchar[]) AS id, row_number() OVER () AS rn
+),
+follower_with_row_number AS (
+    SELECT follower, row_number() OVER () AS rn
+    FROM follows
+    WHERE followee = $6 AND deleted = false
+)
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
+SELECT 
+    i.id, 
+    f.follower, 
+    $1, 
+    $2, 
+    $3, 
+    $4
+FROM 
+    id_with_row_number i
+JOIN 
+    follower_with_row_number f ON i.rn = f.rn
 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
@@ -1257,8 +1274,8 @@ type CreateUserPostedFirstPostNotificationsParams struct {
 	Action   persist.Action           `db:"action" json:"action"`
 	Data     persist.NotificationData `db:"data" json:"data"`
 	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	PostID   persist.DBID             `db:"post_id" json:"post_id"`
 	Ids      []string                 `db:"ids" json:"ids"`
-	Post     sql.NullString           `db:"post" json:"post"`
 	ActorID  persist.DBID             `db:"actor_id" json:"actor_id"`
 }
 
@@ -1267,8 +1284,8 @@ func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, ar
 		arg.Action,
 		arg.Data,
 		arg.EventIds,
+		arg.PostID,
 		arg.Ids,
-		arg.Post,
 		arg.ActorID,
 	)
 	if err != nil {

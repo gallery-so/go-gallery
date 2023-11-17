@@ -830,10 +830,27 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contr
 SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
 
 -- name: CreateUserPostedFirstPostNotifications :many
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) 
-SELECT DISTINCT ON (follows.follower) unnest(sqlc.arg('ids')::varchar[]), follows.follower, $1, $2, $3, sqlc.narg('post') 
-FROM follows 
-WHERE follows.followee = @actor_id AND follows.deleted = false 
+WITH 
+id_with_row_number AS (
+    SELECT unnest(sqlc.arg('ids')::varchar[]) AS id, row_number() OVER () AS rn
+),
+follower_with_row_number AS (
+    SELECT follower, row_number() OVER () AS rn
+    FROM follows
+    WHERE followee = @actor_id AND deleted = false
+)
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
+SELECT 
+    i.id, 
+    f.follower, 
+    $1, 
+    $2, 
+    $3, 
+    $4
+FROM 
+    id_with_row_number i
+JOIN 
+    follower_with_row_number f ON i.rn = f.rn
 RETURNING *;
 
 -- name: CreateSimpleNotification :one
