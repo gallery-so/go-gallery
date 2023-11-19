@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/env"
@@ -264,5 +265,6 @@ var hypeEmojis = []string{
 }
 
 func randomEmoji() string {
+	rand.Seed(time.Now().UnixNano())
 	return hypeEmojis[rand.Intn(len(hypeEmojis))]
 }
