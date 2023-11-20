@@ -1663,6 +1663,15 @@ type ComplexityRoot struct {
 		WalletType   func(childComplexity int) int
 	}
 
+	YouReceivedTopActivityBadgeNotification struct {
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		Threshold    func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
+	}
+
 	_Service struct {
 		SDL func(childComplexity int) int
 	}
@@ -8688,6 +8697,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Wallet.WalletType(childComplexity), true
 
+	case "YouReceivedTopActivityBadgeNotification.creationTime":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.CreationTime(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.dbid":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.Dbid(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.id":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.ID(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.seen":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.Seen(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.threshold":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.Threshold == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.Threshold(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.updatedTime":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.UpdatedTime(childComplexity), true
+
 	case "_Service.sdl":
 		if e.complexity._Service.SDL == nil {
 			break
@@ -11021,6 +11072,16 @@ type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & 
   updatedTime: Time
 
   post: Post @goField(forceResolver: true)
+}
+
+type YouReceivedTopActivityBadgeNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  threshold: Int!
 }
 
 type ClearAllNotificationsPayload {
@@ -60031,6 +60092,261 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_threshold(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_threshold(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Threshold, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_threshold(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) __Service_sdl(ctx context.Context, field graphql.CollectedField, obj *fedruntime.Service) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext__Service_sdl(ctx, field)
 	if err != nil {
@@ -66669,6 +66985,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, obj)
+	case model.YouReceivedTopActivityBadgeNotification:
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, &obj)
+	case *model.YouReceivedTopActivityBadgeNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -66781,6 +67104,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, obj)
+	case model.YouReceivedTopActivityBadgeNotification:
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, &obj)
+	case *model.YouReceivedTopActivityBadgeNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -80386,6 +80716,60 @@ func (ec *executionContext) _Wallet(ctx context.Context, sel ast.SelectionSet, o
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var youReceivedTopActivityBadgeNotificationImplementors = []string{"YouReceivedTopActivityBadgeNotification", "Notification", "Node"}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification(ctx context.Context, sel ast.SelectionSet, obj *model.YouReceivedTopActivityBadgeNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, youReceivedTopActivityBadgeNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("YouReceivedTopActivityBadgeNotification")
+		case "id":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dbid":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "seen":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_updatedTime(ctx, field, obj)
+
+		case "threshold":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_threshold(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

@@ -51,6 +51,7 @@ type pushLimiter struct {
 	follows      *limiters.KeyRateLimiter
 	tokens       *limiters.KeyRateLimiter
 	feedEntities *limiters.KeyRateLimiter
+	users        *limiters.KeyRateLimiter
 }
 
 func newPushLimiter() *pushLimiter {
@@ -62,6 +63,7 @@ func newPushLimiter() *pushLimiter {
 		follows:      limiters.NewKeyRateLimiter(ctx, cache, "follows", 1, time.Minute*10),
 		tokens:       limiters.NewKeyRateLimiter(ctx, cache, "tokens", 1, time.Minute*10),
 		feedEntities: limiters.NewKeyRateLimiter(ctx, cache, "feedEntities", 5, time.Minute),
+		users:        limiters.NewKeyRateLimiter(ctx, cache, "users", 5, time.Minute),
 	}
 }
 
@@ -146,6 +148,18 @@ func (p *pushLimiter) tryTokens(ctx context.Context, sendingUserID persist.DBID,
 	}
 }
 
+func (p *pushLimiter) tryUsers(ctx context.Context, sendingUserID persist.DBID) error {
+	key := fmt.Sprintf("%s", sendingUserID)
+	if p.isActionAllowed(ctx, p.users, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.users.Name(),
+		senderID:    sendingUserID,
+	}
+}
+
 func (p *pushLimiter) isActionAllowed(ctx context.Context, limiter *limiters.KeyRateLimiter, key string) bool {
 	canContinue, _, err := limiter.ForKey(ctx, key)
 	if err != nil {
@@ -157,7 +171,7 @@ func (p *pushLimiter) isActionAllowed(ctx context.Context, limiter *limiters.Key
 }
 
 // New registers specific notification handlers
-func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock *redislock.Client) *NotificationHandlers {
+func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock *redislock.Client, listen bool) *NotificationHandlers {
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
 	limiter := newPushLimiter()
 
@@ -180,6 +194,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
 	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
 	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, def)
+	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, def)
 
 	// notification actions that are grouped and inserted by follower
 	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, follower)
@@ -194,7 +209,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	updated := map[persist.DBID]chan db.Notification{}
 
 	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher, UserNewNotifications: new, UserUpdatedNotifications: updated, pubSub: pub}
-	if pub != nil {
+	if pub != nil && listen {
 		go notificationHandlers.receiveNewNotificationsFromPubSub()
 		go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
 	} else {
@@ -712,6 +727,14 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		return message, nil
 	}
 
+	if notif.Action == persist.ActionTopActivityBadgeReceived {
+		if err := limiter.tryUsers(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		return message, nil
+	}
+
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 }
 
@@ -995,6 +1018,11 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			Action:      "posted their first post",
 			PreviewText: util.TruncateWithEllipsis(post.Caption.String, 40),
 		}, nil
+	case persist.ActionTopActivityBadgeReceived:
+		return UserFacingNotificationData{
+			Actor:  "You",
+			Action: fmt.Sprintf("received a new badge for being in the top %d of active users on Gallery", n.Data.ActivityBadgeThreshold),
+		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
 	}
@@ -1023,6 +1051,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionMentionCommunity:
 		return true
 	case persist.ActionUserPostedFirstPost:
+		return true
+	case persist.ActionTopActivityBadgeReceived:
 		return true
 	default:
 		return false
@@ -1233,7 +1263,7 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Post:      sql.NullString{String: notif.PostID.String(), Valid: true},
 			CommentID: notif.CommentID,
 		})
-	case persist.ActionUserFollowedUsers:
+	case persist.ActionUserFollowedUsers, persist.ActionTopActivityBadgeReceived:
 		return queries.CreateSimpleNotification(ctx, db.CreateSimpleNotificationParams{
 			ID:       id,
 			OwnerID:  notif.OwnerID,

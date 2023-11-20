@@ -71,6 +71,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, followerNotificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionTopActivityBadgeReceived, notificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
@@ -458,7 +459,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 	}
 
 	// Don't notify the user on self events
-	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && persistedEvent.Action != persist.ActionNewTokensReceived {
+	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && (persistedEvent.Action != persist.ActionNewTokensReceived && persistedEvent.Action != persist.ActionTopActivityBadgeReceived) {
 		return nil
 	}
 
@@ -573,7 +574,8 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
 	case persist.ActionReplyToComment:
 		data.OriginalCommentID = event.SubjectID
-
+	case persist.ActionTopActivityBadgeReceived:
+		data.ActivityBadgeThreshold = event.Data.ActivityBadgeThreshold
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}

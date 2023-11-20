@@ -2180,6 +2180,16 @@ type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & 
   post: Post @goField(forceResolver: true)
 }
 
+type YouReceivedTopActivityBadgeNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  threshold: Int!
+}
+
 type ClearAllNotificationsPayload {
   notifications: [Notification]
 }

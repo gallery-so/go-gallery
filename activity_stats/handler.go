@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -80,6 +81,23 @@ func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgx
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
+		}
+
+		for _, r := range top {
+			err := event.Dispatch(c, coredb.Event{
+				ID:             persist.GenerateID(),
+				ActorID:        util.ToNullString(r.ActorID.String(), true),
+				ResourceTypeID: persist.ResourceTypeUser,
+				UserID:         r.ActorID,
+				SubjectID:      r.ActorID,
+				Action:         persist.ActionTopActivityBadgeReceived,
+				Data: persist.EventData{
+					ActivityBadgeThreshold: int(conf.Total),
+				},
+			})
+			if err != nil {
+				logger.For(c).Errorf("error dispatching event: %s", err)
+			}
 		}
 
 		c.JSON(http.StatusOK, top)
