@@ -654,7 +654,7 @@ select exists(select 1 from feed_blocklist where user_id = $1 and not deleted an
 
 -- name: BlockUserFromFeed :exec
 insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, sqlc.narg('reason'), true)
-on conflict(user_id) where not deleted and active do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active=true, last_updated = now();
+on conflict(user_id) where not deleted and active do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now();
 
 -- name: UnblockUserFromFeed :exec
 update feed_blocklist set active = false where user_id = $1 and not deleted;
@@ -1814,3 +1814,15 @@ RETURNING ID;
 
 -- name: RemoveComment :exec
 UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;
+
+-- name: ReportPost :exec
+with offending_post as (select id from posts where posts.id = @post_id and not deleted)
+insert into reported_posts (id, post_id, reporter_id, reason) (select @id, offending_post.id, sqlc.narg(reporter), sqlc.narg(reason) from offending_post);
+
+-- name: BlockUser :exec
+with user_to_block as (select id from users where users.id = @blocked_user_id and not deleted and not universal)
+insert into user_blocklist (id, user_id, blocked_user_id, active) (select id, @user_id, user_to_block.id, true from user_to_block)
+on conflict(user_id, blocked_user_id) where not deleted and active do update set active = true, last_updated = now();
+
+-- name: UnblockUser :exec
+update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;

@@ -1131,6 +1131,21 @@ func (api InteractionAPI) GetMentionsByPostID(ctx context.Context, postID persis
 	return api.loaders.GetMentionsByPostID.Load(postID)
 }
 
+func (api InteractionAPI) ReportPost(ctx context.Context, postID persist.DBID, reason string) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return err
+	}
+	userID := For(ctx).User.GetLoggedInUserId(ctx)
+	return api.queries.ReportPost(ctx, db.ReportPostParams{
+		PostID:   postID,
+		Reporter: util.ToNullString(userID.String(), true),
+		Reason:   util.ToNullString(reason, true),
+	})
+}
+
 func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, queries *db.Queries) ([]db.Mention, error) {
 	res := make([]db.Mention, len(ms))
 

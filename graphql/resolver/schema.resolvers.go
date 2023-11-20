@@ -811,6 +811,33 @@ func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.Remove
 	return &model.RemoveProfileImagePayload{Viewer: resolveViewer(ctx)}, nil
 }
 
+// ReportPost is the resolver for the reportPost field.
+func (r *mutationResolver) ReportPost(ctx context.Context, postID persist.DBID, reason string) (model.ReportPostPayloadOrError, error) {
+	err := publicapi.For(ctx).Interaction.ReportPost(ctx, postID, reason)
+	if err != nil {
+		return nil, err
+	}
+	return model.ReportPostPayload{PostID: postID}, nil
+}
+
+// BlockUser is the resolver for the blockUser field.
+func (r *mutationResolver) BlockUser(ctx context.Context, userID persist.DBID) (model.BlockUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.BlockUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.BlockUserPayload{UserID: userID}, nil
+}
+
+// UnblockUser is the resolver for the unblockUser field.
+func (r *mutationResolver) UnblockUser(ctx context.Context, userID persist.DBID) (model.UnblockUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UnblockUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.UnblockUserPayload{UserID: userID}, nil
+}
+
 // UpdateGalleryCollections is the resolver for the updateGalleryCollections field.
 func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
 	api := publicapi.For(ctx)

@@ -89,9 +89,25 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
+const blockUser = `-- name: BlockUser :exec
+with user_to_block as (select id from users where users.id = $2 and not deleted and not universal)
+insert into user_blocklist (id, user_id, blocked_user_id, active) (select id, $1, user_to_block.id, true from user_to_block)
+on conflict(user_id, blocked_user_id) where not deleted and active do update set active = true, last_updated = now()
+`
+
+type BlockUserParams struct {
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
+}
+
+func (q *Queries) BlockUser(ctx context.Context, arg BlockUserParams) error {
+	_, err := q.db.Exec(ctx, blockUser, arg.UserID, arg.BlockedUserID)
+	return err
+}
+
 const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
 insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, $3, true)
-on conflict(user_id) where not deleted and active do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active=true, last_updated = now()
+on conflict(user_id) where not deleted and active do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now()
 `
 
 type BlockUserFromFeedParams struct {
@@ -2760,7 +2776,6 @@ scores AS (
         COALESCE(ar.admire_received, 0) AS admires_received,
         COALESCE(cm.comments_made, 0) AS comments_made,
         COALESCE(cr.comments_received, 0) AS comments_received
-        
     FROM ag
     FULL OUTER JOIN ar using(actor_id)
     FULL OUTER JOIN cm using(actor_id)
@@ -6602,6 +6617,28 @@ func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFr
 	return err
 }
 
+const reportPost = `-- name: ReportPost :exec
+with offending_post as (select id from posts where posts.id = $4 and not deleted)
+insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offending_post.id, $2, $3 from offending_post)
+`
+
+type ReportPostParams struct {
+	ID       persist.DBID   `db:"id" json:"id"`
+	Reporter sql.NullString `db:"reporter" json:"reporter"`
+	Reason   sql.NullString `db:"reason" json:"reason"`
+	PostID   persist.DBID   `db:"post_id" json:"post_id"`
+}
+
+func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) error {
+	_, err := q.db.Exec(ctx, reportPost,
+		arg.ID,
+		arg.Reporter,
+		arg.Reason,
+		arg.PostID,
+	)
+	return err
+}
+
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = $1, last_updated = now() where id = $2 and deleted = false
 `
@@ -6696,6 +6733,20 @@ func (q *Queries) SetProfileImageToToken(ctx context.Context, arg SetProfileImag
 		arg.TokenSourceType,
 		arg.TokenID,
 	)
+	return err
+}
+
+const unblockUser = `-- name: UnblockUser :exec
+update user_blocklist set active = false, last_updated = now() where user_id = $1 and blocked_user_id = $2 and not deleted
+`
+
+type UnblockUserParams struct {
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
+}
+
+func (q *Queries) UnblockUser(ctx context.Context, arg UnblockUserParams) error {
+	_, err := q.db.Exec(ctx, unblockUser, arg.UserID, arg.BlockedUserID)
 	return err
 }
 

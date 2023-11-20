@@ -47,6 +47,10 @@ type BanUserFromFeedPayloadOrError interface {
 	IsBanUserFromFeedPayloadOrError()
 }
 
+type BlockUserPayloadOrError interface {
+	IsBlockUserPayloadOrError()
+}
+
 type CollectionByIDOrError interface {
 	IsCollectionByIDOrError()
 }
@@ -275,6 +279,10 @@ type RemoveUserWalletsPayloadOrError interface {
 	IsRemoveUserWalletsPayloadOrError()
 }
 
+type ReportPostPayloadOrError interface {
+	IsReportPostPayloadOrError()
+}
+
 type ResendVerificationEmailPayloadOrError interface {
 	IsResendVerificationEmailPayloadOrError()
 }
@@ -353,6 +361,10 @@ type TrendingUsersPayloadOrError interface {
 
 type UnbanUserFromFeedPayloadOrError interface {
 	IsUnbanUserFromFeedPayloadOrError()
+}
+
+type UnblockUserPayloadOrError interface {
+	IsUnblockUserPayloadOrError()
 }
 
 type UnfollowUserPayloadOrError interface {
@@ -563,6 +575,12 @@ type BanUserFromFeedPayload struct {
 }
 
 func (BanUserFromFeedPayload) IsBanUserFromFeedPayloadOrError() {}
+
+type BlockUserPayload struct {
+	UserID persist.DBID `json:"userId"`
+}
+
+func (BlockUserPayload) IsBlockUserPayloadOrError() {}
 
 type ChainAddressTokenInput struct {
 	ChainAddress *persist.ChainAddress `json:"chainAddress"`
@@ -1111,6 +1129,9 @@ func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                            
 func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                                   {}
 func (ErrInvalidInput) IsDeletePostPayloadOrError()                                      {}
 func (ErrInvalidInput) IsReferralPostPreflightPayloadOrError()                           {}
+func (ErrInvalidInput) IsReportPostPayloadOrError()                                      {}
+func (ErrInvalidInput) IsBlockUserPayloadOrError()                                       {}
+func (ErrInvalidInput) IsUnblockUserPayloadOrError()                                     {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1205,14 +1226,17 @@ func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                            
 func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                                     {}
 func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                                   {}
 func (ErrNotAuthorized) IsDeletePostPayloadOrError()                                      {}
+func (ErrNotAuthorized) IsBlockUserPayloadOrError()                                       {}
+func (ErrNotAuthorized) IsUnblockUserPayloadOrError()                                     {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrPostNotFound) IsPostOrError()      {}
-func (ErrPostNotFound) IsError()            {}
-func (ErrPostNotFound) IsFeedEventOrError() {}
+func (ErrPostNotFound) IsPostOrError()              {}
+func (ErrPostNotFound) IsError()                    {}
+func (ErrPostNotFound) IsFeedEventOrError()         {}
+func (ErrPostNotFound) IsReportPostPayloadOrError() {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1286,6 +1310,8 @@ func (ErrUserNotFound) IsUnfollowUserPayloadOrError()       {}
 func (ErrUserNotFound) IsAdminAddWalletPayloadOrError()     {}
 func (ErrUserNotFound) IsSetProfileImagePayloadOrError()    {}
 func (ErrUserNotFound) IsRemoveProfileImagePayloadOrError() {}
+func (ErrUserNotFound) IsBlockUserPayloadOrError()          {}
+func (ErrUserNotFound) IsUnblockUserPayloadOrError()        {}
 
 type ErrUsernameNotAvailable struct {
 	Message string `json:"message"`
@@ -1973,6 +1999,12 @@ type RemoveUserWalletsPayload struct {
 
 func (RemoveUserWalletsPayload) IsRemoveUserWalletsPayloadOrError() {}
 
+type ReportPostPayload struct {
+	PostID persist.DBID `json:"postId"`
+}
+
+func (ReportPostPayload) IsReportPostPayloadOrError() {}
+
 type ResendVerificationEmailPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -2458,6 +2490,12 @@ type UnbanUserFromFeedPayload struct {
 }
 
 func (UnbanUserFromFeedPayload) IsUnbanUserFromFeedPayloadOrError() {}
+
+type UnblockUserPayload struct {
+	UserID persist.DBID `json:"userId"`
+}
+
+func (UnblockUserPayload) IsUnblockUserPayloadOrError() {}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`

@@ -2735,6 +2735,32 @@ type ReferralPostPreflightPayload {
 
 union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload | ErrInvalidInput
 
+type ReportPostPayload {
+  postId: DBID!
+}
+
+union ReportPostPayloadOrError = ReportPostPayload | ErrInvalidInput
+
+type BlockUserPayload {
+  userId: DBID!
+}
+
+union BlockUserPayloadOrError =
+    BlockUserPayload
+  | ErrUserNotFound
+  | ErrNotAuthorized
+  | ErrInvalidInput
+
+type UnblockUserPayload {
+  userId: DBID!
+}
+
+union UnblockUserPayloadOrError =
+    UnblockUserPayload
+  | ErrUserNotFound
+  | ErrNotAuthorized
+  | ErrInvalidInput
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2747,6 +2773,9 @@ type Mutation {
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
   setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
   removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
+  reportPost(postId: DBID!, reason: String!): ReportPostPayloadOrError
+  blockUser(userId: DBID!): BlockUserPayloadOrError @authRequired
+  unblockUser(userId: DBID!): UnblockUserPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(
