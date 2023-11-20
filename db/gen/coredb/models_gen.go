@@ -448,15 +448,6 @@ type RecommendationResult struct {
 }
 
 type ReportedPost struct {
-<<<<<<< HEAD
-	ID          persist.DBID   `db:"id" json:"id"`
-	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
-	LastUpdated time.Time      `db:"last_updated" json:"last_updated"`
-	Deleted     bool           `db:"deleted" json:"deleted"`
-	ReporterID  persist.DBID   `db:"reporter_id" json:"reporter_id"`
-	PostID      persist.DBID   `db:"post_id" json:"post_id"`
-	Reason      sql.NullString `db:"reason" json:"reason"`
-=======
 	ID          persist.DBID         `db:"id" json:"id"`
 	CreatedAt   time.Time            `db:"created_at" json:"created_at"`
 	LastUpdated time.Time            `db:"last_updated" json:"last_updated"`
@@ -464,7 +455,6 @@ type ReportedPost struct {
 	ReporterID  persist.DBID         `db:"reporter_id" json:"reporter_id"`
 	PostID      persist.DBID         `db:"post_id" json:"post_id"`
 	Reason      persist.ReportReason `db:"reason" json:"reason"`
->>>>>>> 2234fef6 (Change global ban reason to enum)
 }
 
 type ReprocessJob struct {

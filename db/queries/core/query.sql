@@ -1817,7 +1817,8 @@ UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;
 
 -- name: ReportPost :one
 with offending_post as (select id from posts where posts.id = @post_id and not deleted)
-insert into reported_posts (id, post_id, reporter_id, reason) (select @id, offending_post.id, sqlc.narg(reporter), sqlc.narg(reason) from offending_post) returning id;
+insert into reported_posts (id, post_id, reporter_id, reason) (select @id, offending_post.id, sqlc.narg(reporter), sqlc.narg(reason) from offending_post)
+on conflict(post_id, reporter_id, reason) where not deleted do update set last_updated = now() returning id;
 
 -- name: BlockUser :one
 with user_to_block as (select id from users where users.id = @blocked_user_id and not deleted and not universal)

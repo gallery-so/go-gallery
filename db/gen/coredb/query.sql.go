@@ -6622,21 +6622,15 @@ func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFr
 
 const reportPost = `-- name: ReportPost :one
 with offending_post as (select id from posts where posts.id = $4 and not deleted)
-insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offending_post.id, $2, $3 from offending_post) returning id
+insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offending_post.id, $2, $3 from offending_post)
+on conflict(post_id, reporter_id, reason) where not deleted do update set last_updated = now() returning id
 `
 
 type ReportPostParams struct {
-<<<<<<< HEAD
-	ID       persist.DBID   `db:"id" json:"id"`
-	Reporter sql.NullString `db:"reporter" json:"reporter"`
-	Reason   sql.NullString `db:"reason" json:"reason"`
-	PostID   persist.DBID   `db:"post_id" json:"post_id"`
-=======
 	ID       persist.DBID         `db:"id" json:"id"`
 	Reporter sql.NullString       `db:"reporter" json:"reporter"`
 	Reason   persist.ReportReason `db:"reason" json:"reason"`
 	PostID   persist.DBID         `db:"post_id" json:"post_id"`
->>>>>>> 2234fef6 (Change global ban reason to enum)
 }
 
 func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) (persist.DBID, error) {

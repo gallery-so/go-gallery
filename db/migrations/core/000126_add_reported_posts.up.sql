@@ -7,3 +7,4 @@ create table if not exists reported_posts (
   post_id character varying(255) references posts(id),
   reason character varying
 );
+create unique index reported_posts_post_id_reported_id_reason_idx on reported_posts(post_id, reporter_id, reason) where not deleted;
