@@ -148,9 +148,9 @@ func (p *pushLimiter) tryTokens(ctx context.Context, sendingUserID persist.DBID,
 	}
 }
 
-func (p *pushLimiter) tryUsers(ctx context.Context, sendingUserID persist.DBID, tokenID persist.DBID) error {
+func (p *pushLimiter) tryUsers(ctx context.Context, sendingUserID persist.DBID) error {
 	key := fmt.Sprintf("%s", sendingUserID)
-	if p.isActionAllowed(ctx, p.tokens, key) {
+	if p.isActionAllowed(ctx, p.users, key) {
 		return nil
 	}
 
