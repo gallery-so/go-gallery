@@ -1132,7 +1132,7 @@ func (api InteractionAPI) GetMentionsByPostID(ctx context.Context, postID persis
 	return api.loaders.GetMentionsByPostID.Load(postID)
 }
 
-func (api InteractionAPI) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportPostReason) error {
+func (api InteractionAPI) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportReason) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"postID": validate.WithTag(postID, "required"),

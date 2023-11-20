@@ -812,7 +812,7 @@ func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.Remove
 }
 
 // ReportPost is the resolver for the reportPost field.
-func (r *mutationResolver) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportPostReason) (model.ReportPostPayloadOrError, error) {
+func (r *mutationResolver) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportReason) (model.ReportPostPayloadOrError, error) {
 	err := publicapi.For(ctx).Interaction.ReportPost(ctx, postID, reason)
 	if err != nil {
 		return nil, err
@@ -1958,7 +1958,7 @@ func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx c
 }
 
 // BanUserFromFeed is the resolver for the banUserFromFeed field.
-func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, reason *string) (model.BanUserFromFeedPayloadOrError, error) {
+func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, reason persist.ReportReason) (model.BanUserFromFeedPayloadOrError, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
 	if err != nil {
 		return nil, err

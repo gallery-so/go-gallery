@@ -14,34 +14,34 @@ const (
 )
 
 const (
-	ReportPostReasonSpamAndOrBot         ReportPostReason = "SPAM_AND_OR_BOT"
-	ReportPostReasonInappropriateContent                  = "INAPPROPRIATE_CONTENT"
-	ReportPostReasonSomethingElse                         = "SOMETHING_ELSE"
+	ReportReasonSpamAndOrBot         ReportReason = "SPAM_AND_OR_BOT"
+	ReportReasonInappropriateContent              = "INAPPROPRIATE_CONTENT"
+	ReportReasonSomethingElse                     = "SOMETHING_ELSE"
 )
 
-type ReportPostReason string
+type ReportReason string
 
-func (r *ReportPostReason) UnmarshalGQL(v any) error {
+func (r *ReportReason) UnmarshalGQL(v any) error {
 	val, ok := v.(string)
 	if !ok {
-		return fmt.Errorf("ReportPostReason must be a string")
+		return fmt.Errorf("ReportReason must be a string")
 	}
 	switch val {
 	case "SPAM_AND_OR_BOT":
-		*r = ReportPostReasonSpamAndOrBot
+		*r = ReportReasonSpamAndOrBot
 	case "INAPPROPRIATE_CONTENT":
-		*r = ReportPostReasonInappropriateContent
+		*r = ReportReasonInappropriateContent
 	case "SOMETHING_ELSE":
-		*r = ReportPostReasonSomethingElse
+		*r = ReportReasonSomethingElse
 	}
 	return nil
 }
 
-func (r ReportPostReason) MarshalGQL(w io.Writer) { w.Write([]byte(string(r))) }
+func (r ReportReason) MarshalGQL(w io.Writer) { w.Write([]byte(string(r))) }
 
-func (r ReportPostReason) Value() (driver.Value, error) { return string(r), nil }
+func (r ReportReason) Value() (driver.Value, error) { return string(r), nil }
 
-func (r *ReportPostReason) Scan(v any) error {
-	*r = ReportPostReason(v.(byte))
+func (r *ReportReason) Scan(v any) error {
+	*r = ReportReason(v.(byte))
 	return nil
 }

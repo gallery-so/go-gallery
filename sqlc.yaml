@@ -157,6 +157,8 @@ sql:
           # Feed Blocklist
           - column: 'feed_blocklist.user_id'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.DBID'
+          - column: 'feed_blocklist.reason'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.ReportReason'
 
           # Notifications
           - column: 'notifications.data'
@@ -195,6 +197,10 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenType'
           - column: 'token_definitions.metadata'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenMetadata'
+
+          # Reported Posts
+          - column: 'reported_posts.reason'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.ReportReason'
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.

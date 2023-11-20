@@ -54,24 +54,16 @@ type FeedAPI struct {
 	multichainProvider *multichain.Provider
 }
 
-func (api FeedAPI) BanUser(ctx context.Context, userId persist.DBID, reason *string) error {
+func (api FeedAPI) BanUser(ctx context.Context, userId persist.DBID, reason persist.ReportReason) error {
 	// Validate
 	err := validate.ValidateFields(api.validator, validate.ValidationMap{"userId": validate.WithTag(userId, "required")})
 	if err != nil {
 		return err
 	}
-
-	p := db.BlockUserFromFeedParams{ID: persist.GenerateID(), UserID: userId}
-
-	if reason != nil {
-		p.Reason = util.ToNullString(*reason, true)
-	}
-
-	err = api.queries.BlockUserFromFeed(ctx, p)
+	err = api.queries.BlockUserFromFeed(ctx, db.BlockUserFromFeedParams{ID: persist.GenerateID(), UserID: userId, Reason: reason})
 	if err != nil {
 		return err
 	}
-
 	// Re-calculate trending feed
 	return api.cache.Client().Del(ctx, trendingFeedCacheKey).Err()
 }
@@ -84,12 +76,10 @@ func (api FeedAPI) UnbanUser(ctx context.Context, userId persist.DBID) error {
 	if err != nil {
 		return err
 	}
-
 	err = api.queries.UnblockUserFromFeed(ctx, userId)
 	if err != nil {
 		return err
 	}
-
 	// Re-calculate trending feed
 	return api.cache.Client().Del(ctx, trendingFeedCacheKey).Err()
 }

@@ -114,9 +114,9 @@ on conflict(user_id) where not deleted do update set reason = coalesce(excluded.
 `
 
 type BlockUserFromFeedParams struct {
-	ID     persist.DBID   `db:"id" json:"id"`
-	UserID persist.DBID   `db:"user_id" json:"user_id"`
-	Reason sql.NullString `db:"reason" json:"reason"`
+	ID     persist.DBID         `db:"id" json:"id"`
+	UserID persist.DBID         `db:"user_id" json:"user_id"`
+	Reason persist.ReportReason `db:"reason" json:"reason"`
 }
 
 func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedParams) error {
@@ -6626,10 +6626,17 @@ insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offend
 `
 
 type ReportPostParams struct {
+<<<<<<< HEAD
 	ID       persist.DBID   `db:"id" json:"id"`
 	Reporter sql.NullString `db:"reporter" json:"reporter"`
 	Reason   sql.NullString `db:"reason" json:"reason"`
 	PostID   persist.DBID   `db:"post_id" json:"post_id"`
+=======
+	ID       persist.DBID         `db:"id" json:"id"`
+	Reporter sql.NullString       `db:"reporter" json:"reporter"`
+	Reason   persist.ReportReason `db:"reason" json:"reason"`
+	PostID   persist.DBID         `db:"post_id" json:"post_id"`
+>>>>>>> 2234fef6 (Change global ban reason to enum)
 }
 
 func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) (persist.DBID, error) {

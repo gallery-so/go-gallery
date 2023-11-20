@@ -829,7 +829,7 @@ type ComplexityRoot struct {
 		AdmireFeedEvent                                 func(childComplexity int, feedEventID persist.DBID) int
 		AdmirePost                                      func(childComplexity int, postID persist.DBID) int
 		AdmireToken                                     func(childComplexity int, tokenID persist.DBID) int
-		BanUserFromFeed                                 func(childComplexity int, username string, reason *string) int
+		BanUserFromFeed                                 func(childComplexity int, username string, reason persist.ReportReason) int
 		BlockUser                                       func(childComplexity int, userID persist.DBID) int
 		ClearAllNotifications                           func(childComplexity int) int
 		CommentOnFeedEvent                              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) int
@@ -866,7 +866,7 @@ type ComplexityRoot struct {
 		RemoveComment                                   func(childComplexity int, commentID persist.DBID) int
 		RemoveProfileImage                              func(childComplexity int) int
 		RemoveUserWallets                               func(childComplexity int, walletIds []persist.DBID) int
-		ReportPost                                      func(childComplexity int, postID persist.DBID, reason persist.ReportPostReason) int
+		ReportPost                                      func(childComplexity int, postID persist.DBID, reason persist.ReportReason) int
 		ResendVerificationEmail                         func(childComplexity int) int
 		RevokeRolesFromUser                             func(childComplexity int, username string, roles []*persist.Role) int
 		SetCommunityOverrideCreator                     func(childComplexity int, communityID persist.DBID, creatorUserID *persist.DBID) int
@@ -1842,7 +1842,7 @@ type MutationResolver interface {
 	UnregisterUserPushToken(ctx context.Context, pushToken string) (model.UnregisterUserPushTokenPayloadOrError, error)
 	SetProfileImage(ctx context.Context, input model.SetProfileImageInput) (model.SetProfileImagePayloadOrError, error)
 	RemoveProfileImage(ctx context.Context) (model.RemoveProfileImagePayloadOrError, error)
-	ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportPostReason) (model.ReportPostPayloadOrError, error)
+	ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportReason) (model.ReportPostPayloadOrError, error)
 	BlockUser(ctx context.Context, userID persist.DBID) (model.BlockUserPayloadOrError, error)
 	UnblockUser(ctx context.Context, userID persist.DBID) (model.UnblockUserPayloadOrError, error)
 	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
@@ -1908,7 +1908,7 @@ type MutationResolver interface {
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
 	SyncCreatedTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncCreatedTokensForUsernamePayloadOrError, error)
 	SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, chainAddress persist.ChainAddress) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error)
-	BanUserFromFeed(ctx context.Context, username string, reason *string) (model.BanUserFromFeedPayloadOrError, error)
+	BanUserFromFeed(ctx context.Context, username string, reason persist.ReportReason) (model.BanUserFromFeedPayloadOrError, error)
 	UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error)
 	MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error)
 	SetCommunityOverrideCreator(ctx context.Context, communityID persist.DBID, creatorUserID *persist.DBID) (model.SetCommunityOverrideCreatorPayloadOrError, error)
@@ -4803,7 +4803,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.BanUserFromFeed(childComplexity, args["username"].(string), args["reason"].(*string)), true
+		return e.complexity.Mutation.BanUserFromFeed(childComplexity, args["username"].(string), args["reason"].(persist.ReportReason)), true
 
 	case "Mutation.blockUser":
 		if e.complexity.Mutation.BlockUser == nil {
@@ -5232,7 +5232,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ReportPost(childComplexity, args["postId"].(persist.DBID), args["reason"].(persist.ReportPostReason)), true
+		return e.complexity.Mutation.ReportPost(childComplexity, args["postId"].(persist.DBID), args["reason"].(persist.ReportReason)), true
 
 	case "Mutation.resendVerificationEmail":
 		if e.complexity.Mutation.ResendVerificationEmail == nil {
@@ -11710,7 +11710,7 @@ type ReportPostPayload {
 
 union ReportPostPayloadOrError = ReportPostPayload | ErrInvalidInput | ErrPostNotFound
 
-enum ReportPostReason {
+enum ReportReason {
   INAPPROPRIATE_CONTENT
   SPAM_AND_OR_BOT
   SOMETHING_ELSE
@@ -11748,7 +11748,7 @@ type Mutation {
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
   setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
   removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
-  reportPost(postId: DBID!, reason: ReportPostReason!): ReportPostPayloadOrError
+  reportPost(postId: DBID!, reason: ReportReason!): ReportPostPayloadOrError
   blockUser(userId: DBID!): BlockUserPayloadOrError @authRequired
   unblockUser(userId: DBID!): UnblockUserPayloadOrError @authRequired
 
@@ -11879,7 +11879,7 @@ type Mutation {
     username: String!
     chainAddress: ChainAddressInput!
   ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
-  banUserFromFeed(username: String!, reason: String): BanUserFromFeedPayloadOrError @retoolAuth
+  banUserFromFeed(username: String!, reason: ReportReason!): BanUserFromFeedPayloadOrError @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
@@ -12753,10 +12753,10 @@ func (ec *executionContext) field_Mutation_banUserFromFeed_args(ctx context.Cont
 		}
 	}
 	args["username"] = arg0
-	var arg1 *string
+	var arg1 persist.ReportReason
 	if tmp, ok := rawArgs["reason"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
-		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		arg1, err = ec.unmarshalNReportReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportReason(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -13344,10 +13344,10 @@ func (ec *executionContext) field_Mutation_reportPost_args(ctx context.Context, 
 		}
 	}
 	args["postId"] = arg0
-	var arg1 persist.ReportPostReason
+	var arg1 persist.ReportReason
 	if tmp, ok := rawArgs["reason"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
-		arg1, err = ec.unmarshalNReportPostReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportPostReason(ctx, tmp)
+		arg1, err = ec.unmarshalNReportReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportReason(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -33982,7 +33982,7 @@ func (ec *executionContext) _Mutation_reportPost(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ReportPost(rctx, fc.Args["postId"].(persist.DBID), fc.Args["reason"].(persist.ReportPostReason))
+		return ec.resolvers.Mutation().ReportPost(rctx, fc.Args["postId"].(persist.DBID), fc.Args["reason"].(persist.ReportReason))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -38411,7 +38411,7 @@ func (ec *executionContext) _Mutation_banUserFromFeed(ctx context.Context, field
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().BanUserFromFeed(rctx, fc.Args["username"].(string), fc.Args["reason"].(*string))
+			return ec.resolvers.Mutation().BanUserFromFeed(rctx, fc.Args["username"].(string), fc.Args["reason"].(persist.ReportReason))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {
@@ -82371,13 +82371,13 @@ func (ec *executionContext) unmarshalNReferralPostTokenInput2githubᚗcomᚋmike
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNReportPostReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportPostReason(ctx context.Context, v interface{}) (persist.ReportPostReason, error) {
-	var res persist.ReportPostReason
+func (ec *executionContext) unmarshalNReportReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportReason(ctx context.Context, v interface{}) (persist.ReportReason, error) {
+	var res persist.ReportReason
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNReportPostReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportPostReason(ctx context.Context, sel ast.SelectionSet, v persist.ReportPostReason) graphql.Marshaler {
+func (ec *executionContext) marshalNReportReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportReason(ctx context.Context, sel ast.SelectionSet, v persist.ReportReason) graphql.Marshaler {
 	return v
 }
 

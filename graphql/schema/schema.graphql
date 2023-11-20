@@ -2741,7 +2741,7 @@ type ReportPostPayload {
 
 union ReportPostPayloadOrError = ReportPostPayload | ErrInvalidInput | ErrPostNotFound
 
-enum ReportPostReason {
+enum ReportReason {
   INAPPROPRIATE_CONTENT
   SPAM_AND_OR_BOT
   SOMETHING_ELSE
@@ -2779,7 +2779,7 @@ type Mutation {
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
   setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
   removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
-  reportPost(postId: DBID!, reason: ReportPostReason!): ReportPostPayloadOrError
+  reportPost(postId: DBID!, reason: ReportReason!): ReportPostPayloadOrError
   blockUser(userId: DBID!): BlockUserPayloadOrError @authRequired
   unblockUser(userId: DBID!): UnblockUserPayloadOrError @authRequired
 
@@ -2910,7 +2910,7 @@ type Mutation {
     username: String!
     chainAddress: ChainAddressInput!
   ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
-  banUserFromFeed(username: String!, reason: String): BanUserFromFeedPayloadOrError @retoolAuth
+  banUserFromFeed(username: String!, reason: ReportReason!): BanUserFromFeedPayloadOrError @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
