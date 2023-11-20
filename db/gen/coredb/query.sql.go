@@ -2733,7 +2733,6 @@ cr AS (
 ),
 scores AS (
     SELECT 
-        u.username,
         ((COALESCE(ar.admire_received, 0) * $2::int) + 
         (COALESCE(ag.admire_given, 0) * $3::int) + 
         (COALESCE(cm.comments_made, 0) * $4::int) + 
@@ -2744,16 +2743,16 @@ scores AS (
         COALESCE(cm.comments_made, 0) AS comments_made,
         COALESCE(cr.comments_received, 0) AS comments_received
         
-    FROM users u
-    FULL OUTER JOIN ag ON u.id = ag.actor_id
-    FULL OUTER JOIN ar ON u.id = ar.actor_id
-    FULL OUTER JOIN cm ON u.id = cm.actor_id
-    FULL OUTER JOIN cr ON u.id = cr.actor_id
-    WHERE u.deleted = false AND u.universal = false
+    FROM ag
+    FULL OUTER JOIN ar using(actor_id)
+    FULL OUTER JOIN cm using(actor_id)
+    FULL OUTER JOIN cr using(actor_id)
 )
-SELECT actor_id, username, admires_given, admires_received, comments_made, comments_received, score
+SELECT score, actor_id, admires_given, admires_received, comments_made, comments_received, id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id
 FROM scores
-WHERE actor_id IS NOT NULL AND score > 0
+JOIN users u ON scores.actor_id = users.id
+WHERE u.deleted = false AND u.universal = false
+AND scores.actor_id IS NOT NULL AND scores.score > 0
 ORDER BY scores.score DESC
 LIMIT $1
 `
@@ -2767,13 +2766,30 @@ type GetMostActiveUsersParams struct {
 }
 
 type GetMostActiveUsersRow struct {
-	ActorID          persist.DBID   `db:"actor_id" json:"actor_id"`
-	Username         sql.NullString `db:"username" json:"username"`
-	AdmiresGiven     int64          `db:"admires_given" json:"admires_given"`
-	AdmiresReceived  int64          `db:"admires_received" json:"admires_received"`
-	CommentsMade     int64          `db:"comments_made" json:"comments_made"`
-	CommentsReceived int64          `db:"comments_received" json:"comments_received"`
-	Score            int32          `db:"score" json:"score"`
+	Score                int32                            `db:"score" json:"score"`
+	ActorID              persist.DBID                     `db:"actor_id" json:"actor_id"`
+	AdmiresGiven         int64                            `db:"admires_given" json:"admires_given"`
+	AdmiresReceived      int64                            `db:"admires_received" json:"admires_received"`
+	CommentsMade         int64                            `db:"comments_made" json:"comments_made"`
+	CommentsReceived     int64                            `db:"comments_received" json:"comments_received"`
+	ID                   persist.DBID                     `db:"id" json:"id"`
+	Deleted              bool                             `db:"deleted" json:"deleted"`
+	Version              sql.NullInt32                    `db:"version" json:"version"`
+	LastUpdated          time.Time                        `db:"last_updated" json:"last_updated"`
+	CreatedAt            time.Time                        `db:"created_at" json:"created_at"`
+	Username             sql.NullString                   `db:"username" json:"username"`
+	UsernameIdempotent   sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
+	Wallets              persist.WalletList               `db:"wallets" json:"wallets"`
+	Bio                  sql.NullString                   `db:"bio" json:"bio"`
+	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
+	Universal            bool                             `db:"universal" json:"universal"`
+	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
+	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
+	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
+	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
+	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
+	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
+	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
 }
 
 func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsersParams) ([]GetMostActiveUsersRow, error) {
@@ -2792,13 +2808,30 @@ func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsers
 	for rows.Next() {
 		var i GetMostActiveUsersRow
 		if err := rows.Scan(
+			&i.Score,
 			&i.ActorID,
-			&i.Username,
 			&i.AdmiresGiven,
 			&i.AdmiresReceived,
 			&i.CommentsMade,
 			&i.CommentsReceived,
-			&i.Score,
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
 		); err != nil {
 			return nil, err
 		}

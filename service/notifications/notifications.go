@@ -728,7 +728,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 	}
 
 	if notif.Action == persist.ActionTopActivityBadgeReceived {
-		if err := limiter.tryUsers(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
+		if err := limiter.tryUsers(ctx, notif.OwnerID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 

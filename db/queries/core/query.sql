@@ -1736,7 +1736,6 @@ cr AS (
 ),
 scores AS (
     SELECT 
-        u.username,
         ((COALESCE(ar.admire_received, 0) * @admire_received_weight::int) + 
         (COALESCE(ag.admire_given, 0) * @admire_given_weight::int) + 
         (COALESCE(cm.comments_made, 0) * @comments_made_weight::int) + 
@@ -1747,16 +1746,16 @@ scores AS (
         COALESCE(cm.comments_made, 0) AS comments_made,
         COALESCE(cr.comments_received, 0) AS comments_received
         
-    FROM users u
-    FULL OUTER JOIN ag ON u.id = ag.actor_id
-    FULL OUTER JOIN ar ON u.id = ar.actor_id
-    FULL OUTER JOIN cm ON u.id = cm.actor_id
-    FULL OUTER JOIN cr ON u.id = cr.actor_id
-    WHERE u.deleted = false AND u.universal = false
+    FROM ag
+    FULL OUTER JOIN ar using(actor_id)
+    FULL OUTER JOIN cm using(actor_id)
+    FULL OUTER JOIN cr using(actor_id)
 )
-SELECT actor_id, username, admires_given, admires_received, comments_made, comments_received, score
+SELECT *
 FROM scores
-WHERE actor_id IS NOT NULL AND score > 0
+JOIN users u ON scores.actor_id = users.id
+WHERE u.deleted = false AND u.universal = false
+AND scores.actor_id IS NOT NULL AND scores.score > 0
 ORDER BY scores.score DESC
 LIMIT $1;
 

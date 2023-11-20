@@ -36,7 +36,7 @@ func InitServer() {
 	ctx := context.Background()
 	router := CoreInitServer(ctx)
 
-	logger.For(nil).Info("Starting autosocial server...")
+	logger.For(nil).Info("Starting activity stats server...")
 	http.Handle("/", router)
 }
 
