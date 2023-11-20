@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/env"
@@ -88,11 +88,16 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 			firstPostID = template.PostOrError.Post.Author.Feed.Edges[0].Node.Post.DBID
 		}
 
+		var communityInfo string
+		if communityName := template.PostOrError.Post.Tokens[0].Community.Name; communityName != "" {
+			communityInfo = fmt.Sprintf("- *%s*", communityName)
+		}
+
 		if message.PostID.String() == firstPostID {
 			emoji := randomEmoji()
-			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("%s *We got a first time poster!!!* %s - *%s*", emoji, emoji, template.PostOrError.Post.Tokens[0].Community.Name)))
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("%s *We got a first time poster!!!* %s *%s*", emoji, emoji, communityInfo)))
 		} else {
-			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("New Post - *%s*", template.PostOrError.Post.Tokens[0].Community.Name)))
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("New Post %s", communityInfo)))
 		}
 
 		tokenPFP := template.PostOrError.Post.Author.ProfileImage.TokenProfileImage.Token.Media.Media.PreviewURLs.Thumbnail
@@ -253,16 +258,9 @@ func linkButtonObject(buttonText, url string) map[string]any {
 	}
 }
 
-var hypeEmojis = []string{
-	":admire_hype:",
-	":get_hype:",
-	":celebrate:",
-	":lfg:",
-	":boy-dancing:",
-	":lets_go:",
-	":blob-hearts:",
-}
+var hypeEmojis = []string{":admire_hype:", ":get_hype:", ":celebrate:", ":lfg:", ":boy-dancing:", ":lets_go:", ":blob-hearts:"}
 
 func randomEmoji() string {
-	return hypeEmojis[rand.Intn(len(hypeEmojis))]
+	i := time.Now().UnixMilli() % int64(len(hypeEmojis))
+	return hypeEmojis[i]
 }
