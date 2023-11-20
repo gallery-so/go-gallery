@@ -9,17 +9,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/validate"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire can remove it")
@@ -1131,19 +1132,25 @@ func (api InteractionAPI) GetMentionsByPostID(ctx context.Context, postID persis
 	return api.loaders.GetMentionsByPostID.Load(postID)
 }
 
-func (api InteractionAPI) ReportPost(ctx context.Context, postID persist.DBID, reason string) error {
+func (api InteractionAPI) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportPostReason) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"postID": validate.WithTag(postID, "required"),
+		"reason": validate.WithTag(reason, "required"),
 	}); err != nil {
 		return err
 	}
-	userID := For(ctx).User.GetLoggedInUserId(ctx)
-	return api.queries.ReportPost(ctx, db.ReportPostParams{
+	userID, _ := getAuthenticatedUserID(ctx)
+	_, err := api.queries.ReportPost(ctx, db.ReportPostParams{
+		ID:       persist.GenerateID(),
 		PostID:   postID,
 		Reporter: util.ToNullString(userID.String(), true),
-		Reason:   util.ToNullString(reason, true),
+		Reason:   reason,
 	})
+	if err != nil && errors.Is(err, pgx.ErrNoRows) {
+		return persist.ErrPostNotFoundByID{ID: postID}
+	}
+	return err
 }
 
 func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, queries *db.Queries) ([]db.Mention, error) {

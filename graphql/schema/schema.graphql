@@ -2739,7 +2739,13 @@ type ReportPostPayload {
   postId: DBID!
 }
 
-union ReportPostPayloadOrError = ReportPostPayload | ErrInvalidInput
+union ReportPostPayloadOrError = ReportPostPayload | ErrInvalidInput | ErrPostNotFound
+
+enum ReportPostReason {
+  INAPPROPRIATE_CONTENT
+  SPAM_AND_OR_BOT
+  SOMETHING_ELSE
+}
 
 type BlockUserPayload {
   userId: DBID!
@@ -2773,7 +2779,7 @@ type Mutation {
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
   setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
   removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
-  reportPost(postId: DBID!, reason: String!): ReportPostPayloadOrError
+  reportPost(postId: DBID!, reason: ReportPostReason!): ReportPostPayloadOrError
   blockUser(userId: DBID!): BlockUserPayloadOrError @authRequired
   unblockUser(userId: DBID!): UnblockUserPayloadOrError @authRequired
 

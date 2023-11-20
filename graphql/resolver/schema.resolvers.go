@@ -812,7 +812,7 @@ func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.Remove
 }
 
 // ReportPost is the resolver for the reportPost field.
-func (r *mutationResolver) ReportPost(ctx context.Context, postID persist.DBID, reason string) (model.ReportPostPayloadOrError, error) {
+func (r *mutationResolver) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportPostReason) (model.ReportPostPayloadOrError, error) {
 	err := publicapi.For(ctx).Interaction.ReportPost(ctx, postID, reason)
 	if err != nil {
 		return nil, err

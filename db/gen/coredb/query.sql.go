@@ -89,25 +89,28 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
-const blockUser = `-- name: BlockUser :exec
-with user_to_block as (select id from users where users.id = $2 and not deleted and not universal)
-insert into user_blocklist (id, user_id, blocked_user_id, active) (select id, $1, user_to_block.id, true from user_to_block)
-on conflict(user_id, blocked_user_id) where not deleted and active do update set active = true, last_updated = now()
+const blockUser = `-- name: BlockUser :one
+with user_to_block as (select id from users where users.id = $3 and not deleted and not universal)
+insert into user_blocklist (id, user_id, blocked_user_id, active) (select $1, $2, user_to_block.id, true from user_to_block)
+on conflict(user_id, blocked_user_id) where not deleted do update set active = true, last_updated = now() returning id
 `
 
 type BlockUserParams struct {
+	ID            persist.DBID `db:"id" json:"id"`
 	UserID        persist.DBID `db:"user_id" json:"user_id"`
 	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
 }
 
-func (q *Queries) BlockUser(ctx context.Context, arg BlockUserParams) error {
-	_, err := q.db.Exec(ctx, blockUser, arg.UserID, arg.BlockedUserID)
-	return err
+func (q *Queries) BlockUser(ctx context.Context, arg BlockUserParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, blockUser, arg.ID, arg.UserID, arg.BlockedUserID)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
 insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, $3, true)
-on conflict(user_id) where not deleted and active do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now()
+on conflict(user_id) where not deleted do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now()
 `
 
 type BlockUserFromFeedParams struct {
@@ -6617,9 +6620,9 @@ func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFr
 	return err
 }
 
-const reportPost = `-- name: ReportPost :exec
+const reportPost = `-- name: ReportPost :one
 with offending_post as (select id from posts where posts.id = $4 and not deleted)
-insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offending_post.id, $2, $3 from offending_post)
+insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offending_post.id, $2, $3 from offending_post) returning id
 `
 
 type ReportPostParams struct {
@@ -6629,14 +6632,16 @@ type ReportPostParams struct {
 	PostID   persist.DBID   `db:"post_id" json:"post_id"`
 }
 
-func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) error {
-	_, err := q.db.Exec(ctx, reportPost,
+func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, reportPost,
 		arg.ID,
 		arg.Reporter,
 		arg.Reason,
 		arg.PostID,
 	)
-	return err
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec

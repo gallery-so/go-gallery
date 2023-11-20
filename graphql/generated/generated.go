@@ -866,7 +866,7 @@ type ComplexityRoot struct {
 		RemoveComment                                   func(childComplexity int, commentID persist.DBID) int
 		RemoveProfileImage                              func(childComplexity int) int
 		RemoveUserWallets                               func(childComplexity int, walletIds []persist.DBID) int
-		ReportPost                                      func(childComplexity int, postID persist.DBID, reason string) int
+		ReportPost                                      func(childComplexity int, postID persist.DBID, reason persist.ReportPostReason) int
 		ResendVerificationEmail                         func(childComplexity int) int
 		RevokeRolesFromUser                             func(childComplexity int, username string, roles []*persist.Role) int
 		SetCommunityOverrideCreator                     func(childComplexity int, communityID persist.DBID, creatorUserID *persist.DBID) int
@@ -1842,7 +1842,7 @@ type MutationResolver interface {
 	UnregisterUserPushToken(ctx context.Context, pushToken string) (model.UnregisterUserPushTokenPayloadOrError, error)
 	SetProfileImage(ctx context.Context, input model.SetProfileImageInput) (model.SetProfileImagePayloadOrError, error)
 	RemoveProfileImage(ctx context.Context) (model.RemoveProfileImagePayloadOrError, error)
-	ReportPost(ctx context.Context, postID persist.DBID, reason string) (model.ReportPostPayloadOrError, error)
+	ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportPostReason) (model.ReportPostPayloadOrError, error)
 	BlockUser(ctx context.Context, userID persist.DBID) (model.BlockUserPayloadOrError, error)
 	UnblockUser(ctx context.Context, userID persist.DBID) (model.UnblockUserPayloadOrError, error)
 	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
@@ -5232,7 +5232,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ReportPost(childComplexity, args["postId"].(persist.DBID), args["reason"].(string)), true
+		return e.complexity.Mutation.ReportPost(childComplexity, args["postId"].(persist.DBID), args["reason"].(persist.ReportPostReason)), true
 
 	case "Mutation.resendVerificationEmail":
 		if e.complexity.Mutation.ResendVerificationEmail == nil {
@@ -11708,7 +11708,13 @@ type ReportPostPayload {
   postId: DBID!
 }
 
-union ReportPostPayloadOrError = ReportPostPayload | ErrPostNotFound | ErrInvalidInput
+union ReportPostPayloadOrError = ReportPostPayload | ErrInvalidInput | ErrPostNotFound
+
+enum ReportPostReason {
+  INAPPROPRIATE_CONTENT
+  SPAM_AND_OR_BOT
+  SOMETHING_ELSE
+}
 
 type BlockUserPayload {
   userId: DBID!
@@ -11742,7 +11748,7 @@ type Mutation {
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
   setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
   removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
-  reportPost(postId: DBID!, reason: String!): ReportPostPayloadOrError
+  reportPost(postId: DBID!, reason: ReportPostReason!): ReportPostPayloadOrError
   blockUser(userId: DBID!): BlockUserPayloadOrError @authRequired
   unblockUser(userId: DBID!): UnblockUserPayloadOrError @authRequired
 
@@ -13338,10 +13344,10 @@ func (ec *executionContext) field_Mutation_reportPost_args(ctx context.Context, 
 		}
 	}
 	args["postId"] = arg0
-	var arg1 string
+	var arg1 persist.ReportPostReason
 	if tmp, ok := rawArgs["reason"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		arg1, err = ec.unmarshalNReportPostReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportPostReason(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -33976,7 +33982,7 @@ func (ec *executionContext) _Mutation_reportPost(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ReportPost(rctx, fc.Args["postId"].(persist.DBID), fc.Args["reason"].(string))
+		return ec.resolvers.Mutation().ReportPost(rctx, fc.Args["postId"].(persist.DBID), fc.Args["reason"].(persist.ReportPostReason))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -68241,13 +68247,6 @@ func (ec *executionContext) _ReportPostPayloadOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ReportPostPayload(ctx, sel, obj)
-	case model.ErrPostNotFound:
-		return ec._ErrPostNotFound(ctx, sel, &obj)
-	case *model.ErrPostNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrPostNotFound(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -68255,6 +68254,13 @@ func (ec *executionContext) _ReportPostPayloadOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrPostNotFound:
+		return ec._ErrPostNotFound(ctx, sel, &obj)
+	case *model.ErrPostNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrPostNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -82363,6 +82369,16 @@ func (ec *executionContext) unmarshalNReferralPostPreflightInput2githubᚗcomᚋ
 func (ec *executionContext) unmarshalNReferralPostTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokenInput(ctx context.Context, v interface{}) (model.ReferralPostTokenInput, error) {
 	res, err := ec.unmarshalInputReferralPostTokenInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNReportPostReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportPostReason(ctx context.Context, v interface{}) (persist.ReportPostReason, error) {
+	var res persist.ReportPostReason
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNReportPostReason2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐReportPostReason(ctx context.Context, sel ast.SelectionSet, v persist.ReportPostReason) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx context.Context, v interface{}) (model.Window, error) {
