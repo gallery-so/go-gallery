@@ -46,11 +46,13 @@ const args = [
   '--disable-inotify',
 ];
 
+const MAX_DIMENSION = 1000;
+
 (async () => {
   console.log('Launching cluster');
   const cluster = await Cluster.launch({
-    concurrency: Cluster.CONCURRENCY_PAGE,
-    maxConcurrency: 10,
+    concurrency: Cluster.CONCURRENCY_CONTEXT,
+    maxConcurrency: 5,
     timeout: 600000,
     retryDelay: 3000,
     retryLimit: 3,
@@ -149,11 +151,17 @@ async function createAnimation(page) {
     }
   });
 
+  svgDimensions.width = Math.min(svgDimensions.width, MAX_DIMENSION);
+  svgDimensions.height = Math.min(svgDimensions.height, MAX_DIMENSION);
+
   await page.setViewport({
     width: Math.ceil(svgDimensions.width),
     height: svgDimensions.height, // Fixed height
     deviceScaleFactor: 1, // Adjust this as needed for higher resolution screenshots
   });
+
+  const svgElement = await page.$('svg');
+  if (!svgElement) throw new Error('SVG element not found');
 
   const frames = [];
 
@@ -161,7 +169,7 @@ async function createAnimation(page) {
   let accumulatedDelay = 0;
 
   for (let i = 0; i < totalFrames; i++) {
-    const frame = await page.screenshot({ fullPage: true });
+    const frame = await svgElement.screenshot();
     const img = PNG.sync.read(frame);
     frames.push(img);
 
@@ -184,7 +192,6 @@ async function createAnimation(page) {
     }
   }
 
-  // Compare all frames to the first one
   let isStatic = true;
   const img1 = frames[0];
 
@@ -204,19 +211,14 @@ async function createAnimation(page) {
 
   const pngBuffer = PNG.sync.write(frames[0]);
 
-  fs.writeFileSync('test.png', pngBuffer);
+  // fs.writeFileSync('test.png', pngBuffer);
 
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
   if (!isStatic) {
-    // If frames are different, save a gif as well
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
     const stream = encoder.createReadStream();
     let gifBuffer = Buffer.alloc(0);
-    stream.on('data', (chunk) => (gifBuffer = Buffer.concat([gifBuffer, chunk])));
-    stream.on('end', () => {
-      result.push(gifBuffer.toString('base64'));
-    });
 
     encoder.start();
     encoder.setRepeat(0);
@@ -228,6 +230,11 @@ async function createAnimation(page) {
     }
 
     encoder.finish();
+
+    stream.on('data', (chunk) => (gifBuffer = Buffer.concat([gifBuffer, chunk])));
+    stream.on('end', () => {
+      result.push(gifBuffer.toString('base64'));
+    });
   }
 
   return result;

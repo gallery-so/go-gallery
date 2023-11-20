@@ -21,14 +21,14 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select tokens.id from tokens join token_definitions on tokens.token_definition_id = token_definitions.id join token_medias on token_definitions.token_media_id = token_medias.id where token_medias.media->>'media_type' = 'svg' and token_medias.media->'thumbnail_url' is null and tokens.deleted = false order by tokens.last_updated desc limit 100000;")
+	rows, err := pgClient.Query("select tokens.id from tokens join token_definitions on tokens.token_definition_id = token_definitions.id join token_medias on token_definitions.token_media_id = token_medias.id where token_medias.media->>'media_type' = 'svg' and token_medias.media->>'thumbnail_url' is null and tokens.deleted = false and token_medias.active = true order by tokens.last_updated desc limit 100000;")
 	if err != nil {
 		panic(err)
 	}
 
 	defer rows.Close()
 
-	p := pool.New().WithErrors().WithMaxGoroutines(25)
+	p := pool.New().WithErrors().WithMaxGoroutines(100)
 
 	for rows.Next() {
 
