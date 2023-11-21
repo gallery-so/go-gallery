@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -94,26 +93,19 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 }
 
 func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*db.Event, error) {
-	var feedEventID sql.NullString
-	var postID sql.NullString
-	if event.FeedEventID != "" {
-		feedEventID = sql.NullString{String: string(event.FeedEventID), Valid: true}
-	}
-	if event.PostID != "" {
-		postID = sql.NullString{String: string(event.PostID), Valid: true}
-	}
 	event, err := r.Queries.CreateAdmireEvent(ctx, db.CreateAdmireEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
 		AdmireID:       event.AdmireID,
-		FeedEvent:      feedEventID,
-		Post:           postID,
+		FeedEvent:      util.ToNullString(event.FeedEventID.String(), true),
+		Post:           util.ToNullString(event.PostID.String(), true),
 		SubjectID:      event.SubjectID,
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
+		Token:          util.ToNullString(event.TokenID.String(), true),
 	})
 	return &event, err
 }
@@ -154,14 +146,18 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 
 func (r *EventRepository) AddContractEvent(ctx context.Context, event db.Event) (*db.Event, error) {
 	event, err := r.Queries.CreateContractEvent(ctx, db.CreateContractEventParams{
-		Post:       util.ToNullString(event.PostID.String(), true),
-		Comment:    util.ToNullString(event.CommentID.String(), true),
-		FeedEvent:  util.ToNullString(event.FeedEventID.String(), true),
-		Mention:    util.ToNullString(event.MentionID.String(), true),
-		ContractID: event.ContractID,
-		Data:       event.Data,
-		GroupID:    event.GroupID,
-		Caption:    event.Caption,
+		Post:           util.ToNullString(event.PostID.String(), true),
+		Comment:        util.ToNullString(event.CommentID.String(), true),
+		FeedEvent:      util.ToNullString(event.FeedEventID.String(), true),
+		Mention:        util.ToNullString(event.MentionID.String(), true),
+		ContractID:     event.ContractID,
+		Data:           event.Data,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
+		Action:         event.Action,
+		ActorID:        event.ActorID,
+		ID:             persist.GenerateID(),
+		ResourceTypeID: event.ResourceTypeID,
 	})
 	return &event, err
 }

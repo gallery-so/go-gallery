@@ -22,6 +22,7 @@ const (
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
 	ActionUserPosted                      Action = "UserPosted"
 	ActionUserPostedYourWork              Action = "UserPostedYourWork"
+	ActionUserPostedFirstPost             Action = "UserPostedFirstPost"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
 	ActionCollectionCreated               Action = "CollectionCreated"
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"
@@ -51,6 +52,7 @@ type EventData struct {
 	TokenCollectorsNote                 string            `json:"token_collectors_note"`
 	TokenCollectionID                   DBID              `json:"token_collection_id"`
 	TokenContractID                     DBID              `json:"token_contract_id"`
+	TokenDefinitionID                   DBID              `json:"token_definition_id"`
 	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`
 	CollectionCollectorsNote            string            `json:"collection_collectors_note"`
 	GalleryName                         *string           `json:"gallery_name"`
@@ -59,7 +61,6 @@ type EventData struct {
 	GalleryNewTokenIDs                  map[DBID]DBIDList `json:"gallery_new_token_ids"`
 	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`
 	GalleryNewTokenCollectorsNotes      map[DBID]string   `json:"gallery_new_token_collectors_notes"`
-	YourContractID                      DBID              `json:"your_contract_id"`
 }
 
 type FeedEventData struct {

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/task"
 	"io"
 	"math/big"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -119,7 +119,6 @@ type indexer struct {
 	arweaveClient *goar.Client
 	storageClient *storage.Client
 	queries       *indexerdb.Queries
-	tokenRepo     persist.TokenRepository
 	contractRepo  persist.ContractRepository
 	dbMu          *sync.Mutex // Manages writes to the db
 	stateMu       *sync.Mutex // Manages updates to the indexer's state
@@ -146,7 +145,7 @@ type indexer struct {
 }
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
-func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, iQueries *indexerdb.Queries, bQueries *coredb.Queries, taskClient *gcptasks.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
+func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, iQueries *indexerdb.Queries, bQueries *coredb.Queries, taskClient *task.Client, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
 	if rpcEnabled && ethClient == nil {
 		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
@@ -159,7 +158,6 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 		ipfsClient:    ipfsClient,
 		arweaveClient: arweaveClient,
 		storageClient: storageClient,
-		tokenRepo:     tokenRepo,
 		contractRepo:  contractRepo,
 		queries:       iQueries,
 		dbMu:          &sync.Mutex{},
@@ -190,7 +188,7 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 		i.lastSyncedChunk = *startingBlock
 		i.lastSyncedChunk -= i.lastSyncedChunk % blocksPerLogsCall
 	} else {
-		recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
+		recentDBBlock, err := contractRepo.MostRecentBlock(context.Background())
 		if err != nil {
 			panic(err)
 		}

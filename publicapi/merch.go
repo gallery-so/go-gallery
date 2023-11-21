@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -40,15 +39,6 @@ var uriToMerchType = map[string]int{
 	"ipfs://QmSPdA9Gg8xAdVxWvUyGkdFKQ8YMVYnGjYcr3cGMcBH1ae": merchTypeCard,
 }
 
-type merchAttribute struct {
-	TraitType string `json:"trait_type"`
-	Value     string `json:"value"`
-}
-
-type merchMetadata struct {
-	Attributes []merchAttribute `json:"attributes"`
-}
-
 type MerchAPI struct {
 	repos              *postgres.Repositories
 	queries            *db.Queries
@@ -83,60 +73,32 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 
 	for i, token := range tokens {
 		t := &model.MerchToken{
-			TokenID: token.TokenID.String(),
+			TokenID: token.Definition.TokenID.String(),
 		}
 
-		isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.TokenID.BigInt())
+		isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.Definition.TokenID.BigInt())
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.TokenID, err)
+			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.Definition.TokenID, err)
 		}
 		t.Redeemed = isRedeemed
 
-		discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
+		discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.Definition.TokenID)
 		if err != nil && err != pgx.ErrNoRows {
-			return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.TokenID, err)
+			return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.Definition.TokenID, err)
 		}
 		if discountCode.Valid && discountCode.String != "" {
 			t.DiscountCode = &discountCode.String
 		}
 
-		if token.TokenURI != "" {
-			otype := uriToMerchType[token.TokenURI.String()]
-			switch otype {
-			case merchTypeTShirt:
-				t.ObjectType = model.MerchTypeTShirt
-			case merchTypeHat:
-				t.ObjectType = model.MerchTypeHat
-			case merchTypeCard:
-				t.ObjectType = model.MerchTypeCard
-			default:
-				return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
-			}
-		} else if token.TokenMetadata != nil && len(token.TokenMetadata) > 0 {
-			// TokenURI should exist but since we have been talking about removing this field, I added this extra backup logic
-			asBytes, err := json.Marshal(token.TokenMetadata)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal token metadata: %w", err)
-			}
-			var metadata merchMetadata
-			if err := json.Unmarshal(asBytes, &metadata); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal token metadata: %w", err)
-			}
-			for _, attr := range metadata.Attributes {
-				if attr.TraitType == "Object" {
-					switch attr.Value {
-					case "001":
-						t.ObjectType = model.MerchTypeTShirt
-					case "002":
-						t.ObjectType = model.MerchTypeHat
-					case "003":
-						t.ObjectType = model.MerchTypeCard
-					default:
-						return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
-					}
-					break
-				}
-			}
+		switch token.Definition.Metadata["name"] {
+		case "T-Shirt":
+			t.ObjectType = model.MerchTypeTShirt
+		case "Hat":
+			t.ObjectType = model.MerchTypeHat
+		case "Card":
+			t.ObjectType = model.MerchTypeCard
+		default:
+			return nil, fmt.Errorf("unknown merch type for token %v", token.Definition.TokenID)
 		}
 
 		merchTokens[i] = t
@@ -155,8 +117,8 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 
 	merchAddress := env.GetString("MERCH_CONTRACT_ADDRESS")
 
-	token, err := api.queries.GetTokenByTokenIdentifiers(ctx, db.GetTokenByTokenIdentifiersParams{
-		TokenHex:        tokenID,
+	token, err := api.queries.GetTokenDefinitionByTokenIdentifiers(ctx, db.GetTokenDefinitionByTokenIdentifiersParams{
+		TokenID:         tokenID,
 		ContractAddress: persist.Address(merchAddress),
 		Chain:           persist.ChainETH,
 	})
@@ -187,48 +149,15 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 		t.DiscountCode = &discountCode.String
 	}
 
-	if token.TokenUri.String != "" {
-		otype := uriToMerchType[token.TokenUri.String]
-		switch otype {
-		case merchTypeTShirt:
-			t.ObjectType = model.MerchTypeTShirt
-		case merchTypeHat:
-			t.ObjectType = model.MerchTypeHat
-		case merchTypeCard:
-			t.ObjectType = model.MerchTypeCard
-		default:
-			return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
-		}
-	} else if token.TokenMediaID != "" {
-		med, err := api.loaders.GetMediaByMediaIDIgnoringStatus.Load(token.TokenMediaID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load media for token %v: %w", token.TokenID, err)
-		}
-		met := med.Metadata
-		// TokenURI should exist but since we have been talking about removing this field, I added this extra backup logic
-		asBytes, err := json.Marshal(met)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal token metadata: %w", err)
-		}
-		var metadata merchMetadata
-		if err := json.Unmarshal(asBytes, &metadata); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal token metadata: %w", err)
-		}
-		for _, attr := range metadata.Attributes {
-			if attr.TraitType == "Object" {
-				switch attr.Value {
-				case "001":
-					t.ObjectType = model.MerchTypeTShirt
-				case "002":
-					t.ObjectType = model.MerchTypeHat
-				case "003":
-					t.ObjectType = model.MerchTypeCard
-				default:
-					return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
-				}
-				break
-			}
-		}
+	switch token.Metadata["name"] {
+	case "T-Shirt":
+		t.ObjectType = model.MerchTypeTShirt
+	case "Hat":
+		t.ObjectType = model.MerchTypeHat
+	case "Card":
+		t.ObjectType = model.MerchTypeCard
+	default:
+		return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
 	}
 
 	return t, nil

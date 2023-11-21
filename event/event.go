@@ -3,9 +3,8 @@ package event
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/tracing"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"golang.org/x/sync/errgroup"
@@ -19,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -26,14 +26,15 @@ import (
 type sendType int
 
 const (
-	eventSenderContextKey          = "event.eventSender"
-	delayedKey            sendType = iota
+	eventSenderContextKey           = "event.eventSender"
+	sentryEventContextName          = "event context"
+	delayedKey             sendType = iota
 	immediateKey
 	groupKey
 )
 
 // Register specific event handlers
-func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *cloudtasks.Client) {
+func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *task.Client) {
 	sender := newEventSender(queries)
 
 	feed := newEventDispatcher()
@@ -56,6 +57,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 
 	notifications := newEventDispatcher()
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
+	followerNotificationHandler := newFollowerNotificationHandler(notif, disableDataloaderCaching, queries)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
@@ -68,6 +70,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, followerNotificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
@@ -111,13 +114,21 @@ func DispatchMany(ctx context.Context, evts []db.Event, editID *string) error {
 }
 
 func PushEvent(ctx context.Context, evt db.Event) {
-	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-		sentryutil.SetEventContext(hub.Scope(), persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
+	err := dispatchDelayed(ctx, evt)
+	if err != nil {
+		sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
+			logger.For(ctx).Error(err)
+			setEventContext(scope, persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
+		})
 	}
-	if err := dispatchDelayed(ctx, evt); err != nil {
-		logger.For(ctx).Error(err)
-		sentryutil.ReportError(ctx, err)
-	}
+}
+
+func setEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, action persist.Action) {
+	scope.SetContext(sentryEventContextName, sentry.Context{
+		"ActorID":   actorID,
+		"SubjectID": subjectID,
+		"Action":    action,
+	})
 }
 
 // dispatchDelayed sends the event to all of its registered handlers.
@@ -364,10 +375,10 @@ type groupHandler interface {
 type feedHandler struct {
 	queries      *db.Queries
 	eventBuilder *feed.EventBuilder
-	tc           *cloudtasks.Client
+	tc           *task.Client
 }
 
-func newFeedHandler(queries *db.Queries, taskClient *cloudtasks.Client) feedHandler {
+func newFeedHandler(queries *db.Queries, taskClient *task.Client) feedHandler {
 	return feedHandler{
 		queries:      queries,
 		eventBuilder: feed.NewEventBuilder(queries),
@@ -384,7 +395,7 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 	if !actionsToBeHandledByFeedService[persistedEvent.Action] {
 		return nil
 	}
-	return task.CreateTaskForFeed(ctx, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
+	return h.tc.CreateTaskForFeed(ctx, task.FeedMessage{ID: persistedEvent.ID})
 }
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
@@ -414,7 +425,7 @@ func (h feedHandler) handleGroup(ctx context.Context, groupID string, action per
 
 	if feedEvent != nil {
 		// Send event to feedbot
-		err = task.CreateTaskForFeedbot(ctx, task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc)
+		err = h.tc.CreateTaskForFeedbot(ctx, task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action})
 		if err != nil {
 			logger.For(ctx).Errorf("failed to create task for feedbot: %s", err.Error())
 		}
@@ -470,39 +481,6 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		MentionID:   persistedEvent.MentionID,
 	})
 }
-
-func (h notificationHandler) createNotificationDataForEvent(event db.Event) (data persist.NotificationData) {
-	switch event.Action {
-	case persist.ActionViewedGallery:
-		if event.ActorID.String != "" {
-			data.AuthedViewerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
-		}
-		if event.ExternalID.String != "" {
-			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
-		}
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
-		if event.ActorID.String != "" {
-			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
-		}
-	case persist.ActionUserFollowedUsers:
-		if event.ActorID.String != "" {
-			data.FollowerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
-		}
-		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
-		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)
-	case persist.ActionNewTokensReceived:
-		data.NewTokenID = event.Data.NewTokenID
-		data.NewTokenQuantity = event.Data.NewTokenQuantity
-	case persist.ActionReplyToComment:
-		data.OriginalCommentID = event.SubjectID
-	case persist.ActionUserPostedYourWork:
-		data.YourContractID = event.Data.YourContractID
-	default:
-		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
-	}
-	return
-}
-
 func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
@@ -534,7 +512,13 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 		}
 
 	case persist.ResourceTypeAdmire:
-		if event.FeedEventID != "" {
+		if event.Action == persist.ActionAdmiredToken {
+			token, err := h.dataloaders.GetTokenByIdBatch.Load(event.SubjectID)
+			if err != nil {
+				return "", err
+			}
+			return token.Token.OwnerUserID, nil
+		} else if event.FeedEventID != "" {
 			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
 			if err != nil {
 				return "", err
@@ -565,9 +549,68 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)
 }
 
+func (h notificationHandler) createNotificationDataForEvent(event db.Event) (data persist.NotificationData) {
+	switch event.Action {
+	case persist.ActionViewedGallery:
+		if event.ActorID.String != "" {
+			data.AuthedViewerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
+		}
+		if event.ExternalID.String != "" {
+			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
+		}
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
+		if event.ActorID.String != "" {
+			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
+		}
+	case persist.ActionUserFollowedUsers:
+		if event.ActorID.String != "" {
+			data.FollowerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
+		}
+		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
+		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)
+	case persist.ActionNewTokensReceived:
+		data.NewTokenID = event.Data.NewTokenID
+		data.NewTokenQuantity = event.Data.NewTokenQuantity
+	case persist.ActionReplyToComment:
+		data.OriginalCommentID = event.SubjectID
+
+	default:
+		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
+	}
+	return
+}
+
+// followerNotificationHandler handles events for consumption as notifications.
+type followerNotificationHandler struct {
+	dataloaders          *dataloader.Loaders
+	notificationHandlers *notifications.NotificationHandlers
+}
+
+func newFollowerNotificationHandler(notifiers *notifications.NotificationHandlers, disableDataloaderCaching bool, queries *db.Queries) *followerNotificationHandler {
+	return &followerNotificationHandler{
+		notificationHandlers: notifiers,
+		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook),
+	}
+}
+
+func (h followerNotificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
+	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
+		// no owner or data for follower notifications
+		Action:      persistedEvent.Action,
+		EventIds:    persist.DBIDList{persistedEvent.ID},
+		GalleryID:   persistedEvent.GalleryID,
+		FeedEventID: persistedEvent.FeedEventID,
+		PostID:      persistedEvent.PostID,
+		CommentID:   persistedEvent.CommentID,
+		TokenID:     persistedEvent.TokenID,
+		ContractID:  persistedEvent.ContractID,
+		MentionID:   persistedEvent.MentionID,
+	})
+}
+
 // slackHandler posts events to Slack
-type slackHandler struct{ tc *cloudtasks.Client }
+type slackHandler struct{ tc *task.Client }
 
 func (s slackHandler) handleDelayed(ctx context.Context, event db.Event) error {
-	return task.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: event.PostID}, s.tc)
+	return s.tc.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: event.PostID})
 }

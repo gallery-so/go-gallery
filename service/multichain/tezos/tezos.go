@@ -815,8 +815,8 @@ func (d *Provider) tzContractToContract(ctx context.Context, tzContract tzktCont
 
 		LatestBlock: persist.BlockNumber(tzContract.LastActivity),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Name:           tzContract.Alias,
-			CreatorAddress: persist.Address(tzContract.Creator.Address),
+			Name:         tzContract.Alias,
+			OwnerAddress: persist.Address(tzContract.Creator.Address),
 		},
 	}
 }

@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"net/http"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -18,7 +17,7 @@ type idAddressTuple struct {
 	Social  persist.SocialProvider
 }
 
-func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
+func processAllUsers(pg *pgxpool.Pool, tc *task.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		noSocials, err := pg.Query(c, `select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.l1_chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;`)
@@ -66,9 +65,9 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 			}
 
 			if len(send) >= 200 {
-				err = task.CreateTaskForAutosocialProcessUsers(c, task.AutosocialProcessUsersMessage{
+				err = tc.CreateTaskForAutosocialProcessUsers(c, task.AutosocialProcessUsersMessage{
 					Users: send,
-				}, ctc)
+				})
 				if err != nil {
 					allErrs = append(allErrs, err)
 				}
@@ -77,9 +76,9 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 			}
 		}
 		if len(send) > 0 {
-			err = task.CreateTaskForAutosocialProcessUsers(c, task.AutosocialProcessUsersMessage{
+			err = tc.CreateTaskForAutosocialProcessUsers(c, task.AutosocialProcessUsersMessage{
 				Users: send,
-			}, ctc)
+			})
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}

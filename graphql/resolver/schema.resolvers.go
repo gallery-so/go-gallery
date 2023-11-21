@@ -21,7 +21,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -208,8 +207,6 @@ func (r *commentResolver) Replies(ctx context.Context, obj *model.Comment, befor
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
-
-	return nil, fmt.Errorf("comment has no source")
 }
 
 // Source is the resolver for the source field.
@@ -258,7 +255,9 @@ func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
 	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
-		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
+		if util.ErrorAs[persist.ErrContractCreatorNotFound](err) {
+			// It's normal not to find a creator for a community -- we may not have an address available.
+			// If that happens, just return nil to the frontend to signify that there is no creator.
 			return nil, nil
 		}
 		return nil, err
@@ -543,7 +542,7 @@ func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.Galle
 
 // PotentialEnsProfileImage is the resolver for the potentialEnsProfileImage field.
 func (r *galleryUserResolver) PotentialEnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error) {
-	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, obj.Dbid)
+	a, err := publicapi.For(ctx).User.GetPotentialENSProfileImageByUserID(ctx, obj.Dbid)
 	if err != nil && (errors.Is(err, eth.ErrNoResolution) || errors.Is(err, eth.ErrNoAvatarRecord)) {
 		return nil, nil
 	}
@@ -583,19 +582,6 @@ func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser
 	}
 
 	return tokensToModel(ctx, tokens), nil
-}
-
-// TokensByChain is the resolver for the tokensByChain field.
-func (r *galleryUserResolver) TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error) {
-	tokens, err := publicapi.For(ctx).Token.GetTokensByUserIDAndChain(ctx, obj.Dbid, chain)
-	if err != nil {
-		return nil, err
-	}
-
-	return &model.ChainTokens{
-		Chain:  &chain,
-		Tokens: tokensToModel(ctx, tokens),
-	}, nil
 }
 
 // Wallets is the resolver for the wallets field.
@@ -2580,42 +2566,27 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 
 // PostComposerDraftDetails is the resolver for the postComposerDraftDetails field.
 func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error) {
-	token := persist.TokenIdentifiers{
+	tID := persist.TokenIdentifiers{
 		Chain:           input.Token.ChainAddress.Chain(),
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
 	}
 
-	media, t, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, token)
+	td, media, err := publicapi.For(ctx).Token.GetMediaByTokenIdentifiers(ctx, tID)
 	if err != nil {
 		return nil, err
-	}
-
-	tokenName := t.Name.String
-	if media.ID != "" && media.Name != "" {
-		tokenName = media.Name
-	}
-
-	tokenDescription := t.Description.String
-	if media.ID != "" && media.Description != "" {
-		tokenDescription = media.Description
-	}
-
-	contractID := t.Contract
-	if media.ID != "" && media.ContractID != "" {
-		contractID = media.ContractID
 	}
 
 	highDef := false
 
 	return model.PostComposerDraftDetailsPayload{
-		Media:            resolveTokenMedia(ctx, t, media, highDef),
-		TokenName:        util.ToPointer(tokenName),
-		TokenDescription: util.ToPointer(tokenDescription),
+		Media:            resolveTokenMedia(ctx, td, media, highDef),
+		TokenName:        util.ToPointer(td.Name.String),
+		TokenDescription: util.ToPointer(td.Description.String),
 		Community:        nil, // handled by dedicated resolver
 		HelperPostComposerDraftDetailsPayloadData: model.HelperPostComposerDraftDetailsPayloadData{
-			Token:      token,
-			ContractID: contractID,
+			Token:      tID,
+			ContractID: td.ContractID,
 		},
 	}, err
 }
@@ -2807,6 +2778,11 @@ func (r *someoneViewedYourGalleryNotificationResolver) Gallery(ctx context.Conte
 	return resolveGalleryByGalleryID(ctx, obj.GalleryID)
 }
 
+// Post is the resolver for the post field.
+func (r *someoneYouFollowPostedTheirFirstPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.PostID)
+}
+
 // NewNotification is the resolver for the newNotification field.
 func (r *subscriptionResolver) NewNotification(ctx context.Context) (<-chan model.Notification, error) {
 	return resolveNewNotificationSubscription(ctx), nil
@@ -2817,30 +2793,6 @@ func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan 
 	return resolveUpdatedNotificationSubscription(ctx), nil
 }
 
-// Media is the resolver for the media field.
-func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
-	var highDef bool
-	if obj.CollectionID != nil {
-		settings, err := resolveTokenSettingsByIDs(ctx, obj.Dbid, *obj.CollectionID)
-		if err != nil {
-			return nil, err
-		}
-		highDef = *settings.HighDefinition
-	}
-
-	tokenMedia := coredb.TokenMedia{}
-	var err error
-
-	if obj.Token.TokenMediaID != "" {
-		tokenMedia, err = publicapi.For(ctx).Token.MediaByMediaID(ctx, obj.Token.TokenMediaID)
-		if util.ErrorAs[persist.ErrMediaNotFound](err) {
-			err = nil
-		}
-	}
-
-	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), err
-}
-
 // Owner is the resolver for the owner field.
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
@@ -2848,66 +2800,22 @@ func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.Gal
 
 // OwnedByWallets is the resolver for the ownedByWallets field.
 func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, obj.Dbid)
+	wallets, err := publicapi.For(ctx).Wallet.GetWalletsByIDs(ctx, obj.HelperTokenData.Token.OwnedByWallets)
 	if err != nil {
 		return nil, err
 	}
 
-	wallets := make([]*model.Wallet, len(token.OwnedByWallets))
-	for i, walletID := range token.OwnedByWallets {
-		wallets[i], err = resolveWalletByWalletID(ctx, walletID)
-		if err != nil {
-			sentryutil.ReportError(ctx, err)
-		}
+	ws := make([]*model.Wallet, len(wallets))
+	for i, w := range wallets {
+		ws[i] = walletToModelSqlc(ctx, w)
 	}
 
-	return wallets, nil
+	return ws, nil
 }
 
-// TokenMetadata is the resolver for the tokenMetadata field.
-func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*string, error) {
-	if obj.Token.TokenMediaID == "" {
-		return nil, persist.ErrMediaNotFound{ID: obj.Token.TokenMediaID}
-	}
-	tokenMedia, err := publicapi.For(ctx).Token.MediaByMediaID(ctx, obj.Token.TokenMediaID)
-	if err != nil {
-		return nil, err
-	}
-	mar, err := json.Marshal(tokenMedia.Metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	return util.ToPointer(string(mar)), nil
-}
-
-// Contract is the resolver for the contract field.
-func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
-	if obj.HelperTokenData.Token.Contract != "" {
-		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.Contract)
-	}
-	return resolveContractByTokenID(ctx, obj.Dbid)
-}
-
-// Community is the resolver for the community field.
-func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
-	return resolveCommunityByTokenID(ctx, obj.Dbid)
-}
-
-// IsSpamByProvider is the resolver for the isSpamByProvider field.
-func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
-	var c *model.Contract
-	var err error
-	if obj.Token.Contract != "" {
-		c, err = resolveContractByContractID(ctx, obj.Token.Contract)
-	} else {
-		c, err = resolveContractByTokenID(ctx, obj.Dbid)
-	}
-	if err != nil {
-		return nil, err
-	}
-	isSpam := (c.IsSpam != nil && *c.IsSpam) || (obj.IsSpamByProvider != nil && *obj.IsSpamByProvider)
-	return &isSpam, nil
+// Definition is the resolver for the definition field.
+func (r *tokenResolver) Definition(ctx context.Context, obj *model.Token) (*model.TokenDefinition, error) {
+	return resolveTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
 }
 
 // Admires is the resolver for the admires field.
@@ -2950,6 +2858,146 @@ func (r *tokenResolver) ViewerAdmire(ctx context.Context, obj *model.Token) (*mo
 	}
 
 	return admireToModel(ctx, *admire), nil
+}
+
+// Media is the resolver for the media field.
+func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
+	var highDef bool
+	if obj.CollectionID != nil {
+		settings, err := resolveTokenSettingsByIDs(ctx, obj.Dbid, *obj.CollectionID)
+		if err != nil {
+			return nil, err
+		}
+		highDef = *settings.HighDefinition
+	}
+
+	// The definition is likely already cached by the root dataloader that queries for the definition alongside the token instance
+	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	var media coredb.TokenMedia
+
+	if td.TokenMediaID != "" {
+		media, err = publicapi.For(ctx).Token.GetMediaByMediaID(ctx, td.TokenMediaID)
+		if util.ErrorAs[persist.ErrMediaNotFound](err) {
+			err = nil
+		}
+	}
+
+	return resolveTokenMedia(ctx, td, media, highDef), err
+}
+
+// TokenType is the resolver for the tokenType field.
+func (r *tokenResolver) TokenType(ctx context.Context, obj *model.Token) (*model.TokenType, error) {
+	td, err := resolveTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	return td.TokenType, nil
+}
+
+// Chain is the resolver for the chain field.
+func (r *tokenResolver) Chain(ctx context.Context, obj *model.Token) (*persist.Chain, error) {
+	td, err := resolveTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	return td.Chain, nil
+}
+
+// Name is the resolver for the name field.
+func (r *tokenResolver) Name(ctx context.Context, obj *model.Token) (*string, error) {
+	td, err := resolveTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	return td.Name, nil
+}
+
+// Description is the resolver for the description field.
+func (r *tokenResolver) Description(ctx context.Context, obj *model.Token) (*string, error) {
+	td, err := resolveTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	return td.Description, nil
+}
+
+// TokenID is the resolver for the tokenId field.
+func (r *tokenResolver) TokenID(ctx context.Context, obj *model.Token) (*string, error) {
+	td, err := resolveTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	return td.TokenID, nil
+}
+
+// TokenMetadata is the resolver for the tokenMetadata field.
+func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*string, error) {
+	tokenMedia, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	mar, err := json.Marshal(tokenMedia.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(string(mar)), nil
+}
+
+// Contract is the resolver for the contract field.
+func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
+	return resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
+}
+
+// Community is the resolver for the community field.
+func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
+	return resolveCommunityByID(ctx, obj.HelperTokenData.Token.ContractID)
+}
+
+// ExternalURL is the resolver for the externalUrl field.
+func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*string, error) {
+	td, err := resolveTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	return td.ExternalURL, nil
+}
+
+// IsSpamByProvider is the resolver for the isSpamByProvider field.
+func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
+	c, err := resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
+	if err != nil {
+		return nil, err
+	}
+	isSpam := (c.IsSpam != nil && *c.IsSpam) || (obj.IsSpamByProvider != nil && *obj.IsSpamByProvider)
+	return &isSpam, nil
+}
+
+// Media is the resolver for the media field.
+func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error) {
+	media, err := publicapi.For(ctx).Token.GetMediaByMediaID(ctx, obj.HelperTokenDefinitionData.Definition.TokenMediaID)
+	if err != nil {
+		return nil, err
+	}
+	return resolveTokenMedia(ctx, obj.HelperTokenDefinitionData.Definition, media, false), nil
+}
+
+// TokenMetadata is the resolver for the tokenMetadata field.
+func (r *tokenDefinitionResolver) TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error) {
+	b, err := obj.HelperTokenDefinitionData.Definition.Metadata.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return util.ToPointer(string(b)), nil
+}
+
+// Community is the resolver for the community field.
+func (r *tokenDefinitionResolver) Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error) {
+	return resolveCommunityByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
 }
 
 // Wallets is the resolver for the wallets field.
@@ -3337,11 +3385,21 @@ func (r *Resolver) SomeoneViewedYourGalleryNotification() generated.SomeoneViewe
 	return &someoneViewedYourGalleryNotificationResolver{r}
 }
 
+// SomeoneYouFollowPostedTheirFirstPostNotification returns generated.SomeoneYouFollowPostedTheirFirstPostNotificationResolver implementation.
+func (r *Resolver) SomeoneYouFollowPostedTheirFirstPostNotification() generated.SomeoneYouFollowPostedTheirFirstPostNotificationResolver {
+	return &someoneYouFollowPostedTheirFirstPostNotificationResolver{r}
+}
+
 // Subscription returns generated.SubscriptionResolver implementation.
 func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
 
 // Token returns generated.TokenResolver implementation.
 func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
+
+// TokenDefinition returns generated.TokenDefinitionResolver implementation.
+func (r *Resolver) TokenDefinition() generated.TokenDefinitionResolver {
+	return &tokenDefinitionResolver{r}
+}
 
 // TokenHolder returns generated.TokenHolderResolver implementation.
 func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
@@ -3435,8 +3493,10 @@ type someoneMentionedYourCommunityNotificationResolver struct{ *Resolver }
 type someonePostedYourWorkNotificationResolver struct{ *Resolver }
 type someoneRepliedToYourCommentNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
+type someoneYouFollowPostedTheirFirstPostNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
+type tokenDefinitionResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }

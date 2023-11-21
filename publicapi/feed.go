@@ -13,9 +13,9 @@ import (
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 
@@ -35,9 +35,12 @@ import (
 	"github.com/mikeydub/go-gallery/util/retry"
 )
 
-const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
+const (
+	tHalf6Hours  = 6 * 60.0
+	tHalf10Hours = 10 * 60.0
+)
 
-var feedLookback = time.Duration(7 * 24 * time.Hour)
+var feedLookback = time.Duration(4 * 24 * time.Hour)
 
 type FeedAPI struct {
 	repos              *postgres.Repositories
@@ -46,7 +49,7 @@ type FeedAPI struct {
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	cache              *redis.Cache
-	taskClient         *gcptasks.Client
+	taskClient         *task.Client
 	multichainProvider *multichain.Provider
 }
 
@@ -195,7 +198,9 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 					Action:         persist.ActionMentionCommunity,
 					MentionID:      mention.ID,
 				})
-
+				if err != nil {
+					return "", err
+				}
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
 			}
@@ -222,6 +227,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 			ContractID:     creator.ContractID,
 		})
 		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 			logger.For(ctx).Errorf("error dispatching event: %v", err)
 		}
 	}
@@ -234,8 +240,32 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		SubjectID:      postID,
 		PostID:         postID,
 	})
+	if err != nil {
+		sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
+		logger.For(ctx).Errorf("error dispatching event: %v", err)
+	}
 
-	return postID, err
+	count, err := api.queries.CountPostsByUserID(ctx, actorID)
+	if err != nil {
+		return "", err
+	}
+
+	if count == 1 {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(actorID),
+			Action:         persist.ActionUserPostedFirstPost,
+			ResourceTypeID: persist.ResourceTypePost,
+			UserID:         actorID,
+			SubjectID:      postID,
+			PostID:         postID,
+		})
+		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
+			logger.For(ctx).Errorf("error dispatching event: %v", err)
+		}
+	}
+
+	return postID, nil
 }
 
 func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
@@ -267,7 +297,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		}
 	}
 
-	token, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+	r, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
 		OwnerID:         user.ID,
 		TokenID:         t.TokenID,
 		ContractAddress: t.ContractAddress,
@@ -276,15 +306,10 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 
 	// The token is already synced
 	if err == nil {
-		contract, err := api.queries.GetContractByID(ctx, token.Contract)
-		if err != nil {
-			return "", err
-		}
-
 		postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 			ID:          persist.GenerateID(),
-			TokenIds:    []persist.DBID{token.ID},
-			ContractIds: []persist.DBID{contract.ID},
+			TokenIds:    []persist.DBID{r.Token.ID},
+			ContractIds: []persist.DBID{r.Contract.ID},
 			ActorID:     user.ID,
 			Caption:     c,
 		})
@@ -292,7 +317,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			return postID, err
 		}
 
-		creator, _ := api.loaders.GetContractCreatorsByIds.Load(contract.ID.String())
+		creator, _ := api.loaders.GetContractCreatorsByIds.Load(r.Contract.ID.String())
 		if creator.CreatorUserID != "" {
 			err = event.Dispatch(ctx, db.Event{
 				ActorID:        persist.DBIDToNullStr(userID),
@@ -304,6 +329,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 				ContractID:     creator.ContractID,
 			})
 			if err != nil {
+				sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 				logger.For(ctx).Errorf("error dispatching event: %v", err)
 			}
 		}
@@ -337,8 +363,8 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 
 	postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
-		TokenIds:    []persist.DBID{synced.ID},
-		ContractIds: []persist.DBID{synced.Contract},
+		TokenIds:    []persist.DBID{synced.Instance.ID},
+		ContractIds: []persist.DBID{synced.Contract.ID},
 		ActorID:     user.ID,
 		Caption:     c,
 	})
@@ -346,7 +372,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		return postID, err
 	}
 
-	creator, _ := api.loaders.GetContractCreatorsByIds.Load(synced.Contract.String())
+	creator, _ := api.loaders.GetContractCreatorsByIds.Load(synced.Contract.ID.String())
 	if creator.CreatorUserID != "" {
 		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(userID),
@@ -358,6 +384,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			ContractID:     creator.ContractID,
 		})
 		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 			logger.For(ctx).Errorf("error dispatching event: %v", err)
 		}
 	}
@@ -370,8 +397,31 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		SubjectID:      postID,
 		PostID:         postID,
 	})
+	if err != nil {
+		sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
+		logger.For(ctx).Errorf("error dispatching event: %v", err)
+	}
+	count, err := api.queries.CountPostsByUserID(ctx, user.ID)
+	if err != nil {
+		return "", err
+	}
 
-	return postID, err
+	if count == 1 {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(user.ID),
+			Action:         persist.ActionUserPostedFirstPost,
+			ResourceTypeID: persist.ResourceTypePost,
+			UserID:         user.ID,
+			SubjectID:      postID,
+			PostID:         postID,
+		})
+		if err != nil {
+			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
+			logger.For(ctx).Errorf("error dispatching event: %v", err)
+		}
+	}
+
+	return postID, nil
 }
 
 func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
@@ -383,7 +433,7 @@ func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIde
 		return err
 	}
 	userID, _ := getAuthenticatedUserID(ctx)
-	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
+	return api.taskClient.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID})
 }
 
 func insertMentionsForPost(ctx context.Context, mentions []*model.MentionInput, postID persist.DBID, q *db.Queries) ([]db.Mention, error) {
@@ -499,8 +549,7 @@ func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *stri
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
@@ -646,9 +695,11 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				return nil, nil, err
 			}
 
+			now := time.Now()
+
 			scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
 			scored := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 {
-				return timeFactor(e.CreatedAt, time.Now()) * engagementFactor(int(e.Interactions))
+				return decayRate(e.CreatedAt, now, postScores[e.ID].IsGalleryPost) * engagementFactor(int(e.Interactions))
 			})
 
 			postIDs := make([]persist.DBID, len(scored))
@@ -738,10 +789,12 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		personalizationScores := make(map[persist.DBID]float64)
 
 		for _, e := range postScores {
-			boost := newPostFactor(e.Post.CreatedAt, now)
-			timeF := timeFactor(e.Post.CreatedAt, now)
-			engagementScores[e.Post.ID] = boost * timeF * (1 + engagementFactor(int(e.FeedEntityScore.Interactions)))
-			personalizationScores[e.Post.ID] = boost * timeF * userpref.For(ctx).RelevanceTo(userID, e.FeedEntityScore)
+			engagementScores[e.Post.ID] = decayRate(e.Post.CreatedAt, now, e.IsGalleryPost) * freshnessFactor(e.Post.CreatedAt, now)
+			personalizationScores[e.Post.ID] = engagementScores[e.Post.ID]
+			engagementScores[e.Post.ID] *= engagementFactor(int(e.FeedEntityScore.Interactions))
+			if !e.IsGalleryPost {
+				personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(userID, e.FeedEntityScore)
+			}
 		}
 
 		// Rank by engagement first, then by personalization
@@ -1008,13 +1061,23 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 	return scoredEntities
 }
 
-func timeFactor(t0, t1 time.Time) float64 {
+func decayRate(t0, t1 time.Time, isGalleryPost bool) float64 {
 	age := t1.Sub(t0).Minutes()
-	return math.Pow(2, -(age / tHalf))
+	if isGalleryPost {
+		h := lerp(tHalf6Hours, tHalf10Hours, age, 4*24*60)
+		return math.Pow(2, -(age / h))
+	}
+	return math.Pow(2, -(age / tHalf6Hours))
 }
 
-// newPostFactor returns a scaling factor for a post based on how recently it was made.
-func newPostFactor(t1, t2 time.Time) float64 {
+// lerp returns a linear interpolation between s and e (clamped to e) based on age
+// period controls the time it takes to reach e from s
+func lerp(s, e, age, period float64) float64 {
+	return math.Min(e, s+((e-s)/period)*age)
+}
+
+// freshnessFactor returns a scaling factor for a post based on how recently it was made.
+func freshnessFactor(t1, t2 time.Time) float64 {
 	if t2.Sub(t1) < 6*time.Hour {
 		return 2.0
 	}
@@ -1022,7 +1085,9 @@ func newPostFactor(t1, t2 time.Time) float64 {
 }
 
 func engagementFactor(interactions int) float64 {
-	return math.Log1p(float64(interactions))
+	// Add 2 because log(0) => undefined and log(1) => 0 and returning 0 will cancel out
+	// the effect of other terms this term may get multiplied with
+	return math.Log2(2 + float64(interactions))
 }
 
 type priorityNode interface {

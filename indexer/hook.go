@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"sync"
 
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
@@ -40,7 +39,7 @@ func newContractHooks(queries *indexerdb.Queries, repo persist.ContractRepositor
 	}
 }
 
-func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[persist.Token] {
+func newTokenHooks(tasks *task.Client, bQueries *coredb.Queries) []DBHook[persist.Token] {
 	return []DBHook[persist.Token]{
 		func(ctx context.Context, it []persist.Token, statsID persist.DBID) error {
 
@@ -93,10 +92,10 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 				}
 				// send each token grouped by user ID to the task queue
 				logger.For(ctx).WithFields(logrus.Fields{"user_id": userID, "token_count": len(tids)}).Infof("submitting task for user %s with %d tokens", userID, len(tids))
-				err = task.CreateTaskForUserTokenProcessing(ctx, task.TokenProcessingUserTokensMessage{
+				err = tasks.CreateTaskForUserTokenProcessing(ctx, task.TokenProcessingUserTokensMessage{
 					UserID:           userID,
 					TokenIdentifiers: tids,
-				}, tasks)
+				})
 				if err != nil {
 					return err
 				}

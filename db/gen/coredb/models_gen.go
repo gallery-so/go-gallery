@@ -49,17 +49,18 @@ type Collection struct {
 }
 
 type Comment struct {
-	ID          persist.DBID `db:"id" json:"id"`
-	Version     int32        `db:"version" json:"version"`
-	FeedEventID persist.DBID `db:"feed_event_id" json:"feed_event_id"`
-	ActorID     persist.DBID `db:"actor_id" json:"actor_id"`
-	ReplyTo     persist.DBID `db:"reply_to" json:"reply_to"`
-	Comment     string       `db:"comment" json:"comment"`
-	Deleted     bool         `db:"deleted" json:"deleted"`
-	CreatedAt   time.Time    `db:"created_at" json:"created_at"`
-	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
-	PostID      persist.DBID `db:"post_id" json:"post_id"`
-	Removed     bool         `db:"removed" json:"removed"`
+	ID                persist.DBID `db:"id" json:"id"`
+	Version           int32        `db:"version" json:"version"`
+	FeedEventID       persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+	ActorID           persist.DBID `db:"actor_id" json:"actor_id"`
+	ReplyTo           persist.DBID `db:"reply_to" json:"reply_to"`
+	Comment           string       `db:"comment" json:"comment"`
+	Deleted           bool         `db:"deleted" json:"deleted"`
+	CreatedAt         time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time    `db:"last_updated" json:"last_updated"`
+	PostID            persist.DBID `db:"post_id" json:"post_id"`
+	Removed           bool         `db:"removed" json:"removed"`
+	TopLevelCommentID persist.DBID `db:"top_level_comment_id" json:"top_level_comment_id"`
 }
 
 type Community struct {
@@ -515,60 +516,52 @@ type SpamUserScore struct {
 }
 
 type Token struct {
-	ID                   persist.DBID               `db:"id" json:"id"`
-	Deleted              bool                       `db:"deleted" json:"deleted"`
-	Version              sql.NullInt32              `db:"version" json:"version"`
-	CreatedAt            time.Time                  `db:"created_at" json:"created_at"`
-	LastUpdated          time.Time                  `db:"last_updated" json:"last_updated"`
-	Name                 sql.NullString             `db:"name" json:"name"`
-	Description          sql.NullString             `db:"description" json:"description"`
-	CollectorsNote       sql.NullString             `db:"collectors_note" json:"collectors_note"`
-	TokenUri             sql.NullString             `db:"token_uri" json:"token_uri"`
-	TokenType            sql.NullString             `db:"token_type" json:"token_type"`
-	TokenID              persist.TokenID            `db:"token_id" json:"token_id"`
-	Quantity             persist.HexString          `db:"quantity" json:"quantity"`
-	OwnershipHistory     persist.AddressAtBlockList `db:"ownership_history" json:"ownership_history"`
-	ExternalUrl          sql.NullString             `db:"external_url" json:"external_url"`
-	BlockNumber          sql.NullInt64              `db:"block_number" json:"block_number"`
-	OwnerUserID          persist.DBID               `db:"owner_user_id" json:"owner_user_id"`
-	OwnedByWallets       persist.DBIDList           `db:"owned_by_wallets" json:"owned_by_wallets"`
-	Chain                persist.Chain              `db:"chain" json:"chain"`
-	Contract             persist.DBID               `db:"contract" json:"contract"`
-	IsUserMarkedSpam     sql.NullBool               `db:"is_user_marked_spam" json:"is_user_marked_spam"`
-	IsProviderMarkedSpam sql.NullBool               `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
-	LastSynced           time.Time                  `db:"last_synced" json:"last_synced"`
-	FallbackMedia        persist.FallbackMedia      `db:"fallback_media" json:"fallback_media"`
-	TokenMediaID         persist.DBID               `db:"token_media_id" json:"token_media_id"`
-	IsCreatorToken       bool                       `db:"is_creator_token" json:"is_creator_token"`
-	IsHolderToken        bool                       `db:"is_holder_token" json:"is_holder_token"`
-	Displayable          bool                       `db:"displayable" json:"displayable"`
+	ID                persist.DBID      `db:"id" json:"id"`
+	Deleted           bool              `db:"deleted" json:"deleted"`
+	Version           sql.NullInt32     `db:"version" json:"version"`
+	CreatedAt         time.Time         `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time         `db:"last_updated" json:"last_updated"`
+	CollectorsNote    sql.NullString    `db:"collectors_note" json:"collectors_note"`
+	Quantity          persist.HexString `db:"quantity" json:"quantity"`
+	BlockNumber       sql.NullInt64     `db:"block_number" json:"block_number"`
+	OwnerUserID       persist.DBID      `db:"owner_user_id" json:"owner_user_id"`
+	OwnedByWallets    persist.DBIDList  `db:"owned_by_wallets" json:"owned_by_wallets"`
+	ContractID        persist.DBID      `db:"contract_id" json:"contract_id"`
+	IsUserMarkedSpam  sql.NullBool      `db:"is_user_marked_spam" json:"is_user_marked_spam"`
+	LastSynced        time.Time         `db:"last_synced" json:"last_synced"`
+	IsCreatorToken    bool              `db:"is_creator_token" json:"is_creator_token"`
+	TokenDefinitionID persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
+	IsHolderToken     bool              `db:"is_holder_token" json:"is_holder_token"`
+	Displayable       bool              `db:"displayable" json:"displayable"`
 }
 
-type TokenCommunityMembership struct {
-	ID          persist.DBID `db:"id" json:"id"`
-	Version     int32        `db:"version" json:"version"`
-	TokenID     persist.DBID `db:"token_id" json:"token_id"`
-	CommunityID persist.DBID `db:"community_id" json:"community_id"`
-	CreatedAt   time.Time    `db:"created_at" json:"created_at"`
-	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
-	Deleted     bool         `db:"deleted" json:"deleted"`
-}
-
-type TokenMedia struct {
+type TokenDefinition struct {
 	ID              persist.DBID          `db:"id" json:"id"`
 	CreatedAt       time.Time             `db:"created_at" json:"created_at"`
 	LastUpdated     time.Time             `db:"last_updated" json:"last_updated"`
-	Version         int32                 `db:"version" json:"version"`
-	ContractID      persist.DBID          `db:"contract_id" json:"contract_id"`
-	TokenID         persist.TokenID       `db:"token_id" json:"token_id"`
-	Chain           persist.Chain         `db:"chain" json:"chain"`
-	Active          bool                  `db:"active" json:"active"`
-	Metadata        persist.TokenMetadata `db:"metadata" json:"metadata"`
-	Media           persist.Media         `db:"media" json:"media"`
-	Name            string                `db:"name" json:"name"`
-	Description     string                `db:"description" json:"description"`
-	ProcessingJobID persist.DBID          `db:"processing_job_id" json:"processing_job_id"`
 	Deleted         bool                  `db:"deleted" json:"deleted"`
+	Name            sql.NullString        `db:"name" json:"name"`
+	Description     sql.NullString        `db:"description" json:"description"`
+	TokenType       persist.TokenType     `db:"token_type" json:"token_type"`
+	TokenID         persist.TokenID       `db:"token_id" json:"token_id"`
+	ExternalUrl     sql.NullString        `db:"external_url" json:"external_url"`
+	Chain           persist.Chain         `db:"chain" json:"chain"`
+	Metadata        persist.TokenMetadata `db:"metadata" json:"metadata"`
+	FallbackMedia   persist.FallbackMedia `db:"fallback_media" json:"fallback_media"`
+	ContractAddress persist.Address       `db:"contract_address" json:"contract_address"`
+	ContractID      persist.DBID          `db:"contract_id" json:"contract_id"`
+	TokenMediaID    persist.DBID          `db:"token_media_id" json:"token_media_id"`
+}
+
+type TokenMedia struct {
+	ID              persist.DBID  `db:"id" json:"id"`
+	CreatedAt       time.Time     `db:"created_at" json:"created_at"`
+	LastUpdated     time.Time     `db:"last_updated" json:"last_updated"`
+	Version         int32         `db:"version" json:"version"`
+	Active          bool          `db:"active" json:"active"`
+	Media           persist.Media `db:"media" json:"media"`
+	ProcessingJobID persist.DBID  `db:"processing_job_id" json:"processing_job_id"`
+	Deleted         bool          `db:"deleted" json:"deleted"`
 }
 
 type TokenMediasActive struct {

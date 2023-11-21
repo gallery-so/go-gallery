@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -373,23 +372,21 @@ type TokenUpdateBalanceInput struct {
 	BlockNumber BlockNumber `json:"block_number"`
 }
 
-// TokenRepository represents a repository for interacting with persisted tokens
-type TokenRepository interface {
-	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
-	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
-	GetOwnedByContract(context.Context, EthereumAddress, EthereumAddress, int64, int64) ([]Token, Contract, error)
-	GetURIByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, error)
-	DeleteByID(context.Context, DBID) error
-	BulkUpsert(context.Context, []Token) error
-	Upsert(context.Context, Token) error
-	UpdateByID(context.Context, DBID, interface{}) error
-	MostRecentBlock(context.Context) (BlockNumber, error)
-	TokenExistsByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (bool, error)
-}
+var errTokenNotFound ErrTokenNotFound
+
+type ErrTokenNotFound struct{}
+
+func (e ErrTokenNotFound) Unwrap() error { return notFoundError }
+func (e ErrTokenNotFound) Error() string { return "token not found" }
 
 // ErrTokenNotFoundByTokenIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
 type ErrTokenNotFoundByTokenIdentifiers struct {
 	Token TokenIdentifiers
+}
+
+func (e ErrTokenNotFoundByTokenIdentifiers) Unwrap() error { return errTokenNotFound }
+func (e ErrTokenNotFoundByTokenIdentifiers) Error() string {
+	return fmt.Sprintf("token not found by identifiers: %s", e.Token.String())
 }
 
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
@@ -397,37 +394,27 @@ type ErrTokenNotFoundByID struct {
 	ID DBID
 }
 
+func (e ErrTokenNotFoundByID) Unwrap() error { return errTokenNotFound }
+func (e ErrTokenNotFoundByID) Error() string {
+	return fmt.Sprintf("token not found by ID: %s", e.ID)
+}
+
 type ErrTokenNotFoundByUserTokenIdentifers struct {
 	UserID DBID
 	Token  TokenIdentifiers
 }
 
-type ErrTokensNotFoundByTokenID struct {
-	TokenID TokenID
+func (e ErrTokenNotFoundByUserTokenIdentifers) Unwrap() error { return errTokenNotFound }
+func (e ErrTokenNotFoundByUserTokenIdentifers) Error() string {
+	return fmt.Sprintf("token not found by user ID: %s and identifiers: %s", e.UserID, e.Token.String())
 }
 
 type ErrTokensNotFoundByContract struct {
 	ContractAddress EthereumAddress
 }
 
-func (e ErrTokenNotFoundByID) Error() string {
-	return fmt.Sprintf("token not found by ID: %s", e.ID)
-}
-
-func (e ErrTokenNotFoundByUserTokenIdentifers) Error() string {
-	return fmt.Sprintf("token not found by user ID: %s and identifiers: %s", e.UserID, e.Token.String())
-}
-
-func (e ErrTokensNotFoundByTokenID) Error() string {
-	return fmt.Sprintf("tokens not found by token ID: %s", e.TokenID)
-}
-
 func (e ErrTokensNotFoundByContract) Error() string {
 	return fmt.Sprintf("tokens not found by contract: %s", e.ContractAddress)
-}
-
-func (e ErrTokenNotFoundByTokenIdentifiers) Error() string {
-	return fmt.Sprintf("token not found by identifiers: %s", e.Token.String())
 }
 
 // NormalizeAddress normalizes an address for the given chain
@@ -1064,12 +1051,4 @@ func (t TokenOwnershipType) MarshalGQL(w io.Writer) {
 	case TokenOwnershipTypeCreator:
 		w.Write([]byte(`"creator"`))
 	}
-}
-
-type ErrContractCreatorNotFound struct {
-	ContractID DBID
-}
-
-func (e ErrContractCreatorNotFound) Error() string {
-	return fmt.Sprintf("ContractCreator not found for contractID %s", e.ContractID)
 }

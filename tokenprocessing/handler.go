@@ -2,11 +2,12 @@ package tokenprocessing
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/task"
 	"time"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -17,27 +18,30 @@ import (
 
 const defaultSyncMaxRetries = 4
 
-var contractSpecificRetries = map[persist.ContractIdentifiers]int{
-	persist.NewContractIdentifiers("0x47a91457a3a1f700097199fd63c039c4784384ab", persist.ChainArbitrum): 24, // Prohibition
-}
+var (
+	prohibitionContract = persist.NewContractIdentifiers("0x47a91457a3a1f700097199fd63c039c4784384ab", persist.ChainArbitrum)
+	ensContract         = persist.NewContractIdentifiers(eth.EnsAddress, persist.ChainETH)
+)
 
-func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *cloudtasks.Client) *gin.Engine {
+var contractSpecificRetries = map[persist.ContractIdentifiers]int{prohibitionContract: 24}
+
+func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *task.Client) *gin.Engine {
 	// Retry tokens that failed during syncs, but don't retry tokens that failed during manual refreshes
-	refreshManager := tokenmanage.New(ctx, taskClient)
-	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, syncMaxRetries)
+	noRetryManager := tokenmanage.New(ctx, taskClient)
+	retryManager := tokenmanage.NewWithRetries(ctx, taskClient, syncMaxRetries)
 
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/process", func(c *gin.Context) {
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8, true))
 		}
-		processMediaForUsersTokens(tp, repos.TokenRepository, repos.ContractRepository, syncManager)(c)
+		processBatch(tp, mc.Queries, retryManager)(c)
 	})
-	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.WalletRepository, refreshManager))
-	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, repos.TokenRepository, repos.ContractRepository, syncManager))
-	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc.Queries, mc, repos.ContractRepository, repos.UserRepository, repos.TokenRepository))
+	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, noRetryManager))
+	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, retryManager))
+	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, retryManager, mc, repos.UserRepository))
 	ownersGroup := router.Group("/owners")
-	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
+	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, throttler))
 	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))
@@ -47,10 +51,10 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	return router
 }
 
-func syncMaxRetries(token persist.TokenIdentifiers) int {
-	c := persist.NewContractIdentifiers(token.ContractAddress, token.Chain)
-	if v, ok := contractSpecificRetries[c]; ok {
-		return v
+func syncMaxRetries(tID persist.TokenIdentifiers) int {
+	cID := persist.NewContractIdentifiers(tID.ContractAddress, tID.Chain)
+	if retries, ok := contractSpecificRetries[cID]; ok {
+		return retries
 	}
 	return defaultSyncMaxRetries
 }

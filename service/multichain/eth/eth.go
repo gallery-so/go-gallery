@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/task"
 	"net/http"
 	"strings"
 	"time"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	ens "github.com/benny-conn/go-ens"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -34,11 +34,11 @@ type Provider struct {
 	indexerBaseURL string
 	httpClient     *http.Client
 	ethClient      *ethclient.Client
-	taskClient     *cloudtasks.Client
+	taskClient     *task.Client
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(httpClient *http.Client, ec *ethclient.Client, tc *cloudtasks.Client) *Provider {
+func NewProvider(httpClient *http.Client, ec *ethclient.Client, tc *task.Client) *Provider {
 	return &Provider{
 		indexerBaseURL: env.GetString("INDEXER_HOST"),
 		httpClient:     httpClient,
@@ -333,9 +333,9 @@ func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnostic
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(contract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Name:           contract.Name.String(),
-			Symbol:         contract.Symbol.String(),
-			CreatorAddress: persist.Address(contract.OwnerAddress.String()),
+			Name:         contract.Name.String(),
+			Symbol:       contract.Symbol.String(),
+			OwnerAddress: persist.Address(util.FirstNonEmptyString(contract.OwnerAddress.String(), contract.CreatorAddress.String())),
 		},
 	}
 }

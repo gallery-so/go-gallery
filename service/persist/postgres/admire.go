@@ -6,6 +6,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 // AdmireRepository represents an admire repository in the postgres database
@@ -52,26 +53,11 @@ func (a *AdmireRepository) CreateAdmire(ctx context.Context, feedEventID, postID
 }
 
 func (a *AdmireRepository) CreateTokenAdmire(ctx context.Context, tokenID, actorID persist.DBID) (persist.DBID, error) {
-	var tokenString sql.NullString
-	if tokenID != "" {
-		tokenString = sql.NullString{
-			String: tokenID.String(),
-			Valid:  true,
-		}
-	}
-
-	admireID, err := a.queries.CreateAdmire(ctx, db.CreateAdmireParams{
-		ID:        persist.GenerateID(),
-		Token:     tokenString,
-		ActorID:   actorID,
+	return a.queries.CreateAdmire(ctx, db.CreateAdmireParams{
+		ID:      persist.GenerateID(),
+		Token:   util.ToNullString(tokenID.String(), true),
+		ActorID: actorID,
 	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return admireID, nil
-
 }
 
 func (a *AdmireRepository) RemoveAdmire(ctx context.Context, admireID persist.DBID) error {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -14,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.HandlerFunc {
+func handleEvent(queries *db.Queries, taskClient *task.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		message := task.FeedMessage{}
 
@@ -45,7 +44,7 @@ func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.Handler
 		}
 
 		// Send event to feedbot
-		err = task.CreateTaskForFeedbot(c.Request.Context(), task.FeedbotMessage{FeedEventID: event.ID, Action: event.Action}, taskClient)
+		err = taskClient.CreateTaskForFeedbot(c.Request.Context(), task.FeedbotMessage{FeedEventID: event.ID, Action: event.Action})
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

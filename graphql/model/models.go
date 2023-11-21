@@ -87,6 +87,7 @@ type HelperSomeoneViewedYourGalleryNotificationData struct {
 	GalleryID        persist.DBID
 	NotificationData persist.NotificationData
 }
+
 type HelperSomeoneFollowedYouBackNotificationData struct {
 	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
@@ -149,6 +150,10 @@ type HelperSomeonePostedYourWorkNotificationData struct {
 	PostID     persist.DBID
 }
 
+type HelperSomeoneYouFollowPostedTheirFirstPostNotificationData struct {
+	PostID persist.DBID
+}
+
 type HelperNotificationsConnectionData struct {
 	UserId persist.DBID
 }
@@ -181,6 +186,10 @@ type HelperSocialConnectionData struct {
 type HelperTokenData struct {
 	Token        db.Token
 	CollectionID *persist.DBID
+}
+
+type HelperTokenDefinitionData struct {
+	Definition db.TokenDefinition
 }
 
 type HelperEnsProfileImageData struct {

@@ -55,3 +55,19 @@ func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID
 
 	return a, nil
 }
+
+func (api WalletAPI) GetWalletsByIDs(ctx context.Context, walletIDs []persist.DBID) ([]db.Wallet, error) {
+	if len(walletIDs) == 0 {
+		return []db.Wallet{}, nil
+	}
+
+	wallets, errs := api.loaders.GetWalletByIDBatch.LoadAll(walletIDs)
+
+	for _, err := range errs {
+		if err != nil {
+			return wallets, err
+		}
+	}
+
+	return wallets, nil
+}

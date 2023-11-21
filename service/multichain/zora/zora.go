@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/machinebox/graphql"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -40,28 +42,47 @@ func (t tokenID) toBase16String() string {
 type zoraToken struct {
 	ChainName         string         `json:"chain_name"`
 	CollectionAddress string         `json:"collection_address"`
+	Collection        zoraCollection `json:"collection"`
+	CreatorAddress    string         `json:"creator_address"`
 	TokenID           tokenID        `json:"token_id"`
 	TokenStandard     string         `json:"token_standard"`
 	Owner             string         `json:"owner"`
 	Metadata          map[string]any `json:"metadata"`
 	Mintable          struct {
-		CreatorAddress string `json:"creator_address"`
-		Collection     struct {
-			Symbol      string `json:"symbol"`
-			Name        string `json:"name"`
-			Description string `json:"description"`
-		}
+		CreatorAddress string         `json:"creator_address"`
+		Collection     zoraCollection `json:"collection"`
 	} `json:"mintable"`
 	Media struct {
-		ImagePreview struct {
-			Raw            string `json:"raw"`
-			MimeType       string `json:"mime_type"`
-			EncodedLarge   string `json:"encoded_large"`
-			EncodedPreview string `json:"encoded_preview"`
-		} `json:"image_preview"`
-		MimeType string `json:"mime_type"`
+		ImagePreview  zoraMedia   `json:"image_preview"`
+		ImageCarousel []zoraMedia `json:"image_carousel"`
+		MimeType      string      `json:"mime_type"`
 	} `json:"media"`
 }
+type zoraMedia struct {
+	Raw            string `json:"raw"`
+	MimeType       string `json:"mime_type"`
+	EncodedLarge   string `json:"encoded_large"`
+	EncodedPreview string `json:"encoded_preview"`
+}
+
+/*
+"address":"0xc25f9ec6380f5b9cd2c91054c3d7a4b7f2aef36f",
+      "name":"Orbiter Degens",
+      "symbol":"RBT",
+      "token_standard":"ERC721",
+      "description":" ",
+      "image":"ipfs://bafybeih3ufeqrz4dp2v3sbnezhhr64eaf4xxo6lwwtqwl77zyhholacf4q"
+*/
+
+type zoraCollection struct {
+	Address       string `json:"address"`
+	Name          string `json:"name"`
+	Symbol        string `json:"symbol"`
+	Description   string `json:"description"`
+	TokenStandard string `json:"token_standard"`
+	Image         string `json:"image"`
+}
+
 type zoraBalanceToken struct {
 	Balance int       `json:"balance"`
 	Token   zoraToken `json:"token"`
@@ -159,18 +180,30 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
 	return d.getToken(ctx, owner, url)
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
 	token, _, err := d.getToken(ctx, "", url)
 	if err != nil {
 		return nil, err
 	}
 
+	logger.For(ctx).Infof("zora token metadata retrieved: %+v", token.TokenMetadata)
+
 	return token.TokenMetadata, nil
+}
+
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	token, contract, err := d.getToken(ctx, "", url)
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+
+	return token.Descriptors, contract.Descriptors, nil
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the zora Blockchain
@@ -249,9 +282,9 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	for i, contract := range resp.ZoraCreateContracts {
 		result[i] = multichain.ChainAgnosticContract{
 			Descriptors: multichain.ChainAgnosticContractDescriptors{
-				Symbol:         contract.Symbol,
-				Name:           contract.Name,
-				CreatorAddress: persist.Address(strings.ToLower(contract.Creator)),
+				Symbol:       contract.Symbol,
+				Name:         contract.Name,
+				OwnerAddress: persist.Address(strings.ToLower(contract.Creator)),
 			},
 			Address: persist.Address(strings.ToLower(contract.Address)),
 		}
@@ -331,7 +364,6 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 }
 
 func (d *Provider) getToken(ctx context.Context, ownerAddress persist.Address, url string) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
@@ -427,9 +459,13 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraToken
 
 }
 
+const ipfsFallbackURLFormat = "https://ipfs.decentralized-content.com/ipfs/%s"
+
 func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multichain.ChainAgnosticToken, error) {
+
 	var tokenType persist.TokenType
-	switch token.TokenStandard {
+	standard := util.FirstNonEmptyString(token.TokenStandard, token.Mintable.Collection.TokenStandard, token.Collection.TokenStandard)
+	switch standard {
 	case "ERC721":
 		tokenType = persist.TokenTypeERC721
 	case "ERC1155":
@@ -437,8 +473,46 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 	default:
 		return multichain.ChainAgnosticToken{}, fmt.Errorf("unknown token standard %s", token.TokenStandard)
 	}
+
+	if token.Metadata == nil {
+		token.Metadata = map[string]any{}
+	}
+
 	metadataName, _ := token.Metadata["name"].(string)
 	metadataDescription, _ := token.Metadata["description"].(string)
+
+	if strings.HasPrefix(token.Media.ImagePreview.Raw, "ipfs://") {
+		afterIPFS := strings.TrimPrefix(token.Media.ImagePreview.Raw, "ipfs://")
+		fallbackFormat, _ := url.Parse("https://remote-image.decentralized-content.com/image?w=1080&q=75")
+		u := fmt.Sprintf(ipfsFallbackURLFormat, afterIPFS)
+		q := fallbackFormat.Query()
+		q.Set("url", u)
+		fallbackFormat.RawQuery = q.Encode()
+		token.Media.ImagePreview.EncodedPreview = fallbackFormat.String()
+	} else if strings.HasPrefix(token.Media.ImagePreview.Raw, "https://") {
+		token.Media.ImagePreview.EncodedPreview = token.Media.ImagePreview.Raw
+	}
+
+	realMedia, ok := util.FindFirst(token.Media.ImageCarousel, func(media zoraMedia) bool {
+		return media.MimeType == token.Media.MimeType
+	})
+	if !ok {
+		if len(token.Media.ImageCarousel) == 0 {
+			realMedia = token.Media.ImagePreview
+		} else {
+			realMedia = token.Media.ImageCarousel[0]
+		}
+	}
+
+	mediaTypeFromContent := media.MediaFromContentType(realMedia.MimeType)
+	if mediaTypeFromContent.IsAnimationLike() {
+		token.Metadata["animation_url"] = realMedia.Raw
+		if token.Media.ImagePreview.MimeType != realMedia.MimeType {
+			token.Metadata["image"] = token.Media.ImagePreview.Raw
+		}
+	} else {
+		token.Metadata["image"] = realMedia.Raw
+	}
 
 	return multichain.ChainAgnosticToken{
 		Descriptors: multichain.ChainAgnosticTokenDescriptors{
@@ -459,13 +533,14 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 }
 
 func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken) multichain.ChainAgnosticContract {
-
+	creator := util.FirstNonEmptyString(token.CreatorAddress, token.Mintable.CreatorAddress)
 	return multichain.ChainAgnosticContract{
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         token.Mintable.Collection.Symbol,
-			Name:           token.Mintable.Collection.Name,
-			Description:    token.Mintable.Collection.Description,
-			CreatorAddress: persist.Address(strings.ToLower(token.Mintable.CreatorAddress)),
+			Symbol:          token.Collection.Symbol,
+			Name:            token.Collection.Name,
+			Description:     token.Collection.Description,
+			OwnerAddress:    persist.Address(strings.ToLower(creator)),
+			ProfileImageURL: token.Collection.Image,
 		},
 		Address: persist.Address(strings.ToLower(token.CollectionAddress)),
 	}

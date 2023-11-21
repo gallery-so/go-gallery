@@ -16,10 +16,10 @@ SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false
     LIMIT $1;
 
 -- name: GetUserByUsername :one
-SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg('username')) AND deleted = false;
+select * from users where username_idempotent = lower(sqlc.arg('username')) and deleted = false and universal = false;
 
 -- name: GetUserByUsernameBatch :batchone
-SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
+select * from users where username_idempotent = lower($1) and deleted = false and universal = false;
 
 -- name: GetUserByVerifiedEmailAddress :one
 select u.* from users u join pii.for_users p on u.id = p.user_id
@@ -89,28 +89,109 @@ SELECT c.* FROM galleries g, unnest(g.collections)
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord;
 
 -- name: GetTokenById :one
-select * from tokens where id = $1 and displayable and deleted = false;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false;
 
--- name: GetTokenMediaByTokenId :one
-select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted;
+-- name: GetTokenDefinitionById :one
+select * from token_definitions where id = $1 and not deleted;
+
+-- name: GetTokenDefinitionByIdBatch :batchone
+select * from token_definitions where id = $1 and not deleted;
+
+-- name: GetTokenDefinitionByTokenDbid :one
+select token_definitions.*
+from token_definitions, tokens
+where token_definitions.id = tokens.token_definition_id
+    and tokens.id = $1
+    and not tokens.deleted
+    and not token_definitions.deleted;
+
+-- name: GetTokenDefinitionByTokenIdentifiers :one
+select *
+from token_definitions
+where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id) and not deleted;
+
+-- name: GetTokenFullDetailsByUserTokenIdentifiers :one
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+where tokens.owner_user_id = $1 
+    and (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = (@chain, @contract_address, @token_id)
+    and tokens.displayable
+    and not tokens.deleted
+    and not token_definitions.deleted
+    and not contracts.deleted
+order by tokens.block_number desc;
+
+-- name: GetTokenFullDetailsByUserId :many
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+where tokens.owner_user_id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
+order by tokens.block_number desc;
+
+-- name: GetTokenFullDetailsByContractId :many
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+where contracts.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
+order by tokens.block_number desc;
+
+-- name: UpdateTokenCollectorsNoteByTokenDbidUserId :exec
+update tokens set collectors_note = $1, last_updated = now() where id = $2 and owner_user_id = $3;
+
+-- name: UpdateTokensAsUserMarkedSpam :exec
+update tokens set is_user_marked_spam = $1, last_updated = now() where owner_user_id = $2 and id = any(@token_ids) and deleted = false;
+
+-- name: CheckUserOwnsAllTokenDbids :one
+with user_tokens as (select count(*) total from tokens where id = any(@token_ids) and owner_user_id = $1 and not tokens.deleted), total_tokens as (select cardinality(@token_ids) total)
+select (select total from total_tokens) = (select total from user_tokens) owns_all;
 
 -- name: GetTokenByIdBatch :batchone
-select * from tokens where id = $1 and displayable and deleted = false;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select * from tokens where id = $1 and deleted = false;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+where t.id = $1 and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
-select t.*
-from tokens t
-join contracts c on t.contract = c.id
-where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+-- Fetch the definition and contract to cache since downstream queries will likely use them
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
+from tokens t, token_definitions td, contracts c
+where t.token_definition_id = td.id
+    and td.contract_id = c.id
+    and t.owner_user_id = @owner_id
+    and td.token_id = @token_id
+    and td.chain = @chain
+    and td.contract_address = @contract_address
+    and t.displayable
+    and not t.deleted
+    and not td.deleted
+    and not c.deleted;
 
 -- name: GetTokenByUserTokenIdentifiers :one
-select t.*
-from tokens t
-join contracts c on t.contract = c.id
-where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
+from tokens t, token_definitions td, contracts c
+where t.token_definition_id = td.id
+    and td.contract_id = c.id
+    and t.owner_user_id = @owner_id
+    and td.token_id = @token_id
+    and td.chain = @chain
+    and td.contract_address = @contract_address
+    and t.displayable
+    and not t.deleted
+    and not td.deleted
+    and not c.deleted;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
@@ -180,7 +261,7 @@ select k.batch_key_index, sqlc.embed(c) from keys k
     where not c.deleted;
 
 -- name: GetContractsByTokenIDs :many
-select contracts.* from contracts join tokens on contracts.id = tokens.contract where tokens.id = any(@token_ids) and contracts.deleted = false;
+select contracts.* from contracts join tokens on contracts.id = tokens.contract_id where tokens.id = any(@token_ids) and contracts.deleted = false;
 
 -- name: GetContractByChainAddress :one
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
@@ -201,7 +282,7 @@ displayed as (
   from last_refreshed, galleries, contracts, tokens
   join collections on tokens.id = any(collections.nfts) and collections.deleted = false
   where tokens.owner_user_id = $1
-    and tokens.contract = contracts.id
+    and tokens.contract_id = contracts.id
     and collections.owner_user_id = tokens.owner_user_id
     and galleries.owner_user_id = tokens.owner_user_id
     and tokens.displayable
@@ -227,17 +308,22 @@ SELECT u.* FROM follows f
     ORDER BY f.last_updated DESC;
 
 -- name: GetTokensByWalletIdsBatch :batchmany
-select * from tokens where owned_by_wallets && $1 and displayable and deleted = false
-    order by tokens.created_at desc, tokens.name desc, tokens.id desc;
+select sqlc.embed(t), sqlc.embed(td)
+from tokens t
+join tokens td on t.token_definition_id = td.id
+where t.owned_by_wallets && $1 and t.displayable and t.deleted = false and td.deleted = false
+order by t.created_at desc, td.name desc, t.id desc;
 
 -- name: GetTokensByContractIdPaginate :many
-select t.* from tokens t
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from tokens t
+    join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
-    join contracts c on t.contract = c.id
+    join contracts c on t.contract_id = c.id
     where (c.id = $1 or c.parent_id = $1)
     and t.displayable
     and t.deleted = false
     and c.deleted = false
+    and td.deleted = false
     and (not @gallery_users_only::bool or u.universal = false)
     and (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     and (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
@@ -249,7 +335,7 @@ select t.* from tokens t
 select count(*)
 from tokens
 join users on users.id = tokens.owner_user_id
-join contracts on tokens.contract = contracts.id
+join contracts on tokens.contract_id = contracts.id
 where (contracts.id = @id or contracts.parent_id = @id)
   and (not @gallery_users_only::bool or users.universal = false) and tokens.deleted = false and contracts.deleted = false
   and tokens.displayable;
@@ -264,7 +350,7 @@ select users.* from (
     select distinct on (u.id) u.* from users u, tokens t, contracts c
         where t.owner_user_id = u.id
         and t.displayable
-        and t.contract = c.id and (c.id = @id or c.parent_id = @id)
+        and t.contract_id = c.id and (c.id = @id or c.parent_id = @id)
         and (not @gallery_users_only::bool or u.universal = false)
         and t.deleted = false and u.deleted = false and c.deleted = false
     ) as users
@@ -277,7 +363,7 @@ select users.* from (
 -- name: CountOwnersByContractId :one
 select count(distinct users.id) from users, tokens, contracts
     where (contracts.id = @id or contracts.parent_id = @id)
-    and tokens.contract = contracts.id
+    and tokens.contract_id = contracts.id
     and tokens.owner_user_id = users.id
     and tokens.displayable
     and (not @gallery_users_only::bool or users.universal = false)
@@ -295,32 +381,31 @@ select u.* from tokens t
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
 select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
-    from tokens t
-        inner join token_medias tm on t.token_media_id = tm.id
-    where t.contract = $1
-      and t.owner_user_id = $2
-      and t.displayable
-      and t.deleted = false
-      and (tm.media ->> 'thumbnail_url' != '' or tm.media->>'media_type' = 'image')
-      and tm.deleted = false
-    order by t.id limit 3;
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+join token_medias tm on td.token_media_id = tm.id
+where t.owner_user_id = @owner_id
+	and t.contract_id = @contract_id
+	and t.displayable
+	and (tm.media ->> 'thumbnail_url' != '' or tm.media->>'media_type' = 'image')
+	and not t.deleted
+	and not td.deleted
+	and not tm.deleted
+	and tm.active
+order by t.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
-select sqlc.embed(t), sqlc.embed(c) from tokens t
-       join contracts c on c.id = t.contract
-    where t.owner_user_id = @owner_user_id
-      and t.deleted = false
-      and t.displayable
-      and ((@include_holder::bool and t.is_holder_token) or (@include_creator::bool and t.is_creator_token))
-    order by t.created_at desc, t.name desc, t.id desc;
-
--- name: GetTokensByUserIdAndChainBatch :batchmany
-select t.* from tokens t
-    where t.owner_user_id = $1
-      and t.chain = $2
-      and t.displayable
-      and t.deleted = false
-    order by t.created_at desc, t.name desc, t.id desc;
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+join contracts c on c.id = td.contract_id
+where t.owner_user_id = @owner_user_id
+    and t.deleted = false
+    and t.displayable
+    and ((@include_holder::bool and t.is_holder_token) or (@include_creator::bool and t.is_creator_token))
+    and td.deleted = false
+    and c.deleted = false
+order by t.created_at desc, td.name desc, t.id desc;
 
 -- name: CreateUserEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
@@ -341,7 +426,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6, $7, $8, $9) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
@@ -483,8 +568,10 @@ with valid_post_ids as (
         JOIN tokens on tokens.id = ANY(posts.token_ids)
             and tokens.displayable
             and tokens.deleted = false
-            and tokens.contract = sqlc.arg('contract_id')
-            and ('x' || lpad(substring(tokens.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
+        JOIN token_definitions on token_definitions.id = tokens.token_definition_id
+            and token_definitions.contract_id = sqlc.arg('contract_id')
+            and ('x' || lpad(substring(token_definitions.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
+            and token_definitions.deleted = false
     WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
       AND posts.deleted = false
 )
@@ -615,13 +702,13 @@ SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_a
 SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
 -- name: GetCommentByCommentID :one
-SELECT * FROM comments WHERE id = $1 and deleted = false;
+SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
 -- name: GetCommentsByCommentIDs :many
-SELECT * from comments WHERE id = ANY(@comment_ids) and deleted = false;
+SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
 
 -- name: GetCommentByCommentIDBatch :batchone
-SELECT * FROM comments WHERE id = $1 and deleted = false;
+SELECT * FROM comments WHERE id = $1 AND deleted = false; 
 
 -- name: PaginateCommentsByFeedEventIDBatch :batchmany
 SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false
@@ -643,9 +730,12 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null 
     LIMIT sqlc.arg('limit');
 
 -- name: PaginateRepliesByCommentIDBatch :batchmany
-SELECT * FROM comments WHERE reply_to = sqlc.arg('comment_id') AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+SELECT * FROM comments WHERE 
+    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
+        or 
+        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false
+    AND (comments.created_at, comments.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (comments.created_at, comments.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -654,7 +744,10 @@ SELECT * FROM comments WHERE reply_to = sqlc.arg('comment_id') AND deleted = fal
 SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
 
 -- name: CountRepliesByCommentIDBatch :batchone
-SELECT count(*) FROM comments WHERE reply_to = sqlc.arg('comment_id') AND deleted = false;
+SELECT count(*) FROM comments WHERE 
+    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
+        or 
+        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
@@ -732,6 +825,33 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 
 -- name: CreateUserPostedYourWorkNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
+
+-- name: CountFollowersByUserID :one
+SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
+
+-- name: CreateUserPostedFirstPostNotifications :many
+WITH 
+id_with_row_number AS (
+    SELECT unnest(sqlc.arg('ids')::varchar[]) AS id, row_number() OVER () AS rn
+),
+follower_with_row_number AS (
+    SELECT follower, row_number() OVER () AS rn
+    FROM follows
+    WHERE followee = @actor_id AND deleted = false
+)
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
+SELECT 
+    i.id, 
+    f.follower, 
+    $1, 
+    $2, 
+    $3, 
+    $4
+FROM 
+    id_with_row_number i
+JOIN 
+    follower_with_row_number f ON i.rn = f.rn
+RETURNING *;
 
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
@@ -888,12 +1008,14 @@ with membership_roles(role) as (
     select (case when exists(
         select 1
         from tokens
+        join token_definitions on tokens.token_definition_id = token_definitions.id
         where owner_user_id = @user_id
-            and token_id = any(@membership_token_ids::varchar[])
-            and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
-            and exists(select 1 from users where id = @user_id and email_verified = 1 and deleted = false)
-            and displayable
-            and deleted = false
+            and token_definitions.chain = @chain
+            and token_definitions.contract_address = @membership_address
+            and token_definitions.token_id = any(@membership_token_ids::varchar[])
+            and tokens.displayable
+            and not tokens.deleted
+            and not token_definitions.deleted
     ) then @granted_membership_role else null end)::varchar
 )
 select role from user_roles where user_id = @user_id and deleted = false
@@ -905,9 +1027,6 @@ update merch set redeemed = true, token_id = @token_hex, last_updated = now() wh
 
 -- name: GetMerchDiscountCodeByTokenID :one
 select discount_code from merch where token_id = @token_hex and redeemed = true and deleted = false;
-
--- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain and displayable and deleted = false) as owns_token;
 
 -- name: UpdateGalleryHidden :one
 update galleries set hidden = @hidden, last_updated = now() where id = @id and deleted = false returning *;
@@ -932,29 +1051,26 @@ update users set featured_gallery = @gallery_id, last_updated = now() from galle
 
 -- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
 select tm.*
-	from galleries g, collections c, tokens t, token_medias tm
-	where
-		g.id = $1
-		and c.id = any(g.collections[:8])
-		and t.id = any(c.nfts[:8])
-		and t.token_media_id = tm.id
-	    and t.owner_user_id = g.owner_user_id
-	    and t.displayable
-		and not g.deleted
-		and not c.deleted
-		and not t.deleted
-		and not tm.deleted
-		and tm.active
-		and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
-	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
-	limit 4;
-
--- name: GetTokenByTokenIdentifiers :one
-select * from tokens
-    where tokens.token_id = @token_hex
-      and contract = (select contracts.id from contracts where contracts.address = @contract_address)
-      and tokens.chain = @chain and tokens.deleted = false
-      and tokens.displayable;
+from galleries g, collections c, tokens t, token_medias tm, token_definitions td
+where
+	g.id = $1
+	and c.id = any(g.collections)
+	and t.id = any(c.nfts)
+    and t.owner_user_id = g.owner_user_id
+    and t.displayable
+    and t.token_definition_id = td.id
+    and td.token_media_id = tm.id
+    and not td.deleted
+	and not g.deleted
+	and not c.deleted
+	and not t.deleted
+	and not tm.deleted
+	and (
+		tm.media->>'thumbnail_url' is not null
+		or (tm.media->>'media_type' = 'image' and tm.media->>'media_url' is not null)
+	)
+order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
+limit 4;
 
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
@@ -1136,6 +1252,7 @@ where a.user_id = @user_a_id
   and contracts.name is not null
   and contracts.name != ''
   and contracts.name != 'Unidentified contract'
+  and not contracts.is_provider_marked_spam
   and (
     a.displayed,
     b.displayed,
@@ -1184,7 +1301,8 @@ where a.user_id = @user_a_id
   and marketplace_contracts.contract_id is null
   and contracts.name is not null
   and contracts.name != ''
-  and contracts.name != 'Unidentified contract';
+  and contracts.name != 'Unidentified contract'
+  and not contracts.is_provider_marked_spam;
 
 -- name: AddPiiAccountCreationInfo :exec
 insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())
@@ -1221,92 +1339,49 @@ update wallets set deleted = true, last_updated = now() where id = $1;
 -- name: InsertUser :one
 insert into users (id, username, username_idempotent, bio, universal, email_unsubscriptions) values ($1, $2, $3, $4, $5, $6) returning id;
 
--- name: IsExistsActiveTokenMediaByTokenIdentifers :one
-select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
-
--- name: InsertTokenPipelineResults :exec
+-- name: InsertTokenPipelineResults :one
 with insert_job(id) as (
     insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
     values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version)
     returning id
-),
--- Optionally create an inactive record of the existing active record if the new media is also active
-insert_media_move_active_record(last_updated) as (
-    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+)
+, set_conditionally_current_media_to_inactive(last_updated) as (
+    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
     (
-        select @retired_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        select @retiring_media_id, media, processing_job_id, false, created_at, now()
         from token_medias
-        where contract_id = @contract_id
-            and token_id = @token_id
-            and chain = @chain
-            and active
-            and not deleted
-            and @active = true
-        limit 1
+        where id = (select token_media_id from token_definitions td where (td.chain, td.contract_address, td.token_id) = (@chain, @contract_address, @token_id) and not deleted)
+        and not deleted
+        and @new_media_is_active::bool
     )
     returning last_updated
-),
--- Update the existing active record with the new media data
-insert_media_add_record(insert_id, active, replaced_current) as (
-    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-    values (@new_media_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, (select id from insert_job), @active,
-        -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
-        (select coalesce((select last_updated from insert_media_move_active_record), now())),
-        (select coalesce((select last_updated from insert_media_move_active_record), now()))
-    )
-    on conflict (contract_id, token_id, chain) where active and not deleted do update
-        set metadata = excluded.metadata,
-            media = excluded.media,
-            name = coalesce(nullif(excluded.name, ''), token_medias.name),
-            description = coalesce(nullif(excluded.description, ''), token_medias.description),
-            processing_job_id = excluded.processing_job_id,
-            last_updated = now()
-    returning id as insert_id, active, id = @new_media_id replaced_current
-),
--- This will return the existing active record if it exists. If the incoming record is active,
--- this will still return the active record before the update, and not the new record.
-existing_active(id) as (
-    select id
-    from token_medias
-    where chain = @chain and contract_id = @contract_id and token_id = @token_id and active and not deleted
-    limit 1
 )
-update tokens
-set token_media_id = (
-    case
-        -- The pipeline didn't produce active media, but one already exists so use that one
-        when not insert_medias.active and (select id from existing_active) is not null
-        then (select id from existing_active)
-
-        -- The pipeline produced active media, or didn't produce active media but no active media existed before
-        else insert_medias.insert_id
-    end
-), name = coalesce(nullif(@name, ''), tokens.name), description = coalesce(nullif(@description, ''), tokens.description), last_updated = now() -- update the duplicate fields on the token in the meantime before we get rid of these fields
-from insert_media_add_record insert_medias
-where
-    tokens.chain = @chain
-    and tokens.contract = @contract_id
-    and tokens.token_id = @token_id
-    and not tokens.deleted
-    and (
-        -- The case statement below handles which token instances get updated:
-        case
-            -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
-            when insert_medias.active and not insert_medias.replaced_current
-            then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
-
-            -- Brand new active media, update all tokens in the filter to use this media
-            when insert_medias.active and insert_medias.replaced_current
-            then 1 = 1
-
-            -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
-            -- Since there is no db constraint on inactive media, all inactive media is new
-            when not insert_medias.active
-            then tokens.id = @token_dbid
-
-            else 1 = 1
+, insert_new_media as (
+    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
+    values (@new_media_id, @new_media, (select id from insert_job), @new_media_is_active,
+        -- Using timestamps generated from set_conditionally_current_media_to_inactive ensures that the new record is only inserted after the current media is moved
+        (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now())),
+        (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now()))
+    )
+    returning *
+)
+, update_token_definition as (
+    update token_definitions
+    set metadata = @new_metadata,
+        name = @new_name,
+        description = @new_description,
+        token_media_id = case
+            -- If there isn't any media, use the new media regardless of its status
+            when token_media_id is null then (select id from insert_new_media)
+            -- Otherwise, only replace reference to new media if it is active
+            when @new_media_is_active then (select id from insert_new_media)
+            -- If it isn't, keep the existing media
+            else token_definitions.token_media_id
         end
-    );
+    where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id) and not deleted
+)
+-- Always return the new media that was inserted, even if its inactive so the pipeline can report metrics accurately
+select sqlc.embed(token_medias) from insert_new_media token_medias;
 
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
@@ -1334,7 +1409,12 @@ update push_notification_tokens set deleted = true where id = any(@ids) and dele
 select * from push_notification_tokens where user_id = @user_id and deleted = false;
 
 -- name: GetPushTokensByIDs :many
-select t.* from unnest(@ids::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false;
+with keys as (
+    select unnest (@ids::text[]) as id
+         , generate_subscripts(@ids::text[], 1) as index
+)
+select t.* from keys k join push_notification_tokens t on t.id = k.id and t.deleted = false
+    order by k.index;
 
 -- name: CreatePushTickets :exec
 insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
@@ -1358,40 +1438,6 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
 
--- name: GetAllTokensWithContractsByIDs :many
-select
-    tokens.*,
-    contracts.*,
-    (
-        select wallets.address
-        from wallets
-        where wallets.id = any(tokens.owned_by_wallets) and wallets.deleted = false
-        limit 1
-    ) as wallet_address
-from tokens
-join contracts on contracts.id = tokens.contract
-left join token_medias on token_medias.id = tokens.token_media_id
-where tokens.deleted = false
-and (tokens.token_media_id is null or token_medias.active = false)
-and tokens.id >= @start_id and tokens.id < @end_id
-order by tokens.id;
-
--- name: GetMissingThumbnailTokensByIDRange :many
-SELECT
-    tokens.*,
-    contracts.*,
-    (
-        SELECT wallets.address
-        FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
-        LIMIT 1
-    ) AS wallet_address
-FROM tokens
-JOIN contracts ON contracts.id = tokens.contract
-left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
-AND tokens.id >= @start_id AND tokens.id < @end_id
-ORDER BY tokens.id;
-
 -- name: GetSVGTokensWithContractsByIDs :many
 SELECT
     tokens.*,
@@ -1403,7 +1449,7 @@ SELECT
         LIMIT 1
     ) AS wallet_address
 FROM tokens
-JOIN contracts ON contracts.id = tokens.contract
+JOIN contracts ON contracts.id = tokens.contract_id
 LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
 WHERE tokens.deleted = false
 AND token_medias.active = true
@@ -1414,38 +1460,16 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByMediaIDIgnoringStatus :batchone
-select m.* from token_medias m where m.id = $1 and not m.deleted;
+-- name: GetMediaByMediaIdIgnoringStatusBatch :batchone
+select m.* from token_medias m where m.id = $1 and not deleted;
 
--- name: GetMediaByUserTokenIdentifiers :one
-with contract as (
-	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
-),
-matching_media as (
-	select token_medias.*
-	from token_medias, contract
-	where token_medias.contract_id = contract.id and token_medias.chain = @chain and token_medias.token_id = @token_id and not token_medias.deleted
-	order by token_medias.active desc, token_medias.last_updated desc
-	limit 1
-),
-matched_token(id) as (
-    select tokens.id
-    from tokens, contract, matching_media
-    where tokens.contract = contract.id and tokens.chain = @chain and tokens.token_id = @token_id and not tokens.deleted
-    order by tokens.owner_user_id = @user_id desc, tokens.token_media_id = matching_media.id desc, tokens.last_updated desc
-    limit 1
-)
-select sqlc.embed(token_medias), (select id from matched_token) token_instance_id from matching_media token_medias;
-
--- name: GetFallbackTokenByUserTokenIdentifiers :one
-with contract as (
-	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
-)
-select tokens.*
-from tokens, contract
-where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = @token_id and not tokens.deleted
-order by tokens.owner_user_id = @user_id desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
-limit 1;
+-- name: GetMediaByTokenIdentifiersIgnoringStatus :one
+select token_medias.*
+from token_definitions
+join token_medias on token_definitions.token_media_id = token_medias.id
+where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id)
+    and not token_definitions.deleted
+    and not token_medias.deleted;
 
 -- name: UpsertSession :one
 insert into sessions (id, user_id,
@@ -1465,24 +1489,24 @@ insert into sessions (id, user_id,
 -- name: InvalidateSession :exec
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
 
--- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
-update tokens
+-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :one
+update token_definitions
 set name = @name,
     description = @description,
     last_updated = now()
 where token_id = @token_id
-    and contract = @contract_id
+    and contract_id = @contract_id
     and chain = @chain
-    and deleted = false;
+    and deleted = false
+returning *;
 
 -- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (
 	select t.id, t.owner_user_id
 	from tokens t
-	join contracts c on t.contract = c.id
+	join contracts c on t.contract_id = c.id
 	where not t.deleted
 	  and not c.deleted
-	  and t.contract = c.id
 	  and t.displayable
 	  and c.chain = $1
 	  and c.address = $2
@@ -1555,19 +1579,23 @@ where pfp.id = @id
 		0 = 1
 	end;
 
--- name: GetEnsProfileImagesByUserID :one
-select sqlc.embed(token_medias), sqlc.embed(wallets)
-from tokens, contracts, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
-where contracts.address = @ens_address
-    and contracts.chain = @chain
+-- name: GetPotentialENSProfileImageByUserId :one
+select sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(wallets)
+from token_definitions, tokens, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
+where token_definitions.contract_address = @ens_address
+    and token_definitions.chain = @chain
     and tokens.owner_user_id = @user_id
-    and tokens.contract = contracts.id
     and users.id = tokens.owner_user_id
-    and tokens.token_media_id = token_medias.id
     and tw.id = wallets.id
+    and token_definitions.id = tokens.token_definition_id
+    and token_definitions.token_media_id = token_medias.id
     and token_medias.active
     and nullif(token_medias.media->>'profile_image_url', '') is not null
-    and not contracts.deleted and not users.deleted and not token_medias.deleted and not wallets.deleted
+    and not users.deleted
+    and not token_medias.deleted
+    and not wallets.deleted
+    and not token_definitions.deleted
+    and not tokens.deleted
 order by tw.id = users.primary_wallet_id desc, tokens.id desc
 limit 1;
 
@@ -1585,12 +1613,12 @@ JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
 WHERE not wallets.deleted AND not users.deleted and not users.universal;
 
 -- name: GetUniqueTokenIdentifiersByTokenID :one
-select tokens.token_id, contracts.address as contract_address, contracts.chain, tokens.quantity, array_agg(wallets.address)::varchar[] as owner_addresses 
+select token_definitions.token_id, token_definitions.contract_address, token_definitions.chain, tokens.quantity, array_agg(wallets.address)::varchar[] as owner_addresses 
 from tokens
-join contracts on tokens.contract = contracts.id
+join token_definitions on tokens.token_definition_id = token_definitions.id
 join wallets on wallets.id = any(tokens.owned_by_wallets)
-where tokens.id = $1 and tokens.displayable and not tokens.deleted and not contracts.deleted and not wallets.deleted
-group by (tokens.token_id, contracts.address, contracts.chain, tokens.quantity) limit 1;
+where tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not wallets.deleted
+group by (token_definitions.token_id, token_definitions.contract_address, token_definitions.chain, tokens.quantity) limit 1;
 
 -- name: GetCreatedContractsByUserID :many
 select sqlc.embed(c),
@@ -1608,7 +1636,7 @@ where u.id = @user_id
   and (not @new_contracts_only::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = @user_id
-          and t.contract = c.id
+          and t.contract_id = c.id
           and t.is_creator_token
           and not t.deleted
         )
@@ -1626,7 +1654,7 @@ where c.override_creator_user_id = @user_id
   and (not @new_contracts_only::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = @user_id
-          and t.contract = c.id
+          and t.contract_id = c.id
           and t.is_creator_token
           and not t.deleted
         )
@@ -1653,11 +1681,20 @@ update tokens
         last_updated = now()
     where owner_user_id = @user_id
       and is_creator_token = true
-      and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract)
+      and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract_id)
       and not deleted;
       
 -- name: IsMemberOfCommunity :one
-select exists (select * from tokens where not deleted and displayable and owner_user_id = @user_id and contract = @contract_id limit 1) is_member;
+with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = @contract_id)
+select exists(
+    select 1
+    from tokens, contract_tokens
+    where tokens.owner_user_id = @user_id
+        and not tokens.deleted
+        and tokens.displayable
+        and tokens.token_definition_id = contract_tokens.id
+    limit 1
+);
 
 -- name: InsertExternalSocialConnectionsForUser :many
 insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
@@ -1686,3 +1723,24 @@ select * from mentions where id = @id and not deleted;
 
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
+
+-- name: InsertMention :one
+INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
+
+-- name: InsertComment :one
+INSERT INTO comments 
+(ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, TOP_LEVEL_COMMENT_ID, COMMENT) 
+VALUES 
+(sqlc.arg('id'), sqlc.narg('feed_event')::varchar, sqlc.narg('post')::varchar, sqlc.arg('actor_id'), sqlc.narg('reply')::varchar, 
+    (CASE 
+        WHEN sqlc.narg('reply')::varchar IS NOT NULL THEN
+            (SELECT COALESCE(c.top_level_comment_id, sqlc.narg('reply')::varchar) 
+             FROM comments c 
+             WHERE c.id = sqlc.narg('reply')::varchar)
+        ELSE NULL 
+    END), 
+sqlc.arg('comment')::varchar) 
+RETURNING ID;
+
+-- name: RemoveComment :exec
+UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;

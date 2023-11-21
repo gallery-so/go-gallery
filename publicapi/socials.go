@@ -3,10 +3,10 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/task"
 	"net/http"
 	"time"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -27,7 +27,7 @@ type SocialAPI struct {
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
 	httpClient *http.Client
-	taskClient *cloudtasks.Client
+	taskClient *task.Client
 }
 
 func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string) *socialauth.TwitterAuthenticator {

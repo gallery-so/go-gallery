@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 
@@ -15,15 +15,12 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
 	// register postgres driver
 	_ "github.com/jackc/pgx/v4/stdlib"
 	// _ "github.com/lib/pq"
 )
-
-var InsertHelpers = BulkInsertHelpers{}
 
 type ErrRoleDoesNotExist struct {
 	role string
@@ -39,6 +36,7 @@ type connectionParams struct {
 	dbname   string
 	host     string
 	port     int
+	retry    *retry.Retry
 }
 
 func (c *connectionParams) toConnectionString() string {
@@ -92,6 +90,9 @@ func newConnectionParamsFromEnv() connectionParams {
 		dbname:   env.GetString("POSTGRES_DB"),
 		host:     env.GetString("POSTGRES_HOST"),
 		port:     env.GetInt("POSTGRES_PORT"),
+
+		// Retry connections by default
+		retry: &retry.Retry{Base: 2, Cap: 4, Tries: 3},
 	}
 }
 
@@ -127,7 +128,20 @@ func WithPort(port int) ConnectionOption {
 	}
 }
 
-// MustCreateClient panics when it fails to create a new database connection
+func WithRetries(r retry.Retry) ConnectionOption {
+	return func(params *connectionParams) {
+		params.retry = &r
+	}
+}
+
+func WithNoRetries() ConnectionOption {
+	return func(params *connectionParams) {
+		params.retry = nil
+	}
+}
+
+// MustCreateClient panics when it fails to create a new database connection. By default, it will try to
+// connect 3 times before returning an error.
 func MustCreateClient(opts ...ConnectionOption) *sql.DB {
 	db, err := NewClient(opts...)
 	if err != nil {
@@ -136,8 +150,9 @@ func MustCreateClient(opts ...ConnectionOption) *sql.DB {
 	return db
 }
 
+// NewClient creates a new Postgres client. By default, it will try to connect 3 times before returning an error.
 func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
 	params := newConnectionParamsFromEnv()
@@ -145,14 +160,29 @@ func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
 		opt(&params)
 	}
 
-	db, err := sql.Open("pgx", params.toConnectionString())
-	if err != nil {
-		return nil, err
+	var db *sql.DB
+
+	connectF := func(ctx context.Context) error {
+		var err error
+		db, err = sql.Open("pgx", params.toConnectionString())
+		return err
+	}
+
+	if params.retry != nil {
+		err := retry.RetryFunc(ctx, connectF, func(err error) bool { return true }, *params.retry)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := connectF(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	db.SetMaxOpenConns(50)
 
-	err = db.PingContext(ctx)
+	err := db.PingContext(ctx)
 	if err != nil && strings.Contains(err.Error(), fmt.Sprintf("role \"%s\" does not exist", params.user)) {
 		return nil, ErrRoleDoesNotExist{params.user}
 	}
@@ -162,7 +192,7 @@ func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
 	return db, nil
 }
 
-// NewPgxClient creates a new postgres client via pgx
+// NewPgxClient creates a new Postgres client via pgx. By default, it will try to connect 3 times before returning an error.
 func NewPgxClient(opts ...ConnectionOption) *pgxpool.Pool {
 	ctx := context.Background()
 
@@ -179,7 +209,20 @@ func NewPgxClient(opts ...ConnectionOption) *pgxpool.Pool {
 
 	config.ConnConfig.Logger = &pgxTracer{continueOnly: true}
 
-	db, err := pgxpool.ConnectConfig(ctx, config)
+	var db *pgxpool.Pool
+
+	connectF := func(ctx context.Context) error {
+		var err error
+		db, err = pgxpool.ConnectConfig(ctx, config)
+		return err
+	}
+
+	if params.retry != nil {
+		err = retry.RetryFunc(ctx, connectF, func(err error) bool { return true }, *params.retry)
+	} else {
+		err = connectF(ctx)
+	}
+
 	if err != nil {
 		logger.For(nil).WithError(err).Fatal("could not open database connection")
 		panic(err)
@@ -306,7 +349,6 @@ type Repositories struct {
 	UserRepository        *UserRepository
 	NonceRepository       *NonceRepository
 	GalleryRepository     *GalleryRepository
-	TokenRepository       *TokenGalleryRepository
 	CollectionRepository  *CollectionTokenRepository
 	ContractRepository    *ContractGalleryRepository
 	MembershipRepository  *MembershipRepository
@@ -326,7 +368,6 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		pool:                  pgx,
 		UserRepository:        NewUserRepository(pq, queries, pgx),
 		NonceRepository:       NewNonceRepository(pq, queries),
-		TokenRepository:       NewTokenGalleryRepository(pq, queries),
 		CollectionRepository:  NewCollectionTokenRepository(pq, queries),
 		GalleryRepository:     NewGalleryRepository(queries),
 		ContractRepository:    NewContractGalleryRepository(pq, queries),
@@ -334,7 +375,7 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		EarlyAccessRepository: NewEarlyAccessRepository(pq, queries),
 		WalletRepository:      NewWalletRepository(pq, queries),
 		AdmireRepository:      NewAdmireRepository(queries),
-		CommentRepository:     NewCommentRepository(pq, queries),
+		CommentRepository:     NewCommentRepository(queries, pgx),
 		EventRepository:       &EventRepository{queries},
 		CommunityRepository:   NewCommunityRepository(queries),
 	}
@@ -342,66 +383,4 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 
 func (r *Repositories) BeginTx(ctx context.Context) (pgx.Tx, error) {
 	return r.pool.BeginTx(ctx, pgx.TxOptions{})
-}
-
-type BulkInsertHelpers struct{}
-
-func (b BulkInsertHelpers) AppendAddressAtBlock(dest *[]pgtype.JSONB, src []persist.AddressAtBlock, startIndices, endIndices *[]int32, errs *[]error) {
-	items := make([]any, len(src))
-	for i, item := range src {
-		items[i] = item
-	}
-	appendJSONBList(dest, items, startIndices, endIndices, errs)
-}
-
-func (b BulkInsertHelpers) AppendWalletList(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
-	items := make([]persist.DBID, len(src))
-	for i, wallet := range src {
-		items[i] = wallet.ID
-	}
-	appendDBIDList(dest, items, startIndices, endIndices)
-}
-
-func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
-	// Postgres uses 1-based indexing
-	startIndex := int32(1)
-	if len(*endIndices) > 0 {
-		startIndex = (*endIndices)[len(*endIndices)-1] + 1
-	}
-	*startIndices = append(*startIndices, startIndex)
-	*endIndices = append(*endIndices, startIndex+int32(entryLength)-1)
-}
-
-func appendBool(dest *[]bool, src *bool, errs *[]error) {
-	if src == nil {
-		*dest = append(*dest, false)
-		return
-	}
-	*dest = append(*dest, *src)
-}
-
-func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
-	jsonb, err := persist.ToJSONB(src)
-	if err != nil {
-		*errs = append(*errs, err)
-		return err
-	}
-	*dest = append(*dest, jsonb)
-	return nil
-}
-
-func appendDBIDList(dest *[]string, src []persist.DBID, startIndices, endIndices *[]int32) {
-	for _, id := range src {
-		*dest = append(*dest, id.String())
-	}
-	appendIndices(startIndices, endIndices, len(src))
-}
-
-func appendJSONBList(dest *[]pgtype.JSONB, src []any, startIndices, endIndices *[]int32, errs *[]error) {
-	for _, item := range src {
-		if err := appendJSONB(dest, item, errs); err != nil {
-			return
-		}
-	}
-	appendIndices(startIndices, endIndices, len(src))
 }

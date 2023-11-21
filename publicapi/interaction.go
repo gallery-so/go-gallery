@@ -991,6 +991,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
 	dbMentions, err := mentionInputsToMentions(ctx, mentions, api.queries)
+	if err != nil {
+		return "", err
+	}
 
 	commentID, resultMentions, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment, dbMentions)
 	if err != nil {
@@ -1076,7 +1079,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 					MentionID:      mention.ID,
 					Action:         persist.ActionMentionCommunity,
 				})
-
+				if err != nil {
+					return "", err
+				}
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
 			}
@@ -1101,7 +1106,7 @@ func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.D
 		return "", "", ErrOnlyRemoveOwnComment
 	}
 
-	return comment.FeedEventID, comment.PostID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
+	return comment.FeedEventID, comment.PostID, api.queries.RemoveComment(ctx, commentID)
 }
 
 func (api InteractionAPI) GetMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]db.Mention, error) {

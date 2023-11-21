@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/env"
@@ -81,7 +82,23 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 		contextBlock := map[string]any{}
 		contextBlock["type"] = "context"
 		contextBlock["elements"] = make([]any, 0)
-		contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("New Post - *%s*", template.PostOrError.Post.Tokens[0].Community.Name)))
+
+		var firstPostID string
+		if len(template.PostOrError.Post.Author.Feed.Edges) == 1 {
+			firstPostID = template.PostOrError.Post.Author.Feed.Edges[0].Node.Post.DBID
+		}
+
+		var communityInfo string
+		if communityName := template.PostOrError.Post.Tokens[0].Community.Name; communityName != "" {
+			communityInfo = fmt.Sprintf("- *%s*", communityName)
+		}
+
+		if message.PostID.String() == firstPostID {
+			emoji := randomEmoji()
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("%s *We got a first time poster!!!* %s %s", emoji, emoji, communityInfo)))
+		} else {
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("New Post %s", communityInfo)))
+		}
 
 		tokenPFP := template.PostOrError.Post.Author.ProfileImage.TokenProfileImage.Token.Media.Media.PreviewURLs.Thumbnail
 		fallbackPFP := template.PostOrError.Post.Author.ProfileImage.TokenProfileImage.Token.Media.Media.FallbackMedia.MediaURL
@@ -190,6 +207,15 @@ type slackTemplateInfo struct {
 						}
 					} `graphql:"...on EnsProfileImage"`
 				}
+				Feed struct {
+					Edges []struct {
+						Node struct {
+							Post struct {
+								DBID string
+							} `graphql:"...on Post"`
+						}
+					}
+				} `graphql:"feed(first: 1)"`
 			}
 			Caption string
 			Tokens  []struct {
@@ -230,4 +256,11 @@ func linkButtonObject(buttonText, url string) map[string]any {
 		"text": map[string]any{"type": "plain_text", "text": buttonText},
 		"url":  url,
 	}
+}
+
+var hypeEmojis = []string{":admire_hype:", ":get_hype:", ":celebrate:", ":lfg:", ":boy-dancing:", ":lets_go:", ":blob-hearts:"}
+
+func randomEmoji() string {
+	i := time.Now().UnixMilli() % int64(len(hypeEmojis))
+	return hypeEmojis[i]
 }
