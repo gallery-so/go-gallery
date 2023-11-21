@@ -95,7 +95,7 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 
 		if message.PostID.String() == firstPostID {
 			emoji := randomEmoji()
-			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("%s *We got a first time poster!!!* %s *%s*", emoji, emoji, communityInfo)))
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("%s *We got a first time poster!!!* %s %s", emoji, emoji, communityInfo)))
 		} else {
 			contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("New Post %s", communityInfo)))
 		}
