@@ -7,7 +7,6 @@
     "gifencoder": "2.0.1",
     "pixelmatch": "5.3.0",
     "pngjs": "7.0.0",
-    "puppeteer": "20.9.0",
     "puppeteer-cluster": "^0.23.0"
   },
   "devDependencies": {

@@ -105,7 +105,7 @@ const MAX_DIMENSION = 1000;
   });
 })();
 
-const totalFrames = 30;
+const totalFrames = 10;
 const idealDelay = 30;
 
 process.on('unhandledRejection', (reason, p) => {
