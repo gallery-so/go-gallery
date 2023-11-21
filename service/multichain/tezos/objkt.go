@@ -90,8 +90,8 @@ type tokensByIdentifiersQuery struct {
 
 type contractQuery struct {
 	Fa []struct {
-		Contract contract
-		Tokens   []token `graphql:"tokens(limit: 1, offset: 0, distinct_on: token_id)"`
+		contract
+		Tokens []token `graphql:"tokens(limit: 1, offset: 0, distinct_on: token_id)"`
 	} `graphql:"fa(where: {contract: {_eq: $contractAddress}, type: {_eq: fa2}})"`
 }
 
@@ -590,14 +590,14 @@ func (p *TezosObjktProvider) GetContractByAddress(ctx context.Context, contractA
 		return multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for address %s", contractAddress)
 	}
 	return multichain.ChainAgnosticContract{
-		Address: q.Fa[0].Contract.Contract,
+		Address: q.Fa[0].Contract,
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
 			Symbol:          q.Fa[0].Tokens[0].Symbol,
-			Name:            q.Fa[0].Contract.Name,
-			Description:     q.Fa[0].Contract.Description,
-			OwnerAddress:    q.Fa[0].Contract.Creator_Address,
-			ProfileImageURL: q.Fa[0].Contract.Logo,
-			MintURL:         mintURL(contractAddress, q.Fa[0].Contract.Path),
+			Name:            q.Fa[0].Name,
+			Description:     q.Fa[0].Description,
+			OwnerAddress:    q.Fa[0].Creator_Address,
+			ProfileImageURL: q.Fa[0].Logo,
+			MintURL:         mintURL(contractAddress, q.Fa[0].Path),
 		},
 	}, nil
 }

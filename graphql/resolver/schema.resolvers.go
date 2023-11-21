@@ -375,28 +375,28 @@ func (r *contractResolver) MintURL(ctx context.Context, obj *model.Contract) (*s
 		return &c.MintUrl.String, nil
 	}
 
-	var mintURL *string
+	var mintURL string
 
 	if c.Address != "" && !c.IsProviderMarkedSpam {
 		if c.Chain == persist.ChainZora {
-			*mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", c.Address)
+			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", c.Address)
 		} else if c.Chain == persist.ChainBase {
-			*mintURL = fmt.Sprintf("https://mint.fun/base/%s", c.Address)
+			mintURL = fmt.Sprintf("https://mint.fun/base/%s", c.Address)
 		} else if c.Chain == persist.ChainOptimism {
-			*mintURL = fmt.Sprintf("https://mint.fun/op/%s", c.Address)
+			mintURL = fmt.Sprintf("https://mint.fun/op/%s", c.Address)
 		} else if c.Chain == persist.ChainETH {
-			*mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", c.Address)
+			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", c.Address)
 		} else if c.Chain == persist.ChainTezos {
 			contract, err := tezos.GetContractByAddress(ctx, c.Address)
 			if err != nil {
 				logger.For(ctx).Errorf("failed to get tezos mint URL for contractID=%s: %s", c.ID, err)
 				sentryutil.ReportError(ctx, err)
 			}
-			*mintURL = contract.Descriptors.MintURL
+			mintURL = contract.Descriptors.MintURL
 		}
 		// Set the mint URL so we don't have to do this again
-		if mintURL != nil {
-			err := publicapi.For(ctx).Contract.SetMintURL(ctx, c.ID, *mintURL)
+		if mintURL != "" {
+			err := publicapi.For(ctx).Contract.SetMintURL(ctx, c.ID, mintURL)
 			if err != nil {
 				logger.For(ctx).Errorf("failed to set mint URL for contractID=%s: %s", c.ID, err)
 				sentryutil.ReportError(ctx, err)
@@ -404,7 +404,7 @@ func (r *contractResolver) MintURL(ctx context.Context, obj *model.Contract) (*s
 		}
 	}
 
-	return mintURL, nil
+	return &mintURL, nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.

@@ -98,7 +98,7 @@ func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContr
 }
 
 const upsertParentContracts = `-- name: UpsertParentContracts :many
-insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, l1_chain, description, profile_image_url, is_provider_marked_spam) (
+insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, l1_chain, description, profile_image_url, is_provider_marked_spam, mint_url) (
   select unnest($1::varchar[])
     , false
     , unnest($2::int[])
