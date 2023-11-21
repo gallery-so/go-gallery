@@ -837,7 +837,7 @@ follower_with_row_number AS (
     WHERE followee = @actor_id AND deleted = false
 ),
 id_with_row_number AS (
-    SELECT unnest(@ids::varchar(255)[]) AS id, row_number() OVER () AS rn
+    SELECT unnest(@ids::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest(@ids::varchar(255)[])) AS rn
 )
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
 SELECT 
@@ -848,9 +848,9 @@ SELECT
     $3, 
     $4
 FROM 
-    follower_with_row_number f
+    id_with_row_number i
 JOIN 
-    id_with_row_number i ON i.rn = f.rn
+    follower_with_row_number f ON i.rn = f.rn
 RETURNING *;
 
 -- name: CreateSimpleNotification :one
