@@ -275,7 +275,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	}
 
 	if len(resp.ZoraCreateContracts) == 0 {
-		return nil, fmt.Errorf("no contract found for address %s", addr.String())
+		return nil, fmt.Errorf("no zora contract found for address %s", addr.String())
 	}
 
 	result := make([]multichain.ChainAgnosticContract, len(resp.ZoraCreateContracts))

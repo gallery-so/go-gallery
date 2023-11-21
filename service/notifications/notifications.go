@@ -1366,7 +1366,7 @@ func addFollowerNotifications(ctx context.Context, notif db.Notification, querie
 			Action:   notif.Action,
 			Data:     notif.Data,
 			EventIds: notif.EventIds,
-			Post:     util.ToNullString(notif.PostID.String(), true),
+			PostID:   notif.PostID,
 			ActorID:  post.ActorID,
 		})
 		if err != nil {
