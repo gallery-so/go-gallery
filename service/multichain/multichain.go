@@ -116,6 +116,7 @@ type ChainAgnosticContractDescriptors struct {
 	Description     string          `json:"description"`
 	ProfileImageURL string          `json:"profile_image_url"`
 	OwnerAddress    persist.Address `json:"creator_address"`
+	MintURL         string          `json:"mint_url"`
 }
 
 // ChainAgnosticIdentifiers identify tokens despite their chain
@@ -2060,6 +2061,7 @@ type contractMetadata struct {
 	ProfileImageURL string
 	Description     string
 	IsSpam          bool
+	MintURL         string
 	priority        *int
 }
 
@@ -2077,6 +2079,7 @@ func chainContractsToUpsertableContracts(contracts []chainContracts, existingCon
 			ProfileImageURL: contract.ProfileImageUrl.String,
 			Description:     contract.Description.String,
 			IsSpam:          contract.IsProviderMarkedSpam,
+			MintURL:         contract.MintUrl.String,
 		}
 	}
 
@@ -2125,6 +2128,7 @@ func chainContractsToUpsertableContracts(contracts []chainContracts, existingCon
 			OwnerAddress:         meta.OwnerAddress,
 			Description:          util.ToNullString(meta.Description, true),
 			IsProviderMarkedSpam: meta.IsSpam,
+			MintUrl:              util.ToNullString(meta.MintURL, true),
 		})
 	}
 	return res
@@ -2139,6 +2143,7 @@ func contractToMetadata(contract ChainAgnosticContract) contractMetadata {
 		ProfileImageURL: contract.Descriptors.ProfileImageURL,
 		Description:     contract.Descriptors.Description,
 		IsSpam:          util.FromPointer(contract.IsSpam),
+		MintURL:         contract.Descriptors.MintURL,
 	}
 }
 
@@ -2161,6 +2166,9 @@ func mergeContractMetadata(lower contractMetadata, higher contractMetadata) cont
 	if higher.IsSpam {
 		// only one provider needs to mark it as spam for it to be spam
 		lower.IsSpam = true
+	}
+	if higher.MintURL != "" {
+		lower.MintURL = higher.MintURL
 	}
 
 	return lower

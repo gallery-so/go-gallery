@@ -54,6 +54,7 @@ type ResolverRoot interface {
 	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
 	CommentOnPostPayload() CommentOnPostPayloadResolver
 	Community() CommunityResolver
+	Contract() ContractResolver
 	CreateCollectionPayload() CreateCollectionPayloadResolver
 	EnsProfileImage() EnsProfileImageResolver
 	Entity() EntityResolver
@@ -1769,6 +1770,9 @@ type CommunityResolver interface {
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
 	Posts(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.PostsConnection, error)
 	TmpPostsWithProjectID(ctx context.Context, obj *model.Community, projectID int, before *string, after *string, first *int, last *int) (*model.PostsConnection, error)
+}
+type ContractResolver interface {
+	MintURL(ctx context.Context, obj *model.Contract) (*string, error)
 }
 type CreateCollectionPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error)
@@ -9633,7 +9637,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
-  mintURL: String
+  mintURL: String @goField(forceResolver: true)
   isSpam: Boolean
 }
 
@@ -22890,7 +22894,7 @@ func (ec *executionContext) _Contract_mintURL(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.MintURL, nil
+		return ec.resolvers.Contract().MintURL(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -22908,8 +22912,8 @@ func (ec *executionContext) fieldContext_Contract_mintURL(ctx context.Context, f
 	fc = &graphql.FieldContext{
 		Object:     "Contract",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -71683,14 +71687,14 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._Contract_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "dbid":
 
 			out.Values[i] = ec._Contract_dbid(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "lastUpdated":
 
@@ -71725,9 +71729,22 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._Contract_badgeURL(ctx, field, obj)
 
 		case "mintURL":
+			field := field
 
-			out.Values[i] = ec._Contract_mintURL(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Contract_mintURL(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "isSpam":
 
 			out.Values[i] = ec._Contract_isSpam(ctx, field, obj)

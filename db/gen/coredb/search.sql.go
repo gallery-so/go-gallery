@@ -20,7 +20,7 @@ poap_weight as (
     -- to offset the fact that we're going to multiply all addresses by 1000000000.
     select $5::float4 / 1000000000 as weight
 )
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain from contracts left join contract_relevance on contract_relevance.id = contracts.id,
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain, contracts.mint_url from contracts left join contract_relevance on contract_relevance.id = contracts.id,
      to_tsquery('simple', websearch_to_tsquery('simple', $1)::text || ':*') simple_partial_query,
      websearch_to_tsquery('simple', $1) simple_full_query,
      websearch_to_tsquery('english', $1) english_full_query,
@@ -85,6 +85,7 @@ func (q *Queries) SearchContracts(ctx context.Context, arg SearchContractsParams
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
 			&i.L1Chain,
+			&i.MintUrl,
 		); err != nil {
 			return nil, err
 		}

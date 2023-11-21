@@ -98,6 +98,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, contracts [
 		params.Description = append(params.Description, c.Description.String)
 		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageUrl.String)
 		params.ProviderMarkedSpam = append(params.ProviderMarkedSpam, c.IsProviderMarkedSpam)
+		params.MintUrl = append(params.MintUrl, c.MintUrl.String)
 	}
 
 	upserted, err := c.queries.UpsertParentContracts(pCtx, params)
