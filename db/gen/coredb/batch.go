@@ -3925,7 +3925,7 @@ func (b *GetWalletByIDBatchBatchResults) Close() error {
 }
 
 const getWalletsByUserIDBatch = `-- name: GetWalletsByUserIDBatch :batchmany
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain FROM users u JOIN wallets w on w.id = any(u.wallets) WHERE u.id = $1 AND u.deleted = false AND w.deleted = false
 `
 
 type GetWalletsByUserIDBatchBatchResults struct {

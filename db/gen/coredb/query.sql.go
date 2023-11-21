@@ -1247,13 +1247,13 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 
 const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
 WITH 
-id_with_row_number AS (
-    SELECT unnest($5::varchar[]) AS id, row_number() OVER () AS rn
-),
 follower_with_row_number AS (
     SELECT follower, row_number() OVER () AS rn
     FROM follows
-    WHERE followee = $6 AND deleted = false
+    WHERE followee = $5 AND deleted = false
+),
+id_with_row_number AS (
+    SELECT unnest($6::varchar(255)[]) AS id, row_number() OVER () AS rn
 )
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
 SELECT 
@@ -1264,9 +1264,9 @@ SELECT
     $3, 
     $4
 FROM 
-    id_with_row_number i
+    follower_with_row_number f
 JOIN 
-    follower_with_row_number f ON i.rn = f.rn
+    id_with_row_number i ON i.rn = f.rn
 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
@@ -1275,8 +1275,8 @@ type CreateUserPostedFirstPostNotificationsParams struct {
 	Data     persist.NotificationData `db:"data" json:"data"`
 	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
 	PostID   persist.DBID             `db:"post_id" json:"post_id"`
-	Ids      []string                 `db:"ids" json:"ids"`
 	ActorID  persist.DBID             `db:"actor_id" json:"actor_id"`
+	Ids      []string                 `db:"ids" json:"ids"`
 }
 
 func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, arg CreateUserPostedFirstPostNotificationsParams) ([]Notification, error) {
@@ -1285,8 +1285,8 @@ func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, ar
 		arg.Data,
 		arg.EventIds,
 		arg.PostID,
-		arg.Ids,
 		arg.ActorID,
+		arg.Ids,
 	)
 	if err != nil {
 		return nil, err
@@ -5416,7 +5416,7 @@ func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (Wallet, e
 }
 
 const getWalletsByUserID = `-- name: GetWalletsByUserID :many
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord) JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
 `
 
 func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {

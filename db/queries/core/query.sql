@@ -831,13 +831,13 @@ SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
 
 -- name: CreateUserPostedFirstPostNotifications :many
 WITH 
-id_with_row_number AS (
-    SELECT unnest(sqlc.arg('ids')::varchar[]) AS id, row_number() OVER () AS rn
-),
 follower_with_row_number AS (
     SELECT follower, row_number() OVER () AS rn
     FROM follows
     WHERE followee = @actor_id AND deleted = false
+),
+id_with_row_number AS (
+    SELECT unnest(@ids::varchar(255)[]) AS id, row_number() OVER () AS rn
 )
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
 SELECT 
@@ -848,9 +848,9 @@ SELECT
     $3, 
     $4
 FROM 
-    id_with_row_number i
+    follower_with_row_number f
 JOIN 
-    follower_with_row_number f ON i.rn = f.rn
+    id_with_row_number i ON i.rn = f.rn
 RETURNING *;
 
 -- name: CreateSimpleNotification :one

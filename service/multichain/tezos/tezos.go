@@ -286,7 +286,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	if len(contractAddress) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address: %s", contractAddress)
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tez contract found for address: %s", contractAddress)
 	}
 	contract := contracts[0]
 
@@ -339,7 +339,7 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	if len(contractAddress) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address: %s", contractAddress)
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tez contract found for address: %s", contractAddress)
 	}
 	contract := contracts[0]
 
