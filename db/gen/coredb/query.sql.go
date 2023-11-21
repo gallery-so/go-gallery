@@ -1253,7 +1253,7 @@ follower_with_row_number AS (
     WHERE followee = $5 AND deleted = false
 ),
 id_with_row_number AS (
-    SELECT unnest($6::varchar(255)[]) AS id, row_number() OVER () AS rn
+    SELECT unnest($6::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($6::varchar(255)[])) AS rn
 )
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
 SELECT 
@@ -1264,9 +1264,9 @@ SELECT
     $3, 
     $4
 FROM 
-    follower_with_row_number f
+    id_with_row_number i
 JOIN 
-    id_with_row_number i ON i.rn = f.rn
+    follower_with_row_number f ON i.rn = f.rn
 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
@@ -5416,7 +5416,7 @@ func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (Wallet, e
 }
 
 const getWalletsByUserID = `-- name: GetWalletsByUserID :many
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord) JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
 `
 
 func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {
