@@ -1591,7 +1591,8 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 
 					contracts, err := f.GetContractsByOwnerAddress(ctx, a)
 					if err != nil {
-						return ContractOwnerResult{Priority: pr}, err
+						logger.For(ctx).Errorf("error fetching contracts for address %s: %s", a, err)
+						return ContractOwnerResult{Priority: pr, Chain: c}, nil
 					}
 
 					logger.For(ctx).Debugf("found %d contracts for address %s", len(contracts), a)
