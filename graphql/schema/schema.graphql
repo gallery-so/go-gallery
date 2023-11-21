@@ -656,6 +656,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  mintURL: String @goField(forceResolver: true)
   isSpam: Boolean
 }
 

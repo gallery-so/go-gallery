@@ -366,6 +366,7 @@ type ComplexityRoot struct {
 		ID               func(childComplexity int) int
 		IsSpam           func(childComplexity int) int
 		LastUpdated      func(childComplexity int) int
+		MintURL          func(childComplexity int) int
 		Name             func(childComplexity int) int
 		ProfileBannerURL func(childComplexity int) int
 		ProfileImageURL  func(childComplexity int) int
@@ -3146,6 +3147,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Contract.LastUpdated(childComplexity), true
+
+	case "Contract.mintURL":
+		if e.complexity.Contract.MintURL == nil {
+			break
+		}
+
+		return e.complexity.Contract.MintURL(childComplexity), true
 
 	case "Contract.name":
 		if e.complexity.Contract.Name == nil {
@@ -9625,6 +9633,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  mintURL: String
   isSpam: Boolean
 }
 
@@ -16940,6 +16949,8 @@ func (ec *executionContext) fieldContext_Badge_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
@@ -21316,6 +21327,8 @@ func (ec *executionContext) fieldContext_Community_contract(ctx context.Context,
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
@@ -22851,6 +22864,47 @@ func (ec *executionContext) _Contract_badgeURL(ctx context.Context, field graphq
 }
 
 func (ec *executionContext) fieldContext_Contract_badgeURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Contract_mintURL(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Contract_mintURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MintURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Contract_mintURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Contract",
 		Field:      field,
@@ -44898,6 +44952,8 @@ func (ec *executionContext) fieldContext_RefreshContractPayload_contract(ctx con
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
@@ -53467,6 +53523,8 @@ func (ec *executionContext) fieldContext_Token_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
@@ -71665,6 +71723,10 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 		case "badgeURL":
 
 			out.Values[i] = ec._Contract_badgeURL(ctx, field, obj)
+
+		case "mintURL":
+
+			out.Values[i] = ec._Contract_mintURL(ctx, field, obj)
 
 		case "isSpam":
 

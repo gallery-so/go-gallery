@@ -813,6 +813,7 @@ type Contract struct {
 	ProfileImageURL  *string               `json:"profileImageURL"`
 	ProfileBannerURL *string               `json:"profileBannerURL"`
 	BadgeURL         *string               `json:"badgeURL"`
+	MintURL          *string               `json:"mintURL"`
 	IsSpam           *bool                 `json:"isSpam"`
 }
 
