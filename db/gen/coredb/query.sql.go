@@ -2721,6 +2721,148 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 	return discount_code, err
 }
 
+<<<<<<< Updated upstream
+=======
+const getMostActiveUsers = `-- name: GetMostActiveUsers :many
+WITH ag AS (
+    SELECT actor_id, COUNT(*) AS admire_given
+    FROM admires
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false
+    GROUP BY actor_id
+),
+ar AS (
+    SELECT p.actor_id, COUNT(*) AS admire_received
+    FROM posts p
+    JOIN admires a ON p.id = a.post_id
+    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND a.deleted = false
+    GROUP BY p.actor_id
+),
+cm AS (
+    SELECT actor_id, COUNT(id) AS comments_made
+    FROM comments
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
+    GROUP BY actor_id
+),
+cr AS (
+    SELECT p.actor_id, COUNT(c.id) AS comments_received
+    FROM posts p
+    JOIN comments c ON p.id = c.post_id
+    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND c.deleted = false and c.removed = false
+    GROUP BY p.actor_id
+),
+scores AS (
+    SELECT 
+        ((COALESCE(ar.admire_received, 0) * $2::int) + 
+        (COALESCE(ag.admire_given, 0) * $3::int) + 
+        (COALESCE(cm.comments_made, 0) * $4::int) + 
+        (COALESCE(cr.comments_received, 0) * $5::int)) AS score,
+        COALESCE(nullif(ag.actor_id,''), nullif(ar.actor_id,''), nullif(cm.actor_id,''), nullif(cr.actor_id,'')) AS actor_id,
+        COALESCE(ag.admire_given, 0) AS admires_given,
+        COALESCE(ar.admire_received, 0) AS admires_received,
+        COALESCE(cm.comments_made, 0) AS comments_made,
+        COALESCE(cr.comments_received, 0) AS comments_received
+        
+    FROM ag
+    FULL OUTER JOIN ar using(actor_id)
+    FULL OUTER JOIN cm using(actor_id)
+    FULL OUTER JOIN cr using(actor_id)
+)
+SELECT score, actor_id, admires_given, admires_received, comments_made, comments_received, id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id
+FROM scores
+JOIN users u ON scores.actor_id = users.id
+WHERE u.deleted = false AND u.universal = false
+AND scores.actor_id IS NOT NULL AND scores.score > 0
+ORDER BY scores.score DESC
+LIMIT $1
+`
+
+type GetMostActiveUsersParams struct {
+	Limit                  int32 `db:"limit" json:"limit"`
+	AdmireReceivedWeight   int32 `db:"admire_received_weight" json:"admire_received_weight"`
+	AdmireGivenWeight      int32 `db:"admire_given_weight" json:"admire_given_weight"`
+	CommentsMadeWeight     int32 `db:"comments_made_weight" json:"comments_made_weight"`
+	CommentsReceivedWeight int32 `db:"comments_received_weight" json:"comments_received_weight"`
+}
+
+type GetMostActiveUsersRow struct {
+	Score                int32                            `db:"score" json:"score"`
+	ActorID              persist.DBID                     `db:"actor_id" json:"actor_id"`
+	AdmiresGiven         int64                            `db:"admires_given" json:"admires_given"`
+	AdmiresReceived      int64                            `db:"admires_received" json:"admires_received"`
+	CommentsMade         int64                            `db:"comments_made" json:"comments_made"`
+	CommentsReceived     int64                            `db:"comments_received" json:"comments_received"`
+	ID                   persist.DBID                     `db:"id" json:"id"`
+	Deleted              bool                             `db:"deleted" json:"deleted"`
+	Version              sql.NullInt32                    `db:"version" json:"version"`
+	LastUpdated          time.Time                        `db:"last_updated" json:"last_updated"`
+	CreatedAt            time.Time                        `db:"created_at" json:"created_at"`
+	Username             sql.NullString                   `db:"username" json:"username"`
+	UsernameIdempotent   sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
+	Wallets              persist.WalletList               `db:"wallets" json:"wallets"`
+	Bio                  sql.NullString                   `db:"bio" json:"bio"`
+	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
+	Universal            bool                             `db:"universal" json:"universal"`
+	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
+	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
+	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
+	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
+	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
+	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
+	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+}
+
+func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsersParams) ([]GetMostActiveUsersRow, error) {
+	rows, err := q.db.Query(ctx, getMostActiveUsers,
+		arg.Limit,
+		arg.AdmireReceivedWeight,
+		arg.AdmireGivenWeight,
+		arg.CommentsMadeWeight,
+		arg.CommentsReceivedWeight,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMostActiveUsersRow
+	for rows.Next() {
+		var i GetMostActiveUsersRow
+		if err := rows.Scan(
+			&i.Score,
+			&i.ActorID,
+			&i.AdmiresGiven,
+			&i.AdmiresReceived,
+			&i.CommentsMade,
+			&i.CommentsReceived,
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+>>>>>>> Stashed changes
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id from notifications
     where owner_id = $1

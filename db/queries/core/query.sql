@@ -731,9 +731,15 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null 
 
 -- name: PaginateRepliesByCommentIDBatch :batchmany
 SELECT * FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
-        or 
-        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    ) AND deleted = false
     AND (comments.created_at, comments.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (comments.created_at, comments.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -1724,6 +1730,71 @@ select * from mentions where id = @id and not deleted;
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
 
+<<<<<<< Updated upstream
+=======
+-- name: GetMostActiveUsers :many
+WITH ag AS (
+    SELECT actor_id, COUNT(*) AS admire_given
+    FROM admires
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false
+    GROUP BY actor_id
+),
+ar AS (
+    SELECT p.actor_id, COUNT(*) AS admire_received
+    FROM posts p
+    JOIN admires a ON p.id = a.post_id
+    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND a.deleted = false
+    GROUP BY p.actor_id
+),
+cm AS (
+    SELECT actor_id, COUNT(id) AS comments_made
+    FROM comments
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
+    GROUP BY actor_id
+),
+cr AS (
+    SELECT p.actor_id, COUNT(c.id) AS comments_received
+    FROM posts p
+    JOIN comments c ON p.id = c.post_id
+    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND c.deleted = false and c.removed = false
+    GROUP BY p.actor_id
+),
+scores AS (
+    SELECT 
+        ((COALESCE(ar.admire_received, 0) * @admire_received_weight::int) + 
+        (COALESCE(ag.admire_given, 0) * @admire_given_weight::int) + 
+        (COALESCE(cm.comments_made, 0) * @comments_made_weight::int) + 
+        (COALESCE(cr.comments_received, 0) * @comments_received_weight::int)) AS score,
+        COALESCE(nullif(ag.actor_id,''), nullif(ar.actor_id,''), nullif(cm.actor_id,''), nullif(cr.actor_id,'')) AS actor_id,
+        COALESCE(ag.admire_given, 0) AS admires_given,
+        COALESCE(ar.admire_received, 0) AS admires_received,
+        COALESCE(cm.comments_made, 0) AS comments_made,
+        COALESCE(cr.comments_received, 0) AS comments_received
+        
+    FROM ag
+    FULL OUTER JOIN ar using(actor_id)
+    FULL OUTER JOIN cm using(actor_id)
+    FULL OUTER JOIN cr using(actor_id)
+)
+SELECT *
+FROM scores
+JOIN users u ON scores.actor_id = users.id
+WHERE u.deleted = false AND u.universal = false
+AND scores.actor_id IS NOT NULL AND scores.score > 0
+ORDER BY scores.score DESC
+LIMIT $1;
+
+-- name: UpdateTopActiveUsers :exec
+UPDATE users
+SET traits = CASE 
+                WHEN id = ANY(@top_user_ids) THEN 
+                    COALESCE(traits, '{}'::jsonb) || '{"top_activity": true}'::jsonb
+                ELSE 
+                    traits - 'top_activity'
+             END
+WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
+
+>>>>>>> Stashed changes
 -- name: InsertMention :one
 INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
 

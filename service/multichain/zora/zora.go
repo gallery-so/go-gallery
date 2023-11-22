@@ -213,7 +213,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
-	if len(contracts) != 1 {
+	if len(contracts) == 0 {
 		logger.For(ctx).Warnf("invalid number of contracts returned from zora: %d", len(contracts))
 		return nil, multichain.ChainAgnosticContract{}, nil
 	}
