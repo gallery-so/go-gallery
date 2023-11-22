@@ -41,6 +41,7 @@ const (
 	ActionGalleryUpdated                  Action = "GalleryUpdated"
 	ActionGalleryInfoUpdated              Action = "GalleryInfoUpdated"
 	ActionNewTokensReceived               Action = "NewTokensReceived"
+	ActionTopActivityBadgeReceived        Action = "ActivityBadgeReceived"
 )
 
 type EventData struct {
@@ -61,6 +62,7 @@ type EventData struct {
 	GalleryNewTokenIDs                  map[DBID]DBIDList `json:"gallery_new_token_ids"`
 	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`
 	GalleryNewTokenCollectorsNotes      map[DBID]string   `json:"gallery_new_token_collectors_notes"`
+	ActivityBadgeThreshold              int               `json:"activity_badge_threshold"`
 }
 
 type FeedEventData struct {

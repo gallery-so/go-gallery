@@ -1768,7 +1768,6 @@ scores AS (
         COALESCE(ar.admire_received, 0) AS admires_received,
         COALESCE(cm.comments_made, 0) AS comments_made,
         COALESCE(cr.comments_received, 0) AS comments_received
-        
     FROM ag
     FULL OUTER JOIN ar using(actor_id)
     FULL OUTER JOIN cm using(actor_id)
@@ -1776,8 +1775,8 @@ scores AS (
 )
 SELECT *
 FROM scores
-JOIN users u ON scores.actor_id = users.id
-WHERE u.deleted = false AND u.universal = false
+join users on scores.actor_id = users.id
+WHERE users.deleted = false AND users.universal = false
 AND scores.actor_id IS NOT NULL AND scores.score > 0
 ORDER BY scores.score DESC
 LIMIT $1;

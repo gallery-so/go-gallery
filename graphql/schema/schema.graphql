@@ -91,7 +91,6 @@ type GalleryUser implements Node @goEmbedHelper {
   profileImage: ProfileImage @goField(forceResolver: true)
   potentialEnsProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
-  traits: String
   universal: Boolean
   roles: [Role] @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)
@@ -2179,6 +2178,16 @@ type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & 
   updatedTime: Time
 
   post: Post @goField(forceResolver: true)
+}
+
+type YouReceivedTopActivityBadgeNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  threshold: Int!
 }
 
 type ClearAllNotificationsPayload {

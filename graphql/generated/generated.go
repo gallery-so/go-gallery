@@ -669,7 +669,6 @@ type ComplexityRoot struct {
 		SharedFollowers          func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts           func(childComplexity int) int
 		Tokens                   func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
-		Traits                   func(childComplexity int) int
 		Universal                func(childComplexity int) int
 		Username                 func(childComplexity int) int
 		Wallets                  func(childComplexity int) int
@@ -1662,6 +1661,15 @@ type ComplexityRoot struct {
 		ID           func(childComplexity int) int
 		Tokens       func(childComplexity int) int
 		WalletType   func(childComplexity int) int
+	}
+
+	YouReceivedTopActivityBadgeNotification struct {
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		Threshold    func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
 	}
 
 	_Service struct {
@@ -4141,13 +4149,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Tokens(childComplexity, args["ownershipFilter"].([]persist.TokenOwnershipType)), true
-
-	case "GalleryUser.traits":
-		if e.complexity.GalleryUser.Traits == nil {
-			break
-		}
-
-		return e.complexity.GalleryUser.Traits(childComplexity), true
 
 	case "GalleryUser.universal":
 		if e.complexity.GalleryUser.Universal == nil {
@@ -8696,6 +8697,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Wallet.WalletType(childComplexity), true
 
+	case "YouReceivedTopActivityBadgeNotification.creationTime":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.CreationTime(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.dbid":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.Dbid(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.id":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.ID(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.seen":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.Seen(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.threshold":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.Threshold == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.Threshold(childComplexity), true
+
+	case "YouReceivedTopActivityBadgeNotification.updatedTime":
+		if e.complexity.YouReceivedTopActivityBadgeNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.YouReceivedTopActivityBadgeNotification.UpdatedTime(childComplexity), true
+
 	case "_Service.sdl":
 		if e.complexity._Service.SDL == nil {
 			break
@@ -8942,7 +8985,6 @@ type GalleryUser implements Node @goEmbedHelper {
   profileImage: ProfileImage @goField(forceResolver: true)
   potentialEnsProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
-  traits: String
   universal: Boolean
   roles: [Role] @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)
@@ -11030,6 +11072,16 @@ type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & 
   updatedTime: Time
 
   post: Post @goField(forceResolver: true)
+}
+
+type YouReceivedTopActivityBadgeNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  threshold: Int!
 }
 
 type ClearAllNotificationsPayload {
@@ -15299,8 +15351,6 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -15560,8 +15610,6 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -16785,8 +16833,6 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -17688,8 +17734,6 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -18623,8 +18667,6 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -19054,8 +19096,6 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -19329,8 +19369,6 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -19788,8 +19826,6 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -26725,8 +26761,6 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -26920,8 +26954,6 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -27659,8 +27691,6 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -27852,8 +27882,6 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -28168,8 +28196,6 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -28684,47 +28710,6 @@ func (ec *executionContext) _GalleryUser_bio(ctx context.Context, field graphql.
 }
 
 func (ec *executionContext) fieldContext_GalleryUser_bio(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "GalleryUser",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _GalleryUser_traits(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_GalleryUser_traits(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Traits, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_GalleryUser_traits(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "GalleryUser",
 		Field:      field,
@@ -29352,8 +29337,6 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -29443,8 +29426,6 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -30143,8 +30124,6 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -39442,8 +39421,6 @@ func (ec *executionContext) fieldContext_OptInForRolesPayload_user(ctx context.C
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -39533,8 +39510,6 @@ func (ec *executionContext) fieldContext_OptOutForRolesPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -40333,8 +40308,6 @@ func (ec *executionContext) fieldContext_Post_author(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -42524,8 +42497,6 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -42999,8 +42970,6 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -45491,8 +45460,6 @@ func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -45969,8 +45936,6 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -52260,8 +52225,6 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -54572,8 +54535,6 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55048,8 +55009,6 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55438,8 +55397,6 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55837,8 +55794,6 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -55991,8 +55946,6 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -57663,8 +57616,6 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -57795,8 +57746,6 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -58185,8 +58134,6 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -58364,8 +58311,6 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -59308,8 +59253,6 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
 			case "universal":
 				return ec.fieldContext_GalleryUser_universal(ctx, field)
 			case "roles":
@@ -60144,6 +60087,261 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_openseaId(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification_threshold(ctx context.Context, field graphql.CollectedField, obj *model.YouReceivedTopActivityBadgeNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_YouReceivedTopActivityBadgeNotification_threshold(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Threshold, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_YouReceivedTopActivityBadgeNotification_threshold(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouReceivedTopActivityBadgeNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -66787,6 +66985,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, obj)
+	case model.YouReceivedTopActivityBadgeNotification:
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, &obj)
+	case *model.YouReceivedTopActivityBadgeNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -66899,6 +67104,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, obj)
+	case model.YouReceivedTopActivityBadgeNotification:
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, &obj)
+	case *model.YouReceivedTopActivityBadgeNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -72957,10 +73169,6 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 		case "bio":
 
 			out.Values[i] = ec._GalleryUser_bio(ctx, field, obj)
-
-		case "traits":
-
-			out.Values[i] = ec._GalleryUser_traits(ctx, field, obj)
 
 		case "universal":
 
@@ -80508,6 +80716,60 @@ func (ec *executionContext) _Wallet(ctx context.Context, sel ast.SelectionSet, o
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var youReceivedTopActivityBadgeNotificationImplementors = []string{"YouReceivedTopActivityBadgeNotification", "Notification", "Node"}
+
+func (ec *executionContext) _YouReceivedTopActivityBadgeNotification(ctx context.Context, sel ast.SelectionSet, obj *model.YouReceivedTopActivityBadgeNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, youReceivedTopActivityBadgeNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("YouReceivedTopActivityBadgeNotification")
+		case "id":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dbid":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "seen":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_updatedTime(ctx, field, obj)
+
+		case "threshold":
+
+			out.Values[i] = ec._YouReceivedTopActivityBadgeNotification_threshold(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

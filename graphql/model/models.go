@@ -56,6 +56,7 @@ type HelperCollectionCreatedFeedEventDataData struct {
 type HelperGalleryUserData struct {
 	UserID            persist.DBID
 	FeaturedGalleryID *persist.DBID
+	Traits            persist.Traits
 }
 
 type HelperCommentData struct {

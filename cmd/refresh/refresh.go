@@ -28,7 +28,7 @@ func main() {
 
 	defer rows.Close()
 
-	p := pool.New().WithErrors().WithMaxGoroutines(25)
+	p := pool.New().WithErrors().WithMaxGoroutines(100)
 
 	for rows.Next() {
 
@@ -50,17 +50,9 @@ func main() {
          					... on Media {
             					mediaURL
             					mediaType
-<<<<<<< Updated upstream
-=======
 								previewURLs {
-<<<<<<< Updated upstream
                 					raw
               					}
-=======
-									raw
-								}
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 							}
         				}
       				}

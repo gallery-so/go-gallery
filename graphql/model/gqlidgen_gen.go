@@ -157,6 +157,10 @@ func (r *Wallet) ID() GqlID {
 	return GqlID(fmt.Sprintf("Wallet:%s", r.Dbid))
 }
 
+func (r *YouReceivedTopActivityBadgeNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("YouReceivedTopActivityBadgeNotification:%s", r.Dbid))
+}
+
 type NodeFetcher struct {
 	OnAdmire                                           func(ctx context.Context, dbid persist.DBID) (*Admire, error)
 	OnCollection                                       func(ctx context.Context, dbid persist.DBID) (*Collection, error)
@@ -190,6 +194,7 @@ type NodeFetcher struct {
 	OnTokenDefinition                                  func(ctx context.Context, dbid persist.DBID) (*TokenDefinition, error)
 	OnViewer                                           func(ctx context.Context, userId string) (*Viewer, error)
 	OnWallet                                           func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
+	OnYouReceivedTopActivityBadgeNotification          func(ctx context.Context, dbid persist.DBID) (*YouReceivedTopActivityBadgeNotification, error)
 }
 
 func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
@@ -362,6 +367,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnWallet(ctx, persist.DBID(ids[0]))
+	case "YouReceivedTopActivityBadgeNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'YouReceivedTopActivityBadgeNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnYouReceivedTopActivityBadgeNotification(ctx, persist.DBID(ids[0]))
 	}
 
 	return nil, ErrInvalidIDFormat{typeName}
@@ -433,5 +443,7 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnViewer")
 	case n.OnWallet == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnWallet")
+	case n.OnYouReceivedTopActivityBadgeNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnYouReceivedTopActivityBadgeNotification")
 	}
 }

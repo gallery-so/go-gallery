@@ -35,6 +35,8 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
+const top100ActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
+
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
 var nodeFetcher = model.NodeFetcher{
@@ -76,6 +78,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneAdmiredYourTokenNotification:              fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
 	OnSomeonePostedYourWorkNotification:                fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
+	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -261,9 +264,8 @@ func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.G
 	return models, nil
 }
 
-func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
+func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits persist.Traits) ([]*model.Badge, error) {
 	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -271,6 +273,14 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.B
 	var result []*model.Badge
 	for _, contract := range contracts {
 		result = append(result, contractToBadgeModel(ctx, contract))
+	}
+
+	if _, ok := traits[persist.TraitTypeTop100ActiveUser]; ok {
+
+		result = append(result, &model.Badge{
+			Name:     util.ToPointer("Top 100 Active User"),
+			ImageURL: top100ActivityImageURL,
+		})
 	}
 
 	return result, nil
@@ -1047,6 +1057,14 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			UpdatedTime:  &notif.LastUpdated,
 			Post:         nil, // handled by dedicated resolver
 		}, nil
+	case persist.ActionTopActivityBadgeReceived:
+		return model.YouReceivedTopActivityBadgeNotification{
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Threshold:    notif.Data.ActivityBadgeThreshold,
+		}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
@@ -1763,10 +1781,14 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
+	var traits persist.Traits
+	user.Traits.AssignTo(&traits)
+
 	return &model.GalleryUser{
 		HelperGalleryUserData: model.HelperGalleryUserData{
 			UserID:            user.ID,
 			FeaturedGalleryID: user.FeaturedGallery,
+			Traits:            traits,
 		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,

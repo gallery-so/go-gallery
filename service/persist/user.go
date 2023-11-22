@@ -12,7 +12,13 @@ import (
 	"github.com/lib/pq"
 )
 
-type Traits map[string]interface{}
+type TraitType string
+
+const (
+	TraitTypeTop100ActiveUser TraitType = "top_100"
+)
+
+type Traits map[TraitType]interface{}
 
 type Socials map[SocialProvider]SocialUserIdentifiers
 

@@ -1453,7 +1453,6 @@ type GalleryUser struct {
 	ProfileImage             ProfileImage           `json:"profileImage"`
 	PotentialEnsProfileImage *EnsProfileImage       `json:"potentialEnsProfileImage"`
 	Bio                      *string                `json:"bio"`
-	Traits                   *string                `json:"traits"`
 	Universal                *bool                  `json:"universal"`
 	Roles                    []*persist.Role        `json:"roles"`
 	SocialAccounts           *SocialAccounts        `json:"socialAccounts"`
@@ -2821,6 +2820,17 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
+
+type YouReceivedTopActivityBadgeNotification struct {
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Threshold    int          `json:"threshold"`
+}
+
+func (YouReceivedTopActivityBadgeNotification) IsNotification() {}
+func (YouReceivedTopActivityBadgeNotification) IsNode()         {}
 
 type TopCollectionsForCommunityInput struct {
 	ChainAddress *persist.ChainAddress `json:"chainAddress"`

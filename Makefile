@@ -76,6 +76,7 @@ $(DEPLOY)-$(DEV)-admin              : SERVICE_FILE := app-dev-admin.yaml
 $(DEPLOY)-$(DEV)-feed               : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(DEV)-tokenprocessing    : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(DEV)-autosocial         : SERVICE_FILE := autosocial-env.yaml
+$(DEPLOY)-$(DEV)-activitystats      : SERVICE_FILE := activitystats-env.yaml
 $(DEPLOY)-$(DEV)-autosocial-orch    : SERVICE_FILE := autosocial-env.yaml
 $(DEPLOY)-$(DEV)-pushnotifications  : SERVICE_FILE := pushnotifications-env.yaml
 $(DEPLOY)-$(DEV)-emails             : SERVICE_FILE := emails-server-env.yaml
@@ -89,6 +90,7 @@ $(DEPLOY)-$(PROD)-admin             : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed              : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(PROD)-feedbot           : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(PROD)-autosocial        : SERVICE_FILE := autosocial-env.yaml
+$(DEPLOY)-$(PROD)-activitystats        : SERVICE_FILE := activitystats-env.yaml
 $(DEPLOY)-$(PROD)-autosocial-orch   : SERVICE_FILE := autosocial-env.yaml
 $(DEPLOY)-$(PROD)-tokenprocessing   : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(PROD)-pushnotifications : SERVICE_FILE := pushnotifications-env.yaml
@@ -111,6 +113,7 @@ $(DEPLOY)-%-feed                  : SENTRY_PROJECT := feed
 $(DEPLOY)-%-feedbot               : SENTRY_PROJECT := feedbot
 $(DEPLOY)-%-emails                : SENTRY_PROJECT := emails
 $(DEPLOY)-%-userpref-upload       : SENTRY_PROJECT := userpref
+$(DEPLOY)-%-activitystats         : SENTRY_PROJECT := activitystats
 $(DEPLOY)-%-autosocial            : SENTRY_PROJECT := autosocial
 $(DEPLOY)-%-autosocial-orch       : SENTRY_PROJECT := autosocial
 
@@ -133,6 +136,15 @@ $(DEPLOY)-%-autosocial            	   : MEMORY         := $(AUTOSOCIAL_MEMORY)
 $(DEPLOY)-%-autosocial            	   : CONCURRENCY    := $(AUTOSOCIAL_CONCURRENCY)
 $(DEPLOY)-$(DEV)-autosocial      	   : SERVICE        := autosocial
 $(DEPLOY)-$(PROD)-autosocial      	   : SERVICE        := autosocial
+$(DEPLOY)-%-activitystats              : REPO           := activitystats
+$(DEPLOY)-%-activitystats              : DOCKER_FILE    := $(DOCKER_DIR)/activitystats/Dockerfile
+$(DEPLOY)-%-activitystats              : PORT           := 6750
+$(DEPLOY)-%-activitystats              : TIMEOUT        := $(ACTIVITYSTATS_TIMEOUT) 
+$(DEPLOY)-%-activitystats              : CPU            := $(ACTIVITYSTATS_CPU)
+$(DEPLOY)-%-activitystats              : MEMORY         := $(ACTIVITYSTATS_MEMORY)
+$(DEPLOY)-%-activitystats              : CONCURRENCY    := $(ACTIVITYSTATS_CONCURRENCY)
+$(DEPLOY)-$(DEV)-activitystats         : SERVICE        := activitystats
+$(DEPLOY)-$(PROD)-activitystats        : SERVICE        := activitystats
 $(DEPLOY)-%-autosocial-orch            : REPO           := autosocial-orchestrator
 $(DEPLOY)-%-autosocial-orch            : DOCKER_FILE    := $(DOCKER_DIR)/autosocial/orchestrator/Dockerfile
 $(DEPLOY)-%-autosocial-orch            : PORT           := 6800
@@ -252,6 +264,14 @@ $(DEPLOY)-%-autosocial-process-users         : CRON_FLAGS     = --oidc-service-a
 $(DEPLOY)-%-autosocial-process-users         : CRON_METHOD    := POST
 $(DEPLOY)-$(DEV)-autosocial-process-users    : URI_NAME       := autosocial-orchestrator
 $(DEPLOY)-$(PROD)-autosocial-process-users   : URI_NAME       := autosocial-orchestrator
+$(DEPLOY)-%-activity-stats-top           : CRON_PREFIX    := activitystats_100
+$(DEPLOY)-%-activity-stats-top           : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-activity-stats-top           : CRON_SCHEDULE  := '0 0 * * *'
+$(DEPLOY)-%-activity-stats-top           : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/calculate_activity_badges
+$(DEPLOY)-%-activity-stats-top           : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
+$(DEPLOY)-%-activity-stats-top           : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-activity-stats-top      : URI_NAME       := activitystats 
+$(DEPLOY)-$(PROD)-activity-stats-top     : URI_NAME       := activitystats
 
 # Cloud Jobs
 $(DEPLOY)-%-userpref-upload            : JOB_NAME       := userpref-upload
@@ -277,6 +297,7 @@ $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing
 $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing-v3
 $(PROMOTE)-%-autosocial                : SERVICE := autosocial
 $(PROMOTE)-%-autosocial-orch           : SERVICE := autosocial-orchestrator
+$(PROMOTE)-%-activitystats             : SERVICE := activitystats
 $(PROMOTE)-%-pushnotifications         : SERVICE := pushnotifications
 $(PROMOTE)-%-dummymetadata             : SERVICE := dummymetadata
 $(PROMOTE)-%-feed                      : SERVICE := feed
@@ -403,7 +424,8 @@ $(DEPLOY)-$(DEV)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-b
 $(DEPLOY)-$(DEV)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(DEV)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(DEV)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
-$(DEPLOY)-$(DEV)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orch
+$(DEPLOY)-$(DEV)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orc
+$(DEPLOY)-$(DEV)-activitystats      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-activitystats _$(RELEASE)-activitystats
 $(DEPLOY)-$(DEV)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
 $(DEPLOY)-$(DEV)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
 $(DEPLOY)-$(DEV)-admin              : _set-project-$(ENV) _$(DEPLOY)-admin
@@ -415,6 +437,7 @@ $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alc
 $(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 $(DEPLOY)-$(DEV)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 $(DEPLOY)-$(DEV)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
+$(DEPLOY)-$(DEV)-activity-stats-top : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
@@ -426,6 +449,7 @@ $(DEPLOY)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-
 $(DEPLOY)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(PROD)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
 $(DEPLOY)-$(PROD)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orch
+$(DEPLOY)-$(PROD)-activitystats      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-activitystats _$(RELEASE)-activitystats
 $(DEPLOY)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
 $(DEPLOY)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
 $(DEPLOY)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
@@ -438,6 +462,7 @@ $(DEPLOY)-$(PROD)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-al
 $(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 $(DEPLOY)-$(PROD)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 $(DEPLOY)-$(PROD)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
+$(DEPLOY)-$(PROD)-activity-stats-top : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
@@ -450,6 +475,7 @@ $(PROMOTE)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE
 $(PROMOTE)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
 $(PROMOTE)-$(PROD)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-autosocial
 $(PROMOTE)-$(PROD)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-autosocial-orch
+$(PROMOTE)-$(PROD)-activitystats      : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-activitystats
 $(PROMOTE)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-pushnotifications
 $(PROMOTE)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
 $(PROMOTE)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
