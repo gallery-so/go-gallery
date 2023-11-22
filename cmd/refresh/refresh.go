@@ -21,7 +21,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select tokens.id from tokens join contracts on contracts.id = tokens.contract_id where (contracts.chain = 0 and (contracts.owner_address = '' or contracts.owner_address is null)) order by tokens.last_updated limit 10000;")
+	rows, err := pgClient.Query("select tokens.id from tokens join token_definitions on tokens.token_definition_id = token_definitions.id join token_medias on token_definitions.token_media_id = token_medias.id where token_medias.media->>'media_type' = 'svg' and token_medias.media->>'thumbnail_url' is null and tokens.deleted = false and tokens.displayable = true order by tokens.last_updated limit 10000;")
 	if err != nil {
 		panic(err)
 	}
@@ -50,6 +50,17 @@ func main() {
          					... on Media {
             					mediaURL
             					mediaType
+<<<<<<< Updated upstream
+=======
+								previewURLs {
+<<<<<<< Updated upstream
+                					raw
+              					}
+=======
+									raw
+								}
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 							}
         				}
       				}
