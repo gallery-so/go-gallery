@@ -2721,8 +2721,6 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 	return discount_code, err
 }
 
-<<<<<<< Updated upstream
-=======
 const getMostActiveUsers = `-- name: GetMostActiveUsers :many
 WITH ag AS (
     SELECT actor_id, COUNT(*) AS admire_given
@@ -2862,7 +2860,6 @@ func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsers
 	return items, nil
 }
 
->>>>>>> Stashed changes
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id from notifications
     where owner_id = $1
@@ -7027,6 +7024,22 @@ type UpdateTokensAsUserMarkedSpamParams struct {
 
 func (q *Queries) UpdateTokensAsUserMarkedSpam(ctx context.Context, arg UpdateTokensAsUserMarkedSpamParams) error {
 	_, err := q.db.Exec(ctx, updateTokensAsUserMarkedSpam, arg.IsUserMarkedSpam, arg.OwnerUserID, arg.TokenIds)
+	return err
+}
+
+const updateTopActiveUsers = `-- name: UpdateTopActiveUsers :exec
+UPDATE users
+SET traits = CASE 
+                WHEN id = ANY($1) THEN 
+                    COALESCE(traits, '{}'::jsonb) || '{"top_activity": true}'::jsonb
+                ELSE 
+                    traits - 'top_activity'
+             END
+WHERE id = ANY($1) OR traits ? 'top_activity'
+`
+
+func (q *Queries) UpdateTopActiveUsers(ctx context.Context, topUserIds persist.DBIDList) error {
+	_, err := q.db.Exec(ctx, updateTopActiveUsers, topUserIds)
 	return err
 }
 
