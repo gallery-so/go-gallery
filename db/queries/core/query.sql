@@ -731,9 +731,15 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null 
 
 -- name: PaginateRepliesByCommentIDBatch :batchmany
 SELECT * FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
-        or 
-        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    ) AND deleted = false
     AND (comments.created_at, comments.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (comments.created_at, comments.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -1735,7 +1741,7 @@ ar AS (
     SELECT p.actor_id, COUNT(*) AS admire_received
     FROM posts p
     JOIN admires a ON p.id = a.post_id
-    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND deleted = false
+    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND a.deleted = false
     GROUP BY p.actor_id
 ),
 cm AS (
@@ -1748,7 +1754,7 @@ cr AS (
     SELECT p.actor_id, COUNT(c.id) AS comments_received
     FROM posts p
     JOIN comments c ON p.id = c.post_id
-    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
+    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND c.deleted = false and c.removed = false
     GROUP BY p.actor_id
 ),
 scores AS (
@@ -1770,7 +1776,7 @@ scores AS (
 )
 SELECT *
 FROM scores
-JOIN users u ON scores.actor_id = users.id
+JOIN users u ON scores.actor_id = u.id
 WHERE u.deleted = false AND u.universal = false
 AND scores.actor_id IS NOT NULL AND scores.score > 0
 ORDER BY scores.score DESC
@@ -1785,6 +1791,7 @@ SET traits = CASE
                     traits - 'top_activity'
              END
 WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
+
 -- name: InsertMention :one
 INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
 

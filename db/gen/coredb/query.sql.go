@@ -2732,7 +2732,7 @@ ar AS (
     SELECT p.actor_id, COUNT(*) AS admire_received
     FROM posts p
     JOIN admires a ON p.id = a.post_id
-    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND deleted = false
+    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND a.deleted = false
     GROUP BY p.actor_id
 ),
 cm AS (
@@ -2745,7 +2745,7 @@ cr AS (
     SELECT p.actor_id, COUNT(c.id) AS comments_received
     FROM posts p
     JOIN comments c ON p.id = c.post_id
-    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
+    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND c.deleted = false and c.removed = false
     GROUP BY p.actor_id
 ),
 scores AS (

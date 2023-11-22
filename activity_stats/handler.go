@@ -2,6 +2,7 @@ package activitystats
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"cloud.google.com/go/storage"
@@ -56,7 +57,7 @@ func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgx
 			CommentsReceivedWeight: conf.CommentsReceivedWeight,
 		})
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error getting most active users: %w", err))
 			return
 		}
 
@@ -73,7 +74,7 @@ func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgx
 
 		err = qtx.UpdateTopActiveUsers(c, userIDs)
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error updating top active users: %w", err))
 			return
 		}
 
