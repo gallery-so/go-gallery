@@ -2767,8 +2767,8 @@ scores AS (
 )
 SELECT score, actor_id, admires_given, admires_received, comments_made, comments_received, id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id
 FROM scores
-JOIN users u ON scores.actor_id = users.id
-WHERE u.deleted = false AND u.universal = false
+join users on scores.actor_id = users.id
+WHERE users.deleted = false AND users.universal = false
 AND scores.actor_id IS NOT NULL AND scores.score > 0
 ORDER BY scores.score DESC
 LIMIT $1
