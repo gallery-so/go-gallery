@@ -278,7 +278,7 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits pers
 	if _, ok := traits[persist.TraitTypeTop100ActiveUser]; ok {
 
 		result = append(result, &model.Badge{
-			Name:     util.ToPointer("Top 100 Active User"),
+			Name:     util.ToPointer("Top Member"),
 			ImageURL: top100ActivityImageURL,
 		})
 	}
