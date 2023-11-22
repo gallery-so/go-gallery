@@ -1730,8 +1730,6 @@ select * from mentions where id = @id and not deleted;
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
 
-<<<<<<< Updated upstream
-=======
 -- name: GetMostActiveUsers :many
 WITH ag AS (
     SELECT actor_id, COUNT(*) AS admire_given
@@ -1794,7 +1792,6 @@ SET traits = CASE
              END
 WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 
->>>>>>> Stashed changes
 -- name: InsertMention :one
 INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
 
