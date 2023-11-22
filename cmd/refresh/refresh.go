@@ -50,23 +50,9 @@ func main() {
          					... on Media {
             					mediaURL
             					mediaType
-<<<<<<< HEAD
 								previewURLs {
                 					raw
               					}
-=======
-<<<<<<< Updated upstream
-=======
-								previewURLs {
-<<<<<<< Updated upstream
-                					raw
-              					}
-=======
-									raw
-								}
->>>>>>> Stashed changes
->>>>>>> Stashed changes
->>>>>>> main
 							}
         				}
       				}
