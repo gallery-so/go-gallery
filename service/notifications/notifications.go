@@ -175,32 +175,32 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
 	limiter := newPushLimiter()
 
-	def := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	group := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	follower := followerNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	tokenIDGrouped := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	defaultHandler := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	defaultGroupHandler := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	followerHandler := followerNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	tokenGroupedHandler := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	view := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 
 	// grouped notification actions
-	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
-	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, group)
-	notifDispatcher.AddHandler(persist.ActionAdmiredPost, group)
-	notifDispatcher.AddHandler(persist.ActionAdmiredToken, group)
+	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, defaultGroupHandler)
+	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, defaultGroupHandler)
+	notifDispatcher.AddHandler(persist.ActionAdmiredPost, defaultGroupHandler)
 
 	// single notification actions (default)
-	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
-	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, def)
-	notifDispatcher.AddHandler(persist.ActionReplyToComment, def)
-	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
-	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
-	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, def)
-	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, def)
+	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, defaultHandler)
+	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, defaultHandler)
+	notifDispatcher.AddHandler(persist.ActionReplyToComment, defaultHandler)
+	notifDispatcher.AddHandler(persist.ActionMentionUser, defaultHandler)
+	notifDispatcher.AddHandler(persist.ActionMentionCommunity, defaultHandler)
+	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, defaultHandler)
+	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, defaultHandler)
 
 	// notification actions that are grouped and inserted by follower
-	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, follower)
+	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, followerHandler)
 
 	// notification actions that are grouped by token id
-	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
+	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenGroupedHandler)
+	notifDispatcher.AddHandler(persist.ActionAdmiredToken, tokenGroupedHandler)
 
 	// viewed notifications are handled separately
 	notifDispatcher.AddHandler(persist.ActionViewedGallery, view)
@@ -335,7 +335,6 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 	}
 	logger.For(ctx).Infof("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
-
 }
 
 type tokenIDGroupedNotificationHandler struct {
