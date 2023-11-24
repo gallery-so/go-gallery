@@ -1052,7 +1052,7 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionUserPostedFirstPost:
 		return true
 	case persist.ActionTopActivityBadgeReceived:
-		return true
+		return false
 	default:
 		return false
 	}
