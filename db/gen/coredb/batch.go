@@ -393,9 +393,15 @@ func (b *CountInteractionsByPostIDBatchBatchResults) Close() error {
 
 const countRepliesByCommentIDBatch = `-- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = $1) 
-        or 
-        (reply_to is not null and reply_to = $1) AND deleted = false
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = $1) IS NULL 
+        AND top_level_comment_id = $1 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = $1) IS NOT NULL 
+        AND reply_to = $1 
+    ) AND deleted = false
 `
 
 type CountRepliesByCommentIDBatchBatchResults struct {
