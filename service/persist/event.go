@@ -30,6 +30,7 @@ const (
 	ActionAdmiredFeedEvent                Action = "AdmiredFeedEvent"
 	ActionAdmiredPost                     Action = "AdmiredPost"
 	ActionAdmiredToken                    Action = "AdmiredToken"
+	ActionAdmiredComment                  Action = "AdmiredComment"
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
 	ActionReplyToComment                  Action = "RepliedToComment"

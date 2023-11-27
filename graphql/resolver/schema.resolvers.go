@@ -42,6 +42,16 @@ func (r *admireResolver) Source(ctx context.Context, obj *model.Admire) (model.A
 	return nil, fmt.Errorf("admire source not found")
 }
 
+// Comment is the resolver for the comment field.
+func (r *admireCommentPayloadResolver) Comment(ctx context.Context, obj *model.AdmireCommentPayload) (*model.Comment, error) {
+	panic(fmt.Errorf("not implemented: Comment - comment"))
+}
+
+// Admire is the resolver for the admire field.
+func (r *admireCommentPayloadResolver) Admire(ctx context.Context, obj *model.AdmireCommentPayload) (*model.Admire, error) {
+	panic(fmt.Errorf("not implemented: Admire - admire"))
+}
+
 // Admire is the resolver for the admire field.
 func (r *admireFeedEventPayloadResolver) Admire(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.Admire, error) {
 	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
@@ -219,6 +229,24 @@ func (r *commentResolver) Source(ctx context.Context, obj *model.Comment) (model
 	}
 
 	return nil, fmt.Errorf("comment has no source")
+}
+
+// Admires is the resolver for the admires field.
+func (r *commentResolver) Admires(ctx context.Context, obj *model.Comment, before *string, after *string, first *int, last *int) (*model.CommentAdmiresConnection, error) {
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByCommentID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.CommentAdmireEdge
+	for _, admire := range admires {
+		edges = append(edges, &model.CommentAdmireEdge{Node: admireToModel(ctx, admire)})
+	}
+
+	return &model.CommentAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // Comment is the resolver for the comment field.
@@ -1423,6 +1451,20 @@ func (r *mutationResolver) AdmireToken(ctx context.Context, tokenID persist.DBID
 		Viewer: resolveViewer(ctx),
 		Admire: &model.Admire{Dbid: id},
 		Token:  &model.Token{Dbid: tokenID},
+	}
+	return output, nil
+}
+
+// AdmireComment is the resolver for the admireComment field.
+func (r *mutationResolver) AdmireComment(ctx context.Context, commentID persist.DBID) (model.AdmireCommentPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Interaction.AdmireComment(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.AdmireCommentPayload{
+		Viewer:  resolveViewer(ctx),
+		Admire:  &model.Admire{Dbid: id},
+		Comment: &model.Comment{Dbid: commentID},
 	}
 	return output, nil
 }
@@ -3197,6 +3239,11 @@ func (r *chainPubKeyInputResolver) Chain(ctx context.Context, obj *persist.Chain
 // Admire returns generated.AdmireResolver implementation.
 func (r *Resolver) Admire() generated.AdmireResolver { return &admireResolver{r} }
 
+// AdmireCommentPayload returns generated.AdmireCommentPayloadResolver implementation.
+func (r *Resolver) AdmireCommentPayload() generated.AdmireCommentPayloadResolver {
+	return &admireCommentPayloadResolver{r}
+}
+
 // AdmireFeedEventPayload returns generated.AdmireFeedEventPayloadResolver implementation.
 func (r *Resolver) AdmireFeedEventPayload() generated.AdmireFeedEventPayloadResolver {
 	return &admireFeedEventPayloadResolver{r}
@@ -3465,6 +3512,7 @@ func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
 }
 
 type admireResolver struct{ *Resolver }
+type admireCommentPayloadResolver struct{ *Resolver }
 type admireFeedEventPayloadResolver struct{ *Resolver }
 type admirePostPayloadResolver struct{ *Resolver }
 type admireTokenPayloadResolver struct{ *Resolver }

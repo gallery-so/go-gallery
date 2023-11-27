@@ -18,6 +18,10 @@ func (*CountAdmiresByTokenIDBatch) getNotFoundError(key persist.DBID) error {
 	return pgx.ErrNoRows
 }
 
+func (*CountAdmiresByCommentIDBatch) getNotFoundError(key persist.DBID) error {
+	return pgx.ErrNoRows
+}
+
 func (*CountCommentsByFeedEventIDBatch) getNotFoundError(key persist.DBID) error {
 	return pgx.ErrNoRows
 }
@@ -31,15 +35,15 @@ func (*CountRepliesByCommentIDBatch) getNotFoundError(key persist.DBID) error {
 }
 
 func (*GetAdmireByActorIDAndFeedEventID) getNotFoundError(key coredb.GetAdmireByActorIDAndFeedEventIDParams) error {
-	return persist.ErrAdmireFeedEventNotFound{ActorID: key.ActorID, FeedEventID: key.FeedEventID}
+	return persist.ErrAdmireNotFoundByFeedEventID{ActorID: key.ActorID, FeedEventID: key.FeedEventID}
 }
 
 func (*GetAdmireByActorIDAndPostID) getNotFoundError(key coredb.GetAdmireByActorIDAndPostIDParams) error {
-	return persist.ErrAdmirePostNotFound{ActorID: key.ActorID, PostID: key.PostID}
+	return persist.ErrAdmireNotFoundByPostID{ActorID: key.ActorID, PostID: key.PostID}
 }
 
 func (*GetAdmireByActorIDAndTokenID) getNotFoundError(key coredb.GetAdmireByActorIDAndTokenIDParams) error {
-	return persist.ErrAdmireTokenNotFound{ActorID: key.ActorID, TokenID: key.TokenID}
+	return persist.ErrAdmireNotFoundByTokenID{ActorID: key.ActorID, TokenID: key.TokenID}
 }
 
 func (*GetAdmireByAdmireIDBatch) getNotFoundError(key persist.DBID) error {

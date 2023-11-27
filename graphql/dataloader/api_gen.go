@@ -14,6 +14,7 @@ import (
 )
 
 type Loaders struct {
+	CountAdmiresByCommentIDBatch             *CountAdmiresByCommentIDBatch
 	CountAdmiresByFeedEventIDBatch           *CountAdmiresByFeedEventIDBatch
 	CountAdmiresByPostIDBatch                *CountAdmiresByPostIDBatch
 	CountAdmiresByTokenIDBatch               *CountAdmiresByTokenIDBatch
@@ -67,6 +68,7 @@ type Loaders struct {
 	GetUsersWithTraitBatch                   *GetUsersWithTraitBatch
 	GetWalletByIDBatch                       *GetWalletByIDBatch
 	GetWalletsByUserIDBatch                  *GetWalletsByUserIDBatch
+	PaginateAdmiresByCommentIDBatch          *PaginateAdmiresByCommentIDBatch
 	PaginateAdmiresByFeedEventIDBatch        *PaginateAdmiresByFeedEventIDBatch
 	PaginateAdmiresByPostIDBatch             *PaginateAdmiresByPostIDBatch
 	PaginateAdmiresByTokenIDBatch            *PaginateAdmiresByTokenIDBatch
@@ -83,6 +85,7 @@ type Loaders struct {
 func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, preFetchHook PreFetchHook, postFetchHook PostFetchHook) *Loaders {
 	loaders := &Loaders{}
 
+	loaders.CountAdmiresByCommentIDBatch = newCountAdmiresByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountAdmiresByCommentIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountAdmiresByFeedEventIDBatch = newCountAdmiresByFeedEventIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountAdmiresByFeedEventIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountAdmiresByPostIDBatch = newCountAdmiresByPostIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountAdmiresByPostIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountAdmiresByTokenIDBatch = newCountAdmiresByTokenIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountAdmiresByTokenIDBatch(q), preFetchHook, postFetchHook)
@@ -136,6 +139,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetUsersWithTraitBatch = newGetUsersWithTraitBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUsersWithTraitBatch(q), preFetchHook, postFetchHook)
 	loaders.GetWalletByIDBatch = newGetWalletByIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetWalletByIDBatch(q), preFetchHook, postFetchHook)
 	loaders.GetWalletsByUserIDBatch = newGetWalletsByUserIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetWalletsByUserIDBatch(q), preFetchHook, postFetchHook)
+	loaders.PaginateAdmiresByCommentIDBatch = newPaginateAdmiresByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateAdmiresByCommentIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateAdmiresByFeedEventIDBatch = newPaginateAdmiresByFeedEventIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateAdmiresByFeedEventIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateAdmiresByPostIDBatch = newPaginateAdmiresByPostIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateAdmiresByPostIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateAdmiresByTokenIDBatch = newPaginateAdmiresByTokenIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateAdmiresByTokenIDBatch(q), preFetchHook, postFetchHook)
@@ -158,6 +162,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetAdmireByAdmireIDBatch.Prime(loaders.GetAdmireByAdmireIDBatch.getKeyForResult(result), result)
 	})
 	loaders.GetAdmiresByActorIDBatch.RegisterResultSubscriber(func(result []coredb.Admire) {
+		for _, entry := range result {
+			loaders.GetAdmireByAdmireIDBatch.Prime(loaders.GetAdmireByAdmireIDBatch.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.PaginateAdmiresByCommentIDBatch.RegisterResultSubscriber(func(result []coredb.Admire) {
 		for _, entry := range result {
 			loaders.GetAdmireByAdmireIDBatch.Prime(loaders.GetAdmireByAdmireIDBatch.getKeyForResult(entry), entry)
 		}
@@ -400,6 +409,25 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	})
 
 	return loaders
+}
+
+func loadCountAdmiresByCommentIDBatch(q *coredb.Queries) func(context.Context, *CountAdmiresByCommentIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountAdmiresByCommentIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountAdmiresByCommentIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
 }
 
 func loadCountAdmiresByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *CountAdmiresByFeedEventIDBatch, []persist.DBID) ([]int64, []error) {
@@ -1333,6 +1361,22 @@ func loadGetWalletsByUserIDBatch(q *coredb.Queries) func(context.Context, *GetWa
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.Wallet, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateAdmiresByCommentIDBatch(q *coredb.Queries) func(context.Context, *PaginateAdmiresByCommentIDBatch, []coredb.PaginateAdmiresByCommentIDBatchParams) ([][]coredb.Admire, []error) {
+	return func(ctx context.Context, d *PaginateAdmiresByCommentIDBatch, params []coredb.PaginateAdmiresByCommentIDBatchParams) ([][]coredb.Admire, []error) {
+		results := make([][]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateAdmiresByCommentIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Admire, err error) {
 			results[i], errors[i] = r, err
 		})
 

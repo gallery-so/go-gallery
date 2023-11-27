@@ -126,10 +126,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case util.ErrorAs[persist.ErrAddressOwnedByUser](err):
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case util.ErrorAs[persist.ErrAdmireNotFound](err) || util.ErrorAs[persist.ErrAdmireFeedEventNotFound](err) || util.ErrorAs[persist.ErrAdmirePostNotFound](err) || util.ErrorAs[persist.ErrAdmireTokenNotFound](err):
+	case util.ErrorAs[persist.ErrAdmireNotFound](err):
 		mappedErr = model.ErrAdmireNotFound{Message: message}
-	case util.ErrorAs[persist.ErrAdmireAlreadyExists](err):
-		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
 	case util.ErrorAs[persist.ErrCommentNotFound](err):
 		mappedErr = model.ErrCommentNotFound{Message: message}
 	case util.ErrorAs[publicapi.ErrTokenRefreshFailed](err):
@@ -157,6 +155,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
 	case errors.Is(err, eth.ErrNoAvatarRecord) || errors.Is(err, eth.ErrNoResolution):
 		mappedErr = model.ErrNoAvatarRecordSet{Message: message}
+	case errors.Is(err, persist.ErrAdmireAlreadyExists):
+		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
 	}
 
 	if mappedErr != nil {

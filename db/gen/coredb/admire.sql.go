@@ -7,34 +7,85 @@ package coredb
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const createAdmire = `-- name: CreateAdmire :one
-INSERT INTO admires (id, feed_event_id, post_id, token_id, actor_id)
-VALUES ($1, $3, $4, $5, $2)
-ON CONFLICT (actor_id, token_id) WHERE deleted = false DO UPDATE SET last_updated = now()
-RETURNING id
+const createCommentAdmire = `-- name: CreateCommentAdmire :one
+with comment_to_admire as (select id from comments where comments.id = $3 and not deleted and not removed)
+insert into admires (id, comment_id, actor_id) (select $1, comment_to_admire.id, $2 from comment_to_admire)
+on conflict (actor_id, comment_id) where deleted = false do update set last_updated = now()
+returning id
 `
 
-type CreateAdmireParams struct {
-	ID        persist.DBID   `db:"id" json:"id"`
-	ActorID   persist.DBID   `db:"actor_id" json:"actor_id"`
-	FeedEvent sql.NullString `db:"feed_event" json:"feed_event"`
-	Post      sql.NullString `db:"post" json:"post"`
-	Token     sql.NullString `db:"token" json:"token"`
+type CreateCommentAdmireParams struct {
+	ID        persist.DBID `db:"id" json:"id"`
+	ActorID   persist.DBID `db:"actor_id" json:"actor_id"`
+	CommentID persist.DBID `db:"comment_id" json:"comment_id"`
 }
 
-func (q *Queries) CreateAdmire(ctx context.Context, arg CreateAdmireParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, createAdmire,
-		arg.ID,
-		arg.ActorID,
-		arg.FeedEvent,
-		arg.Post,
-		arg.Token,
-	)
+func (q *Queries) CreateCommentAdmire(ctx context.Context, arg CreateCommentAdmireParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, createCommentAdmire, arg.ID, arg.ActorID, arg.CommentID)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createFeedEventAdmire = `-- name: CreateFeedEventAdmire :one
+with feed_event_to_admire as (select id from feed_events where feed_events.id = $3 and not deleted)
+insert into admires (id, feed_event_id, actor_id) (select $1, feed_event_to_admire.id, $2 from feed_event_to_admire)
+on conflict (actor_id, feed_event_id) where deleted = false do update set last_updated = now()
+returning id
+`
+
+type CreateFeedEventAdmireParams struct {
+	ID          persist.DBID `db:"id" json:"id"`
+	ActorID     persist.DBID `db:"actor_id" json:"actor_id"`
+	FeedEventID persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+}
+
+func (q *Queries) CreateFeedEventAdmire(ctx context.Context, arg CreateFeedEventAdmireParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, createFeedEventAdmire, arg.ID, arg.ActorID, arg.FeedEventID)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createPostAdmire = `-- name: CreatePostAdmire :one
+with post_to_admire as (select id from posts where posts.id = $3 and not deleted)
+insert into admires (id, post_id, actor_id) (select $1, post_to_admire.id, $2 from post_to_admire)
+on conflict (actor_id, post_id) where deleted = false do update set last_updated = now()
+returning id
+`
+
+type CreatePostAdmireParams struct {
+	ID      persist.DBID `db:"id" json:"id"`
+	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
+	PostID  persist.DBID `db:"post_id" json:"post_id"`
+}
+
+func (q *Queries) CreatePostAdmire(ctx context.Context, arg CreatePostAdmireParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, createPostAdmire, arg.ID, arg.ActorID, arg.PostID)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createTokenAdmire = `-- name: CreateTokenAdmire :one
+with token_to_admire as (select id from tokens where tokens.id = $3 and not deleted)
+insert into admires (id, token_id, actor_id) (select $1, token_to_admire.id, $2 from token_to_admire)
+on conflict (actor_id, token_id) where deleted = false do update set last_updated = now()
+returning id
+`
+
+type CreateTokenAdmireParams struct {
+	ID      persist.DBID `db:"id" json:"id"`
+	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
+	TokenID persist.DBID `db:"token_id" json:"token_id"`
+}
+
+func (q *Queries) CreateTokenAdmire(ctx context.Context, arg CreateTokenAdmireParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, createTokenAdmire, arg.ID, arg.ActorID, arg.TokenID)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err

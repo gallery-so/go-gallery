@@ -1510,7 +1510,7 @@ func (q *Queries) GetActorForGroup(ctx context.Context, groupID sql.NullString) 
 }
 
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Admire, error) {
@@ -1526,12 +1526,13 @@ func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Adm
 		&i.LastUpdated,
 		&i.PostID,
 		&i.TokenID,
+		&i.CommentID,
 	)
 	return i, err
 }
 
 const getAdmiresByActorID = `-- name: GetAdmiresByActorID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID) ([]Admire, error) {
@@ -1553,6 +1554,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		); err != nil {
 			return nil, err
 		}
@@ -1565,7 +1567,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 }
 
 const getAdmiresByAdmireIDs = `-- name: GetAdmiresByAdmireIDs :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id from admires WHERE id = ANY($1) AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id from admires WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.DBIDList) ([]Admire, error) {
@@ -1587,6 +1589,7 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		); err != nil {
 			return nil, err
 		}
@@ -2884,8 +2887,9 @@ select id, deleted, owner_id, version, last_updated, created_at, action, data, e
     where owner_id = $1
     and action = $2
     and deleted = false
-    and (not $5::bool or feed_event_id = $3)
-    and (not $6::bool or post_id = $4)
+    and (not $6::bool or feed_event_id = $3)
+    and (not $7::bool or post_id = $4)
+    and (not $8::bool or comment_id = $5)
     order by created_at desc
     limit 1
 `
@@ -2895,8 +2899,10 @@ type GetMostRecentNotificationByOwnerIDForActionParams struct {
 	Action           persist.Action `db:"action" json:"action"`
 	FeedEventID      persist.DBID   `db:"feed_event_id" json:"feed_event_id"`
 	PostID           persist.DBID   `db:"post_id" json:"post_id"`
+	CommentID        persist.DBID   `db:"comment_id" json:"comment_id"`
 	OnlyForFeedEvent bool           `db:"only_for_feed_event" json:"only_for_feed_event"`
 	OnlyForPost      bool           `db:"only_for_post" json:"only_for_post"`
+	OnlyForComment   bool           `db:"only_for_comment" json:"only_for_comment"`
 }
 
 func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
@@ -2905,8 +2911,10 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 		arg.Action,
 		arg.FeedEventID,
 		arg.PostID,
+		arg.CommentID,
 		arg.OnlyForFeedEvent,
 		arg.OnlyForPost,
+		arg.OnlyForComment,
 	)
 	var i Notification
 	err := row.Scan(

@@ -62,6 +62,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredPost, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionAdmiredComment, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnPost, notificationHandler)
@@ -482,6 +483,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		MentionID:   persistedEvent.MentionID,
 	})
 }
+
 func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
@@ -511,7 +513,6 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 			}
 			return post.ActorID, nil
 		}
-
 	case persist.ResourceTypeAdmire:
 		if event.Action == persist.ActionAdmiredToken {
 			token, err := h.dataloaders.GetTokenByIdBatch.Load(event.SubjectID)
@@ -531,6 +532,12 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 				return "", err
 			}
 			return post.ActorID, nil
+		} else if event.CommentID != "" {
+			comment, err := h.dataloaders.GetCommentByCommentIDBatch.Load(event.CommentID)
+			if err != nil {
+				return "", err
+			}
+			return comment.ActorID, nil
 		}
 	case persist.ResourceTypeUser:
 		return event.SubjectID, nil

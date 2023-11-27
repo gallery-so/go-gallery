@@ -704,6 +704,16 @@ SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_a
 -- name: CountAdmiresByTokenIDBatch :batchone
 SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
+-- name: PaginateAdmiresByCommentIDBatch :batchmany
+select * from admires where comment_id = sqlc.arg('comment_id') and deleted = false
+    and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    order by case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
+             case when not sqlc.arg('paging_forward')::bool then (created_at, id) end desc
+    limit sqlc.arg('limit');
+
+-- name: CountAdmiresByCommentIDBatch :batchone
+select count(*) from admires where comment_id = $1 and deleted = false;
+
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
@@ -810,6 +820,7 @@ select * from notifications
     and deleted = false
     and (not @only_for_feed_event::bool or feed_event_id = $3)
     and (not @only_for_post::bool or post_id = $4)
+    and (not @only_for_comment::bool or comment_id = $5)
     order by created_at desc
     limit 1;
 
