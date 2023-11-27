@@ -754,9 +754,15 @@ SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to i
 
 -- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
-        or 
-        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false;
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    ) AND deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
