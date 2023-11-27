@@ -518,7 +518,7 @@ from feed_entities fe
 left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
 where (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        and fb.user_id is null
+        and (fb.user_id is null or @viewer_id = fb.user_id)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
