@@ -89,18 +89,38 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
+const blockUser = `-- name: BlockUser :one
+with user_to_block as (select id from users where users.id = $3 and not deleted and not universal)
+insert into user_blocklist (id, user_id, blocked_user_id, active) (select $1, $2, user_to_block.id, true from user_to_block)
+on conflict(user_id, blocked_user_id) where not deleted do update set active = true, last_updated = now() returning id
+`
+
+type BlockUserParams struct {
+	ID            persist.DBID `db:"id" json:"id"`
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
+}
+
+func (q *Queries) BlockUser(ctx context.Context, arg BlockUserParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, blockUser, arg.ID, arg.UserID, arg.BlockedUserID)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
-INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
+insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, $3, true)
+on conflict(user_id) where not deleted do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now()
 `
 
 type BlockUserFromFeedParams struct {
-	ID     persist.DBID   `db:"id" json:"id"`
-	UserID persist.DBID   `db:"user_id" json:"user_id"`
-	Action persist.Action `db:"action" json:"action"`
+	ID     persist.DBID         `db:"id" json:"id"`
+	UserID persist.DBID         `db:"user_id" json:"user_id"`
+	Reason persist.ReportReason `db:"reason" json:"reason"`
 }
 
 func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedParams) error {
-	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Action)
+	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Reason)
 	return err
 }
 
@@ -2759,7 +2779,6 @@ scores AS (
         COALESCE(ar.admire_received, 0) AS admires_received,
         COALESCE(cm.comments_made, 0) AS comments_made,
         COALESCE(cr.comments_received, 0) AS comments_received
-        
     FROM ag
     FULL OUTER JOIN ar using(actor_id)
     FULL OUTER JOIN cm using(actor_id)
@@ -4628,6 +4647,17 @@ func (q *Queries) GetUserExperiencesByUserID(ctx context.Context, id persist.DBI
 	return user_experiences, err
 }
 
+const getUserIsBlockedFromFeed = `-- name: GetUserIsBlockedFromFeed :one
+select exists(select 1 from feed_blocklist where user_id = $1 and not deleted and active)
+`
+
+func (q *Queries) GetUserIsBlockedFromFeed(ctx context.Context, userID persist.DBID) (bool, error) {
+	row := q.db.QueryRow(ctx, getUserIsBlockedFromFeed, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getUserNotifications = `-- name: GetUserNotifications :many
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
@@ -6205,22 +6235,6 @@ func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.Nul
 	return exists, err
 }
 
-const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false)
-`
-
-type IsFeedUserActionBlockedParams struct {
-	UserID persist.DBID   `db:"user_id" json:"user_id"`
-	Action persist.Action `db:"action" json:"action"`
-}
-
-func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserActionBlockedParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isFeedUserActionBlocked, arg.UserID, arg.Action)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
 with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = $2)
 select exists(
@@ -6247,14 +6261,16 @@ func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommuni
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
-SELECT id, feed_entity_type, created_at, actor_id
-FROM feed_entities
-WHERE (created_at, id) < ($1, $2)
-        AND (created_at, id) > ($3, $4)
-ORDER BY 
-    CASE WHEN $5::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $5::bool THEN (created_at, id) END DESC
-LIMIT $6
+select fe.id, fe.feed_entity_type, fe.created_at, fe.actor_id
+from feed_entities fe
+left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fe.created_at, fe.id) < ($1, $2)
+        and (fe.created_at, fe.id) > ($3, $4)
+        and fb.user_id is null
+order by
+    case when $5::bool then (fe.created_at, fe.id) end asc,
+    case when not $5::bool then (fe.created_at, fe.id) end desc
+limit $6
 `
 
 type PaginateGlobalFeedParams struct {
@@ -6604,6 +6620,31 @@ func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFr
 	return err
 }
 
+const reportPost = `-- name: ReportPost :one
+with offending_post as (select id from posts where posts.id = $4 and not deleted)
+insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offending_post.id, $2, $3 from offending_post)
+on conflict(post_id, reporter_id, reason) where not deleted do update set last_updated = now() returning id
+`
+
+type ReportPostParams struct {
+	ID       persist.DBID         `db:"id" json:"id"`
+	Reporter sql.NullString       `db:"reporter" json:"reporter"`
+	Reason   persist.ReportReason `db:"reason" json:"reason"`
+	PostID   persist.DBID         `db:"post_id" json:"post_id"`
+}
+
+func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, reportPost,
+		arg.ID,
+		arg.Reporter,
+		arg.Reason,
+		arg.PostID,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = $1, last_updated = now() where id = $2 and deleted = false
 `
@@ -6701,8 +6742,22 @@ func (q *Queries) SetProfileImageToToken(ctx context.Context, arg SetProfileImag
 	return err
 }
 
+const unblockUser = `-- name: UnblockUser :exec
+update user_blocklist set active = false, last_updated = now() where user_id = $1 and blocked_user_id = $2 and not deleted
+`
+
+type UnblockUserParams struct {
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
+}
+
+func (q *Queries) UnblockUser(ctx context.Context, arg UnblockUserParams) error {
+	_, err := q.db.Exec(ctx, unblockUser, arg.UserID, arg.BlockedUserID)
+	return err
+}
+
 const unblockUserFromFeed = `-- name: UnblockUserFromFeed :exec
-UPDATE feed_blocklist SET deleted = true WHERE user_id = $1
+update feed_blocklist set active = false where user_id = $1 and not deleted
 `
 
 func (q *Queries) UnblockUserFromFeed(ctx context.Context, userID persist.DBID) error {

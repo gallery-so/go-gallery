@@ -54,10 +54,9 @@ func createEventGroups(groupingConfig map[persist.Action]persist.ActionList) map
 type segment int
 
 type EventBuilder struct {
-	queries           *db.Queries
-	eventRepo         *postgres.EventRepository
-	feedRepo          *postgres.FeedRepository
-	feedBlocklistRepo *postgres.FeedBlocklistRepository
+	queries   *db.Queries
+	eventRepo *postgres.EventRepository
+	feedRepo  *postgres.FeedRepository
 	// windowSize is used to determine if a user is still editing and is ignored if
 	// skipCooldown is enabled.
 	windowSize time.Duration
@@ -65,11 +64,10 @@ type EventBuilder struct {
 
 func NewEventBuilder(queries *db.Queries) *EventBuilder {
 	return &EventBuilder{
-		queries:           queries,
-		eventRepo:         &postgres.EventRepository{Queries: queries},
-		feedRepo:          &postgres.FeedRepository{Queries: queries},
-		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
-		windowSize:        env.GetDuration("FEED_WINDOW_SIZE") * time.Second,
+		queries:    queries,
+		eventRepo:  &postgres.EventRepository{Queries: queries},
+		feedRepo:   &postgres.FeedRepository{Queries: queries},
+		windowSize: env.GetDuration("FEED_WINDOW_SIZE") * time.Second,
 	}
 }
 
@@ -86,8 +84,7 @@ func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.Fe
 }
 
 func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-
-	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, persist.NullStrToDBID(event.ActorID), event.Action)
+	blocked, err := b.queries.GetUserIsBlockedFromFeed(ctx, persist.DBID(event.ActorID.String))
 	if err != nil || blocked {
 		return nil, err
 	}
@@ -122,7 +119,7 @@ func (b *EventBuilder) NewFeedEventFromGroup(ctx context.Context, groupID string
 	if err != nil {
 		return nil, err
 	}
-	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, persist.NullStrToDBID(actor), action)
+	blocked, err := b.queries.GetUserIsBlockedFromFeed(ctx, persist.DBID(actor.String))
 	if err != nil || blocked {
 		return nil, err
 	}

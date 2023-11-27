@@ -513,14 +513,16 @@ select exists(
 );
 
 -- name: PaginateGlobalFeed :many
-SELECT *
-FROM feed_entities
-WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
-LIMIT sqlc.arg('limit');
+select fe.*
+from feed_entities fe
+left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and fb.user_id is null
+order by
+    case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
+    case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
+limit sqlc.arg('limit');
 
 -- name: PaginatePersonalFeedByUserID :many
 select fe.* from feed_entities fe, follows fl
@@ -647,14 +649,15 @@ select * from feed_events where deleted = false
     order by event_time desc
     limit 1;
 
--- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false);
+-- name: GetUserIsBlockedFromFeed :one
+select exists(select 1 from feed_blocklist where user_id = $1 and not deleted and active);
 
 -- name: BlockUserFromFeed :exec
-INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3);
+insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, sqlc.narg('reason'), true)
+on conflict(user_id) where not deleted do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now();
 
 -- name: UnblockUserFromFeed :exec
-UPDATE feed_blocklist SET deleted = true WHERE user_id = $1;
+update feed_blocklist set active = false where user_id = $1 and not deleted;
 
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
@@ -1811,3 +1814,16 @@ RETURNING ID;
 
 -- name: RemoveComment :exec
 UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;
+
+-- name: ReportPost :one
+with offending_post as (select id from posts where posts.id = @post_id and not deleted)
+insert into reported_posts (id, post_id, reporter_id, reason) (select @id, offending_post.id, sqlc.narg(reporter), sqlc.narg(reason) from offending_post)
+on conflict(post_id, reporter_id, reason) where not deleted do update set last_updated = now() returning id;
+
+-- name: BlockUser :one
+with user_to_block as (select id from users where users.id = @blocked_user_id and not deleted and not universal)
+insert into user_blocklist (id, user_id, blocked_user_id, active) (select @id, @user_id, user_to_block.id, true from user_to_block)
+on conflict(user_id, blocked_user_id) where not deleted do update set active = true, last_updated = now() returning id;
+
+-- name: UnblockUser :exec
+update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;

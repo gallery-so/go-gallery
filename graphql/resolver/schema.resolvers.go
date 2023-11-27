@@ -811,6 +811,33 @@ func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.Remove
 	return &model.RemoveProfileImagePayload{Viewer: resolveViewer(ctx)}, nil
 }
 
+// ReportPost is the resolver for the reportPost field.
+func (r *mutationResolver) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportReason) (model.ReportPostPayloadOrError, error) {
+	err := publicapi.For(ctx).Interaction.ReportPost(ctx, postID, reason)
+	if err != nil {
+		return nil, err
+	}
+	return model.ReportPostPayload{PostID: postID}, nil
+}
+
+// BlockUser is the resolver for the blockUser field.
+func (r *mutationResolver) BlockUser(ctx context.Context, userID persist.DBID) (model.BlockUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.BlockUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.BlockUserPayload{UserID: userID}, nil
+}
+
+// UnblockUser is the resolver for the unblockUser field.
+func (r *mutationResolver) UnblockUser(ctx context.Context, userID persist.DBID) (model.UnblockUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UnblockUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.UnblockUserPayload{UserID: userID}, nil
+}
+
 // UpdateGalleryCollections is the resolver for the updateGalleryCollections field.
 func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
 	api := publicapi.For(ctx)
@@ -1931,15 +1958,13 @@ func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx c
 }
 
 // BanUserFromFeed is the resolver for the banUserFromFeed field.
-func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error) {
+func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, reason persist.ReportReason) (model.BanUserFromFeedPayloadOrError, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
-
 	if err != nil {
 		return nil, err
 	}
 
-	err = publicapi.For(ctx).Feed.BlockUser(ctx, user.ID, persist.Action(action))
-
+	err = publicapi.For(ctx).Feed.BanUser(ctx, user.ID, reason)
 	if err != nil {
 		return nil, err
 	}
@@ -1950,13 +1975,11 @@ func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string,
 // UnbanUserFromFeed is the resolver for the unbanUserFromFeed field.
 func (r *mutationResolver) UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
-
 	if err != nil {
 		return nil, err
 	}
 
-	err = publicapi.For(ctx).Feed.UnBlockUser(ctx, user.ID)
-
+	err = publicapi.For(ctx).Feed.UnbanUser(ctx, user.ID)
 	if err != nil {
 		return nil, err
 	}

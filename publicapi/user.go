@@ -1753,6 +1753,42 @@ func (api UserAPI) IsMemberOfCommunity(ctx context.Context, userID persist.DBID,
 	})
 }
 
+func (api UserAPI) BlockUser(ctx context.Context, userID persist.DBID) error {
+	// Validate
+	viewerID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, fmt.Sprintf("required,ne=%s", viewerID)),
+	}); err != nil {
+		return err
+	}
+	_, err = api.queries.BlockUser(ctx, db.BlockUserParams{
+		ID:            persist.GenerateID(),
+		UserID:        viewerID,
+		BlockedUserID: userID,
+	})
+	if err != nil && errors.Is(err, pgx.ErrNoRows) {
+		return persist.ErrUserNotFound{UserID: userID}
+	}
+	return err
+}
+
+func (api UserAPI) UnblockUser(ctx context.Context, userID persist.DBID) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, "required"),
+	}); err != nil {
+		return err
+	}
+	viewerID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+	return api.queries.UnblockUser(ctx, db.UnblockUserParams{UserID: viewerID, BlockedUserID: userID})
+}
+
 func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRecord) (uri string, err error) {
 	switch u := r.(type) {
 	case nil:

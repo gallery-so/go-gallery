@@ -699,8 +699,8 @@ query notificationsForViewerQuery {
       __typename
       message
     }
-    ...on Viewer {
-      notifications(last:1, before:null) {
+    ... on Viewer {
+      notifications(last: 1, before: null) {
         unseenCount
       }
     }

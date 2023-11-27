@@ -36,8 +36,9 @@ import (
 )
 
 const (
-	tHalf6Hours  = 6 * 60.0
-	tHalf10Hours = 10 * 60.0
+	tHalf6Hours          = 6 * 60.0
+	tHalf10Hours         = 10 * 60.0
+	trendingFeedCacheKey = "trending:feedEvents:all"
 )
 
 var feedLookback = time.Duration(4 * 24 * time.Hour)
@@ -53,37 +54,34 @@ type FeedAPI struct {
 	multichainProvider *multichain.Provider
 }
 
-func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
+func (api FeedAPI) BanUser(ctx context.Context, userId persist.DBID, reason persist.ReportReason) error {
 	// Validate
-	err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userId": validate.WithTag(userId, "required"),
-		"action": validate.WithTag(action, "required"),
-	})
-
+	err := validate.ValidateFields(api.validator, validate.ValidationMap{"userId": validate.WithTag(userId, "required")})
 	if err != nil {
 		return err
 	}
-
-	return api.queries.BlockUserFromFeed(ctx, db.BlockUserFromFeedParams{
-		ID:     persist.GenerateID(),
-		UserID: userId,
-		Action: action,
-	})
-
+	err = api.queries.BlockUserFromFeed(ctx, db.BlockUserFromFeedParams{ID: persist.GenerateID(), UserID: userId, Reason: reason})
+	if err != nil {
+		return err
+	}
+	// Re-calculate trending feed
+	return api.cache.Client().Del(ctx, trendingFeedCacheKey).Err()
 }
 
-func (api FeedAPI) UnBlockUser(ctx context.Context, userId persist.DBID) error {
+func (api FeedAPI) UnbanUser(ctx context.Context, userId persist.DBID) error {
 	// Validate
 	err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userId": validate.WithTag(userId, "required"),
 	})
-
 	if err != nil {
 		return err
 	}
-
-	return api.queries.UnblockUserFromFeed(ctx, userId)
-
+	err = api.queries.UnblockUserFromFeed(ctx, userId)
+	if err != nil {
+		return err
+	}
+	// Re-calculate trending feed
+	return api.cache.Client().Del(ctx, trendingFeedCacheKey).Err()
 }
 
 func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
@@ -1172,11 +1170,10 @@ type feedCache struct {
 }
 
 func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
-	key := "trending:feedEvents:all"
 	return &feedCache{
 		LazyCache: &redis.LazyCache{
 			Cache: cache,
-			Key:   key,
+			Key:   trendingFeedCacheKey,
 			TTL:   time.Minute * 10,
 			CalcFunc: func(ctx context.Context) ([]byte, error) {
 				types, ids, err := f(ctx)
