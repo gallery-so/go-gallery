@@ -6266,11 +6266,11 @@ from feed_entities fe
 left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
 where (fe.created_at, fe.id) < ($1, $2)
         and (fe.created_at, fe.id) > ($3, $4)
-        and fb.user_id is null
+        and (fb.user_id is null or $5 = fb.user_id)
 order by
-    case when $5::bool then (fe.created_at, fe.id) end asc,
-    case when not $5::bool then (fe.created_at, fe.id) end desc
-limit $6
+    case when $6::bool then (fe.created_at, fe.id) end asc,
+    case when not $6::bool then (fe.created_at, fe.id) end desc
+limit $7
 `
 
 type PaginateGlobalFeedParams struct {
@@ -6278,6 +6278,7 @@ type PaginateGlobalFeedParams struct {
 	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
 	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
 	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	ViewerID      persist.DBID `db:"viewer_id" json:"viewer_id"`
 	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
 	Limit         int32        `db:"limit" json:"limit"`
 }
@@ -6288,6 +6289,7 @@ func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeed
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
+		arg.ViewerID,
 		arg.PagingForward,
 		arg.Limit,
 	)
