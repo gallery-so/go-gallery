@@ -13,8 +13,8 @@ import (
 
 	"blockwatch.cc/tzgo/tezos"
 	"github.com/gammazero/workerpool"
-	"github.com/machinebox/graphql"
-	gql "github.com/shurcooL/graphql"
+	mgql "github.com/machinebox/graphql"
+	sgql "github.com/shurcooL/graphql"
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/mikeydub/go-gallery/env"
@@ -135,19 +135,19 @@ type tzktContract struct {
 
 // Provider is an the struct for retrieving data from the Tezos blockchain
 type Provider struct {
-	apiURL     string
-	httpClient *http.Client
-	graphQL    *graphql.Client
-	gql        *gql.Client
+	apiURL       string
+	httpClient   *http.Client
+	tzDomainsGQL *mgql.Client
+	fxGQL        *sgql.Client
 }
 
 // NewProvider creates a new Tezos Provider
 func NewProvider(httpClient *http.Client) *Provider {
 	return &Provider{
-		apiURL:     env.GetString("TEZOS_API_URL"),
-		httpClient: httpClient,
-		graphQL:    graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
-		gql:        gql.NewClient(fxHashGQLApiURL, http.DefaultClient),
+		apiURL:       env.GetString("TEZOS_API_URL"),
+		httpClient:   httpClient,
+		tzDomainsGQL: mgql.NewClient(tezDomainsApiURL, mgql.WithHTTPClient(httpClient)),
+		fxGQL:        sgql.NewClient(fxHashGQLApiURL, http.DefaultClient),
 	}
 }
 
@@ -652,8 +652,8 @@ func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context,
 	// fxhash and objkt are two known omnibus contracts, let objkt provider handle objkt
 	var query accountWithCollectionsQuery
 
-	if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
-		"usernameOrAddress": gql.String(creatorAddress),
+	if err := retry.RetryQuery(ctx, p.fxGQL, &query, inputArgs{
+		"usernameOrAddress": sgql.String(creatorAddress),
 	}); err != nil {
 		return nil, err
 	}
@@ -812,7 +812,7 @@ type tezDomainResponse struct {
 }
 
 func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
-	req := graphql.NewRequest(fmt.Sprintf(`{
+	req := mgql.NewRequest(fmt.Sprintf(`{
 	  "query": "query ($addresses: [String!]) {
 		reverseRecords(
 			where: {
@@ -836,7 +836,7 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	}`, addr.String()))
 
 	resp := tezDomainResponse{}
-	err := d.graphQL.Run(ctx, req, &resp)
+	err := d.tzDomainsGQL.Run(ctx, req, &resp)
 	if err != nil {
 		return addr.String()
 	}
