@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 )
@@ -101,25 +103,31 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, strin
 		}
 		switch uriType {
 		case persist.URITypeIPFS:
-			contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, strings.TrimPrefix(asURI.String(), "ipfs://"))
+			header, err := ipfs.GetHeader(ctx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 			if err != nil {
 				return persist.MediaTypeUnknown, "", nil, err
 			}
-			return MediaFromContentType(contentType), contentType, &contentLength, nil
+			contentType := parseContentType(header)
+			contentLength, err := parseContentLength(header)
+			return MediaFromContentType(contentType), contentType, &contentLength, err
 		case persist.URITypeIPFSGateway:
 
 			ctl, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrNotFound, func(ctx context.Context) (contentTypeLengthTuple, error) {
-				contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, util.GetURIPath(asURI.String(), false))
+				header, err := ipfs.GetHeader(ctx, util.GetURIPath(asURI.String(), false))
 				if err != nil {
 					return contentTypeLengthTuple{}, err
 				}
-				return contentTypeLengthTuple{contentType: contentType, length: contentLength}, nil
+				contentType := parseContentType(header)
+				contentLength, err := parseContentLength(header)
+				return contentTypeLengthTuple{contentType: contentType, length: contentLength}, err
 			}, func(ctx context.Context) (contentTypeLengthTuple, error) {
-				contentType, contentLength, err := rpc.GetHTTPHeaders(ctx, url)
+				header, err := rpc.GetHTTPHeaders(ctx, url)
 				if err != nil {
 					return contentTypeLengthTuple{}, err
 				}
-				return contentTypeLengthTuple{contentType: contentType, length: contentLength}, nil
+				contentType := parseContentType(header)
+				contentLength, err := parseContentLength(header)
+				return contentTypeLengthTuple{contentType: contentType, length: contentLength}, err
 			})
 
 			if err != nil {
@@ -132,11 +140,13 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, strin
 			url = fmt.Sprintf("https://arweave.net/%s", path)
 			fallthrough
 		case persist.URITypeHTTP, persist.URITypeIPFSAPI, persist.URITypeArweaveGateway:
-			contentType, contentLength, err := rpc.GetHTTPHeaders(ctx, url)
+			header, err := rpc.GetHTTPHeaders(ctx, url)
 			if err != nil {
 				return persist.MediaTypeUnknown, "", nil, err
 			}
-			return MediaFromContentType(contentType), contentType, &contentLength, nil
+			contentType := parseContentType(header)
+			contentLength, err := parseContentLength(header)
+			return MediaFromContentType(contentType), contentType, &contentLength, err
 		}
 		return persist.MediaTypeUnknown, "", nil, nil
 	}
@@ -328,4 +338,26 @@ func keywordsForToken(contract persist.Address, chain persist.Chain) ([]string, 
 	default:
 		return chain.BaseKeywords()
 	}
+}
+
+func parseContentLength(h http.Header) (int64, error) {
+	contentLength := h.Get("Content-Length")
+	if contentLength != "" {
+		contentLengthInt, err := strconv.Atoi(contentLength)
+		if err != nil {
+			return 0, err
+		}
+		return int64(contentLengthInt), nil
+	}
+	return 0, nil
+}
+
+func parseContentType(h http.Header) string {
+	contentType := h.Get("Content-Type")
+	contentType = strings.TrimSpace(contentType)
+	whereCharset := strings.IndexByte(contentType, ';')
+	if whereCharset != -1 {
+		contentType = contentType[:whereCharset]
+	}
+	return contentType
 }
