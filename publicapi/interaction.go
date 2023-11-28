@@ -831,136 +831,145 @@ func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DB
 
 func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (persist.DBID, error) {
 	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"feedEventID": validate.WithTag(feedEventID, "required"),
-	}); err != nil {
-		return "", err
-	}
-
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	_, err = api.loaders.GetEventByIdBatch.Load(feedEventID)
+	_, err = For(ctx).Feed.GetFeedEventById(ctx, feedEventID)
 	if err != nil {
 		return "", err
 	}
 
-	newAdmireID := persist.GenerateID()
-
-	admireID, err := api.repos.AdmireRepository.CreateFeedEventAdmire(ctx, newAdmireID, feedEventID, userID)
+	params := db.CreateFeedEventAdmireParams{
+		ID:          persist.GenerateID(),
+		FeedEventID: feedEventID,
+		ActorID:     userID,
+	}
+	admireID, err := api.queries.CreateFeedEventAdmire(ctx, params)
 	if err != nil {
 		return "", err
 	}
 
-	err = event.Dispatch(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		ResourceTypeID: persist.ResourceTypeAdmire,
-		SubjectID:      feedEventID,
-		FeedEventID:    feedEventID,
-		AdmireID:       admireID,
-		Action:         persist.ActionAdmiredFeedEvent,
-	})
+	// Admire did not exist before, so dispatch event
+	if admireID == params.ID {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(userID),
+			ResourceTypeID: persist.ResourceTypeAdmire,
+			SubjectID:      feedEventID,
+			FeedEventID:    feedEventID,
+			AdmireID:       admireID,
+			Action:         persist.ActionAdmiredFeedEvent,
+		})
+	}
 
 	return admireID, err
 }
 
 func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID) (persist.DBID, error) {
 	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": validate.WithTag(tokenID, "required"),
-	}); err != nil {
-		return "", err
-	}
-
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	admireID, err := api.repos.AdmireRepository.CreateTokenAdmire(ctx, tokenID, userID)
+	_, err = For(ctx).Token.GetTokenById(ctx, tokenID)
 	if err != nil {
-		if err == persist.ErrAdmireAlreadyExists {
-			return admireID, nil
-		}
-		return admireID, err
+		return "", err
 	}
 
-	err = event.Dispatch(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		ResourceTypeID: persist.ResourceTypeAdmire,
-		SubjectID:      tokenID,
-		TokenID:        tokenID,
-		AdmireID:       admireID,
-		Action:         persist.ActionAdmiredToken,
-	})
+	params := db.CreateTokenAdmireParams{
+		ID:      persist.GenerateID(),
+		TokenID: tokenID,
+		ActorID: userID,
+	}
+	admireID, err := api.queries.CreateTokenAdmire(ctx, params)
+	if err != nil {
+		return "", err
+	}
+
+	// Admire did not exist before, so dispatch event
+	if admireID == params.ID {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(userID),
+			ResourceTypeID: persist.ResourceTypeAdmire,
+			SubjectID:      tokenID,
+			TokenID:        tokenID,
+			AdmireID:       admireID,
+			Action:         persist.ActionAdmiredToken,
+		})
+	}
 
 	return admireID, err
 }
 
 func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (persist.DBID, error) {
 	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"postID": validate.WithTag(postID, "required"),
-	}); err != nil {
-		return "", err
-	}
-
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	admireID, err := api.repos.AdmireRepository.CreatePostAdmire(ctx, postID, userID)
+	_, err = For(ctx).Feed.GetPostById(ctx, postID)
 	if err != nil {
-		if err == persist.ErrAdmireAlreadyExists {
-			return admireID, nil
-		}
-		return admireID, err
+		return "", err
 	}
 
-	err = event.Dispatch(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		ResourceTypeID: persist.ResourceTypeAdmire,
-		SubjectID:      postID,
-		PostID:         postID,
-		AdmireID:       admireID,
-		Action:         persist.ActionAdmiredPost,
-	})
+	params := db.CreatePostAdmireParams{
+		ID:      persist.GenerateID(),
+		PostID:  postID,
+		ActorID: userID,
+	}
+
+	admireID, err := api.queries.CreatePostAdmire(ctx, params)
+	if err != nil {
+		return "", err
+	}
+
+	// Admire did not exist before, so dispatch event
+	if admireID == params.ID {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(userID),
+			ResourceTypeID: persist.ResourceTypeAdmire,
+			SubjectID:      postID,
+			PostID:         postID,
+			AdmireID:       admireID,
+			Action:         persist.ActionAdmiredPost,
+		})
+	}
 
 	return admireID, err
 }
 
 func (api InteractionAPI) AdmireComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {
 	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"commentID": validate.WithTag(commentID, "required"),
-	}); err != nil {
-		return "", err
-	}
-
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	admireID, err := api.repos.AdmireRepository.CreateCommentAdmire(ctx, commentID, userID)
+	_, err = api.GetCommentByID(ctx, commentID)
 	if err != nil {
-		if err == persist.ErrAdmireAlreadyExists {
-			return admireID, nil
-		}
-		return admireID, err
+		return "", err
 	}
 
-	err = event.Dispatch(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		ResourceTypeID: persist.ResourceTypeAdmire,
-		SubjectID:      commentID,
-		CommentID:      commentID,
-		AdmireID:       admireID,
-		Action:         persist.ActionAdmiredComment,
-	})
+	params := db.CreateCommentAdmireParams{
+		ID:        persist.GenerateID(),
+		CommentID: commentID,
+		ActorID:   userID,
+	}
+	admireID, err := api.queries.CreateCommentAdmire(ctx, params)
+	if err != nil {
+		return "", err
+	}
+
+	// Admire did not exist before, so dispatch event
+	if admireID == params.ID {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(userID),
+			ResourceTypeID: persist.ResourceTypeAdmire,
+			SubjectID:      commentID,
+			CommentID:      commentID,
+			AdmireID:       admireID,
+			Action:         persist.ActionAdmiredComment,
+		})
+	}
 
 	return admireID, err
 }
@@ -982,7 +991,7 @@ func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBI
 		return "", "", ErrOnlyRemoveOwnAdmire
 	}
 
-	return admire.FeedEventID, admire.PostID, api.repos.AdmireRepository.RemoveAdmire(ctx, admireID)
+	return admire.FeedEventID, admire.PostID, api.queries.DeleteAdmireByID(ctx, admireID)
 }
 
 func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {

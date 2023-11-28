@@ -108,7 +108,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
 
 	switch {
-	case util.ErrorAs[auth.ErrAuthenticationFailed](err):
+	case util.ErrorAs[auth.ErrAuthenticationFailed](err) || errors.Is(err, publicapi.ErrOnlyRemoveOwnAdmire) || errors.Is(err, publicapi.ErrOnlyRemoveOwnComment):
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
 	case util.ErrorAs[auth.ErrDoesNotOwnRequiredNFT](err):
 		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
@@ -157,8 +157,6 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
 	case errors.Is(err, eth.ErrNoAvatarRecord) || errors.Is(err, eth.ErrNoResolution):
 		mappedErr = model.ErrNoAvatarRecordSet{Message: message}
-	case errors.Is(err, persist.ErrAdmireAlreadyExists):
-		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
 	}
 
 	if mappedErr != nil {

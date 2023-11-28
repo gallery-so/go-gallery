@@ -35,19 +35,19 @@ func (*CountRepliesByCommentIDBatch) getNotFoundError(key persist.DBID) error {
 }
 
 func (*GetAdmireByActorIDAndFeedEventID) getNotFoundError(key coredb.GetAdmireByActorIDAndFeedEventIDParams) error {
-	return persist.ErrAdmireNotFoundByFeedEventID{ActorID: key.ActorID, FeedEventID: key.FeedEventID}
+	return persist.ErrAdmireNotFoundByActorIDFeedEventID{ActorID: key.ActorID, FeedEventID: key.FeedEventID}
 }
 
 func (*GetAdmireByActorIDAndPostID) getNotFoundError(key coredb.GetAdmireByActorIDAndPostIDParams) error {
-	return persist.ErrAdmireNotFoundByPostID{ActorID: key.ActorID, PostID: key.PostID}
+	return persist.ErrAdmireNotFoundByActorIDPostID{ActorID: key.ActorID, PostID: key.PostID}
 }
 
 func (*GetAdmireByActorIDAndTokenID) getNotFoundError(key coredb.GetAdmireByActorIDAndTokenIDParams) error {
-	return persist.ErrAdmireNotFoundByTokenID{ActorID: key.ActorID, TokenID: key.TokenID}
+	return persist.ErrAdmireNotFoundByActorIDTokenID{ActorID: key.ActorID, TokenID: key.TokenID}
 }
 
 func (*GetAdmireByAdmireIDBatch) getNotFoundError(key persist.DBID) error {
-	return pgx.ErrNoRows
+	return persist.ErrAdmireNotFoundByID{ID: key}
 }
 
 func (*GetCollectionByIdBatch) getNotFoundError(key persist.DBID) error {
@@ -55,7 +55,7 @@ func (*GetCollectionByIdBatch) getNotFoundError(key persist.DBID) error {
 }
 
 func (*GetCommentByCommentIDBatch) getNotFoundError(key persist.DBID) error {
-	return pgx.ErrNoRows
+	return persist.ErrCommentNotFoundByID{ID: key}
 }
 
 func (*GetContractByChainAddressBatch) getNotFoundError(key coredb.GetContractByChainAddressBatchParams) error {
