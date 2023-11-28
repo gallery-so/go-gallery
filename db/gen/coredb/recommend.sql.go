@@ -100,7 +100,9 @@ select
 from feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 left join feed_blocklist on posts.actor_id = feed_blocklist.user_id and not feed_blocklist.deleted and feed_blocklist.active
-where feed_entity_scores.created_at > $1::timestamptz and not posts.deleted and feed_blocklist.user_id is null
+where feed_entity_scores.created_at > $1::timestamptz
+  and not posts.deleted
+  and (feed_blocklist.user_id is null or $2 = feed_blocklist.user_id)
 union
 select
   feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated,
@@ -109,8 +111,15 @@ select
 from feed_entity_score_view feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 left join feed_blocklist on posts.actor_id = feed_blocklist.user_id and not feed_blocklist.deleted and feed_blocklist.active
-where feed_entity_scores.created_at > (select last_updated from refreshed limit 1) and not posts.deleted and feed_blocklist.user_id is null
+where feed_entity_scores.created_at > (select last_updated from refreshed limit 1)
+  and not posts.deleted
+  and (feed_blocklist.user_id is null or $2 = feed_blocklist.user_id)
 `
+
+type GetFeedEntityScoresParams struct {
+	WindowEnd time.Time    `db:"window_end" json:"window_end"`
+	ViewerID  persist.DBID `db:"viewer_id" json:"viewer_id"`
+}
 
 type GetFeedEntityScoresRow struct {
 	FeedEntityScore FeedEntityScore `db:"feedentityscore" json:"feedentityscore"`
@@ -118,8 +127,8 @@ type GetFeedEntityScoresRow struct {
 	IsGalleryPost   bool            `db:"is_gallery_post" json:"is_gallery_post"`
 }
 
-func (q *Queries) GetFeedEntityScores(ctx context.Context, windowEnd time.Time) ([]GetFeedEntityScoresRow, error) {
-	rows, err := q.db.Query(ctx, getFeedEntityScores, windowEnd)
+func (q *Queries) GetFeedEntityScores(ctx context.Context, arg GetFeedEntityScoresParams) ([]GetFeedEntityScoresRow, error) {
+	rows, err := q.db.Query(ctx, getFeedEntityScores, arg.WindowEnd, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}

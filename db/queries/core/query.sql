@@ -518,7 +518,7 @@ from feed_entities fe
 left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
 where (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        and fb.user_id is null
+        and (fb.user_id is null or @viewer_id = fb.user_id)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
@@ -754,9 +754,15 @@ SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to i
 
 -- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
-        or 
-        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false;
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    ) AND deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false

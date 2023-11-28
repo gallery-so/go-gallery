@@ -591,7 +591,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
-
+	viewerID, _ := getAuthenticatedUserID(ctx)
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.PaginateGlobalFeed(ctx, db.PaginateGlobalFeedParams{
 			Limit:         params.Limit,
@@ -600,6 +600,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
+			ViewerID:      viewerID,
 		})
 
 		if err != nil {
@@ -617,8 +618,11 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	return paginator.paginate(before, after, first, last)
 }
 
-func fetchFeedEntityScores(ctx context.Context, queries *db.Queries) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
-	scores, err := queries.GetFeedEntityScores(ctx, time.Now().Add(-feedLookback))
+func fetchFeedEntityScores(ctx context.Context, q *db.Queries, viewerID persist.DBID) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
+	scores, err := q.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
+		WindowEnd: time.Now().Add(-feedLookback),
+		ViewerID:  viewerID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -686,9 +690,9 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		}
 	} else {
 		var posts []db.Post
-
+		viewerID, _ := getAuthenticatedUserID(ctx)
 		cacheCalcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			postScores, err := fetchFeedEntityScores(ctx, api.queries)
+			postScores, err := fetchFeedEntityScores(ctx, api.queries, viewerID)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -751,10 +755,10 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
 	// Validate
-	userID, _ := getAuthenticatedUserID(ctx)
+	viewerID, _ := getAuthenticatedUserID(ctx)
 
 	// Fallback to trending if no user
-	if userID == "" {
+	if viewerID == "" {
 		return api.TrendingFeed(ctx, before, after, first, last)
 	}
 
@@ -776,7 +780,7 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 			return nil, PageInfo{}, err
 		}
 	} else {
-		postScores, err := fetchFeedEntityScores(ctx, api.queries)
+		postScores, err := fetchFeedEntityScores(ctx, api.queries, viewerID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -791,7 +795,7 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 			personalizationScores[e.Post.ID] = engagementScores[e.Post.ID]
 			engagementScores[e.Post.ID] *= engagementFactor(int(e.FeedEntityScore.Interactions))
 			if !e.IsGalleryPost {
-				personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(userID, e.FeedEntityScore)
+				personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(viewerID, e.FeedEntityScore)
 			}
 		}
 
@@ -827,7 +831,7 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 
 		// Score based on the average of the two rankings
 		interleaved := api.scoreFeedEntities(ctx, 128, combined, func(e db.FeedEntityScore) float64 {
-			if e.ActorID == userID {
+			if e.ActorID == viewerID {
 				return float64(engagementRank[e.ID])
 			}
 			return float64(engagementRank[e.ID]+personalizationRank[e.ID]) / 2.0
