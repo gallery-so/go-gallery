@@ -421,7 +421,7 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 		LatestBlock: persist.BlockNumber(firstToken.Fa.Level),
 	}
 
-	return objktUnownedTokensToChainAgnostic(query.Token), agnosticContract, nil
+	return objktHolderTokensToChainAgnostic(query.Token), agnosticContract, nil
 }
 
 func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
@@ -480,7 +480,7 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
 	}
 
-	return objktUnownedTokensToChainAgnostic(tokens), agnosticContract, nil
+	return objktHolderTokensToChainAgnostic(tokens), agnosticContract, nil
 }
 
 func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
@@ -540,10 +540,10 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
 	}
 
-	return objktUnownedTokensToChainAgnostic(tokens), agnosticContract, nil
+	return objktHolderTokensToChainAgnostic(tokens), agnosticContract, nil
 }
 
-func objktUnownedTokensToChainAgnostic(tokens []token) []multichain.ChainAgnosticToken {
+func objktHolderTokensToChainAgnostic(tokens []token) []multichain.ChainAgnosticToken {
 	result := make([]multichain.ChainAgnosticToken, 0, len(tokens))
 	for _, token := range tokens {
 		tokenID := persist.TokenID(token.Token_ID.toBase16String())
