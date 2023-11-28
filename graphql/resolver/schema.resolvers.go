@@ -228,6 +228,9 @@ func (r *commentOnFeedEventPayloadResolver) Comment(ctx context.Context, obj *mo
 
 // ReplyToComment is the resolver for the replyToComment field.
 func (r *commentOnFeedEventPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error) {
+	if obj.ReplyToComment == nil {
+		return nil, nil
+	}
 	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
@@ -248,6 +251,9 @@ func (r *commentOnPostPayloadResolver) Comment(ctx context.Context, obj *model.C
 
 // ReplyToComment is the resolver for the replyToComment field.
 func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
+	if obj.ReplyToComment == nil {
+		return nil, nil
+	}
 	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
