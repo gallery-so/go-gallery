@@ -20,7 +20,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -478,7 +477,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 			readerChan <- util.NewFileHeaderReader(resp, bufSize)
 		case persist.URITypeIPFS:
 			path := util.GetURIPath(asString, true)
-			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
+			resp, err := ipfs.GetResponse(ctx, path)
 			if err != nil {
 				errChan <- err
 				return
@@ -487,7 +486,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 			readerChan <- util.NewFileHeaderReader(resp, bufSize)
 		case persist.URITypeIPFSGateway:
 			path := util.GetURIPath(asString, false)
-			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
+			resp, err := ipfs.GetResponse(ctx, path)
 			if err != nil {
 				logger.For(ctx).Errorf("Error getting data from IPFS: %s", err)
 			} else {
@@ -526,7 +525,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 				return
 			}
 			path := parsedURL.Query().Get("arg")
-			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
+			resp, err := ipfs.GetResponse(ctx, path)
 			if err != nil {
 				errChan <- err
 				return
@@ -594,73 +593,24 @@ func getHeaders(ctx context.Context, method, url string) (http.Header, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
 		return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 	}
 
-	defer resp.Body.Close()
 	return resp.Header, nil
 }
 
-func parseContentLength(contentLength string) (int64, error) {
-	if contentLength != "" {
-		contentLengthInt, err := strconv.Atoi(contentLength)
-		if err != nil {
-			return 0, err
-		}
-		return int64(contentLengthInt), nil
-	}
-	return 0, nil
-}
-
-func parseContentType(contentType string) string {
-	contentType = strings.TrimSpace(contentType)
-	whereCharset := strings.IndexByte(contentType, ';')
-	if whereCharset != -1 {
-		contentType = contentType[:whereCharset]
-	}
-	return contentType
-}
-
-type headerResult struct {
-	contentType   string
-	contentLength int64
-}
-
-func getContentHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
-	contentHeader := func(method, url string) func(ctx context.Context) (headerResult, error) {
-		return func(ctx context.Context) (headerResult, error) {
-			headers, err := getHeaders(ctx, method, url)
-			if err != nil {
-				return headerResult{}, err
-			}
-			contentType := parseContentType(headers.Get("Content-Type"))
-			contentLength, err := parseContentLength(headers.Get("Content-Length"))
-			if err != nil {
-				return headerResult{}, err
-			}
-			return headerResult{contentType, contentLength}, nil
-		}
-	}
-	fromHEAD := contentHeader(http.MethodHead, url)
-	fromGET := contentHeader(http.MethodGet, url)
-	result, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrNotFound, fromHEAD, fromGET)
-	if err != nil {
-		return "", 0, err
-	}
-
-	return result.contentType, result.contentLength, nil
-}
-
-// GetIPFSHeaders returns the headers for the given IPFS hash
-func GetIPFSHeaders(ctx context.Context, path string) (contentType string, contentLength int64, err error) {
-	return getContentHeaders(ctx, ipfs.PathGatewayFor(env.GetString("IPFS_URL"), path))
-}
-
 // GetHTTPHeaders returns the headers for the given URL
-func GetHTTPHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
-	return getContentHeaders(ctx, url)
+func GetHTTPHeaders(ctx context.Context, url string) (http.Header, error) {
+	contentHeader := func(method, url string) func(ctx context.Context) (http.Header, error) {
+		return func(ctx context.Context) (http.Header, error) { return getHeaders(ctx, method, url) }
+	}
+	return util.FirstNonErrorWithValue(ctx, true, nil,
+		contentHeader(http.MethodHead, url),
+		contentHeader(http.MethodGet, url),
+	)
 }
 
 // GetTokenURI returns metadata URI for a given token address.
