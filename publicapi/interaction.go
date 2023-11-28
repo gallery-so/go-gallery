@@ -842,9 +842,16 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	admireID, err := api.repos.AdmireRepository.CreateFeedEventAdmire(ctx, feedEventID, userID)
+	_, err = api.loaders.GetEventByIdBatch.Load(feedEventID)
 	if err != nil {
-		return admireID, err
+		return "", err
+	}
+
+	newAdmireID := persist.GenerateID()
+
+	admireID, err := api.repos.AdmireRepository.CreateFeedEventAdmire(ctx, newAdmireID, feedEventID, userID)
+	if err != nil {
+		return "", err
 	}
 
 	err = event.Dispatch(ctx, db.Event{
@@ -874,6 +881,9 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 
 	admireID, err := api.repos.AdmireRepository.CreateTokenAdmire(ctx, tokenID, userID)
 	if err != nil {
+		if err == persist.ErrAdmireAlreadyExists {
+			return admireID, nil
+		}
 		return admireID, err
 	}
 
@@ -904,6 +914,9 @@ func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (
 
 	admireID, err := api.repos.AdmireRepository.CreatePostAdmire(ctx, postID, userID)
 	if err != nil {
+		if err == persist.ErrAdmireAlreadyExists {
+			return admireID, nil
+		}
 		return admireID, err
 	}
 
@@ -934,6 +947,9 @@ func (api InteractionAPI) AdmireComment(ctx context.Context, commentID persist.D
 
 	admireID, err := api.repos.AdmireRepository.CreateCommentAdmire(ctx, commentID, userID)
 	if err != nil {
+		if err == persist.ErrAdmireAlreadyExists {
+			return admireID, nil
+		}
 		return admireID, err
 	}
 

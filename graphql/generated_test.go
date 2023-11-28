@@ -1482,6 +1482,7 @@ func (v *admirePostMutationAdmirePostAdmirePostPayload) GetPost() *admirePostMut
 // admirePostMutationAdmirePostAdmirePostPayload
 // admirePostMutationAdmirePostErrInvalidInput
 // admirePostMutationAdmirePostErrNotAuthorized
+// admirePostMutationAdmirePostErrPostNotFound
 type admirePostMutationAdmirePostAdmirePostPayloadOrError interface {
 	implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -1493,6 +1494,8 @@ func (v *admirePostMutationAdmirePostAdmirePostPayload) implementsGraphQLInterfa
 func (v *admirePostMutationAdmirePostErrInvalidInput) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
 }
 func (v *admirePostMutationAdmirePostErrNotAuthorized) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
+}
+func (v *admirePostMutationAdmirePostErrPostNotFound) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
 }
 
 func __unmarshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(b []byte, v *admirePostMutationAdmirePostAdmirePostPayloadOrError) error {
@@ -1517,6 +1520,9 @@ func __unmarshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(b []byte, v
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(admirePostMutationAdmirePostErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(admirePostMutationAdmirePostErrPostNotFound)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -1553,6 +1559,14 @@ func __marshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(v *admirePost
 		result := struct {
 			TypeName string `json:"__typename"`
 			*admirePostMutationAdmirePostErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *admirePostMutationAdmirePostErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admirePostMutationAdmirePostErrPostNotFound
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -1594,6 +1608,18 @@ func (v *admirePostMutationAdmirePostErrNotAuthorized) GetTypename() *string { r
 
 // GetMessage returns admirePostMutationAdmirePostErrNotAuthorized.Message, and is useful for accessing the field via an interface.
 func (v *admirePostMutationAdmirePostErrNotAuthorized) GetMessage() string { return v.Message }
+
+// admirePostMutationAdmirePostErrPostNotFound includes the requested fields of the GraphQL type ErrPostNotFound.
+type admirePostMutationAdmirePostErrPostNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admirePostMutationAdmirePostErrPostNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrPostNotFound) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admirePostMutationAdmirePostErrPostNotFound.Message, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrPostNotFound) GetMessage() string { return v.Message }
 
 // admirePostMutationResponse is returned by admirePostMutation on success.
 type admirePostMutationResponse struct {

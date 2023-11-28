@@ -44,12 +44,12 @@ func (r *admireResolver) Source(ctx context.Context, obj *model.Admire) (model.A
 
 // Comment is the resolver for the comment field.
 func (r *admireCommentPayloadResolver) Comment(ctx context.Context, obj *model.AdmireCommentPayload) (*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: Comment - comment"))
+	return resolveCommentByCommentID(ctx, obj.Comment.Dbid)
 }
 
 // Admire is the resolver for the admire field.
 func (r *admireCommentPayloadResolver) Admire(ctx context.Context, obj *model.AdmireCommentPayload) (*model.Admire, error) {
-	panic(fmt.Errorf("not implemented: Admire - admire"))
+	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
 }
 
 // Admire is the resolver for the admire field.

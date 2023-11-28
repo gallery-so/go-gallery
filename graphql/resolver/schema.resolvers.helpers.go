@@ -130,12 +130,14 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrAdmireNotFound{Message: message}
 	case util.ErrorAs[persist.ErrCommentNotFound](err):
 		mappedErr = model.ErrCommentNotFound{Message: message}
+	case util.ErrorAs[persist.ErrPostNotFound](err):
+		mappedErr = model.ErrPostNotFound{Message: message}
 	case util.ErrorAs[publicapi.ErrTokenRefreshFailed](err):
 		mappedErr = model.ErrSyncFailed{Message: message}
 	case util.ErrorAs[validate.ErrInvalidInput](err):
 		errTyp := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: errTyp.Parameters, Reasons: errTyp.Reasons}
-	case util.ErrorAs[persist.ErrFeedEventNotFoundByID](err):
+	case util.ErrorAs[persist.ErrFeedEventNotFound](err):
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
 	case util.ErrorAs[persist.ErrUnknownAction](err):
 		mappedErr = model.ErrUnknownAction{Message: message}

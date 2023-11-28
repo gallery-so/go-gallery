@@ -11765,7 +11765,7 @@ type AdmirePostPayload {
   admire: Admire @goField(forceResolver: true)
 }
 
-union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
+union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized | ErrPostNotFound
 
 type AdmireTokenPayload {
   viewer: Viewer
@@ -66430,6 +66430,13 @@ func (ec *executionContext) _AdmirePostPayloadOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrPostNotFound:
+		return ec._ErrPostNotFound(ctx, sel, &obj)
+	case *model.ErrPostNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrPostNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -73508,7 +73515,7 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errPostNotFoundImplementors = []string{"ErrPostNotFound", "PostOrError", "Error", "FeedEventOrError", "ReportPostPayloadOrError"}
+var errPostNotFoundImplementors = []string{"ErrPostNotFound", "PostOrError", "Error", "FeedEventOrError", "AdmirePostPayloadOrError", "ReportPostPayloadOrError"}
 
 func (ec *executionContext) _ErrPostNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrPostNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errPostNotFoundImplementors)

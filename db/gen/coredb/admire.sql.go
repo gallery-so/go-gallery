@@ -12,80 +12,72 @@ import (
 )
 
 const createCommentAdmire = `-- name: CreateCommentAdmire :one
-with comment_to_admire as (select id from comments where comments.id = $3 and not deleted and not removed)
-insert into admires (id, comment_id, actor_id) (select $1, comment_to_admire.id, $2 from comment_to_admire)
-on conflict (actor_id, comment_id) where deleted = false do update set last_updated = now()
-returning id
+insert into admires (id, comment_id, actor_id) values ($1, $2, $3)
+on conflict (actor_id, comment_id) where deleted = false do update set last_updated = now() returning id
 `
 
 type CreateCommentAdmireParams struct {
 	ID        persist.DBID `db:"id" json:"id"`
-	ActorID   persist.DBID `db:"actor_id" json:"actor_id"`
 	CommentID persist.DBID `db:"comment_id" json:"comment_id"`
+	ActorID   persist.DBID `db:"actor_id" json:"actor_id"`
 }
 
 func (q *Queries) CreateCommentAdmire(ctx context.Context, arg CreateCommentAdmireParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, createCommentAdmire, arg.ID, arg.ActorID, arg.CommentID)
+	row := q.db.QueryRow(ctx, createCommentAdmire, arg.ID, arg.CommentID, arg.ActorID)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err
 }
 
 const createFeedEventAdmire = `-- name: CreateFeedEventAdmire :one
-with feed_event_to_admire as (select id from feed_events where feed_events.id = $3 and not deleted)
-insert into admires (id, feed_event_id, actor_id) (select $1, feed_event_to_admire.id, $2 from feed_event_to_admire)
-on conflict (actor_id, feed_event_id) where deleted = false do update set last_updated = now()
-returning id
+insert into admires (id, feed_event_id, actor_id) values ($1, $2, $3)
+on conflict (actor_id, feed_event_id) where deleted = false do update set last_updated = now() returning id
 `
 
 type CreateFeedEventAdmireParams struct {
 	ID          persist.DBID `db:"id" json:"id"`
-	ActorID     persist.DBID `db:"actor_id" json:"actor_id"`
 	FeedEventID persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+	ActorID     persist.DBID `db:"actor_id" json:"actor_id"`
 }
 
 func (q *Queries) CreateFeedEventAdmire(ctx context.Context, arg CreateFeedEventAdmireParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, createFeedEventAdmire, arg.ID, arg.ActorID, arg.FeedEventID)
+	row := q.db.QueryRow(ctx, createFeedEventAdmire, arg.ID, arg.FeedEventID, arg.ActorID)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err
 }
 
 const createPostAdmire = `-- name: CreatePostAdmire :one
-with post_to_admire as (select id from posts where posts.id = $3 and not deleted)
-insert into admires (id, post_id, actor_id) (select $1, post_to_admire.id, $2 from post_to_admire)
-on conflict (actor_id, post_id) where deleted = false do update set last_updated = now()
-returning id
+insert into admires (id, post_id, actor_id) values ($1, $2, $3)
+on conflict (actor_id, post_id) where deleted = false do update set last_updated = now() returning id
 `
 
 type CreatePostAdmireParams struct {
 	ID      persist.DBID `db:"id" json:"id"`
-	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
 	PostID  persist.DBID `db:"post_id" json:"post_id"`
+	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
 }
 
 func (q *Queries) CreatePostAdmire(ctx context.Context, arg CreatePostAdmireParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, createPostAdmire, arg.ID, arg.ActorID, arg.PostID)
+	row := q.db.QueryRow(ctx, createPostAdmire, arg.ID, arg.PostID, arg.ActorID)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err
 }
 
 const createTokenAdmire = `-- name: CreateTokenAdmire :one
-with token_to_admire as (select id from tokens where tokens.id = $3 and not deleted)
-insert into admires (id, token_id, actor_id) (select $1, token_to_admire.id, $2 from token_to_admire)
-on conflict (actor_id, token_id) where deleted = false do update set last_updated = now()
-returning id
+insert into admires (id, token_id, actor_id) (select $1, $2, $3)
+on conflict (actor_id, token_id) where deleted = false do update set last_updated = now() returning id
 `
 
 type CreateTokenAdmireParams struct {
 	ID      persist.DBID `db:"id" json:"id"`
-	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
 	TokenID persist.DBID `db:"token_id" json:"token_id"`
+	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
 }
 
 func (q *Queries) CreateTokenAdmire(ctx context.Context, arg CreateTokenAdmireParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, createTokenAdmire, arg.ID, arg.ActorID, arg.TokenID)
+	row := q.db.QueryRow(ctx, createTokenAdmire, arg.ID, arg.TokenID, arg.ActorID)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err

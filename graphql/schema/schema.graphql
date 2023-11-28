@@ -2697,7 +2697,11 @@ type AdmirePostPayload {
   admire: Admire @goField(forceResolver: true)
 }
 
-union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
+union AdmirePostPayloadOrError =
+    AdmirePostPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrPostNotFound
 
 type AdmireTokenPayload {
   viewer: Viewer
@@ -2711,30 +2715,18 @@ union AdmireTokenPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
-<<<<<<< Updated upstream
 union AdmireCommentPayloadOrError =
     AdmireCommentPayload
   | ErrCommentNotFound
   | ErrInvalidInput
   | ErrNotAuthorized
 
-=======
->>>>>>> Stashed changes
 type AdmireCommentPayload {
   viewer: Viewer
   comment: Comment @goField(forceResolver: true)
   admire: Admire @goField(forceResolver: true)
 }
 
-<<<<<<< Updated upstream
-=======
-union AdmireTokenPayloadOrError =
-    AdmireTokenPayload
-  | ErrTokenNotFound
-  | ErrInvalidInput
-  | ErrNotAuthorized
-
->>>>>>> Stashed changes
 type CommentOnPostPayload {
   viewer: Viewer
   post: Post @goField(forceResolver: true)

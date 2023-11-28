@@ -1262,6 +1262,7 @@ type ErrPostNotFound struct {
 func (ErrPostNotFound) IsPostOrError()              {}
 func (ErrPostNotFound) IsError()                    {}
 func (ErrPostNotFound) IsFeedEventOrError()         {}
+func (ErrPostNotFound) IsAdmirePostPayloadOrError() {}
 func (ErrPostNotFound) IsReportPostPayloadOrError() {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
