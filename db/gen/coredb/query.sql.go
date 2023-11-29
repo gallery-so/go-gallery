@@ -3080,7 +3080,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostByID = `-- name: GetPostByID :one
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post FROM posts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error) {
@@ -3096,12 +3096,13 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 		&i.CreatedAt,
 		&i.LastUpdated,
 		&i.Deleted,
+		&i.IsFirstPost,
 	)
 	return i, err
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post
 from posts
 join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
 where not posts.deleted
@@ -3127,6 +3128,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, 
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
 		); err != nil {
 			return nil, err
 		}
@@ -5857,7 +5859,10 @@ func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) (p
 }
 
 const insertPost = `-- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id
+insert into posts(id, token_ids, contract_ids, actor_id, caption, is_first_post, created_at)
+values ($1, $2, $3, $4, $5, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
+on conflict (actor_id, is_first_post) where is_first_post do update set is_first_post = false
+returning id
 `
 
 type InsertPostParams struct {
@@ -6396,7 +6401,7 @@ with valid_post_ids as (
     WHERE $7 = ANY(posts.contract_ids)
       AND posts.deleted = false
 )
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted from posts
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post from posts
     join valid_post_ids on posts.id = valid_post_ids.id
 WHERE (posts.created_at, posts.id) < ($1, $2)
   AND (posts.created_at, posts.id) > ($3, $4)
@@ -6445,6 +6450,7 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
 		); err != nil {
 			return nil, err
 		}
@@ -6457,7 +6463,7 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 }
 
 const paginatePostsByUserID = `-- name: PaginatePostsByUserID :many
-select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted
+select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post
 from posts
 where actor_id = $1
         and (created_at, id) < ($2, $3)
@@ -6506,6 +6512,7 @@ func (q *Queries) PaginatePostsByUserID(ctx context.Context, arg PaginatePostsBy
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
 		); err != nil {
 			return nil, err
 		}

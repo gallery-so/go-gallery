@@ -949,7 +949,10 @@ SELECT * FROM admires WHERE actor_id = $1 AND token_id = $2 AND deleted = false;
 SELECT * FROM admires WHERE actor_id = $1 AND comment_id = $2 AND deleted = false;
 
 -- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id;
+insert into posts(id, token_ids, contract_ids, actor_id, caption, is_first_post, created_at)
+values ($1, $2, $3, $4, $5, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
+on conflict (actor_id, is_first_post) where is_first_post do update set is_first_post = false
+returning id;
 
 -- name: DeletePostByID :exec
 update posts set deleted = true where id = $1;

@@ -657,32 +657,9 @@ func ownersToConnection(ctx context.Context, owners []db.User, contractID persis
 func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.DBID, pageInfo publicapi.PageInfo) model.PostsConnection {
 	edges := make([]*model.PostEdge, len(posts))
 	for i, post := range posts {
-
 		po := post
-
-		cval, _ := po.Caption.Value()
-
-		var caption *string
-		if cval != nil {
-			caption = util.ToPointer(cval.(string))
-		}
-
 		edges[i] = &model.PostEdge{
-			Node: &model.Post{
-				HelperPostData: model.HelperPostData{
-					TokenIDs: po.TokenIds,
-					AuthorID: po.ActorID,
-				},
-				CreationTime: &po.CreatedAt,
-				Dbid:         po.ID,
-				Tokens:       nil, // handled by dedicated resolver
-				Caption:      caption,
-				Admires:      nil, // handled by dedicated resolver
-				Comments:     nil, // handled by dedicated resolver
-				Interactions: nil, // handled by dedicated resolver
-				ViewerAdmire: nil, // handled by dedicated resolver
-
-			},
+			Node:   postToModel(&po),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
@@ -759,7 +736,7 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 		return nil, err
 	}
 
-	return postToModel(post)
+	return postToModel(post), nil
 }
 
 func resolveTokenDefinitionByID(ctx context.Context, dbid persist.DBID) (*model.TokenDefinition, error) {
@@ -1409,21 +1386,7 @@ func feedEntityToModel(event any) (model.FeedEventOrError, error) {
 
 	switch event := event.(type) {
 	case db.Post:
-		caption, _ := event.Caption.Value()
-
-		var captionVal *string
-		if caption != nil {
-			captionVal = util.ToPointer(caption.(string))
-		}
-		return &model.Post{
-			HelperPostData: model.HelperPostData{
-				TokenIDs: event.TokenIds,
-				AuthorID: event.ActorID,
-			},
-			CreationTime: &event.CreatedAt,
-			Dbid:         event.ID,
-			Caption:      captionVal,
-		}, nil
+		return postToModel(&event), nil
 	case db.FeedEvent:
 		var groupID sql.NullString
 		if event.GroupID.String != "" {
@@ -1718,9 +1681,9 @@ func entitiesToFeedEdges(events []any) ([]*model.FeedEdge, error) {
 	return edges, nil
 }
 
-func postToModel(event *db.Post) (*model.Post, error) {
+func postToModel(post *db.Post) *model.Post {
 	// Value always returns a nil error so we can safely ignore it.
-	caption, _ := event.Caption.Value()
+	caption, _ := post.Caption.Value()
 
 	var captionVal *string
 	if caption != nil {
@@ -1729,14 +1692,19 @@ func postToModel(event *db.Post) (*model.Post, error) {
 
 	return &model.Post{
 		HelperPostData: model.HelperPostData{
-			TokenIDs: event.TokenIds,
-			AuthorID: event.ActorID,
+			TokenIDs: post.TokenIds,
+			AuthorID: post.ActorID,
 		},
-		Dbid:         event.ID,
-		CreationTime: &event.CreatedAt,
+		Dbid:         post.ID,
+		Tokens:       nil, // handled by dedicated resolver
+		CreationTime: &post.CreatedAt,
 		Caption:      captionVal,
-	}, nil
-
+		Admires:      nil, // handled by dedicated resolver
+		Comments:     nil, // handled by dedicated resolver
+		Interactions: nil, // handled by dedicated resolver
+		ViewerAdmire: nil, // handled by dedicated resolver
+		IsFirstPost:  post.IsFirstPost,
+	}
 }
 
 func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {

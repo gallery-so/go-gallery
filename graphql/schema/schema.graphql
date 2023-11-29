@@ -1053,6 +1053,7 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
+  isFirstPost: Boolean!
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
