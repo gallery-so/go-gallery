@@ -1906,6 +1906,20 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 	})
 	creator := persist.NewChainAddress(creatorAddress, chain)
 
+	var mintURL string
+
+	if contract.Address != "" && !contract.IsProviderMarkedSpam {
+		if contract.Chain == persist.ChainZora {
+			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", contract.Address)
+		} else if contract.Chain == persist.ChainBase {
+			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+		} else if contract.Chain == persist.ChainOptimism {
+			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+		} else if contract.Chain == persist.ChainETH {
+			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+		}
+	}
+
 	return &model.Contract{
 		Dbid:             contract.ID,
 		ContractAddress:  &addr,
@@ -1916,6 +1930,7 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 		ProfileImageURL:  &contract.ProfileImageUrl.String,
 		ProfileBannerURL: &contract.ProfileBannerUrl.String,
 		BadgeURL:         &contract.BadgeUrl.String,
+		MintURL:          &mintURL,
 		IsSpam:           &contract.IsProviderMarkedSpam,
 	}
 }
