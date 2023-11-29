@@ -8,23 +8,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/limiters"
-	"github.com/mikeydub/go-gallery/service/redis"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/sourcegraph/conc/pool"
-
 	"cloud.google.com/go/pubsub"
 	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
 	"github.com/googleapis/gax-go/v2/apierror"
+	"github.com/sourcegraph/conc/pool"
+	"golang.org/x/net/html"
+	"google.golang.org/grpc/codes"
+
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
-	"google.golang.org/grpc/codes"
 )
 
 type lockKey struct {
@@ -753,7 +754,7 @@ func (u UserFacingNotificationData) String() string {
 	if u.PreviewText != "" {
 		cur = fmt.Sprintf("%s: %s", cur, u.PreviewText)
 	}
-	return cur
+	return html.UnescapeString(cur)
 }
 
 func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (UserFacingNotificationData, error) {
