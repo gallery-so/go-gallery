@@ -119,6 +119,11 @@ type HelperSomeoneAdmiredYourPostNotificationData struct {
 	NotificationData persist.NotificationData
 }
 
+type HelperSomeoneAdmiredYourCommentNotificationData struct {
+	CommentID        persist.DBID
+	NotificationData persist.NotificationData
+}
+
 type HelperSomeoneAdmiredYourTokenNotificationData struct {
 	OwnerID          persist.DBID
 	TokenID          persist.DBID

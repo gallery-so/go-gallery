@@ -2722,6 +2722,16 @@ func (r *socialQueriesResolver) SocialConnections(ctx context.Context, obj *mode
 	}, nil
 }
 
+// Comment is the resolver for the comment field.
+func (r *someoneAdmiredYourCommentNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneAdmiredYourCommentNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.HelperSomeoneAdmiredYourCommentNotificationData.CommentID)
+}
+
+// Admirers is the resolver for the admirers field.
+func (r *someoneAdmiredYourCommentNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourCommentNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *someoneAdmiredYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEventID)
@@ -3391,6 +3401,11 @@ func (r *Resolver) SocialConnection() generated.SocialConnectionResolver {
 // SocialQueries returns generated.SocialQueriesResolver implementation.
 func (r *Resolver) SocialQueries() generated.SocialQueriesResolver { return &socialQueriesResolver{r} }
 
+// SomeoneAdmiredYourCommentNotification returns generated.SomeoneAdmiredYourCommentNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourCommentNotification() generated.SomeoneAdmiredYourCommentNotificationResolver {
+	return &someoneAdmiredYourCommentNotificationResolver{r}
+}
+
 // SomeoneAdmiredYourFeedEventNotification returns generated.SomeoneAdmiredYourFeedEventNotificationResolver implementation.
 func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAdmiredYourFeedEventNotificationResolver {
 	return &someoneAdmiredYourFeedEventNotificationResolver{r}
@@ -3548,6 +3563,7 @@ type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
 type socialConnectionResolver struct{ *Resolver }
 type socialQueriesResolver struct{ *Resolver }
+type someoneAdmiredYourCommentNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourPostNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourTokenNotificationResolver struct{ *Resolver }

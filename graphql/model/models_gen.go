@@ -2127,6 +2127,21 @@ type SocialQueries struct {
 
 func (SocialQueries) IsSocialQueriesOrError() {}
 
+type SomeoneAdmiredYourCommentNotification struct {
+	HelperSomeoneAdmiredYourCommentNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Comment      *Comment                          `json:"comment"`
+	Admirers     *GroupNotificationUsersConnection `json:"admirers"`
+}
+
+func (SomeoneAdmiredYourCommentNotification) IsNotification()        {}
+func (SomeoneAdmiredYourCommentNotification) IsNode()                {}
+func (SomeoneAdmiredYourCommentNotification) IsGroupedNotification() {}
+
 type SomeoneAdmiredYourFeedEventNotification struct {
 	HelperSomeoneAdmiredYourFeedEventNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`

@@ -960,16 +960,19 @@ func (api InteractionAPI) AdmireComment(ctx context.Context, commentID persist.D
 	}
 
 	// Admire did not exist before, so dispatch event
-	if admireID == params.ID {
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			ResourceTypeID: persist.ResourceTypeAdmire,
-			SubjectID:      commentID,
-			CommentID:      commentID,
-			AdmireID:       admireID,
-			Action:         persist.ActionAdmiredComment,
-		})
+	// XXX if admireID == params.ID {
+	err = event.Dispatch(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(userID),
+		ResourceTypeID: persist.ResourceTypeAdmire,
+		SubjectID:      commentID,
+		CommentID:      commentID,
+		AdmireID:       admireID,
+		Action:         persist.ActionAdmiredComment,
+	})
+	if err != nil {
+		panic(err)
 	}
+	// XXX }
 
 	return admireID, err
 }

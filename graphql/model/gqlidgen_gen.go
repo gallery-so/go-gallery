@@ -80,6 +80,10 @@ func (r *SocialConnection) ID() GqlID {
 	return GqlID(fmt.Sprintf("SocialConnection:%s:%s", r.SocialID, r.SocialType))
 }
 
+func (r *SomeoneAdmiredYourCommentNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneAdmiredYourCommentNotification:%s", r.Dbid))
+}
+
 func (r *SomeoneAdmiredYourFeedEventNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneAdmiredYourFeedEventNotification:%s", r.Dbid))
 }
@@ -177,6 +181,7 @@ type NodeFetcher struct {
 	OnNewTokensNotification                            func(ctx context.Context, dbid persist.DBID) (*NewTokensNotification, error)
 	OnPost                                             func(ctx context.Context, dbid persist.DBID) (*Post, error)
 	OnSocialConnection                                 func(ctx context.Context, socialId string, socialType persist.SocialProvider) (*SocialConnection, error)
+	OnSomeoneAdmiredYourCommentNotification            func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourCommentNotification, error)
 	OnSomeoneAdmiredYourFeedEventNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourFeedEventNotification, error)
 	OnSomeoneAdmiredYourPostNotification               func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourPostNotification, error)
 	OnSomeoneAdmiredYourTokenNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourTokenNotification, error)
@@ -282,6 +287,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SocialConnection' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnSocialConnection(ctx, string(ids[0]), persist.SocialProvider(ids[1]))
+	case "SomeoneAdmiredYourCommentNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneAdmiredYourCommentNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneAdmiredYourCommentNotification(ctx, persist.DBID(ids[0]))
 	case "SomeoneAdmiredYourFeedEventNotification":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneAdmiredYourFeedEventNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -409,6 +419,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnPost")
 	case n.OnSocialConnection == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSocialConnection")
+	case n.OnSomeoneAdmiredYourCommentNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneAdmiredYourCommentNotification")
 	case n.OnSomeoneAdmiredYourFeedEventNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneAdmiredYourFeedEventNotification")
 	case n.OnSomeoneAdmiredYourPostNotification == nil:
