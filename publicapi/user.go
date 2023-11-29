@@ -1290,9 +1290,10 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		if ok {
 			l.Bio = bio
 		}
-		signtatureApproved, ok := social.Metadata["signature_approved"].(bool)
-		if ok {
-			l.SignatureApproved = signtatureApproved
+		signtatureApproved, sok := social.Metadata["signature_approved"].(bool)
+		dispatcherEnabled, dok := social.Metadata["dispatcher_enabled"].(bool)
+		if sok && dok {
+			l.WriteApproved = signtatureApproved && dispatcherEnabled
 		}
 		result.Lens = l
 	default:

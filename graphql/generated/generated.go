@@ -65,6 +65,7 @@ type ResolverRoot interface {
 	GalleryInfoUpdatedFeedEventData() GalleryInfoUpdatedFeedEventDataResolver
 	GalleryUpdatedFeedEventData() GalleryUpdatedFeedEventDataResolver
 	GalleryUser() GalleryUserResolver
+	LensSocialAccount() LensSocialAccountResolver
 	Mention() MentionResolver
 	Mutation() MutationResolver
 	NewTokensNotification() NewTokensNotificationResolver
@@ -777,15 +778,21 @@ type ComplexityRoot struct {
 		PreviewURLs      func(childComplexity int) int
 	}
 
+	LensSignables struct {
+		Challenge           func(childComplexity int) int
+		DispatcherTypedData func(childComplexity int) int
+	}
+
 	LensSocialAccount struct {
-		Bio               func(childComplexity int) int
-		Display           func(childComplexity int) int
-		Name              func(childComplexity int) int
-		ProfileImageURL   func(childComplexity int) int
-		SignatureApproved func(childComplexity int) int
-		SocialID          func(childComplexity int) int
-		Type              func(childComplexity int) int
-		Username          func(childComplexity int) int
+		Bio             func(childComplexity int) int
+		Display         func(childComplexity int) int
+		Name            func(childComplexity int) int
+		ProfileImageURL func(childComplexity int) int
+		Signables       func(childComplexity int, signingAddress persist.Address) int
+		SocialID        func(childComplexity int) int
+		Type            func(childComplexity int) int
+		Username        func(childComplexity int) int
+		WriteApproved   func(childComplexity int) int
 	}
 
 	LoginPayload struct {
@@ -1870,6 +1877,9 @@ type GalleryUserResolver interface {
 	SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error)
+}
+type LensSocialAccountResolver interface {
+	Signables(ctx context.Context, obj *model.LensSocialAccount, signingAddress persist.Address) (*model.LensSignables, error)
 }
 type MentionResolver interface {
 	Entity(ctx context.Context, obj *model.Mention) (model.MentionEntity, error)
@@ -4610,6 +4620,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.JsonMedia.PreviewURLs(childComplexity), true
 
+	case "LensSignables.challenge":
+		if e.complexity.LensSignables.Challenge == nil {
+			break
+		}
+
+		return e.complexity.LensSignables.Challenge(childComplexity), true
+
+	case "LensSignables.dispatcherTypedData":
+		if e.complexity.LensSignables.DispatcherTypedData == nil {
+			break
+		}
+
+		return e.complexity.LensSignables.DispatcherTypedData(childComplexity), true
+
 	case "LensSocialAccount.bio":
 		if e.complexity.LensSocialAccount.Bio == nil {
 			break
@@ -4638,12 +4662,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.LensSocialAccount.ProfileImageURL(childComplexity), true
 
-	case "LensSocialAccount.signatureApproved":
-		if e.complexity.LensSocialAccount.SignatureApproved == nil {
+	case "LensSocialAccount.signables":
+		if e.complexity.LensSocialAccount.Signables == nil {
 			break
 		}
 
-		return e.complexity.LensSocialAccount.SignatureApproved(childComplexity), true
+		args, err := ec.field_LensSocialAccount_signables_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.LensSocialAccount.Signables(childComplexity, args["signingAddress"].(persist.Address)), true
 
 	case "LensSocialAccount.social_id":
 		if e.complexity.LensSocialAccount.SocialID == nil {
@@ -4665,6 +4694,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.LensSocialAccount.Username(childComplexity), true
+
+	case "LensSocialAccount.writeApproved":
+		if e.complexity.LensSocialAccount.WriteApproved == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.WriteApproved(childComplexity), true
 
 	case "LoginPayload.userId":
 		if e.complexity.LoginPayload.UserID == nil {
@@ -9879,6 +9915,11 @@ type FarcasterSocialAccount implements SocialAccount {
   signerStatus: String
 }
 
+type LensSignables {
+  challenge: String!
+  dispatcherTypedData: String
+}
+
 type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
@@ -9887,7 +9928,14 @@ type LensSocialAccount implements SocialAccount {
   profileImageURL: String!
   bio: String!
   display: Boolean!
-  signatureApproved: Boolean!
+  """
+  writeApproved represents whether they have signed a message that we verified with the Lens API to generate an access to token and refresh token for the Lens API
+  """
+  writeApproved: Boolean!
+  """
+  signables represents the typed data and challenge that the user needs to sign if they want to enable the dispatcher and approve us to write on their behalf
+  """
+  signables(signingAddress: Address!): LensSignables! @goField(forceResolver: true)
 }
 
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
@@ -11012,9 +11060,14 @@ input FarcasterAuth {
 input LensAuth {
   address: Address!
   """
-  signature is the signed challenge provided by a GQL request to the lens endpoint
+  writeSignature is the signed challenge provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
   """
-  signature: String @scrub
+  writeSignature: String @scrub
+  """
+  dispatcherSignature is the signed typed data provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+  """
+  dispatcherSignature: String @scrub
+
   # lens only supports ETH addresses currently so no need to specify a chain
 }
 
@@ -11846,6 +11899,7 @@ input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
   mentions: [MentionInput!]
+  crossPosts: [SocialAccountType!]
 }
 
 type PostTokensPayload {
@@ -12911,6 +12965,21 @@ func (ec *executionContext) field_GalleryUser_tokens_args(ctx context.Context, r
 		}
 	}
 	args["ownershipFilter"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_LensSocialAccount_signables_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.Address
+	if tmp, ok := rawArgs["signingAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signingAddress"))
+		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["signingAddress"] = arg0
 	return args, nil
 }
 
@@ -32871,6 +32940,91 @@ func (ec *executionContext) fieldContext_JsonMedia_fallbackMedia(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _LensSignables_challenge(ctx context.Context, field graphql.CollectedField, obj *model.LensSignables) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSignables_challenge(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Challenge, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSignables_challenge(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSignables",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSignables_dispatcherTypedData(ctx context.Context, field graphql.CollectedField, obj *model.LensSignables) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSignables_dispatcherTypedData(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DispatcherTypedData, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSignables_dispatcherTypedData(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSignables",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _LensSocialAccount_type(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_LensSocialAccount_type(ctx, field)
 	if err != nil {
@@ -33179,8 +33333,8 @@ func (ec *executionContext) fieldContext_LensSocialAccount_display(ctx context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _LensSocialAccount_signatureApproved(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_LensSocialAccount_signatureApproved(ctx, field)
+func (ec *executionContext) _LensSocialAccount_writeApproved(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_writeApproved(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -33193,7 +33347,7 @@ func (ec *executionContext) _LensSocialAccount_signatureApproved(ctx context.Con
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.SignatureApproved, nil
+		return obj.WriteApproved, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -33210,7 +33364,7 @@ func (ec *executionContext) _LensSocialAccount_signatureApproved(ctx context.Con
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_LensSocialAccount_signatureApproved(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_LensSocialAccount_writeApproved(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "LensSocialAccount",
 		Field:      field,
@@ -33219,6 +33373,67 @@ func (ec *executionContext) fieldContext_LensSocialAccount_signatureApproved(ctx
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_signables(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_signables(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.LensSocialAccount().Signables(rctx, obj, fc.Args["signingAddress"].(persist.Address))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.LensSignables)
+	fc.Result = res
+	return ec.marshalNLensSignables2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensSignables(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_signables(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "challenge":
+				return ec.fieldContext_LensSignables_challenge(ctx, field)
+			case "dispatcherTypedData":
+				return ec.fieldContext_LensSignables_dispatcherTypedData(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type LensSignables", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_LensSocialAccount_signables_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -47270,8 +47485,10 @@ func (ec *executionContext) fieldContext_SocialAccounts_lens(ctx context.Context
 				return ec.fieldContext_LensSocialAccount_bio(ctx, field)
 			case "display":
 				return ec.fieldContext_LensSocialAccount_display(ctx, field)
-			case "signatureApproved":
-				return ec.fieldContext_LensSocialAccount_signatureApproved(ctx, field)
+			case "writeApproved":
+				return ec.fieldContext_LensSocialAccount_writeApproved(ctx, field)
+			case "signables":
+				return ec.fieldContext_LensSocialAccount_signables(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type LensSocialAccount", field.Name)
 		},
@@ -65201,7 +65418,7 @@ func (ec *executionContext) unmarshalInputLensAuth(ctx context.Context, obj inte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address", "signature"}
+	fieldsInOrder := [...]string{"address", "writeSignature", "dispatcherSignature"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -65217,15 +65434,24 @@ func (ec *executionContext) unmarshalInputLensAuth(ctx context.Context, obj inte
 				return it, err
 			}
 			it.Address = data
-		case "signature":
+		case "writeSignature":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("writeSignature"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Signature = data
+			it.WriteSignature = data
+		case "dispatcherSignature":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("dispatcherSignature"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DispatcherSignature = data
 		}
 	}
 
@@ -65505,7 +65731,7 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokenIds", "caption", "mentions"}
+	fieldsInOrder := [...]string{"tokenIds", "caption", "mentions", "crossPosts"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -65539,6 +65765,15 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 				return it, err
 			}
 			it.Mentions = data
+		case "crossPosts":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("crossPosts"))
+			data, err := ec.unmarshalOSocialAccountType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProviderᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CrossPosts = data
 		}
 	}
 
@@ -76114,6 +76349,38 @@ func (ec *executionContext) _JsonMedia(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var lensSignablesImplementors = []string{"LensSignables"}
+
+func (ec *executionContext) _LensSignables(ctx context.Context, sel ast.SelectionSet, obj *model.LensSignables) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, lensSignablesImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LensSignables")
+		case "challenge":
+
+			out.Values[i] = ec._LensSignables_challenge(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dispatcherTypedData":
+
+			out.Values[i] = ec._LensSignables_dispatcherTypedData(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var lensSocialAccountImplementors = []string{"LensSocialAccount", "SocialAccount"}
 
 func (ec *executionContext) _LensSocialAccount(ctx context.Context, sel ast.SelectionSet, obj *model.LensSocialAccount) graphql.Marshaler {
@@ -76129,57 +76396,77 @@ func (ec *executionContext) _LensSocialAccount(ctx context.Context, sel ast.Sele
 			out.Values[i] = ec._LensSocialAccount_type(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "social_id":
 
 			out.Values[i] = ec._LensSocialAccount_social_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "name":
 
 			out.Values[i] = ec._LensSocialAccount_name(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "username":
 
 			out.Values[i] = ec._LensSocialAccount_username(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "profileImageURL":
 
 			out.Values[i] = ec._LensSocialAccount_profileImageURL(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "bio":
 
 			out.Values[i] = ec._LensSocialAccount_bio(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "display":
 
 			out.Values[i] = ec._LensSocialAccount_display(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
-		case "signatureApproved":
+		case "writeApproved":
 
-			out.Values[i] = ec._LensSocialAccount_signatureApproved(ctx, field, obj)
+			out.Values[i] = ec._LensSocialAccount_writeApproved(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
+		case "signables":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._LensSocialAccount_signables(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -83958,6 +84245,20 @@ func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.S
 	return ret
 }
 
+func (ec *executionContext) marshalNLensSignables2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensSignables(ctx context.Context, sel ast.SelectionSet, v model.LensSignables) graphql.Marshaler {
+	return ec._LensSignables(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNLensSignables2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensSignables(ctx context.Context, sel ast.SelectionSet, v *model.LensSignables) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._LensSignables(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNMentionInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInput(ctx context.Context, v interface{}) (*model.MentionInput, error) {
 	res, err := ec.unmarshalInputMentionInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
@@ -87694,6 +87995,73 @@ func (ec *executionContext) marshalOSetSpamPreferencePayloadOrError2githubᚗcom
 		return graphql.Null
 	}
 	return ec._SetSpamPreferencePayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOSocialAccountType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProviderᚄ(ctx context.Context, v interface{}) ([]persist.SocialProvider, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.SocialProvider, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOSocialAccountType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProviderᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.SocialProvider) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOSocialAccounts2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialAccounts(ctx context.Context, sel ast.SelectionSet, v *model.SocialAccounts) graphql.Marshaler {

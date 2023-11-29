@@ -317,15 +317,20 @@ func (v *IntervalInput) GetLength() int { return v.Length }
 
 type LensAuth struct {
 	Address string `json:"address"`
-	// signature is the signed challenge provided by a GQL request to the lens endpoint
-	Signature *string `json:"signature"`
+	// writeSignature is the signed challenge provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+	WriteSignature *string `json:"writeSignature"`
+	// dispatcherSignature is the signed typed data provided by a GQL request to the lens challenge endpoint enabling us to act on the user's behalf
+	DispatcherSignature *string `json:"dispatcherSignature"`
 }
 
 // GetAddress returns LensAuth.Address, and is useful for accessing the field via an interface.
 func (v *LensAuth) GetAddress() string { return v.Address }
 
-// GetSignature returns LensAuth.Signature, and is useful for accessing the field via an interface.
-func (v *LensAuth) GetSignature() *string { return v.Signature }
+// GetWriteSignature returns LensAuth.WriteSignature, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetWriteSignature() *string { return v.WriteSignature }
+
+// GetDispatcherSignature returns LensAuth.DispatcherSignature, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetDispatcherSignature() *string { return v.DispatcherSignature }
 
 type MagicLinkAuth struct {
 	Token string `json:"token"`
@@ -370,9 +375,10 @@ type OneTimeLoginTokenAuth struct {
 func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 
 type PostTokensInput struct {
-	TokenIds []persist.DBID `json:"tokenIds"`
-	Caption  *string        `json:"caption"`
-	Mentions []MentionInput `json:"mentions"`
+	TokenIds   []persist.DBID      `json:"tokenIds"`
+	Caption    *string             `json:"caption"`
+	Mentions   []MentionInput      `json:"mentions"`
+	CrossPosts []SocialAccountType `json:"crossPosts"`
 }
 
 // GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
@@ -383,6 +389,9 @@ func (v *PostTokensInput) GetCaption() *string { return v.Caption }
 
 // GetMentions returns PostTokensInput.Mentions, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
+
+// GetCrossPosts returns PostTokensInput.CrossPosts, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetCrossPosts() []SocialAccountType { return v.CrossPosts }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`

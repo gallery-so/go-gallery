@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/lens"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -43,7 +44,7 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 
 	ney := farcaster.NewNeynarAPI(http.DefaultClient)
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
-	router.POST("/process/users", processUsers(queries, ney, lens.NewAPI(http.DefaultClient)))
+	router.POST("/process/users", processUsers(queries, ney, lens.NewAPI(http.DefaultClient, redis.NewCache(redis.SocialCache))))
 	router.POST("/checkFarcasterApproval", checkFarcasterApproval(queries, ney))
 	return router
 }

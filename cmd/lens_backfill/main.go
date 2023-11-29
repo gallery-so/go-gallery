@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/lens"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
@@ -25,7 +26,7 @@ func main() {
 
 	pg := postgres.NewPgxClient()
 
-	l := lens.NewAPI(&http.Client{Timeout: 10 * time.Second})
+	l := lens.NewAPI(&http.Client{Timeout: 10 * time.Second}, redis.NewCache(redis.SocialCache))
 
 	queries := coredb.New(pg)
 
