@@ -45,3 +45,13 @@ func (e ErrAdmireNotFoundByActorIDTokenID) Unwrap() error { return errAdmireNotF
 func (e ErrAdmireNotFoundByActorIDTokenID) Error() string {
 	return fmt.Sprintf("admire not found by actorID=%s; tokenID=%s", e.ActorID, e.TokenID)
 }
+
+type ErrAdmireNotFoundByActorIDCommentID struct {
+	ActorID   DBID
+	CommentID DBID
+}
+
+func (e ErrAdmireNotFoundByActorIDCommentID) Unwrap() error { return errAdmireNotFound }
+func (e ErrAdmireNotFoundByActorIDCommentID) Error() string {
+	return fmt.Sprintf("admire not found by actorID=%s; commentID=%s", e.ActorID, e.CommentID)
+}

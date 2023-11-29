@@ -813,6 +813,27 @@ func (api InteractionAPI) GetAdmireByActorIDAndTokenID(ctx context.Context, acto
 	return &admire, nil
 }
 
+func (api InteractionAPI) GetAdmireByActorIDAndCommentID(ctx context.Context, actorID persist.DBID, commentID persist.DBID) (*db.Admire, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"actorID":   validate.WithTag(actorID, "required"),
+		"commentID": validate.WithTag(commentID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	admire, err := api.loaders.GetAdmireByActorIDAndCommentID.Load(db.GetAdmireByActorIDAndCommentIDParams{
+		ActorID:   actorID,
+		CommentID: commentID,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &admire, nil
+}
+
 func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*db.Admire, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

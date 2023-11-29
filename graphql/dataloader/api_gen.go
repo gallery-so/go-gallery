@@ -23,6 +23,7 @@ type Loaders struct {
 	CountInteractionsByFeedEventIDBatch      *CountInteractionsByFeedEventIDBatch
 	CountInteractionsByPostIDBatch           *CountInteractionsByPostIDBatch
 	CountRepliesByCommentIDBatch             *CountRepliesByCommentIDBatch
+	GetAdmireByActorIDAndCommentID           *GetAdmireByActorIDAndCommentID
 	GetAdmireByActorIDAndFeedEventID         *GetAdmireByActorIDAndFeedEventID
 	GetAdmireByActorIDAndPostID              *GetAdmireByActorIDAndPostID
 	GetAdmireByActorIDAndTokenID             *GetAdmireByActorIDAndTokenID
@@ -94,6 +95,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.CountInteractionsByFeedEventIDBatch = newCountInteractionsByFeedEventIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountInteractionsByFeedEventIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountInteractionsByPostIDBatch = newCountInteractionsByPostIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountInteractionsByPostIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountRepliesByCommentIDBatch = newCountRepliesByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountRepliesByCommentIDBatch(q), preFetchHook, postFetchHook)
+	loaders.GetAdmireByActorIDAndCommentID = newGetAdmireByActorIDAndCommentID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetAdmireByActorIDAndCommentID(q), preFetchHook, postFetchHook)
 	loaders.GetAdmireByActorIDAndFeedEventID = newGetAdmireByActorIDAndFeedEventID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetAdmireByActorIDAndFeedEventID(q), preFetchHook, postFetchHook)
 	loaders.GetAdmireByActorIDAndPostID = newGetAdmireByActorIDAndPostID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetAdmireByActorIDAndPostID(q), preFetchHook, postFetchHook)
 	loaders.GetAdmireByActorIDAndTokenID = newGetAdmireByActorIDAndTokenID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetAdmireByActorIDAndTokenID(q), preFetchHook, postFetchHook)
@@ -152,6 +154,9 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetContractCreatorsByIds = newGetContractCreatorsByIds(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractCreatorsByIds(q), preFetchHook, postFetchHook)
 	loaders.GetContractsByIDs = newGetContractsByIDs(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractsByIDs(q), preFetchHook, postFetchHook)
 
+	loaders.GetAdmireByActorIDAndCommentID.RegisterResultSubscriber(func(result coredb.Admire) {
+		loaders.GetAdmireByAdmireIDBatch.Prime(loaders.GetAdmireByAdmireIDBatch.getKeyForResult(result), result)
+	})
 	loaders.GetAdmireByActorIDAndFeedEventID.RegisterResultSubscriber(func(result coredb.Admire) {
 		loaders.GetAdmireByAdmireIDBatch.Prime(loaders.GetAdmireByAdmireIDBatch.getKeyForResult(result), result)
 	})
@@ -566,6 +571,25 @@ func loadCountRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context, *
 		defer b.Close()
 
 		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetAdmireByActorIDAndCommentID(q *coredb.Queries) func(context.Context, *GetAdmireByActorIDAndCommentID, []coredb.GetAdmireByActorIDAndCommentIDParams) ([]coredb.Admire, []error) {
+	return func(ctx context.Context, d *GetAdmireByActorIDAndCommentID, params []coredb.GetAdmireByActorIDAndCommentIDParams) ([]coredb.Admire, []error) {
+		results := make([]coredb.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetAdmireByActorIDAndCommentID(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Admire, err error) {
 			results[i], errors[i] = r, err
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = d.getNotFoundError(params[i])

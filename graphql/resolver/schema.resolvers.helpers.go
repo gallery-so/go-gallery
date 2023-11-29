@@ -1835,24 +1835,21 @@ func usersToEdges(ctx context.Context, users []db.User) []*model.UserEdge {
 
 // admireToModel converts a db.Admire to a model.Admire
 func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
-
-	var postID, feedEventID *persist.DBID
-	if admire.PostID != "" {
-		postID = &admire.PostID
+	var data model.HelperAdmireData
+	switch postID, feedEventID, commentID := admire.PostID, admire.FeedEventID, admire.CommentID; {
+	case postID != "":
+		data.PostID = &postID
+	case feedEventID != "":
+		data.FeedEventID = &feedEventID
+	case commentID != "":
+		data.CommentID = &commentID
 	}
-	if admire.FeedEventID != "" {
-		feedEventID = &admire.FeedEventID
-	}
-
 	return &model.Admire{
-		HelperAdmireData: model.HelperAdmireData{
-			PostID:      postID,
-			FeedEventID: feedEventID,
-		},
-		Dbid:         admire.ID,
-		CreationTime: &admire.CreatedAt,
-		LastUpdated:  &admire.LastUpdated,
-		Admirer:      &model.GalleryUser{Dbid: admire.ActorID}, // remaining fields handled by dedicated resolver
+		HelperAdmireData: data,
+		Dbid:             admire.ID,
+		CreationTime:     &admire.CreatedAt,
+		LastUpdated:      &admire.LastUpdated,
+		Admirer:          &model.GalleryUser{Dbid: admire.ActorID}, // remaining fields handled by dedicated resolver
 	}
 }
 

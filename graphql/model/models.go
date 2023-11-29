@@ -73,6 +73,7 @@ type HelperMentionData struct {
 type HelperAdmireData struct {
 	PostID      *persist.DBID
 	FeedEventID *persist.DBID
+	CommentID   *persist.DBID
 }
 
 type HelperNotificationSettingsData struct {

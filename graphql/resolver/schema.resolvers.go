@@ -33,12 +33,14 @@ func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model
 // Source is the resolver for the source field.
 func (r *admireResolver) Source(ctx context.Context, obj *model.Admire) (model.AdmireSource, error) {
 	if obj.PostID != nil {
-		return resolvePostByPostID(ctx, *obj.PostID)
+		return resolvePostByPostID(ctx, *obj.HelperAdmireData.PostID)
 	}
 	if obj.FeedEventID != nil {
-		return resolveFeedEventByEventID(ctx, *obj.FeedEventID)
+		return resolveFeedEventByEventID(ctx, *obj.HelperAdmireData.FeedEventID)
 	}
-
+	if obj.CommentID != nil {
+		return resolveCommentByCommentID(ctx, *obj.HelperAdmireData.CommentID)
+	}
 	return nil, fmt.Errorf("admire source not found")
 }
 
@@ -229,6 +231,27 @@ func (r *commentResolver) Source(ctx context.Context, obj *model.Comment) (model
 	}
 
 	return nil, fmt.Errorf("comment has no source")
+}
+
+// ViewerAdmire is the resolver for the viewerAdmire field.
+func (r *commentResolver) ViewerAdmire(ctx context.Context, obj *model.Comment) (*model.Admire, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+
+	admire, err := api.Interaction.GetAdmireByActorIDAndCommentID(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting the admire fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns an admire (if it can find one) or nil.
+		return nil, nil
+	}
+
+	return admireToModel(ctx, *admire), nil
 }
 
 // Admires is the resolver for the admires field.

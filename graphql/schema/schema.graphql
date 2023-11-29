@@ -849,7 +849,7 @@ union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | Err
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
-union AdmireSource = Post | FeedEvent
+union AdmireSource = Post | FeedEvent | Comment
 
 type Admire implements Node @goEmbedHelper {
   id: ID!
@@ -877,6 +877,7 @@ type Comment implements Node @goEmbedHelper {
 
   # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
   deleted: Boolean
+  viewerAdmire: Admire @goField(forceResolver: true)
   admires(before: String, after: String, first: Int, last: Int): CommentAdmiresConnection
     @goField(forceResolver: true)
 }

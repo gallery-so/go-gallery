@@ -295,6 +295,7 @@ type ComplexityRoot struct {
 		Replies      func(childComplexity int, before *string, after *string, first *int, last *int) int
 		ReplyTo      func(childComplexity int) int
 		Source       func(childComplexity int) int
+		ViewerAdmire func(childComplexity int) int
 	}
 
 	CommentAdmireEdge struct {
@@ -1784,6 +1785,7 @@ type CommentResolver interface {
 	Replies(ctx context.Context, obj *model.Comment, before *string, after *string, first *int, last *int) (*model.CommentsConnection, error)
 	Source(ctx context.Context, obj *model.Comment) (model.CommentSource, error)
 
+	ViewerAdmire(ctx context.Context, obj *model.Comment) (*model.Admire, error)
 	Admires(ctx context.Context, obj *model.Comment, before *string, after *string, first *int, last *int) (*model.CommentAdmiresConnection, error)
 }
 type CommentOnFeedEventPayloadResolver interface {
@@ -2867,6 +2869,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Comment.Source(childComplexity), true
+
+	case "Comment.viewerAdmire":
+		if e.complexity.Comment.ViewerAdmire == nil {
+			break
+		}
+
+		return e.complexity.Comment.ViewerAdmire(childComplexity), true
 
 	case "CommentAdmireEdge.cursor":
 		if e.complexity.CommentAdmireEdge.Cursor == nil {
@@ -9994,7 +10003,7 @@ union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | Err
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
-union AdmireSource = Post | FeedEvent
+union AdmireSource = Post | FeedEvent | Comment
 
 type Admire implements Node @goEmbedHelper {
   id: ID!
@@ -10022,6 +10031,7 @@ type Comment implements Node @goEmbedHelper {
 
   # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
   deleted: Boolean
+  viewerAdmire: Admire @goField(forceResolver: true)
   admires(before: String, after: String, first: Int, last: Int): CommentAdmiresConnection
     @goField(forceResolver: true)
 }
@@ -16296,6 +16306,8 @@ func (ec *executionContext) fieldContext_AdmireCommentPayload_comment(ctx contex
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -20483,6 +20495,8 @@ func (ec *executionContext) fieldContext_Comment_replyTo(ctx context.Context, fi
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -20809,6 +20823,61 @@ func (ec *executionContext) fieldContext_Comment_deleted(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Comment_viewerAdmire(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Comment_viewerAdmire(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Comment().ViewerAdmire(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Comment_viewerAdmire(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Admire_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Admire_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Admire_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Admire_lastUpdated(ctx, field)
+			case "admirer":
+				return ec.fieldContext_Admire_admirer(ctx, field)
+			case "source":
+				return ec.fieldContext_Admire_source(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Comment_admires(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_admires(ctx, field)
 	if err != nil {
@@ -21123,6 +21192,8 @@ func (ec *executionContext) fieldContext_CommentEdge_node(ctx context.Context, f
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -21294,6 +21365,8 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_comment(ctx c
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -21361,6 +21434,8 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_replyToCommen
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -21617,6 +21692,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_comment(ctx contex
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -21684,6 +21761,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_replyToComment(ctx
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -27477,6 +27556,8 @@ func (ec *executionContext) fieldContext_FeedEventCommentEdge_node(ctx context.C
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -42319,6 +42400,8 @@ func (ec *executionContext) fieldContext_PostCommentEdge_node(ctx context.Contex
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -48112,6 +48195,8 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourCommentNotification_c
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -49607,6 +49692,8 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourFeedEventNotifica
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -49946,6 +50033,8 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -51855,6 +51944,8 @@ func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -51922,6 +52013,8 @@ func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification
 				return ec.fieldContext_Comment_source(ctx, field)
 			case "deleted":
 				return ec.fieldContext_Comment_deleted(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Comment_viewerAdmire(ctx, field)
 			case "admires":
 				return ec.fieldContext_Comment_admires(ctx, field)
 			}
@@ -66974,6 +67067,13 @@ func (ec *executionContext) _AdmireSource(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._FeedEvent(ctx, sel, obj)
+	case model.Comment:
+		return ec._Comment(ctx, sel, &obj)
+	case *model.Comment:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Comment(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -72284,7 +72384,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData(ctx context
 	return out
 }
 
-var commentImplementors = []string{"Comment", "Node", "Interaction", "MentionSource"}
+var commentImplementors = []string{"Comment", "AdmireSource", "Node", "Interaction", "MentionSource"}
 
 func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *model.Comment) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, commentImplementors)
@@ -72409,6 +72509,23 @@ func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, 
 
 			out.Values[i] = ec._Comment_deleted(ctx, field, obj)
 
+		case "viewerAdmire":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Comment_viewerAdmire(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "admires":
 			field := field
 

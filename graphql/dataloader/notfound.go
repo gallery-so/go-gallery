@@ -46,6 +46,10 @@ func (*GetAdmireByActorIDAndTokenID) getNotFoundError(key coredb.GetAdmireByActo
 	return persist.ErrAdmireNotFoundByActorIDTokenID{ActorID: key.ActorID, TokenID: key.TokenID}
 }
 
+func (*GetAdmireByActorIDAndCommentID) getNotFoundError(key coredb.GetAdmireByActorIDAndCommentIDParams) error {
+	return persist.ErrAdmireNotFoundByActorIDCommentID{ActorID: key.ActorID, CommentID: key.CommentID}
+}
+
 func (*GetAdmireByAdmireIDBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrAdmireNotFoundByID{ID: key}
 }

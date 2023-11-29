@@ -730,9 +730,11 @@ type Comment struct {
 	Replies      *CommentsConnection       `json:"replies"`
 	Source       CommentSource             `json:"source"`
 	Deleted      *bool                     `json:"deleted"`
+	ViewerAdmire *Admire                   `json:"viewerAdmire"`
 	Admires      *CommentAdmiresConnection `json:"admires"`
 }
 
+func (Comment) IsAdmireSource()  {}
 func (Comment) IsNode()          {}
 func (Comment) IsInteraction()   {}
 func (Comment) IsMentionSource() {}

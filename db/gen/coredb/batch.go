@@ -490,6 +490,68 @@ func (b *CountRepliesByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getAdmireByActorIDAndCommentID = `-- name: GetAdmireByActorIDAndCommentID :batchone
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND comment_id = $2 AND deleted = false
+`
+
+type GetAdmireByActorIDAndCommentIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetAdmireByActorIDAndCommentIDParams struct {
+	ActorID   persist.DBID `db:"actor_id" json:"actor_id"`
+	CommentID persist.DBID `db:"comment_id" json:"comment_id"`
+}
+
+func (q *Queries) GetAdmireByActorIDAndCommentID(ctx context.Context, arg []GetAdmireByActorIDAndCommentIDParams) *GetAdmireByActorIDAndCommentIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ActorID,
+			a.CommentID,
+		}
+		batch.Queue(getAdmireByActorIDAndCommentID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetAdmireByActorIDAndCommentIDBatchResults{br, len(arg), false}
+}
+
+func (b *GetAdmireByActorIDAndCommentIDBatchResults) QueryRow(f func(int, Admire, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Admire
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.PostID,
+			&i.TokenID,
+			&i.CommentID,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetAdmireByActorIDAndCommentIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getAdmireByActorIDAndFeedEventID = `-- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
 `
