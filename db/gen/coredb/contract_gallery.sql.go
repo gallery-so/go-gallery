@@ -31,7 +31,7 @@ do update set deleted = excluded.deleted
   , owner_address = excluded.owner_address
   , description = excluded.description
   , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain, mint_url
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain
 `
 
 type UpsertChildContractsParams struct {
@@ -85,7 +85,6 @@ func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContr
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
 			&i.L1Chain,
-			&i.MintUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -98,7 +97,7 @@ func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContr
 }
 
 const upsertParentContracts = `-- name: UpsertParentContracts :many
-insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, l1_chain, description, profile_image_url, is_provider_marked_spam, mint_url) (
+insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, l1_chain, description, profile_image_url, is_provider_marked_spam) (
   select unnest($1::varchar[])
     , false
     , unnest($2::int[])
@@ -112,7 +111,6 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest($9::varchar[])
     , unnest($10::varchar[])
     , unnest($11::bool[])
-    , unnest($12::varchar[])
 )
 on conflict (l1_chain, chain, address) where parent_id is null
 do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.symbol, ''))
@@ -120,17 +118,16 @@ do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.sy
   , name = coalesce(nullif(excluded.name, ''), nullif(contracts.name, ''))
   , owner_address =
       case
-          when nullif(contracts.owner_address, '') is null or ($13::bool and nullif (excluded.owner_address, '') is not null)
+          when nullif(contracts.owner_address, '') is null or ($12::bool and nullif (excluded.owner_address, '') is not null)
             then excluded.owner_address
           else
             contracts.owner_address
       end
   , description = coalesce(nullif(excluded.description, ''), nullif(contracts.description, ''))
   , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(contracts.profile_image_url, ''))
-  , mint_url = coalesce(nullif(excluded.mint_url, ''), nullif(contracts.mint_url, ''))
   , deleted = excluded.deleted
   , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain, mint_url
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain
 `
 
 type UpsertParentContractsParams struct {
@@ -145,7 +142,6 @@ type UpsertParentContractsParams struct {
 	Description              []string `db:"description" json:"description"`
 	ProfileImageUrl          []string `db:"profile_image_url" json:"profile_image_url"`
 	ProviderMarkedSpam       []bool   `db:"provider_marked_spam" json:"provider_marked_spam"`
-	MintUrl                  []string `db:"mint_url" json:"mint_url"`
 	CanOverwriteOwnerAddress bool     `db:"can_overwrite_owner_address" json:"can_overwrite_owner_address"`
 }
 
@@ -162,7 +158,6 @@ func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentCon
 		arg.Description,
 		arg.ProfileImageUrl,
 		arg.ProviderMarkedSpam,
-		arg.MintUrl,
 		arg.CanOverwriteOwnerAddress,
 	)
 	if err != nil {
@@ -192,7 +187,6 @@ func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentCon
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
 			&i.L1Chain,
-			&i.MintUrl,
 		); err != nil {
 			return nil, err
 		}

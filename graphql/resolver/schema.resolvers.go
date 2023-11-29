@@ -20,9 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -362,49 +360,6 @@ func (r *communityResolver) TmpPostsWithProjectID(ctx context.Context, obj *mode
 	}
 	connection := postsToConnection(ctx, posts, obj.Dbid, pageInfo)
 	return &connection, nil
-}
-
-// MintURL is the resolver for the mintURL field.
-func (r *contractResolver) MintURL(ctx context.Context, obj *model.Contract) (*string, error) {
-	c, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.Dbid)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.MintUrl.String != "" {
-		return &c.MintUrl.String, nil
-	}
-
-	var mintURL string
-
-	if c.Address != "" && !c.IsProviderMarkedSpam {
-		if c.Chain == persist.ChainZora {
-			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", c.Address)
-		} else if c.Chain == persist.ChainBase {
-			mintURL = fmt.Sprintf("https://mint.fun/base/%s", c.Address)
-		} else if c.Chain == persist.ChainOptimism {
-			mintURL = fmt.Sprintf("https://mint.fun/op/%s", c.Address)
-		} else if c.Chain == persist.ChainETH {
-			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", c.Address)
-		} else if c.Chain == persist.ChainTezos {
-			contract, err := tezos.GetContractByAddress(ctx, c.Address)
-			if err != nil {
-				logger.For(ctx).Errorf("failed to get tezos mint URL for contractID=%s: %s", c.ID, err)
-				sentryutil.ReportError(ctx, err)
-			}
-			mintURL = contract.Descriptors.MintURL
-		}
-		// Set the mint URL so we don't have to do this again
-		if mintURL != "" {
-			err := publicapi.For(ctx).Contract.SetMintURL(ctx, c.ID, mintURL)
-			if err != nil {
-				logger.For(ctx).Errorf("failed to set mint URL for contractID=%s: %s", c.ID, err)
-				sentryutil.ReportError(ctx, err)
-			}
-		}
-	}
-
-	return &mintURL, nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -3301,9 +3256,6 @@ func (r *Resolver) CommentOnPostPayload() generated.CommentOnPostPayloadResolver
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
 
-// Contract returns generated.ContractResolver implementation.
-func (r *Resolver) Contract() generated.ContractResolver { return &contractResolver{r} }
-
 // CreateCollectionPayload returns generated.CreateCollectionPayloadResolver implementation.
 func (r *Resolver) CreateCollectionPayload() generated.CreateCollectionPayloadResolver {
 	return &createCollectionPayloadResolver{r}
@@ -3526,7 +3478,6 @@ type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type commentOnPostPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
-type contractResolver struct{ *Resolver }
 type createCollectionPayloadResolver struct{ *Resolver }
 type ensProfileImageResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }

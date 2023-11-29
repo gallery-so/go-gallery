@@ -343,18 +343,6 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 	return posts, pageInfo, err
 }
 
-func (api ContractAPI) SetMintURL(ctx context.Context, contractID persist.DBID, mintURL string) error {
-	// Validate
-	err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": validate.WithTag(contractID, "required"),
-		"mintURL":    validate.WithTag(mintURL, "required,http"),
-	})
-	if err != nil {
-		return err
-	}
-	return api.queries.SetContractMintURL(ctx, db.SetContractMintURLParams{ID: contractID, MintUrl: mintURL})
-}
-
 // ------ Temporary ------
 func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Context, contractID persist.DBID, projectID int, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
 	// Validate

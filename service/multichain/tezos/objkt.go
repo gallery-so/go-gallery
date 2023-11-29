@@ -38,7 +38,6 @@ type contract struct {
 	Level           int
 	Type            tokenStandard
 	Logo            string
-	Path            string // Path describes the resource path to the collection on objkt
 }
 
 type token struct {
@@ -86,13 +85,6 @@ type tokensByContractQuery struct {
 
 type tokensByIdentifiersQuery struct {
 	Token []token `graphql:"token(where: {fa: {type: {_eq: fa2}}, fa_contract: {_eq: $contractAddress}, token_id: {_eq: $tokenID}, holders: {quantity: {_gt: 0}, holder: {address: {_eq: $ownerAddress}}}})"`
-}
-
-type contractQuery struct {
-	Fa []struct {
-		contract
-		Tokens []token `graphql:"tokens(limit: 1, offset: 0, distinct_on: token_id)"`
-	} `graphql:"fa(where: {contract: {_eq: $contractAddress}, type: {_eq: fa2}})"`
 }
 
 // Objkt's API has pretty strict usage limits (120 requests/minute, and 500 results per page)
@@ -195,7 +187,6 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 					Description:     node.Token.Fa.Description,
 					OwnerAddress:    node.Token.Fa.Creator_Address,
 					ProfileImageURL: node.Token.Fa.Logo,
-					MintURL:         mintURL(node.Token.Fa.Contract, node.Token.Fa.Path),
 				},
 
 				LatestBlock: persist.BlockNumber(node.Token.Fa.Level),
@@ -313,7 +304,6 @@ func (p *TezosObjktProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Cont
 			Name:         token.Fa.Name,
 			Description:  token.Fa.Description,
 			OwnerAddress: token.Fa.Creator_Address,
-			MintURL:      mintURL(token.Fa.Contract, token.Fa.Path),
 		},
 
 		LatestBlock: persist.BlockNumber(token.Fa.Level),
@@ -371,7 +361,6 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 			Name:         firstToken.Name,
 			Description:  firstToken.Description,
 			OwnerAddress: firstToken.Fa.Creator_Address,
-			MintURL:      mintURL(firstToken.Fa.Contract, firstToken.Fa.Path),
 		},
 
 		LatestBlock: persist.BlockNumber(firstToken.Fa.Level),
@@ -453,7 +442,6 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 			Name:         tokens[0].Fa.Name,
 			Description:  tokens[0].Fa.Description,
 			OwnerAddress: tokens[0].Fa.Creator_Address,
-			MintURL:      mintURL(tokens[0].Fa.Contract, tokens[0].Fa.Path),
 		},
 
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
@@ -537,7 +525,6 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 			Name:         tokens[0].Fa.Name,
 			Description:  tokens[0].Fa.Description,
 			OwnerAddress: tokens[0].Fa.Creator_Address,
-			MintURL:      mintURL(tokens[0].Fa.Contract, tokens[0].Fa.Path),
 		},
 
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
@@ -577,36 +564,6 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 	return returnTokens, agnosticContract, nil
 }
 
-func (p *TezosObjktProvider) GetContractByAddress(ctx context.Context, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
-	var q contractQuery
-	err := retry.RetryQuery(ctx, p.gql, &q, inputArgs{"contractAddress": graphql.String(contractAddress)})
-	if err != nil {
-		return multichain.ChainAgnosticContract{}, err
-	}
-	if len(q.Fa) == 0 {
-		return multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address %s", contractAddress)
-	}
-	if len(q.Fa[0].Tokens) == 0 {
-		return multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for address %s", contractAddress)
-	}
-	return multichain.ChainAgnosticContract{
-		Address: q.Fa[0].Contract,
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:          q.Fa[0].Tokens[0].Symbol,
-			Name:            q.Fa[0].Name,
-			Description:     q.Fa[0].Description,
-			OwnerAddress:    q.Fa[0].Creator_Address,
-			ProfileImageURL: q.Fa[0].Logo,
-			MintURL:         mintURL(contractAddress, q.Fa[0].Path),
-		},
-	}, nil
-}
-
-func GetContractByAddress(ctx context.Context, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
-	c := NewObjktProvider()
-	return c.GetContractByAddress(ctx, contractAddress)
-}
-
 func createMetadata(t token) persist.TokenMetadata {
 	metadata := persist.TokenMetadata{}
 	metadata["name"] = t.Name
@@ -620,12 +577,4 @@ func createMetadata(t token) persist.TokenMetadata {
 	metadata["thumbnailUri"] = t.Thumbnail_URI
 	metadata["isBooleanAmount"] = t.Is_Boolean_Amount
 	return metadata
-}
-
-func mintURL(contractAddress persist.Address, path string) string {
-	baseURL := "https://objkt.com/collection/"
-	if path != "" {
-		return baseURL + path
-	}
-	return baseURL + contractAddress.String()
 }

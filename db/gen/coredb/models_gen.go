@@ -83,7 +83,6 @@ type Contract struct {
 	ParentID              persist.DBID    `db:"parent_id" json:"parent_id"`
 	OverrideCreatorUserID persist.DBID    `db:"override_creator_user_id" json:"override_creator_user_id"`
 	L1Chain               persist.L1Chain `db:"l1_chain" json:"l1_chain"`
-	MintUrl               sql.NullString  `db:"mint_url" json:"mint_url"`
 }
 
 type ContractCreator struct {

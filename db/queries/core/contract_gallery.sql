@@ -1,5 +1,5 @@
 -- name: UpsertParentContracts :many
-insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, l1_chain, description, profile_image_url, is_provider_marked_spam, mint_url) (
+insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, l1_chain, description, profile_image_url, is_provider_marked_spam) (
   select unnest(@ids::varchar[])
     , false
     , unnest(@version::int[])
@@ -13,7 +13,6 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest(@description::varchar[])
     , unnest(@profile_image_url::varchar[])
     , unnest(@provider_marked_spam::bool[])
-    , unnest(@mint_url::varchar[])
 )
 on conflict (l1_chain, chain, address) where parent_id is null
 do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.symbol, ''))
@@ -28,7 +27,6 @@ do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.sy
       end
   , description = coalesce(nullif(excluded.description, ''), nullif(contracts.description, ''))
   , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(contracts.profile_image_url, ''))
-  , mint_url = coalesce(nullif(excluded.mint_url, ''), nullif(contracts.mint_url, ''))
   , deleted = excluded.deleted
   , last_updated = now()
 returning *;
