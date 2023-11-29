@@ -22,6 +22,7 @@ type Admire struct {
 	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
 	PostID      persist.DBID `db:"post_id" json:"post_id"`
 	TokenID     persist.DBID `db:"token_id" json:"token_id"`
+	CommentID   persist.DBID `db:"comment_id" json:"comment_id"`
 }
 
 type AlchemySpamContract struct {

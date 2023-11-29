@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"context"
 	"fmt"
 	"time"
 )
@@ -24,16 +23,16 @@ const (
 	MentionTypeCommunity MentionType = "community"
 )
 
-type CommentRepository interface {
-	// replyToID is optional
-	CreateComment(ctx context.Context, feedEventID DBID, actorID DBID, replyToID *DBID, comment string) (DBID, error)
-	RemoveComment(ctx context.Context, commentID DBID) error
-}
+var errCommentNotFound ErrCommentNotFound
 
-type ErrCommentNotFound struct {
-	ID DBID
-}
+type ErrCommentNotFound struct{}
 
-func (e ErrCommentNotFound) Error() string {
-	return fmt.Sprintf("comment not found by id: %s", e.ID)
+func (e ErrCommentNotFound) Unwrap() error { return notFoundError }
+func (e ErrCommentNotFound) Error() string { return "comment not found" }
+
+type ErrCommentNotFoundByID struct{ ID DBID }
+
+func (e ErrCommentNotFoundByID) Unwrap() error { return errCommentNotFound }
+func (e ErrCommentNotFoundByID) Error() string {
+	return fmt.Sprintf("comment not found by id=%s", e.ID)
 }

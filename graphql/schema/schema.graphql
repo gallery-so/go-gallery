@@ -850,7 +850,7 @@ union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | Err
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
-union AdmireSource = Post | FeedEvent
+union AdmireSource = Post | FeedEvent | Comment
 
 type Admire implements Node @goEmbedHelper {
   id: ID!
@@ -878,6 +878,19 @@ type Comment implements Node @goEmbedHelper {
 
   # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
   deleted: Boolean
+  viewerAdmire: Admire @goField(forceResolver: true)
+  admires(before: String, after: String, first: Int, last: Int): CommentAdmiresConnection
+    @goField(forceResolver: true)
+}
+
+type CommentAdmiresConnection {
+  edges: [CommentAdmireEdge]
+  pageInfo: PageInfo
+}
+
+type CommentAdmireEdge {
+  node: Admire
+  cursor: String
 }
 
 union MentionEntity = GalleryUser | Community
@@ -2075,6 +2088,20 @@ type SomeoneAdmiredYourTokenNotification implements Notification & Node & Groupe
     @goField(forceResolver: true)
 }
 
+type SomeoneAdmiredYourCommentNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  comment: Comment @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
+}
+
 type SomeoneCommentedOnYourPostNotification implements Notification & Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
@@ -2686,7 +2713,11 @@ type AdmirePostPayload {
   admire: Admire @goField(forceResolver: true)
 }
 
-union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
+union AdmirePostPayloadOrError =
+    AdmirePostPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrPostNotFound
 
 type AdmireTokenPayload {
   viewer: Viewer
@@ -2699,6 +2730,18 @@ union AdmireTokenPayloadOrError =
   | ErrTokenNotFound
   | ErrInvalidInput
   | ErrNotAuthorized
+
+union AdmireCommentPayloadOrError =
+    AdmireCommentPayload
+  | ErrCommentNotFound
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+type AdmireCommentPayload {
+  viewer: Viewer
+  comment: Comment @goField(forceResolver: true)
+  admire: Admire @goField(forceResolver: true)
+}
 
 type CommentOnPostPayload {
   viewer: Viewer
@@ -2848,6 +2891,7 @@ type Mutation {
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired
   admireToken(tokenId: DBID!): AdmireTokenPayloadOrError @authRequired
+  admireComment(commentId: DBID!): AdmireCommentPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(
     feedEventId: DBID!
