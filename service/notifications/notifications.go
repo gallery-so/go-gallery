@@ -332,7 +332,6 @@ type ownerGroupedNotificationHandler struct {
 func (h ownerGroupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	var curNotif db.Notification
 	// Bucket notifications on a specific resource if it has one
-	// We assume that only one field is set which may cause unexpected behavior if more than one is set
 	onlyForFeed := notif.FeedEventID != ""
 	onlyForPost := notif.PostID != ""
 	onlyForComment := notif.CommentID != ""
