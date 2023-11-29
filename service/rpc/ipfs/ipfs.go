@@ -28,14 +28,6 @@ func (r ErrInfuraQuotaExceeded) Error() string {
 	return fmt.Sprintf("quota exceeded: %s", r.Err.Error())
 }
 
-type Reader interface {
-	Do(ctx context.Context, path string) (io.ReadCloser, error)
-}
-
-type Header interface {
-	Head(ctx context.Context, path string) (http.Header, error)
-}
-
 // HTTPReader is a reader that uses a HTTP gateway to read from
 type HTTPReader struct {
 	Host   string
@@ -99,22 +91,22 @@ func NewShell() *shell.Shell {
 }
 
 // Node that uses Infura
-var nodeInfura = func(h *http.Client, s *shell.Shell) Reader {
+var nodeInfura = func(h *http.Client, s *shell.Shell) HTTPReader {
 	return HTTPReader{Host: env.GetString("IPFS_URL"), Client: h}
 }
 
 // Node that uses a self-hosted gateway
-var nodeGallery = func(h *http.Client, s *shell.Shell) Reader {
+var nodeGallery = func(h *http.Client, s *shell.Shell) HTTPReader {
 	return HTTPReader{Host: env.GetString("FALLBACK_IPFS_URL"), Client: h}
 }
 
 // Node that uses ipfs:// protocol
-var nodeIPFS = func(h *http.Client, s *shell.Shell) Reader {
+var nodeIPFS = func(h *http.Client, s *shell.Shell) IPFSReader {
 	return IPFSReader{Client: s}
 }
 
 // Node that uses a public gateway
-var nodePublic = func(h *http.Client, s *shell.Shell) Reader {
+var nodePublic = func(h *http.Client, s *shell.Shell) HTTPReader {
 	return HTTPReader{Host: "https://ipfs.io", Client: h}
 }
 
@@ -142,13 +134,13 @@ func GetHeader(ctx context.Context, path string) (http.Header, error) {
 	ipfsClient := NewShell()
 	return util.FirstNonErrorWithValue(ctx, true, nil,
 		func(ctx context.Context) (http.Header, error) {
-			return nodeInfura(httpClient, ipfsClient).(Header).Head(ctx, path)
+			return nodeInfura(httpClient, ipfsClient).Head(ctx, path)
 		},
 		func(ctx context.Context) (http.Header, error) {
-			return nodeGallery(httpClient, ipfsClient).(Header).Head(ctx, path)
+			return nodeGallery(httpClient, ipfsClient).Head(ctx, path)
 		},
 		func(ctx context.Context) (http.Header, error) {
-			return nodePublic(httpClient, ipfsClient).(Header).Head(ctx, path)
+			return nodePublic(httpClient, ipfsClient).Head(ctx, path)
 		},
 	)
 }
