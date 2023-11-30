@@ -202,6 +202,7 @@ type Provider struct {
 
 // NewProvider creates a new ethereum Provider
 func NewProvider(chain persist.Chain, httpClient *http.Client, cache *redis.Cache) *Provider {
+	// currently using v2 endpoints, alchemy recently added v3
 	var apiURL string
 	switch chain {
 	case persist.ChainETH:

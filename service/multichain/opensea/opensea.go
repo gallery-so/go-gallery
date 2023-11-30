@@ -251,6 +251,21 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	return tokens, contract, nil
 }
 
+// GetTokensIncrementallyByWalletAddress returns a list of tokens for a wallet address
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+
+	assetsChan := make(chan assetsReceieved)
+	go func() {
+		defer close(assetsChan)
+		streamAssetsForContract(ctx, persist.EthereumAddress(address), assetsChan)
+	}()
+
+	go streamAssetsToTokens(ctx, address, assetsChan, p.ethClient, p.chain, rec, errChan)
+	return rec, errChan
+}
+
 // GetTokensByContractAddressAndOwner returns a list of tokens for a contract address and owner
 func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)
@@ -793,6 +808,8 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 }
 
 func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client, chain persist.Chain, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+	defer close(rec)
+
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		errChan <- err

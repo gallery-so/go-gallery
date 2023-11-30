@@ -410,7 +410,7 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 		walletWg.Wait()
 	}()
 
-	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, chains, result, errChan)
+	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, false, chains, result, errChan)
 }
 
 // SyncCreatedTokensForNewContractsIncrementally processes a user's created tokens incrementally
@@ -453,8 +453,7 @@ func (p *Provider) SyncCreatedTokensForNewContractsIncrementally(ctx context.Con
 				for i, contractsFetcher := range contractFetchers {
 					contractsFetcher := contractsFetcher
 					i := i
-
-					logger.For(ctx).Infof("incrementally fetching created from provider %d (%T)", i, contractsFetcher)
+					logger.For(ctx).Infof("incrementally fetching created contracts from provider %d (%T)", i, contractsFetcher)
 
 					providerWg.Go(func() {
 
@@ -466,6 +465,7 @@ func (p *Provider) SyncCreatedTokensForNewContractsIncrementally(ctx context.Con
 							return
 						}
 						for _, tokensFetcher := range tokensFetchers {
+							logger.For(ctx).Infof("incrementally fetching created tokens from provider %d (%T)", i, tokensFetcher)
 							tokensFetcher := tokensFetcher
 							for _, contract := range contracts {
 								c := contract
@@ -480,7 +480,7 @@ func (p *Provider) SyncCreatedTokensForNewContractsIncrementally(ctx context.Con
 											}
 											result <- chainTokensAndContracts{
 												tokens:    chainTokens{chain: chain, tokens: tss.Tokens, priority: i},
-												contracts: chainContracts{chain: chain, contracts: tss.Contracts, priority: i},
+												contracts: chainContracts{chain: chain, contracts: contracts, priority: i},
 											}
 										case err := <-errs:
 											logger.For(ctx).Errorf("error while incrementally syncing created tokens for user %s: %s (provider: %d (%T))", user.Username, err, i, contractsFetcher)
@@ -505,7 +505,9 @@ func (p *Provider) SyncCreatedTokensForNewContractsIncrementally(ctx context.Con
 		walletWg.Wait()
 	}()
 
-	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, chains, result, errChan)
+	logger.For(ctx).Infof("waiting for results in receiver")
+
+	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, true, chains, result, errChan)
 }
 
 // SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
@@ -725,7 +727,7 @@ outer:
 	if replace {
 		_, newTokens, err = p.ReplaceHolderTokensForUser(ctx, user, tokensFromProviders, persistedContracts, chains, currentTokens)
 	} else {
-		_, newTokens, err = p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, chains, currentTokens)
+		_, newTokens, err = p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, currentTokens)
 	}
 	if err != nil {
 		return nil, err
@@ -734,7 +736,7 @@ outer:
 	return newTokens, nil
 }
 
-func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, user persist.User, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) error {
+func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, user persist.User, isCreator bool, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) error {
 
 	beginTime := time.Now()
 	errs := []error{}
@@ -759,7 +761,13 @@ outer:
 
 			totalTokensReceived += len(inc.tokens.tokens)
 
-			currentTokens, _, err = p.AddHolderTokensToUser(ctx, user, []chainTokens{inc.tokens}, currentContracts, chains, currentTokens)
+			if isCreator {
+				logger.For(ctx).Infof("incrementally adding %d created tokens for user %s", len(inc.tokens.tokens), user.Username)
+				currentTokens, _, err = p.AddCreatorTokensOfContractsForUser(ctx, user, []chainTokens{inc.tokens}, currentContracts, currentTokens)
+			} else {
+				logger.For(ctx).Infof("incrementally adding %d tokens for user %s", len(inc.tokens.tokens), user.Username)
+				currentTokens, _, err = p.AddHolderTokensToUser(ctx, user, []chainTokens{inc.tokens}, currentContracts, currentTokens)
+			}
 			if err != nil {
 				return err
 			}
@@ -773,10 +781,11 @@ outer:
 		return util.MultiErr(errs)
 	}
 
+	logger.For(ctx).Infof("incrementally synced %d tokens for user %s in %s", totalTokensReceived, user.Username, time.Since(beginTime))
 	// once we have all the tokens, remove any tokens that are no longer owned by the user
 	_, err = p.Queries.DeleteTokensBeforeTimestamp(ctx, db.DeleteTokensBeforeTimestampParams{
-		RemoveHolderStatus:  true,
-		RemoveCreatorStatus: false,
+		RemoveHolderStatus:  !isCreator,
+		RemoveCreatorStatus: isCreator,
 		OnlyFromUserID:      sql.NullString{String: user.ID.String(), Valid: true},
 		OnlyFromContractIds: util.MapWithoutError(currentContracts, func(c db.Contract) string { return c.ID.String() }),
 		OnlyFromChains:      util.MapWithoutError(chains, func(c persist.Chain) int32 { return int32(c) }),
@@ -1146,8 +1155,19 @@ func (p *Provider) ReplaceCreatorTokensOfContractsForUser(ctx context.Context, u
 	})
 }
 
+// AddCreatorTokensOfContractsForUser will update a user's creator tokens for the given contracts, adding new
+// tokens and removing creator status from tokens that the user is no longer the creator of. The removal step is
+// scoped to the provided contracts, and tokens from other contracts will be unaffected.
+func (p *Provider) AddCreatorTokensOfContractsForUser(ctx context.Context, user persist.User, tokensFromProviders []chainTokens, contracts []db.Contract, existingTokens []op.TokenFullDetails) (currentTokenState []op.TokenFullDetails, newTokens []op.TokenFullDetails, err error) {
+	return p.processTokensForUser(ctx, user, tokensFromProviders, contracts, existingTokens, op.TokenUpsertParams{
+		SetCreatorFields: true,
+		SetHolderFields:  false,
+		OptionalDelete:   nil,
+	})
+}
+
 // AddHolderTokensToUser will append to a user's existing holder tokens
-func (p *Provider) AddHolderTokensToUser(ctx context.Context, user persist.User, tokensFromProviders []chainTokens, contracts []db.Contract, chains []persist.Chain, existingTokens []op.TokenFullDetails) (currentTokenState []op.TokenFullDetails, newTokens []op.TokenFullDetails, err error) {
+func (p *Provider) AddHolderTokensToUser(ctx context.Context, user persist.User, tokensFromProviders []chainTokens, contracts []db.Contract, existingTokens []op.TokenFullDetails) (currentTokenState []op.TokenFullDetails, newTokens []op.TokenFullDetails, err error) {
 	return p.processTokensForUser(ctx, user, tokensFromProviders, contracts, existingTokens, op.TokenUpsertParams{
 		SetCreatorFields: false,
 		SetHolderFields:  true,
@@ -1306,7 +1326,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	allUserTokens, _, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, []persist.Chain{contractAddress.Chain()}, existingTokens)
+	allUserTokens, _, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, existingTokens)
 	if err != nil {
 		return nil, err
 	}
