@@ -413,8 +413,8 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, chains, result, errChan)
 }
 
-// SyncCreatedTokensForNewContractsIncrementallyByUserID processes a user's created tokens incrementally
-func (p *Provider) SyncCreatedTokensForNewContractsIncrementallyByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+// SyncCreatedTokensForNewContractsIncrementally processes a user's created tokens incrementally
+func (p *Provider) SyncCreatedTokensForNewContractsIncrementally(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"user_id": userID, "chains": chains})
 
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
