@@ -1156,8 +1156,7 @@ func (p *Provider) ReplaceCreatorTokensOfContractsForUser(ctx context.Context, u
 }
 
 // AddCreatorTokensOfContractsForUser will update a user's creator tokens for the given contracts, adding new
-// tokens and removing creator status from tokens that the user is no longer the creator of. The removal step is
-// scoped to the provided contracts, and tokens from other contracts will be unaffected.
+// tokens and leaving creator status on tokens that the user is no longer the creator of.
 func (p *Provider) AddCreatorTokensOfContractsForUser(ctx context.Context, user persist.User, tokensFromProviders []chainTokens, contracts []db.Contract, existingTokens []op.TokenFullDetails) (currentTokenState []op.TokenFullDetails, newTokens []op.TokenFullDetails, err error) {
 	return p.processTokensForUser(ctx, user, tokensFromProviders, contracts, existingTokens, op.TokenUpsertParams{
 		SetCreatorFields: true,
