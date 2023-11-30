@@ -180,6 +180,13 @@ type TokensIncrementalOwnerFetcher interface {
 	GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (rec <-chan ChainAgnosticTokensAndContracts, errChain <-chan error)
 }
 
+// TokensIncrementalContractFetcher supports fetching tokens by contract for syncing incrementally
+type TokensIncrementalContractFetcher interface {
+	// NOTE: implementations MUST close the rec channel
+	// maxLimit is not for pagination, it is to make sure we don't fetch a bajilion tokens from an omnibus contract
+	GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (rec <-chan ChainAgnosticTokensAndContracts, errChain <-chan error)
+}
+
 type TokensContractFetcher interface {
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
@@ -386,11 +393,106 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 								}
 
 							case err := <-errs:
-								logger.For(ctx).Errorf("error while syncing tokens for user %s: %s (provider: %d (%T))", user.Username, err, priority, fetcher)
+								logger.For(ctx).Errorf("error while incrementally syncing tokens for user %s: %s (provider: %d (%T))", user.Username, err, priority, fetcher)
 								errChan <- err
 								return
 							}
 						}
+					})
+				}
+				providerWg.Wait()
+			})
+		}
+	}
+
+	go func() {
+		defer close(result)
+		walletWg.Wait()
+	}()
+
+	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, chains, result, errChan)
+}
+
+// SyncCreatedTokensForNewContractsIncrementallyByUserID processes a user's created tokens incrementally
+func (p *Provider) SyncCreatedTokensForNewContractsIncrementallyByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"user_id": userID, "chains": chains})
+
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	errChan := make(chan error)
+	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
+
+	// Guard against removing user's tokens inadverdently
+	if len(chainsToAddresses) == 0 {
+		return nil
+	}
+
+	totalBuf := 0
+	for c := range chainsToAddresses {
+		totalBuf += len(matchingProvidersForChain[TokensIncrementalContractFetcher](p.Chains, c)) * len(matchingProvidersForChain[ContractsOwnerFetcher](p.Chains, c))
+	}
+
+	result := make(chan chainTokensAndContracts, totalBuf)
+
+	walletWg := &conc.WaitGroup{}
+	for c, a := range chainsToAddresses {
+		logger.For(ctx).Infof("incrementally syncing chain %d created tokens for user %s wallets %s", c, user.Username, a)
+		chain := c
+		addresses := a
+
+		for _, addr := range addresses {
+			addr := addr
+			chain := chain
+			walletWg.Go(func() {
+				providerWg := &conc.WaitGroup{}
+				contractFetchers := matchingProvidersForChain[ContractsOwnerFetcher](p.Chains, chain)
+				tokensFetchers := matchingProvidersForChain[TokensIncrementalContractFetcher](p.Chains, chain)
+				for i, contractsFetcher := range contractFetchers {
+					contractsFetcher := contractsFetcher
+					i := i
+
+					logger.For(ctx).Infof("incrementally fetching created from provider %d (%T)", i, contractsFetcher)
+
+					providerWg.Go(func() {
+
+						innerWg := &conc.WaitGroup{}
+						// we shouldn't need to fetch contracts incrementally, owned contracts are relatively infrequent
+						contracts, err := contractsFetcher.GetContractsByOwnerAddress(ctx, addr)
+						if err != nil {
+							errChan <- errWithPriority{err: err, priority: i}
+							return
+						}
+						for _, tokensFetcher := range tokensFetchers {
+							tokensFetcher := tokensFetcher
+							for _, contract := range contracts {
+								c := contract
+								innerWg.Go(func() {
+									incTokens, errs := tokensFetcher.GetTokensIncrementallyByContractAddress(ctx, c.Address, maxCommunitySize)
+								outer:
+									for {
+										select {
+										case tss, ok := <-incTokens:
+											if !ok {
+												break outer
+											}
+											result <- chainTokensAndContracts{
+												tokens:    chainTokens{chain: chain, tokens: tss.Tokens, priority: i},
+												contracts: chainContracts{chain: chain, contracts: tss.Contracts, priority: i},
+											}
+										case err := <-errs:
+											logger.For(ctx).Errorf("error while incrementally syncing created tokens for user %s: %s (provider: %d (%T))", user.Username, err, i, contractsFetcher)
+											errChan <- err
+											return
+										}
+									}
+								})
+							}
+						}
+
+						innerWg.Wait()
 					})
 				}
 				providerWg.Wait()
@@ -767,7 +869,7 @@ func (p *Provider) syncCreatedTokensForContract(ctx context.Context, user persis
 		fetcher := f
 
 		wg.Go(func() {
-			tokens, contract, err := fetcher.GetTokensByContractAddress(ctx, address, 0, 0)
+			tokens, contract, err := fetcher.GetTokensByContractAddress(ctx, address, maxCommunitySize, 0)
 			if err != nil {
 				errChan <- errWithPriority{err: err, priority: priority}
 				return

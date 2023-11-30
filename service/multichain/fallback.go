@@ -20,6 +20,7 @@ type SyncWithContractEvalPrimary interface {
 	Configurer
 	TokensOwnerFetcher
 	TokensIncrementalOwnerFetcher
+	TokensIncrementalContractFetcher
 	TokensContractFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
@@ -41,6 +42,7 @@ type SyncFailurePrimary interface {
 	Configurer
 	TokensOwnerFetcher
 	TokensIncrementalOwnerFetcher
+	TokensIncrementalContractFetcher
 	TokenDescriptorsFetcher
 	TokensContractFetcher
 	ContractsFetcher
@@ -66,6 +68,10 @@ func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx conte
 
 func (f SyncWithContractEvalFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
 	return getTokensIncrementallyByWalletAddressWithFallback(ctx, address, f.Primary, f.Fallback, f.resolveTokens, nil)
+}
+
+func (f SyncWithContractEvalFallbackProvider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
+	return f.Primary.GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
@@ -155,6 +161,10 @@ func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Contex
 
 func (f SyncFailureFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
 	return getTokensIncrementallyByWalletAddressWithFallback(ctx, address, f.Primary, f.Fallback, nil, nil)
+}
+
+func (f SyncFailureFallbackProvider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
+	return f.Primary.GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
 }
 
 func getTokensIncrementallyByWalletAddressWithFallback(ctx context.Context, address persist.Address, primary TokensIncrementalOwnerFetcher, fallback any, processTokens func(context.Context, []ChainAgnosticToken) []ChainAgnosticToken, processContracts func(context.Context, []ChainAgnosticContract) []ChainAgnosticContract) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {

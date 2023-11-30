@@ -221,6 +221,20 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 }
 
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	url := fmt.Sprintf("%s/tokens/ZORA-MAINNET/%s?&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, addr.String())
+	go func() {
+		_, _, err := d.getTokens(ctx, url, rec, true)
+		if err != nil {
+			errChan <- err
+			return
+		}
+	}()
+	return rec, errChan
+}
+
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tokens, contracts, err := d.GetTokensByWalletAddress(ctx, ownerAddress)
 	if err != nil {
@@ -293,6 +307,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	return result, nil
 }
 
+// TODO max limit
 func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := 50
