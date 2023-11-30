@@ -403,6 +403,7 @@ type Post struct {
 	CreatedAt   time.Time        `db:"created_at" json:"created_at"`
 	LastUpdated time.Time        `db:"last_updated" json:"last_updated"`
 	Deleted     bool             `db:"deleted" json:"deleted"`
+	IsFirstPost bool             `db:"is_first_post" json:"is_first_post"`
 }
 
 type ProfileImage struct {

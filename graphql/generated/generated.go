@@ -997,6 +997,7 @@ type ComplexityRoot struct {
 		Dbid         func(childComplexity int) int
 		ID           func(childComplexity int) int
 		Interactions func(childComplexity int, before *string, after *string, first *int, last *int) int
+		IsFirstPost  func(childComplexity int) int
 		Mentions     func(childComplexity int) int
 		Tokens       func(childComplexity int) int
 		ViewerAdmire func(childComplexity int) int
@@ -6112,6 +6113,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Post.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Post.isFirstPost":
+		if e.complexity.Post.IsFirstPost == nil {
+			break
+		}
+
+		return e.complexity.Post.IsFirstPost(childComplexity), true
+
 	case "Post.mentions":
 		if e.complexity.Post.Mentions == nil {
 			break
@@ -10215,6 +10223,7 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
+  isFirstPost: Boolean!
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -16681,6 +16690,8 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -21638,6 +21649,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -24870,6 +24883,8 @@ func (ec *executionContext) fieldContext_Entity_findPostByDbid(ctx context.Conte
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -42195,6 +42210,50 @@ func (ec *executionContext) fieldContext_Post_viewerAdmire(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Post_isFirstPost(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Post_isFirstPost(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsFirstPost, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Post_isFirstPost(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PostAdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmireEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PostAdmireEdge_node(ctx, field)
 	if err != nil {
@@ -42960,6 +43019,8 @@ func (ec *executionContext) fieldContext_PostTokensPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -45759,6 +45820,8 @@ func (ec *executionContext) fieldContext_ReferralPostTokenPayload_post(ctx conte
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -46283,6 +46346,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_post(ctx context.Co
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -46472,6 +46537,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -49001,6 +49068,8 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_post
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -50158,6 +50227,8 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -51641,6 +51712,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_post(
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -52761,6 +52834,8 @@ func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNot
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "isFirstPost":
+				return ec.fieldContext_Post_isFirstPost(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -77581,6 +77656,13 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 				return innerFunc(ctx)
 
 			})
+		case "isFirstPost":
+
+			out.Values[i] = ec._Post_isFirstPost(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

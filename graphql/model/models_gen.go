@@ -1842,6 +1842,7 @@ type Post struct {
 	Comments     *PostCommentsConnection `json:"comments"`
 	Interactions *InteractionsConnection `json:"interactions"`
 	ViewerAdmire *Admire                 `json:"viewerAdmire"`
+	IsFirstPost  bool                    `json:"isFirstPost"`
 }
 
 func (Post) IsAdmireSource()     {}
