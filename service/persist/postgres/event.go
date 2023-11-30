@@ -106,6 +106,7 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
 		Token:          util.ToNullString(event.TokenID.String(), true),
+		Comment:        util.ToNullString(event.CommentID.String(), true),
 	})
 	return &event, err
 }
