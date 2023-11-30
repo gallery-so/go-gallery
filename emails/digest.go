@@ -142,6 +142,7 @@ func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s
 	for _, post := range overrides {
 		selectedResults[post.Position] = overrideFetcher(post)
 	}
+outer:
 	for i, it := range initial {
 		ic := i
 		if selectedResults[i].Position != nil && i < 5 {
@@ -155,7 +156,7 @@ func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s
 						Position: &j,
 					}
 					i = j
-					break
+					continue outer
 				}
 			}
 		}
