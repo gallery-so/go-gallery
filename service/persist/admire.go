@@ -1,73 +1,57 @@
 package persist
 
 import (
-	"context"
 	"fmt"
-	"time"
 )
 
-type Admire struct {
-	ID          DBID      `json:"id"`
-	CreatedAt   time.Time `json:"created_at"`
-	LastUpdated time.Time `json:"last_updated"`
-	FeedEventID DBID      `json:"feed_event_id"`
-	ActorID     DBID      `json:"actor_id"`
-	Deleted     bool      `json:"deleted"`
-}
+var errAdmireNotFound ErrAdmireNotFound
 
-type AdmireRepository interface {
-	CreateAdmire(ctx context.Context, feedEventID DBID, actorID DBID) (DBID, error)
-	CreateTokenAdmire(ctx context.Context, tokenID DBID) (DBID, error)
-	RemoveAdmire(ctx context.Context, admireID DBID) error
-}
+type ErrAdmireNotFound struct{}
 
-type ErrAdmireNotFound struct {
-	AdmireID    DBID
-	ActorID     DBID
-}
+func (e ErrAdmireNotFound) Unwrap() error { return notFoundError }
+func (e ErrAdmireNotFound) Error() string { return "admire not found" }
 
-type ErrAdmireFeedEventNotFound struct {
-	AdmireID    DBID
+type ErrAdmireNotFoundByID struct{ ID DBID }
+
+func (e ErrAdmireNotFoundByID) Unwrap() error { return errAdmireNotFound }
+func (e ErrAdmireNotFoundByID) Error() string { return fmt.Sprintf("admire not found by id=%s", e.ID) }
+
+type ErrAdmireNotFoundByActorIDFeedEventID struct {
 	ActorID     DBID
 	FeedEventID DBID
 }
 
-type ErrAdmirePostNotFound struct {
-	AdmireID    DBID
-	ActorID     DBID
-	PostID		DBID
+func (e ErrAdmireNotFoundByActorIDFeedEventID) Unwrap() error { return errAdmireNotFound }
+func (e ErrAdmireNotFoundByActorIDFeedEventID) Error() string {
+	return fmt.Sprintf("admire not found by actorID=%s; feedEventID=%s", e.ActorID, e.FeedEventID)
 }
 
-
-type ErrAdmireTokenNotFound struct {
-	AdmireID    DBID
-	ActorID     DBID
-	TokenID		DBID
+type ErrAdmireNotFoundByActorIDPostID struct {
+	ActorID DBID
+	PostID  DBID
 }
 
-func (e ErrAdmireNotFound) Error() string {
-	return fmt.Sprintf("admire not found | AdmireID: %s, ActorID: %s", e.AdmireID, e.ActorID)
+func (e ErrAdmireNotFoundByActorIDPostID) Unwrap() error { return errAdmireNotFound }
+func (e ErrAdmireNotFoundByActorIDPostID) Error() string {
+	return fmt.Sprintf("admire not found by actorID=%s; postID=%s", e.ActorID, e.PostID)
 }
 
-func (e ErrAdmireFeedEventNotFound) Error() string {
-	return fmt.Sprintf("admire feed event not found | AdmireID: %s, ActorID: %s, FeedEventID: %s", e.AdmireID, e.ActorID, e.FeedEventID)
+type ErrAdmireNotFoundByActorIDTokenID struct {
+	ActorID DBID
+	TokenID DBID
 }
 
-func (e ErrAdmirePostNotFound) Error() string {
-	return fmt.Sprintf("admire post not found | AdmireID: %s, ActorID: %s, PostID: %s", e.AdmireID, e.ActorID, e.PostID)
+func (e ErrAdmireNotFoundByActorIDTokenID) Unwrap() error { return errAdmireNotFound }
+func (e ErrAdmireNotFoundByActorIDTokenID) Error() string {
+	return fmt.Sprintf("admire not found by actorID=%s; tokenID=%s", e.ActorID, e.TokenID)
 }
 
-func (e ErrAdmireTokenNotFound) Error() string {
-	return fmt.Sprintf("admire token not found | AdmireID: %s, ActorID: %s, TokenID: %s", e.AdmireID, e.ActorID, e.TokenID)
+type ErrAdmireNotFoundByActorIDCommentID struct {
+	ActorID   DBID
+	CommentID DBID
 }
 
-type ErrAdmireAlreadyExists struct {
-	AdmireID    DBID
-	ActorID     DBID
-	FeedEventID DBID
-	PostID      DBID
-}
-
-func (e ErrAdmireAlreadyExists) Error() string {
-	return fmt.Sprintf("admire already exists | AdmireID: %s, ActorID: %s, FeedEventID: %s, PostID: %s", e.AdmireID, e.ActorID, e.FeedEventID, e.PostID)
+func (e ErrAdmireNotFoundByActorIDCommentID) Unwrap() error { return errAdmireNotFound }
+func (e ErrAdmireNotFoundByActorIDCommentID) Error() string {
+	return fmt.Sprintf("admire not found by actorID=%s; commentID=%s", e.ActorID, e.CommentID)
 }

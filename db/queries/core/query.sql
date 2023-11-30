@@ -426,7 +426,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), $6, $7, $8, $9) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, comment_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), sqlc.narg('comment'), $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
@@ -704,6 +704,16 @@ SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_a
 -- name: CountAdmiresByTokenIDBatch :batchone
 SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
+-- name: PaginateAdmiresByCommentIDBatch :batchmany
+select * from admires where comment_id = sqlc.arg('comment_id') and deleted = false
+    and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    order by case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
+             case when not sqlc.arg('paging_forward')::bool then (created_at, id) end desc
+    limit sqlc.arg('limit');
+
+-- name: CountAdmiresByCommentIDBatch :batchone
+select count(*) from admires where comment_id = $1 and deleted = false;
+
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
@@ -810,6 +820,7 @@ select * from notifications
     and deleted = false
     and (not @only_for_feed_event::bool or feed_event_id = $3)
     and (not @only_for_post::bool or post_id = $4)
+    and (not @only_for_comment::bool or comment_id = $5)
     order by created_at desc
     limit 1;
 
@@ -934,8 +945,14 @@ SELECT * FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false;
 -- name: GetAdmireByActorIDAndTokenID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND token_id = $2 AND deleted = false;
 
+-- name: GetAdmireByActorIDAndCommentID :batchone
+SELECT * FROM admires WHERE actor_id = $1 AND comment_id = $2 AND deleted = false;
+
 -- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id;
+insert into posts(id, token_ids, contract_ids, actor_id, caption, is_first_post, created_at)
+values ($1, $2, $3, $4, $5, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
+on conflict (actor_id, is_first_post) where is_first_post do update set is_first_post = false
+returning id;
 
 -- name: DeletePostByID :exec
 update posts set deleted = true where id = $1;

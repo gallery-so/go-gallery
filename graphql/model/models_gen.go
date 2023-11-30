@@ -23,6 +23,10 @@ type AdminAddWalletPayloadOrError interface {
 	IsAdminAddWalletPayloadOrError()
 }
 
+type AdmireCommentPayloadOrError interface {
+	IsAdmireCommentPayloadOrError()
+}
+
 type AdmireFeedEventPayloadOrError interface {
 	IsAdmireFeedEventPayloadOrError()
 }
@@ -513,6 +517,14 @@ type Admire struct {
 func (Admire) IsNode()        {}
 func (Admire) IsInteraction() {}
 
+type AdmireCommentPayload struct {
+	Viewer  *Viewer  `json:"viewer"`
+	Comment *Comment `json:"comment"`
+	Admire  *Admire  `json:"admire"`
+}
+
+func (AdmireCommentPayload) IsAdmireCommentPayloadOrError() {}
+
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
 	Admire    *Admire    `json:"admire"`
@@ -708,21 +720,34 @@ func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}
 
 type Comment struct {
 	HelperCommentData
-	Dbid         persist.DBID        `json:"dbid"`
-	CreationTime *time.Time          `json:"creationTime"`
-	LastUpdated  *time.Time          `json:"lastUpdated"`
-	ReplyTo      *Comment            `json:"replyTo"`
-	Commenter    *GalleryUser        `json:"commenter"`
-	Comment      *string             `json:"comment"`
-	Mentions     []*Mention          `json:"mentions"`
-	Replies      *CommentsConnection `json:"replies"`
-	Source       CommentSource       `json:"source"`
-	Deleted      *bool               `json:"deleted"`
+	Dbid         persist.DBID              `json:"dbid"`
+	CreationTime *time.Time                `json:"creationTime"`
+	LastUpdated  *time.Time                `json:"lastUpdated"`
+	ReplyTo      *Comment                  `json:"replyTo"`
+	Commenter    *GalleryUser              `json:"commenter"`
+	Comment      *string                   `json:"comment"`
+	Mentions     []*Mention                `json:"mentions"`
+	Replies      *CommentsConnection       `json:"replies"`
+	Source       CommentSource             `json:"source"`
+	Deleted      *bool                     `json:"deleted"`
+	ViewerAdmire *Admire                   `json:"viewerAdmire"`
+	Admires      *CommentAdmiresConnection `json:"admires"`
 }
 
+func (Comment) IsAdmireSource()  {}
 func (Comment) IsNode()          {}
 func (Comment) IsInteraction()   {}
 func (Comment) IsMentionSource() {}
+
+type CommentAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+}
+
+type CommentAdmiresConnection struct {
+	Edges    []*CommentAdmireEdge `json:"edges"`
+	PageInfo *PageInfo            `json:"pageInfo"`
+}
 
 type CommentEdge struct {
 	Node   *Comment `json:"node"`
@@ -813,6 +838,7 @@ type Contract struct {
 	ProfileImageURL  *string               `json:"profileImageURL"`
 	ProfileBannerURL *string               `json:"profileBannerURL"`
 	BadgeURL         *string               `json:"badgeURL"`
+	MintURL          *string               `json:"mintURL"`
 	IsSpam           *bool                 `json:"isSpam"`
 }
 
@@ -999,6 +1025,7 @@ type ErrCommentNotFound struct {
 
 func (ErrCommentNotFound) IsError()                       {}
 func (ErrCommentNotFound) IsRemoveCommentPayloadOrError() {}
+func (ErrCommentNotFound) IsAdmireCommentPayloadOrError() {}
 
 type ErrCommunityNotFound struct {
 	Message string `json:"message"`
@@ -1126,6 +1153,7 @@ func (ErrInvalidInput) IsPostTokensPayloadOrError()                             
 func (ErrInvalidInput) IsReferralPostTokenPayloadOrError()                               {}
 func (ErrInvalidInput) IsAdmirePostPayloadOrError()                                      {}
 func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                                     {}
+func (ErrInvalidInput) IsAdmireCommentPayloadOrError()                                   {}
 func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                                   {}
 func (ErrInvalidInput) IsDeletePostPayloadOrError()                                      {}
 func (ErrInvalidInput) IsReferralPostPreflightPayloadOrError()                           {}
@@ -1224,6 +1252,7 @@ func (ErrNotAuthorized) IsPostTokensPayloadOrError()                            
 func (ErrNotAuthorized) IsReferralPostTokenPayloadOrError()                               {}
 func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                                      {}
 func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                                     {}
+func (ErrNotAuthorized) IsAdmireCommentPayloadOrError()                                   {}
 func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                                   {}
 func (ErrNotAuthorized) IsDeletePostPayloadOrError()                                      {}
 func (ErrNotAuthorized) IsBlockUserPayloadOrError()                                       {}
@@ -1236,6 +1265,7 @@ type ErrPostNotFound struct {
 func (ErrPostNotFound) IsPostOrError()              {}
 func (ErrPostNotFound) IsError()                    {}
 func (ErrPostNotFound) IsFeedEventOrError()         {}
+func (ErrPostNotFound) IsAdmirePostPayloadOrError() {}
 func (ErrPostNotFound) IsReportPostPayloadOrError() {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
@@ -1812,6 +1842,7 @@ type Post struct {
 	Comments     *PostCommentsConnection `json:"comments"`
 	Interactions *InteractionsConnection `json:"interactions"`
 	ViewerAdmire *Admire                 `json:"viewerAdmire"`
+	IsFirstPost  bool                    `json:"isFirstPost"`
 }
 
 func (Post) IsAdmireSource()     {}
@@ -2099,6 +2130,21 @@ type SocialQueries struct {
 }
 
 func (SocialQueries) IsSocialQueriesOrError() {}
+
+type SomeoneAdmiredYourCommentNotification struct {
+	HelperSomeoneAdmiredYourCommentNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Comment      *Comment                          `json:"comment"`
+	Admirers     *GroupNotificationUsersConnection `json:"admirers"`
+}
+
+func (SomeoneAdmiredYourCommentNotification) IsNotification()        {}
+func (SomeoneAdmiredYourCommentNotification) IsNode()                {}
+func (SomeoneAdmiredYourCommentNotification) IsGroupedNotification() {}
 
 type SomeoneAdmiredYourFeedEventNotification struct {
 	HelperSomeoneAdmiredYourFeedEventNotificationData
