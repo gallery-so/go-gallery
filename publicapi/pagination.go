@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -31,7 +32,7 @@ var (
 	// Some position that comes after any other position
 	defaultCursorBeforePosition = -1
 	// Some position that comes before any other position
-	defaultCursorAfterPosition = math.MaxInt32
+	defaultCursorAfterPosition = math.MaxInt16
 )
 
 type PageInfo struct {
@@ -540,7 +541,7 @@ type positionPaginator struct {
 	QueryFunc func(params positionPagingParams) ([]any, error)
 
 	// CursorFunc returns the current position and a fixed slice of DBIDs that will be encoded into a cursor string
-	CursorFunc func(node interface{}) (int64, []persist.DBID, error)
+	CursorFunc func(node any) (curPos int64, ids []persist.DBID, err error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
@@ -942,6 +943,7 @@ func (cursorableN) NewPositionCursorer(f func(any) (int64, []persist.DBID, error
 	return func(node any) (c cursorer, err error) {
 		cur := cursors.NewPositionCursor()
 		cur.CurrentPosition, cur.IDs, err = f(node)
+		cur.Positions = util.SliceToMapIndex(cur.IDs)
 		return cur, err
 	}
 }
@@ -950,6 +952,7 @@ func (cursorableN) NewFeedPositionCursorer(f func(any) (int64, []persist.FeedEnt
 	return func(node any) (c cursorer, err error) {
 		cur := cursors.NewFeedPositionCursor()
 		cur.CurrentPosition, cur.EntityTypes, cur.EntityIDs, err = f(node)
+		cur.Positions = util.SliceToMapIndex(cur.EntityIDs)
 		return cur, err
 	}
 }
@@ -1035,7 +1038,7 @@ type feedPositionCursor struct {
 	CurrentPosition int64
 	EntityTypes     []persist.FeedEntityType
 	EntityIDs       []persist.DBID
-	PositionLookup  map[persist.DBID]int64
+	Positions       map[persist.DBID]int64
 }
 
 func (f *feedPositionCursor) Unpack(s string) error {
@@ -1043,14 +1046,12 @@ func (f *feedPositionCursor) Unpack(s string) error {
 	if err != nil {
 		return err
 	}
-	for i, id := range f.EntityIDs {
-		f.PositionLookup[id] = int64(i)
-	}
+	f.Positions = util.SliceToMapIndex(f.EntityIDs)
 	return nil
 }
 
 func (cursorN) NewFeedPositionCursor() *feedPositionCursor {
-	c := feedPositionCursor{baseCursor: &baseCursor{}, PositionLookup: make(map[persist.DBID]int64)}
+	c := feedPositionCursor{baseCursor: &baseCursor{}, Positions: make(map[persist.DBID]int64)}
 	initCursor(c.baseCursor, &c.CurrentPosition, &c.EntityTypes, &c.EntityIDs)
 	return &c
 }
@@ -1061,10 +1062,20 @@ type positionCursor struct {
 	*baseCursor
 	CurrentPosition int64
 	IDs             []persist.DBID
+	Positions       map[persist.DBID]int64
+}
+
+func (f *positionCursor) Unpack(s string) error {
+	err := f.baseCursor.Unpack(s)
+	if err != nil {
+		return err
+	}
+	f.Positions = util.SliceToMapIndex(f.IDs)
+	return nil
 }
 
 func (cursorN) NewPositionCursor() *positionCursor {
-	c := positionCursor{baseCursor: &baseCursor{}}
+	c := positionCursor{baseCursor: &baseCursor{}, Positions: make(map[persist.DBID]int64)}
 	initCursor(c.baseCursor, &c.CurrentPosition, &c.IDs)
 	return &c
 }

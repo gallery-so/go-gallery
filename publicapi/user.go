@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/sort"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -189,6 +191,85 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 	}
 
 	return users, pageInfo, err
+}
+
+type userRec struct {
+	User db.User
+	Freq int
+}
+
+func (u userRec) Less(a any) bool {
+	other, ok := a.(userRec)
+	if !ok {
+		return false
+	}
+	if u.Freq != other.Freq {
+		return u.Freq < other.Freq
+	}
+	return rand.Int() < rand.Int()
+}
+
+func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+	usersActive := make([]db.User, 0)
+	usersHandSelected := make([]db.User, 0)
+	usersFreqRec := make([]db.User, 0)
+	// XXX usersActive, err := api.GetActiveUsers(ctx)
+	// XXX if err != nil {
+	// XXX 	return nil, PageInfo{}, err
+	// XXX }
+	// XXX usersFreqRec, err := api.GetFrequentlyRecommendedUsers(ctx)
+	// XXX if err != nil {
+	// XXX 	return nil, PageInfo{}, err
+	// XXX }
+	// XXX usersHandSelected, err := api.GetHandPickedUsers(ctx)
+	// XXX if err != nil {
+	// XXX 	return nil, PageInfo{}, err
+	// XXX }
+
+	userHist := make(map[persist.DBID]*userRec)
+
+	for _, l := range [][]db.User{usersActive, usersFreqRec, usersHandSelected} {
+		for _, u := range l {
+			if _, ok := userHist[u.ID]; !ok {
+				userHist[u.ID] = &userRec{User: u, Freq: 1}
+			}
+			userHist[u.ID].Freq += 1
+		}
+	}
+
+	h := sort.Heap[userRec]{}
+	for _, u := range userHist {
+		h.Push(u)
+	}
+
+	result := make([]db.User, 0)
+	for i := 0; h.Len() > 0; i++ {
+		result[i] = h.Pop().(userRec).User
+	}
+
+	// Create a cursor from the computed result
+	cursor, _ := cursorables.NewPositionCursorer(func(any) (int64, []persist.DBID, error) {
+		userIDs := make([]persist.DBID, len(result))
+		for i, u := range result {
+			userIDs[i] = u.ID
+		}
+		return 0, userIDs, nil
+	})(nil)
+
+	var paginator positionPaginator
+
+	// We already did the work to fetch the users above so we can just return them here
+	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
+		return util.MapWithoutError(result, func(u db.User) any { return u }), nil
+	}
+
+	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
+		user := node.(db.User)
+		posCur := cursor.(*positionCursor)
+		return posCur.Positions[user.ID], posCur.IDs, nil
+	}
+
+	return result, PageInfo{}, nil
 }
 
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
@@ -1376,7 +1457,6 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 	}
 
 	cursor := cursors.NewPositionCursor()
-	var paginator positionPaginator
 
 	// If we have a cursor, we can page through the original set of recommended users
 	if before != nil {
@@ -1394,55 +1474,35 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 			return nil, PageInfo{}, err
 		}
 
-		cursor.IDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
+		ids, err := recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
+
+		c, _ := cursorables.NewPositionCursorer(func(any) (int64, []persist.DBID, error) { return 0, ids, err })(nil)
+		cursor = c.(*positionCursor)
 	}
 
-	positionLookup := map[persist.DBID]int{}
-	idsAsString := make([]string, len(cursor.IDs))
-
-	for i, id := range cursor.IDs {
-		// Postgres uses 1-based indexing
-		positionLookup[id] = i + 1
-		idsAsString[i] = id.String()
-	}
+	var paginator positionPaginator
 
 	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
 		keys, err := api.queries.GetUsersByPositionPaginate(ctx, db.GetUsersByPositionPaginateParams{
-			UserIds:       idsAsString,
-			CurBeforePos:  params.CursorBeforePos,
-			CurAfterPos:   params.CursorAfterPos,
+			UserIds: util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() }),
+			// Postgres uses 1-based indexing
+			CurBeforePos:  params.CursorBeforePos + 1,
+			CurAfterPos:   params.CursorAfterPos + 1,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]any, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		return util.MapWithoutError(keys, func(u db.User) any { return u }), err
 	}
 
 	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
-		if user, ok := node.(db.User); ok {
-			return int64(positionLookup[user.ID]), cursor.IDs, nil
-		}
-		return 0, nil, fmt.Errorf("node is not a db.User")
+		return cursor.Positions[node.(db.User).ID], cursor.IDs, nil
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	users := make([]db.User, len(results))
-	for i, result := range results {
-		users[i] = result.(db.User)
-	}
-
+	users := util.MapWithoutError(results, func(u any) db.User { return u.(db.User) })
 	return users, pageInfo, err
 }
 

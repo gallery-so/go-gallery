@@ -2675,6 +2675,24 @@ func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input mode
 	}, err
 }
 
+// NewUserRecommendations is the resolver for the newUserRecommendations field.
+func (r *queryResolver) NewUserRecommendations(ctx context.Context, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.GetNewUserRecommendations(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+	edges := util.MapWithoutError(users, func(u coredb.User) *model.UserEdge {
+		return &model.UserEdge{
+			Node:   userToModel(ctx, u),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	})
+	return &model.UsersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {

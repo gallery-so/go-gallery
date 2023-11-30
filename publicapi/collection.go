@@ -108,29 +108,27 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress, before, after *string, first, last *int) (c []db.Collection, pageInfo PageInfo, err error) {
+func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress, before, after *string, first, last *int) ([]db.Collection, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"chainAddress": validate.WithTag(chainAddress, "required"),
 	}); err != nil {
-		return nil, pageInfo, err
+		return nil, PageInfo{}, err
 	}
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, pageInfo, err
+		return nil, PageInfo{}, err
 	}
 
-	var collectionIDs []persist.DBID
 	cursor := cursors.NewPositionCursor()
-	var paginator positionPaginator
 
 	// If a cursor is provided, we can skip querying the cache
 	if before != nil {
-		if err = cursor.Unpack(*before); err != nil {
-			return nil, pageInfo, err
+		if err := cursor.Unpack(*before); err != nil {
+			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		if err = cursor.Unpack(*after); err != nil {
-			return nil, pageInfo, err
+		if err := cursor.Unpack(*after); err != nil {
+			return nil, PageInfo{}, err
 		}
 	} else {
 		// No cursor provided, need to access the cache
@@ -141,43 +139,43 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 				Address: chainAddress.Address(),
 			})
 		})
-		if collectionIDs, err = l.Load(ctx); err != nil {
-			return nil, pageInfo, err
+
+		collectionIDs, err := l.Load(ctx)
+		if err != nil {
+			return nil, PageInfo{}, err
 		}
+
+		cursor.CurrentPosition = 0
+		cursor.IDs = collectionIDs
+		cursor.Positions = util.SliceToMapIndex(cursor.IDs)
 	}
 
+	var paginator positionPaginator
+
 	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
-		cIDs := util.MapWithoutError(collectionIDs, func(id persist.DBID) string { return id.String() })
-		c, err := api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
+		cIDs := util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() })
+		collections, err := api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
 			CollectionIds: cIDs,
-			CurBeforePos:  params.CursorBeforePos,
-			CurAfterPos:   params.CursorAfterPos,
+			// Postgres uses 1-based indexing
+			CurBeforePos:  params.CursorBeforePos + 1,
+			CurAfterPos:   params.CursorAfterPos + 1,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		a := util.MapWithoutError(c, func(c db.Collection) any { return c })
-		return a, err
-	}
-
-	posLookup := make(map[persist.DBID]int)
-	for i, id := range collectionIDs {
-		posLookup[id] = i + 1 // Postgres uses 1-based indexing
+		collectionsAny := util.MapWithoutError(collections, func(c db.Collection) any { return c })
+		return collectionsAny, err
 	}
 
 	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
-		return int64(posLookup[node.(db.Collection).ID]), collectionIDs, nil
+		return cursor.Positions[node.(db.Collection).ID], cursor.IDs, nil
 	}
 
 	// The collections are sorted by ascending rank so we need to switch the cursor positions
-	// so that the default before position (posiiton that comes after any other position) has the largest idx
+	// so that the default before position (position that comes after any other position) has the largest idx
 	// and the default after position (position that comes before any other position) has the smallest idx
 	results, pageInfo, err := paginator.paginate(before, after, first, last, positionOpts.WithStartingCursors(math.MaxInt32, -1))
-
-	c, _ = util.Map(results, func(r any) (db.Collection, error) {
-		return r.(db.Collection), nil
-	})
-
-	return c, pageInfo, err
+	collections := util.MapWithoutError(results, func(r any) db.Collection { return r.(db.Collection) })
+	return collections, pageInfo, err
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {

@@ -1434,6 +1434,7 @@ type Query {
   postComposerDraftDetails(
     input: PostComposerDraftDetailsInput!
   ): PostComposerDraftDetailsPayloadOrError
+  newUserRecommendations(before: String, after: String, first: Int, last: Int): UsersConnection
 }
 
 type SocialQueries {
