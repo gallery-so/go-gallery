@@ -35,13 +35,25 @@ import (
 	"github.com/mikeydub/go-gallery/util/retry"
 )
 
-const (
-	tHalf6Hours          = 6 * 60.0
-	tHalf10Hours         = 10 * 60.0
-	trendingFeedCacheKey = "trending:feedEvents:all"
-)
+const trendingFeedCacheKey = "trending:feedEvents:all"
 
-var feedLookback = time.Duration(4 * 24 * time.Hour)
+var feedOpts = struct {
+	FreshnessFactor     float64 // extra weight added to a new post
+	FirstPostFactor     float64 // extra weight added to a first post
+	LookbackWindow      float64 // how far back to look for feed events
+	FreshnessWindow     float64 // how long a post is considered new
+	PostHalfLife        float64 // controls the decay rate of posts
+	GalleryPostHalfLife float64 // controls the decay rate of Gallery posts
+	GalleryDecayPeriod  float64 // time it takes for a Gallery post to reach GalleryPostHalfLife from PostHalfLife
+}{
+	FreshnessFactor:     2.0,
+	FirstPostFactor:     2.0,
+	LookbackWindow:      time.Duration(4 * 24 * time.Hour).Minutes(),
+	FreshnessWindow:     time.Duration(6 * time.Hour).Minutes(),
+	PostHalfLife:        time.Duration(6 * time.Hour).Minutes(),
+	GalleryPostHalfLife: time.Duration(10 * time.Hour).Minutes(),
+	GalleryDecayPeriod:  time.Duration(4 * 24 * time.Hour).Minutes(),
+}
 
 type FeedAPI struct {
 	repos              *postgres.Repositories
@@ -620,7 +632,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 
 func fetchFeedEntityScores(ctx context.Context, q *db.Queries, viewerID persist.DBID) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
 	scores, err := q.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
-		WindowEnd: time.Now().Add(-feedLookback),
+		WindowEnd: time.Now().Add(-time.Minute * time.Duration(feedOpts.LookbackWindow)),
 		ViewerID:  viewerID,
 	})
 	if err != nil {
@@ -701,7 +713,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 			scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
 			scored := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 {
-				return decayRate(e.CreatedAt, now, postScores[e.ID].IsGalleryPost) * engagementFactor(int(e.Interactions))
+				return timeFactor(now.Sub(e.CreatedAt).Minutes(), postScores[e.ID].IsGalleryPost) * engagementFactor(float64(e.Interactions))
 			})
 
 			postIDs := make([]persist.DBID, len(scored))
@@ -791,9 +803,9 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		personalizationScores := make(map[persist.DBID]float64)
 
 		for _, e := range postScores {
-			engagementScores[e.Post.ID] = decayRate(e.Post.CreatedAt, now, e.IsGalleryPost) * freshnessFactor(e.Post.CreatedAt, now)
+			engagementScores[e.Post.ID] = scorePost(e.Post, now, e.IsGalleryPost, float64(e.FeedEntityScore.Interactions))
 			personalizationScores[e.Post.ID] = engagementScores[e.Post.ID]
-			engagementScores[e.Post.ID] *= engagementFactor(int(e.FeedEntityScore.Interactions))
+			engagementScores[e.Post.ID] *= engagementFactor(float64(e.FeedEntityScore.Interactions))
 			if !e.IsGalleryPost {
 				personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(viewerID, e.FeedEntityScore)
 			}
@@ -1063,33 +1075,35 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 	return scoredEntities
 }
 
-func decayRate(t0, t1 time.Time, isGalleryPost bool) float64 {
-	age := t1.Sub(t0).Minutes()
-	if isGalleryPost {
-		h := lerp(tHalf6Hours, tHalf10Hours, age, 4*24*60)
-		return math.Pow(2, -(age / h))
+func scorePost(p db.Post, t time.Time, isGallery bool, interactions float64) (s float64) {
+	age := t.Sub(p.CreatedAt).Minutes()
+	s = timeFactor(age, isGallery)
+	if age < feedOpts.FreshnessWindow {
+		s *= feedOpts.FreshnessFactor
 	}
-	return math.Pow(2, -(age / tHalf6Hours))
+	if p.IsFirstPost {
+		s *= feedOpts.FirstPostFactor
+	}
+	return s
+}
+
+func timeFactor(age float64, isGalleryPost bool) float64 {
+	if isGalleryPost {
+		return math.Pow(2, -(age / lerp(age, feedOpts.PostHalfLife, feedOpts.GalleryPostHalfLife, feedOpts.GalleryDecayPeriod)))
+	}
+	return math.Pow(2, -(age / feedOpts.PostHalfLife))
 }
 
 // lerp returns a linear interpolation between s and e (clamped to e) based on age
 // period controls the time it takes to reach e from s
-func lerp(s, e, age, period float64) float64 {
+func lerp(age, s, e, period float64) float64 {
 	return math.Min(e, s+((e-s)/period)*age)
 }
 
-// freshnessFactor returns a scaling factor for a post based on how recently it was made.
-func freshnessFactor(t1, t2 time.Time) float64 {
-	if t2.Sub(t1) < 6*time.Hour {
-		return 2.0
-	}
-	return 1.0
-}
-
-func engagementFactor(interactions int) float64 {
+func engagementFactor(interactions float64) float64 {
 	// Add 2 because log(0) => undefined and log(1) => 0 and returning 0 will cancel out
 	// the effect of other terms this term may get multiplied with
-	return math.Log2(2 + float64(interactions))
+	return math.Log2(2 + interactions)
 }
 
 type priorityNode interface {

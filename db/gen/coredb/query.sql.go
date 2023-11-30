@@ -365,7 +365,7 @@ func (q *Queries) CountUserUnseenNotifications(ctx context.Context, ownerID pers
 }
 
 const createAdmireEvent = `-- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $12, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, comment_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $12, $13, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateAdmireEventParams struct {
@@ -381,6 +381,7 @@ type CreateAdmireEventParams struct {
 	FeedEvent      sql.NullString       `db:"feed_event" json:"feed_event"`
 	Post           sql.NullString       `db:"post" json:"post"`
 	Token          sql.NullString       `db:"token" json:"token"`
+	Comment        sql.NullString       `db:"comment" json:"comment"`
 }
 
 func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventParams) (Event, error) {
@@ -397,6 +398,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 		arg.FeedEvent,
 		arg.Post,
 		arg.Token,
+		arg.Comment,
 	)
 	var i Event
 	err := row.Scan(
@@ -1510,7 +1512,7 @@ func (q *Queries) GetActorForGroup(ctx context.Context, groupID sql.NullString) 
 }
 
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Admire, error) {
@@ -1526,12 +1528,13 @@ func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Adm
 		&i.LastUpdated,
 		&i.PostID,
 		&i.TokenID,
+		&i.CommentID,
 	)
 	return i, err
 }
 
 const getAdmiresByActorID = `-- name: GetAdmiresByActorID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID) ([]Admire, error) {
@@ -1553,6 +1556,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		); err != nil {
 			return nil, err
 		}
@@ -1565,7 +1569,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 }
 
 const getAdmiresByAdmireIDs = `-- name: GetAdmiresByAdmireIDs :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id from admires WHERE id = ANY($1) AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id from admires WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.DBIDList) ([]Admire, error) {
@@ -1587,6 +1591,7 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		); err != nil {
 			return nil, err
 		}
@@ -2884,8 +2889,9 @@ select id, deleted, owner_id, version, last_updated, created_at, action, data, e
     where owner_id = $1
     and action = $2
     and deleted = false
-    and (not $5::bool or feed_event_id = $3)
-    and (not $6::bool or post_id = $4)
+    and (not $6::bool or feed_event_id = $3)
+    and (not $7::bool or post_id = $4)
+    and (not $8::bool or comment_id = $5)
     order by created_at desc
     limit 1
 `
@@ -2895,8 +2901,10 @@ type GetMostRecentNotificationByOwnerIDForActionParams struct {
 	Action           persist.Action `db:"action" json:"action"`
 	FeedEventID      persist.DBID   `db:"feed_event_id" json:"feed_event_id"`
 	PostID           persist.DBID   `db:"post_id" json:"post_id"`
+	CommentID        persist.DBID   `db:"comment_id" json:"comment_id"`
 	OnlyForFeedEvent bool           `db:"only_for_feed_event" json:"only_for_feed_event"`
 	OnlyForPost      bool           `db:"only_for_post" json:"only_for_post"`
+	OnlyForComment   bool           `db:"only_for_comment" json:"only_for_comment"`
 }
 
 func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
@@ -2905,8 +2913,10 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 		arg.Action,
 		arg.FeedEventID,
 		arg.PostID,
+		arg.CommentID,
 		arg.OnlyForFeedEvent,
 		arg.OnlyForPost,
+		arg.OnlyForComment,
 	)
 	var i Notification
 	err := row.Scan(
@@ -3070,7 +3080,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostByID = `-- name: GetPostByID :one
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post FROM posts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error) {
@@ -3086,12 +3096,13 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 		&i.CreatedAt,
 		&i.LastUpdated,
 		&i.Deleted,
+		&i.IsFirstPost,
 	)
 	return i, err
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post
 from posts
 join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
 where not posts.deleted
@@ -3117,6 +3128,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, 
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
 		); err != nil {
 			return nil, err
 		}
@@ -5905,7 +5917,10 @@ func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) (p
 }
 
 const insertPost = `-- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id
+insert into posts(id, token_ids, contract_ids, actor_id, caption, is_first_post, created_at)
+values ($1, $2, $3, $4, $5, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
+on conflict (actor_id, is_first_post) where is_first_post do update set is_first_post = false
+returning id
 `
 
 type InsertPostParams struct {
@@ -6444,7 +6459,7 @@ with valid_post_ids as (
     WHERE $7 = ANY(posts.contract_ids)
       AND posts.deleted = false
 )
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted from posts
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post from posts
     join valid_post_ids on posts.id = valid_post_ids.id
 WHERE (posts.created_at, posts.id) < ($1, $2)
   AND (posts.created_at, posts.id) > ($3, $4)
@@ -6493,6 +6508,7 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
 		); err != nil {
 			return nil, err
 		}
@@ -6505,7 +6521,7 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 }
 
 const paginatePostsByUserID = `-- name: PaginatePostsByUserID :many
-select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted
+select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post
 from posts
 where actor_id = $1
         and (created_at, id) < ($2, $3)
@@ -6554,6 +6570,7 @@ func (q *Queries) PaginatePostsByUserID(ctx context.Context, arg PaginatePostsBy
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
 		); err != nil {
 			return nil, err
 		}

@@ -67,6 +67,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneAdmiredYourFeedEventNotification:          fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
 	OnSomeoneCommentedOnYourFeedEventNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
 	OnSomeoneAdmiredYourPostNotification:               fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
+	OnSomeoneAdmiredYourCommentNotification:            fetchNotificationByID[model.SomeoneAdmiredYourCommentNotification],
 	OnSomeoneCommentedOnYourPostNotification:           fetchNotificationByID[model.SomeoneCommentedOnYourPostNotification],
 	OnSomeoneFollowedYouBackNotification:               fetchNotificationByID[model.SomeoneFollowedYouBackNotification],
 	OnSomeoneFollowedYouNotification:                   fetchNotificationByID[model.SomeoneFollowedYouNotification],
@@ -108,7 +109,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
 
 	switch {
-	case util.ErrorAs[auth.ErrAuthenticationFailed](err):
+	case util.ErrorAs[auth.ErrAuthenticationFailed](err) || errors.Is(err, publicapi.ErrOnlyRemoveOwnAdmire) || errors.Is(err, publicapi.ErrOnlyRemoveOwnComment):
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
 	case util.ErrorAs[auth.ErrDoesNotOwnRequiredNFT](err):
 		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
@@ -126,18 +127,18 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case util.ErrorAs[persist.ErrAddressOwnedByUser](err):
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case util.ErrorAs[persist.ErrAdmireNotFound](err) || util.ErrorAs[persist.ErrAdmireFeedEventNotFound](err) || util.ErrorAs[persist.ErrAdmirePostNotFound](err) || util.ErrorAs[persist.ErrAdmireTokenNotFound](err):
+	case util.ErrorAs[persist.ErrAdmireNotFound](err):
 		mappedErr = model.ErrAdmireNotFound{Message: message}
-	case util.ErrorAs[persist.ErrAdmireAlreadyExists](err):
-		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
 	case util.ErrorAs[persist.ErrCommentNotFound](err):
 		mappedErr = model.ErrCommentNotFound{Message: message}
+	case util.ErrorAs[persist.ErrPostNotFound](err):
+		mappedErr = model.ErrPostNotFound{Message: message}
 	case util.ErrorAs[publicapi.ErrTokenRefreshFailed](err):
 		mappedErr = model.ErrSyncFailed{Message: message}
 	case util.ErrorAs[validate.ErrInvalidInput](err):
 		errTyp := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: errTyp.Parameters, Reasons: errTyp.Reasons}
-	case util.ErrorAs[persist.ErrFeedEventNotFoundByID](err):
+	case util.ErrorAs[persist.ErrFeedEventNotFound](err):
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
 	case util.ErrorAs[persist.ErrUnknownAction](err):
 		mappedErr = model.ErrUnknownAction{Message: message}
@@ -656,32 +657,9 @@ func ownersToConnection(ctx context.Context, owners []db.User, contractID persis
 func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.DBID, pageInfo publicapi.PageInfo) model.PostsConnection {
 	edges := make([]*model.PostEdge, len(posts))
 	for i, post := range posts {
-
 		po := post
-
-		cval, _ := po.Caption.Value()
-
-		var caption *string
-		if cval != nil {
-			caption = util.ToPointer(cval.(string))
-		}
-
 		edges[i] = &model.PostEdge{
-			Node: &model.Post{
-				HelperPostData: model.HelperPostData{
-					TokenIDs: po.TokenIds,
-					AuthorID: po.ActorID,
-				},
-				CreationTime: &po.CreatedAt,
-				Dbid:         po.ID,
-				Tokens:       nil, // handled by dedicated resolver
-				Caption:      caption,
-				Admires:      nil, // handled by dedicated resolver
-				Comments:     nil, // handled by dedicated resolver
-				Interactions: nil, // handled by dedicated resolver
-				ViewerAdmire: nil, // handled by dedicated resolver
-
-			},
+			Node:   postToModel(&po),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
@@ -758,7 +736,7 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 		return nil, err
 	}
 
-	return postToModel(post)
+	return postToModel(post), nil
 }
 
 func resolveTokenDefinitionByID(ctx context.Context, dbid persist.DBID) (*model.TokenDefinition, error) {
@@ -1065,7 +1043,20 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			UpdatedTime:  &notif.LastUpdated,
 			Threshold:    notif.Data.ActivityBadgeThreshold,
 		}, nil
-
+	case persist.ActionAdmiredComment:
+		return model.SomeoneAdmiredYourCommentNotification{
+			HelperSomeoneAdmiredYourCommentNotificationData: model.HelperSomeoneAdmiredYourCommentNotificationData{
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Comment:      nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
@@ -1395,21 +1386,7 @@ func feedEntityToModel(event any) (model.FeedEventOrError, error) {
 
 	switch event := event.(type) {
 	case db.Post:
-		caption, _ := event.Caption.Value()
-
-		var captionVal *string
-		if caption != nil {
-			captionVal = util.ToPointer(caption.(string))
-		}
-		return &model.Post{
-			HelperPostData: model.HelperPostData{
-				TokenIDs: event.TokenIds,
-				AuthorID: event.ActorID,
-			},
-			CreationTime: &event.CreatedAt,
-			Dbid:         event.ID,
-			Caption:      captionVal,
-		}, nil
+		return postToModel(&event), nil
 	case db.FeedEvent:
 		var groupID sql.NullString
 		if event.GroupID.String != "" {
@@ -1704,9 +1681,9 @@ func entitiesToFeedEdges(events []any) ([]*model.FeedEdge, error) {
 	return edges, nil
 }
 
-func postToModel(event *db.Post) (*model.Post, error) {
+func postToModel(post *db.Post) *model.Post {
 	// Value always returns a nil error so we can safely ignore it.
-	caption, _ := event.Caption.Value()
+	caption, _ := post.Caption.Value()
 
 	var captionVal *string
 	if caption != nil {
@@ -1715,14 +1692,19 @@ func postToModel(event *db.Post) (*model.Post, error) {
 
 	return &model.Post{
 		HelperPostData: model.HelperPostData{
-			TokenIDs: event.TokenIds,
-			AuthorID: event.ActorID,
+			TokenIDs: post.TokenIds,
+			AuthorID: post.ActorID,
 		},
-		Dbid:         event.ID,
-		CreationTime: &event.CreatedAt,
+		Dbid:         post.ID,
+		Tokens:       nil, // handled by dedicated resolver
+		CreationTime: &post.CreatedAt,
 		Caption:      captionVal,
-	}, nil
-
+		Admires:      nil, // handled by dedicated resolver
+		Comments:     nil, // handled by dedicated resolver
+		Interactions: nil, // handled by dedicated resolver
+		ViewerAdmire: nil, // handled by dedicated resolver
+		IsFirstPost:  post.IsFirstPost,
+	}
 }
 
 func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
@@ -1821,24 +1803,21 @@ func usersToEdges(ctx context.Context, users []db.User) []*model.UserEdge {
 
 // admireToModel converts a db.Admire to a model.Admire
 func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
-
-	var postID, feedEventID *persist.DBID
-	if admire.PostID != "" {
-		postID = &admire.PostID
+	var data model.HelperAdmireData
+	switch postID, feedEventID, commentID := admire.PostID, admire.FeedEventID, admire.CommentID; {
+	case postID != "":
+		data.PostID = &postID
+	case feedEventID != "":
+		data.FeedEventID = &feedEventID
+	case commentID != "":
+		data.CommentID = &commentID
 	}
-	if admire.FeedEventID != "" {
-		feedEventID = &admire.FeedEventID
-	}
-
 	return &model.Admire{
-		HelperAdmireData: model.HelperAdmireData{
-			PostID:      postID,
-			FeedEventID: feedEventID,
-		},
-		Dbid:         admire.ID,
-		CreationTime: &admire.CreatedAt,
-		LastUpdated:  &admire.LastUpdated,
-		Admirer:      &model.GalleryUser{Dbid: admire.ActorID}, // remaining fields handled by dedicated resolver
+		HelperAdmireData: data,
+		Dbid:             admire.ID,
+		CreationTime:     &admire.CreatedAt,
+		LastUpdated:      &admire.LastUpdated,
+		Admirer:          &model.GalleryUser{Dbid: admire.ActorID}, // remaining fields handled by dedicated resolver
 	}
 }
 

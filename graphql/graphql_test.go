@@ -38,7 +38,7 @@ type testCase struct {
 func TestMain(t *testing.T) {
 	tests := []testCase{
 		{
-			title:    "test GraphQL",
+			title:    "test graphql",
 			run:      testGraphQL,
 			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasksDirectDispatch, useAutosocial, useNotificationTopics},
 		},
@@ -808,20 +808,22 @@ func testSendNotifications(t *testing.T) {
 	ctx := context.Background()
 	pushService := newPushNotificationServiceFixture(t)
 	userF := newUserWithFeedEntitiesFixture(t)
-	alice := newUserFixture(t)
+	alice := newUserWithFeedEntitiesFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 	c2 := authedHandlerClient(t, alice.ID)
 	registerPushToken(t, ctx, c)
+	registerPushToken(t, ctx, c2)
 
 	admirePost(t, ctx, c2, userF.PostIDs[0])
 	commentOnPost(t, ctx, c2, userF.PostIDs[0], "post comment 1")
 	commentOnPost(t, ctx, c2, userF.PostIDs[0], "post comment 2")
 	admireFeedEvent(t, ctx, c2, userF.FeedEventIDs[0])
-	commentOnFeedEvent(t, ctx, c2, userF.FeedEventIDs[0], "feed event comment")
+	commentID := commentOnFeedEvent(t, ctx, c2, userF.FeedEventIDs[0], "feed event comment")
+	admireComment(t, ctx, c, commentID)
 
 	require.Eventuallyf(t, func() bool {
-		return len(pushService.SentNotificationBodies) == 5
-	}, time.Second*30, time.Second, "expected 5 push notifications to be sent, got %d", len(pushService.SentNotificationBodies))
+		return len(pushService.SentNotificationBodies) == 6
+	}, time.Second*30, time.Second, "expected 6 push notifications to be sent, got %d", len(pushService.SentNotificationBodies))
 
 	assert.Empty(t, pushService.Errors)
 	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s admired your post", alice.Username))
@@ -829,12 +831,20 @@ func testSendNotifications(t *testing.T) {
 	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s commented on your post: post comment 2", alice.Username))
 	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s admired your gallery update", alice.Username))
 	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s commented on your gallery update: feed event comment", alice.Username))
+	assert.Contains(t, pushService.SentNotificationBodies, fmt.Sprintf("%s admired your comment", userF.Username))
 
+	// Check viewer notifications
 	response, err := notificationsForViewerQuery(ctx, c)
 	require.NoError(t, err)
 	payload := (*response.GetViewer()).(*notificationsForViewerQueryViewer)
 	require.NotNil(t, payload)
 	assert.Equal(t, 5, *(payload.GetNotifications().GetUnseenCount()))
+	// Check other user's notifications
+	response, err = notificationsForViewerQuery(ctx, c2)
+	require.NoError(t, err)
+	payload = (*response.GetViewer()).(*notificationsForViewerQueryViewer)
+	require.NotNil(t, payload)
+	assert.Equal(t, 1, *(payload.GetNotifications().GetUnseenCount()))
 }
 
 func testSyncNewTokens(t *testing.T) {
@@ -1488,11 +1498,11 @@ func admireFeedEvent(t *testing.T, ctx context.Context, c genql.Client, feedEven
 }
 
 // commentOnFeedEvent makes a GraphQL request to admire a feed event
-func commentOnFeedEvent(t *testing.T, ctx context.Context, c genql.Client, feedEventID persist.DBID, comment string) {
+func commentOnFeedEvent(t *testing.T, ctx context.Context, c genql.Client, feedEventID persist.DBID, comment string) persist.DBID {
 	t.Helper()
 	resp, err := commentOnFeedEventMutation(ctx, c, feedEventID, comment)
 	require.NoError(t, err)
-	_ = (*resp.CommentOnFeedEvent).(*commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload)
+	return (*resp.CommentOnFeedEvent).(*commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload).Comment.Dbid
 }
 
 // admirePost makes a GraphQL request to admire a post
@@ -1511,6 +1521,14 @@ func admireToken(t *testing.T, ctx context.Context, c genql.Client, tokenID pers
 	require.NoError(t, err)
 	payload := (*resp.AdmireToken).(*admireTokenMutationAdmireTokenAdmireTokenPayload)
 	return payload.Token.Dbid
+}
+
+// admireComment makes a GraphQL request to admire a comment
+func admireComment(t *testing.T, ctx context.Context, c genql.Client, commentID persist.DBID) {
+	t.Helper()
+	resp, err := admireCommentMutation(ctx, c, commentID)
+	require.NoError(t, err)
+	_ = (*resp.AdmireComment).(*admireCommentMutationAdmireCommentAdmireCommentPayload)
 }
 
 // commentOnPost makes a GraphQL request to comment on a post
