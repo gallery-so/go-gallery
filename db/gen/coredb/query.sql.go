@@ -4398,6 +4398,64 @@ func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopC
 	return items, nil
 }
 
+const getTopCommunitiesByPosts = `-- name: GetTopCommunitiesByPosts :many
+SELECT contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain, COUNT(*) as frequency
+FROM posts
+JOIN LATERAL UNNEST(posts.contract_ids) as contract_id ON true
+JOIN contracts ON contracts.id = contract_id
+WHERE posts.created_at >= NOW() - INTERVAL '7 days'
+GROUP BY contracts.id
+ORDER BY frequency DESC
+LIMIT $1
+`
+
+type GetTopCommunitiesByPostsRow struct {
+	Contract  Contract `db:"contract" json:"contract"`
+	Frequency int64    `db:"frequency" json:"frequency"`
+}
+
+// posts has an array, contract_ids that maps to the contracts table. Find the top 10 contracts by post count in the last 7 days
+func (q *Queries) GetTopCommunitiesByPosts(ctx context.Context, limit int32) ([]GetTopCommunitiesByPostsRow, error) {
+	rows, err := q.db.Query(ctx, getTopCommunitiesByPosts, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTopCommunitiesByPostsRow
+	for rows.Next() {
+		var i GetTopCommunitiesByPostsRow
+		if err := rows.Scan(
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.Contract.L1Chain,
+			&i.Frequency,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTrendingUsersByIDs = `-- name: GetTrendingUsersByIDs :many
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
 `

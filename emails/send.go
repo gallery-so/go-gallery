@@ -10,6 +10,7 @@ import (
 
 	"github.com/bsm/redislock"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/notifications"
 
 	"cloud.google.com/go/pubsub"
@@ -34,10 +35,6 @@ func init() {
 
 const emailsAtATime = 10_000
 
-type VerificationEmailInput struct {
-	UserID persist.DBID `json:"user_id" binding:"required"`
-}
-
 type sendNotificationEmailHttpInput struct {
 	UserID         persist.DBID  `json:"user_id" binding:"required"`
 	ToEmail        persist.Email `json:"to_email" binding:"required"`
@@ -55,7 +52,7 @@ type errEmailMismatch struct {
 func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input VerificationEmailInput
+		var input emails.VerificationEmailInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)

@@ -1833,3 +1833,17 @@ on conflict(user_id, blocked_user_id) where not deleted do update set active = t
 
 -- name: UnblockUser :exec
 update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;
+
+
+-- posts has an array, contract_ids that maps to the contracts table. Find the top 10 contracts by post count in the last 7 days
+-- name: GetTopCommunitiesByPosts :many
+SELECT sqlc.embed(contracts), COUNT(*) as frequency
+FROM posts
+JOIN LATERAL UNNEST(posts.contract_ids) as contract_id ON true
+JOIN contracts ON contracts.id = contract_id
+WHERE posts.created_at >= NOW() - INTERVAL '7 days'
+GROUP BY contracts.id
+ORDER BY frequency DESC
+LIMIT $1;
+
+

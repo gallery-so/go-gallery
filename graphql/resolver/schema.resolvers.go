@@ -12,7 +12,6 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	emailService "github.com/mikeydub/go-gallery/emails"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -1774,11 +1773,11 @@ func (r *mutationResolver) PreverifyEmail(ctx context.Context, input model.Preve
 	var modelResult model.PreverifyEmailResult
 
 	switch result.Result {
-	case emailService.PreverifyEmailResultValid:
+	case emails.PreverifyEmailResultValid:
 		modelResult = model.PreverifyEmailResultValid
-	case emailService.PreverifyEmailResultInvalid:
+	case emails.PreverifyEmailResultInvalid:
 		modelResult = model.PreverifyEmailResultInvalid
-	case emailService.PreverifyEmailResultRisky:
+	case emails.PreverifyEmailResultRisky:
 		modelResult = model.PreverifyEmailResultRisky
 	default:
 		return nil, fmt.Errorf("unknown preverify result: %d", result.Result)

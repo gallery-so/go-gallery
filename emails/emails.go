@@ -12,10 +12,12 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -46,6 +48,7 @@ func coreInitServer() *gin.Engine {
 	sendgridClient := sendgrid.NewSendClient(env.GetString("SENDGRID_API_KEY"))
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
+	stg := rpc.NewStorageClient(context.Background())
 
 	router := gin.Default()
 
@@ -76,7 +79,9 @@ func coreInitServer() *gin.Engine {
 
 	go autoSendNotificationEmails(queries, sendgridClient, pub, lock)
 
-	return handlersInitServer(router, loaders, queries, sendgridClient)
+	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, nil, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil)
+
+	return handlersInitServer(router, loaders, queries, sendgridClient, stg, p)
 }
 
 func setDefaults() {
@@ -101,6 +106,8 @@ func setDefaults() {
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("ADMIN_PASS", "admin")
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
+	viper.SetDefault("RETOOL_AUTH_TOKEN", "")
+	viper.SetDefault("CONFIGURATION_BUCKET", "gallery-dev-configurations")
 
 	viper.AutomaticEnv()
 
