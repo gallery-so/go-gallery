@@ -90,33 +90,31 @@ func NewShell() *shell.Shell {
 	return sh
 }
 
-// Node that uses Infura
-var nodeInfura = func(h *http.Client, s *shell.Shell) HTTPReader {
-	return HTTPReader{Host: env.GetString("IPFS_URL"), Client: h}
-}
-
-// Node that uses a self-hosted gateway
-var nodeGallery = func(h *http.Client, s *shell.Shell) HTTPReader {
-	return HTTPReader{Host: env.GetString("FALLBACK_IPFS_URL"), Client: h}
-}
-
-// Node that uses ipfs:// protocol
-var nodeIPFS = func(h *http.Client, s *shell.Shell) IPFSReader {
-	return IPFSReader{Client: s}
-}
-
-// Node that uses a public gateway
-var nodePublic = func(h *http.Client, s *shell.Shell) HTTPReader {
-	return HTTPReader{Host: "https://ipfs.io", Client: h}
-}
+var (
+	nodeGallery = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: env.GetString("FALLBACK_IPFS_URL"), Client: h}
+	}
+	nodeIPFS = func(h *http.Client, s *shell.Shell) IPFSReader {
+		return IPFSReader{Client: s}
+	}
+	nodeIpfsIO = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://ipfs.io", Client: h}
+	}
+	nodePinata = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://gateway.pinata.cloud", Client: h}
+	}
+	nodeNftStorage = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://nftstorage.link", Client: h}
+	}
+	nodeCloudFlare = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://cloudflare-ipfs.com", Client: h}
+	}
+)
 
 func GetResponse(ctx context.Context, path string) (io.ReadCloser, error) {
 	httpClient := defaultHTTPClient()
 	ipfsClient := NewShell()
 	return util.FirstNonErrorWithValue(ctx, false, nil,
-		func(ctx context.Context) (io.ReadCloser, error) {
-			return nodeInfura(httpClient, ipfsClient).Do(ctx, path)
-		},
 		func(ctx context.Context) (io.ReadCloser, error) {
 			return nodeGallery(httpClient, ipfsClient).Do(ctx, path)
 		},
@@ -124,7 +122,16 @@ func GetResponse(ctx context.Context, path string) (io.ReadCloser, error) {
 			return nodeIPFS(httpClient, ipfsClient).Do(ctx, path)
 		},
 		func(ctx context.Context) (io.ReadCloser, error) {
-			return nodePublic(httpClient, ipfsClient).Do(ctx, path)
+			return nodeIpfsIO(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodePinata(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodeNftStorage(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodeCloudFlare(httpClient, ipfsClient).Do(ctx, path)
 		},
 	)
 }
@@ -134,13 +141,19 @@ func GetHeader(ctx context.Context, path string) (http.Header, error) {
 	ipfsClient := NewShell()
 	return util.FirstNonErrorWithValue(ctx, true, nil,
 		func(ctx context.Context) (http.Header, error) {
-			return nodeInfura(httpClient, ipfsClient).Head(ctx, path)
-		},
-		func(ctx context.Context) (http.Header, error) {
 			return nodeGallery(httpClient, ipfsClient).Head(ctx, path)
 		},
 		func(ctx context.Context) (http.Header, error) {
-			return nodePublic(httpClient, ipfsClient).Head(ctx, path)
+			return nodeIpfsIO(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodePinata(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodeNftStorage(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodeCloudFlare(httpClient, ipfsClient).Head(ctx, path)
 		},
 	)
 }
@@ -159,7 +172,8 @@ func defaultHTTPClient() *http.Client {
 
 // DefaultGatewayFrom rewrites an IPFS URL to a gateway URL using the default gateway
 func DefaultGatewayFrom(ipfsURL string) string {
-	return PathGatewayFrom(env.GetString("IPFS_URL"), ipfsURL, true)
+	// Rewrite Gallery Infura URLs temporarily to ipfs.io while our gateway is down
+	return PathGatewayFrom("https://ipfs.io", ipfsURL, true)
 }
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL

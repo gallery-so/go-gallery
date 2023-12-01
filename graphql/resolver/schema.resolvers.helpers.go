@@ -2106,13 +2106,6 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 }
 
 func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
-	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := td.FallbackMedia.ImageURL.String(); strings.HasPrefix(fallback, "ipfs://") {
-		td.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
-	} else if strings.HasPrefix(fallback, "ar://") {
-		td.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
-	}
-
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
 		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
@@ -2143,6 +2136,20 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
+	// Rewrite fallback IPFS and Arweave URLs to HTTP
+
+	if fallbackURL := fallback.ImageURL.String(); strings.HasPrefix(fallbackURL, "ipfs://") || strings.HasPrefix(fallbackURL, "https://gallery.infura-ipfs.io") {
+		fallback.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallbackURL))
+	} else if strings.HasPrefix(fallbackURL, "ar://") {
+		fallback.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
+	}
+
+	if mediaURL := tokenMedia.Media.MediaURL.String(); strings.HasPrefix(mediaURL, "ipfs://") || strings.HasPrefix(mediaURL, "https://gallery.infura-ipfs.io") {
+		tokenMedia.Media.MediaURL = persist.NullString(ipfs.DefaultGatewayFrom(mediaURL))
+	} else if strings.HasPrefix(mediaURL, "ar://") {
+		tokenMedia.Media.MediaURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(mediaURL, false)))
+	}
+
 	fallbackMedia := getFallbackMedia(ctx, fallback)
 
 	switch media := tokenMedia.Media; media.MediaType {
