@@ -38,11 +38,22 @@ type SelectedID struct {
 }
 
 type DigestValueOverrides struct {
-	TopPosts       []SelectedID `json:"posts"`
-	TopCollections []SelectedID `json:"collections"`
-	TopGalleries   []SelectedID `json:"galleries"`
-	TopFirstPosts  []SelectedID `json:"first_posts"`
+	TopPosts        []SelectedID `json:"posts"`
+	TopCollections  []SelectedID `json:"collections"`
+	TopGalleries    []SelectedID `json:"galleries"`
+	TopFirstPosts   []SelectedID `json:"first_posts"`
+	PostCount       int          `json:"post_count"`
+	CollectionCount int          `json:"collection_count"`
+	GalleryCount    int          `json:"gallery_count"`
+	FirstPostCount  int          `json:"first_post_count"`
 }
+
+const (
+	defaultPostCount       = 5
+	defaultCollectionCount = 5
+	defaultGalleryCount    = 5
+	defaultFirstPostCount  = 5
+)
 
 const overrideFile = "email_digest_overrides.json"
 
@@ -86,6 +97,17 @@ func getDigestValues(q *coredb.Queries, stg *storage.Client, f *publicapi.FeedAP
 			return
 		}
 
+		postCount := defaultPostCount
+		collectionCount := defaultCollectionCount
+
+		if overrides.PostCount != 0 {
+			postCount = overrides.PostCount
+		}
+
+		if overrides.CollectionCount != 0 {
+			collectionCount = overrides.CollectionCount
+		}
+
 		trendingFeed, _, err := f.TrendingFeed(c, nil, nil, util.ToPointer(10), nil)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error getting trending feed: %v", err))
@@ -110,7 +132,7 @@ func getDigestValues(q *coredb.Queries, stg *storage.Client, f *publicapi.FeedAP
 				Entity:   p,
 				Position: &s.Position,
 			}
-		})
+		}, postCount)
 
 		topCollections, err := q.GetTopCommunitiesByPosts(c, 10)
 		if err != nil {
@@ -127,7 +149,7 @@ func getDigestValues(q *coredb.Queries, stg *storage.Client, f *publicapi.FeedAP
 				Entity:   c,
 				Position: &s.Position,
 			}
-		})
+		}, collectionCount)
 
 		c.JSON(http.StatusOK, DigestValues{
 			TopPosts:       selectedPosts,
@@ -137,7 +159,7 @@ func getDigestValues(q *coredb.Queries, stg *storage.Client, f *publicapi.FeedAP
 	}
 }
 
-func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected) []Selected {
+func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int) []Selected {
 	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
 	for _, post := range overrides {
 		selectedResults[post.Position] = overrideFetcher(post)
@@ -145,10 +167,10 @@ func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s
 outer:
 	for i, it := range initial {
 		ic := i
-		if selectedResults[i].Position != nil && i < 5 {
+		if selectedResults[i].Position != nil && i < selectedCount {
 			// add to the next available position while keeping the order, if we exceed 5, append to the end still without a position
 			// also ensure that i is updated so that we don't overwrite the same position in the next loop
-			for j := i; j < 5; j++ {
+			for j := i; j < selectedCount; j++ {
 				j := j
 				if selectedResults[j].Position == nil {
 					selectedResults[j] = Selected{
@@ -160,7 +182,7 @@ outer:
 				}
 			}
 		}
-		if i < 5 {
+		if i < selectedCount {
 			selectedResults[i] = Selected{
 				Entity:   it,
 				Position: &ic,
