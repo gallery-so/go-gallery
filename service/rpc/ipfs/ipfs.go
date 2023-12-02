@@ -177,9 +177,9 @@ func DefaultGatewayFrom(ipfsURL string) string {
 }
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
-// If includeQueryParams is true, the query parameters will be included in the gateway URL
-func PathGatewayFrom(gatewayHost, ipfsURL string, includeQueryParams bool) string {
-	return PathGatewayFor(gatewayHost, util.GetURIPath(ipfsURL, includeQueryParams))
+// If withOutQueryParams is true, the query parameters will be removed from the gateway URL
+func PathGatewayFrom(gatewayHost, ipfsURL string, withOutQueryParams bool) string {
+	return PathGatewayFor(gatewayHost, util.GetURIPath(ipfsURL, withOutQueryParams))
 }
 
 // PathGatewayFor returns the path gateway URL for a CID
