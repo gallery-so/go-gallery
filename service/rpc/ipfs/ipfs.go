@@ -173,7 +173,7 @@ func defaultHTTPClient() *http.Client {
 // DefaultGatewayFrom rewrites an IPFS URL to a gateway URL using the default gateway
 func DefaultGatewayFrom(ipfsURL string) string {
 	// Rewrite Gallery Infura URLs temporarily to ipfs.io while our gateway is down
-	return PathGatewayFrom("https://ipfs.io", ipfsURL, true)
+	return PathGatewayFrom("https://ipfs.io", ipfsURL, false)
 }
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
