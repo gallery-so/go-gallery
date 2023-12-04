@@ -102,7 +102,7 @@ func tezosProviderSet(serverEnvInit envInit, client *http.Client) tezosProviderL
 
 // tezosProvidersConfig is a wire injector that binds multichain interfaces to their concrete Tezos implementations
 func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackProvider) tezosProviderList {
-	serverTezosProviderList := tezosRequirements(tezosProvider, tezosProvider, tezosProvider, tezosProvider)
+	serverTezosProviderList := tezosRequirements(tezosProvider, tezosProvider, tezosProvider, tezosProvider, tezosProvider)
 	return serverTezosProviderList
 }
 
@@ -309,8 +309,9 @@ func tezosRequirements(
 	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
+	tcof multichain.ContractsOwnerFetcher,
 ) tezosProviderList {
-	return tezosProviderList{tof, tiof, toc, tmf}
+	return tezosProviderList{tof, tiof, toc, tmf, tcof}
 }
 
 // optimismRequirements is the set of provider interfaces required for Optimism

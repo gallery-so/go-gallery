@@ -165,6 +165,7 @@ func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackP
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(tezosProvider)),
+		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(tezosProvider)),
 		tezosRequirements,
 	)
 	return nil
@@ -176,8 +177,9 @@ func tezosRequirements(
 	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
+	tcof multichain.ContractsOwnerFetcher,
 ) tezosProviderList {
-	return tezosProviderList{tof, tiof, toc, tmf}
+	return tezosProviderList{tof, tiof, toc, tmf, tcof}
 }
 
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
