@@ -209,12 +209,12 @@ func pathURL(host, uri string) string {
 	return fmt.Sprintf("%s/ipfs/%s", host, uri)
 }
 
-// standardizeQueryParams converts a URI with optional query params from the format <cid>?key=val&key=val to the format <cid>/?key=val&key=val
-// Most gateways will redirect the former to the latter, but some gayeways like fxhash.xyz don't.
-// https://docs.ipfs.tech/concepts/ipfs-gateway/#path
+// standardizeQueryParams converts a URI with optional params from the format <cid>?key=val&key=val to the format <cid>/?key=val&key=val
+// Most gateways will redirect the former to the latter, but some gateways don't. https://docs.ipfs.tech/concepts/ipfs-gateway/#path
 func standardizeQueryParams(uri string) string {
 	paramIdx := strings.Index(uri, "?")
-	if paramIdx == -1 {
+	isClean := strings.Index(uri, "/?") != -1
+	if paramIdx != -1 && !isClean {
 		uri = uri[:paramIdx] + "/?" + uri[paramIdx+1:]
 	}
 	return uri
