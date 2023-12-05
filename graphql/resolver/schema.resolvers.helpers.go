@@ -26,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
@@ -35,7 +36,7 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-const top100ActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
+const topActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
@@ -276,11 +277,11 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits pers
 		result = append(result, contractToBadgeModel(ctx, contract))
 	}
 
-	if _, ok := traits[persist.TraitTypeTop100ActiveUser]; ok {
+	if _, ok := traits[persist.TraitTypeTopActiveUser]; ok {
 
 		result = append(result, &model.Badge{
 			Name:     util.ToPointer("Top Member"),
-			ImageURL: top100ActivityImageURL,
+			ImageURL: topActivityImageURL,
 		})
 	}
 
@@ -2106,16 +2107,11 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 }
 
 func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
-	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := td.FallbackMedia.ImageURL.String(); strings.HasPrefix(fallback, "ipfs://") {
-		td.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
-	} else if strings.HasPrefix(fallback, "ar://") {
-		td.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
-	}
+	isFxHash := tezos.IsFxHash(td.ContractAddress)
 
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2129,7 +2125,7 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
@@ -2139,10 +2135,24 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 }
 
-func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
+func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool, isFxHash bool) model.MediaSubtype {
+	// Rewrite fallback IPFS and Arweave URLs to HTTP
+
+	if fallbackURL := fallback.ImageURL.String(); strings.HasPrefix(fallbackURL, "ipfs://") || strings.HasPrefix(fallbackURL, "https://gallery.infura-ipfs.io") {
+		fallback.ImageURL = persist.NullString(ipfs.BestGatewayNodeFrom(fallbackURL, isFxHash))
+	} else if strings.HasPrefix(fallbackURL, "ar://") {
+		fallback.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
+	}
+
+	if mediaURL := tokenMedia.Media.MediaURL.String(); strings.HasPrefix(mediaURL, "ipfs://") || strings.HasPrefix(mediaURL, "https://gallery.infura-ipfs.io") {
+		tokenMedia.Media.MediaURL = persist.NullString(ipfs.BestGatewayNodeFrom(mediaURL, isFxHash))
+	} else if strings.HasPrefix(mediaURL, "ar://") {
+		tokenMedia.Media.MediaURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(mediaURL, false)))
+	}
+
 	fallbackMedia := getFallbackMedia(ctx, fallback)
 
 	switch media := tokenMedia.Media; media.MediaType {

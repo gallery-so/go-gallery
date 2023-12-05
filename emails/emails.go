@@ -75,9 +75,7 @@ func coreInitServer() *gin.Engine {
 		}
 	}
 
-	lock := redis.NewLockClient(redis.NewCache(redis.EmailThrottleCache))
-
-	go autoSendNotificationEmails(queries, sendgridClient, pub, lock)
+	go autoSendNotificationEmails(queries, sendgridClient, pub, redis.NewCache(redis.EmailThrottleCache))
 
 	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, nil, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil)
 

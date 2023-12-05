@@ -37,6 +37,7 @@ type contract struct {
 	Creator_Address persist.Address
 	Level           int
 	Type            tokenStandard
+	Collection_ID   string
 	Logo            string
 }
 
@@ -85,6 +86,60 @@ type tokensByContractQuery struct {
 
 type tokensByIdentifiersQuery struct {
 	Token []token `graphql:"token(where: {fa: {type: {_eq: fa2}}, fa_contract: {_eq: $contractAddress}, token_id: {_eq: $tokenID}, holders: {quantity: {_gt: 0}, holder: {address: {_eq: $ownerAddress}}}})"`
+}
+
+/*
+tokens by creator
+ token_creator(
+    where: {creator_address: {_eq: "tz1hghbrDGx33HendcHRAdKUDtdFoFP24uaE"}, token: {fa_contract: {_nin: ["KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi", "KT1GtbuswcNMGhHF2TSuH1Yfaqn16do8Qtva","KT1EfsNuqwLAWDd3o4pvfUx1CAh5GMdTrRvr"]}}}
+    order_by: {token_pk: desc_nulls_last}
+  ) {
+    token {
+      pk
+       description
+      decimals
+      extra
+      level
+      ophash
+      metadata
+      tags {
+         tag {
+          id
+          name
+          token_count
+        }
+      }
+      tzip16_key
+      name
+      token_id
+      supply
+      symbol
+      holders {
+        quantity
+      }
+      fa_contract
+      fa {
+        name
+      }
+    }
+  }
+
+  collections by creator
+  fa(where: {creator: {address: {_eq: "tz1hghbrDGx33HendcHRAdKUDtdFoFP24uaE"}}}) {
+	... fa fields
+  }
+*/
+
+type objktTokenCreator struct {
+	Token token
+}
+
+type tokensByCreatorQuery struct {
+	TokenCreator []objktTokenCreator `graphql:"token_creator(where: {creator_address: {_eq: $creatorAddress}, token: {fa_contract: {_nin: $contracts}}}, order_by: {token_pk: desc_nulls_last}, limit: $limit, offset: $offset)"`
+}
+
+type faByCreatorQuery struct {
+	Fa []contract `graphql:"fa(where: {creator: {address: {_eq: $creatorAddress}}})"`
 }
 
 // Objkt's API has pretty strict usage limits (120 requests/minute, and 500 results per page)
@@ -366,29 +421,7 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 		LatestBlock: persist.BlockNumber(firstToken.Fa.Level),
 	}
 
-	tokenID := persist.TokenID(firstToken.Token_ID.toBase16String())
-	agnosticTokens := make([]multichain.ChainAgnosticToken, len(query.Token))
-	for i, token := range query.Token {
-		var ownerAddress persist.Address
-		if len(token.Holders) > 0 {
-			ownerAddress = persist.Address(token.Holders[0].Holder_Address)
-		}
-		agnosticTokens[i] = multichain.ChainAgnosticToken{
-			TokenType: persist.TokenTypeERC1155,
-			Descriptors: multichain.ChainAgnosticTokenDescriptors{
-				Description: firstToken.Description,
-				Name:        firstToken.Name,
-			},
-			TokenID:         tokenID,
-			ContractAddress: agnosticContract.Address,
-			Quantity:        persist.HexString(fmt.Sprintf("%x", firstToken.Holders[0].Quantity)),
-			TokenMetadata:   createMetadata(token),
-			OwnerAddress:    ownerAddress,
-			BlockNumber:     persist.BlockNumber(firstToken.Level),
-		}
-	}
-
-	return agnosticTokens, agnosticContract, nil
+	return objktHolderTokensToChainAgnostic(query.Token), agnosticContract, nil
 }
 
 func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
@@ -447,30 +480,7 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
 	}
 
-	returnTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
-	for _, token := range tokens {
-		tokenID := persist.TokenID(token.Token_ID.toBase16String())
-		metadata := createMetadata(token)
-		// Create token per holder
-		for _, holder := range token.Holders {
-			agnosticToken := multichain.ChainAgnosticToken{
-				TokenType: persist.TokenTypeERC1155,
-				Descriptors: multichain.ChainAgnosticTokenDescriptors{
-					Description: token.Description,
-					Name:        token.Name,
-				},
-				TokenID:         tokenID,
-				ContractAddress: agnosticContract.Address,
-				Quantity:        persist.HexString(fmt.Sprintf("%x", holder.Quantity)),
-				TokenMetadata:   metadata,
-				OwnerAddress:    holder.Holder_Address,
-				BlockNumber:     persist.BlockNumber(token.Level),
-			}
-			returnTokens = append(returnTokens, agnosticToken)
-		}
-	}
-
-	return returnTokens, agnosticContract, nil
+	return objktHolderTokensToChainAgnostic(tokens), agnosticContract, nil
 }
 
 func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
@@ -530,7 +540,11 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
 	}
 
-	returnTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
+	return objktHolderTokensToChainAgnostic(tokens), agnosticContract, nil
+}
+
+func objktHolderTokensToChainAgnostic(tokens []token) []multichain.ChainAgnosticToken {
+	result := make([]multichain.ChainAgnosticToken, 0, len(tokens))
 	for _, token := range tokens {
 		tokenID := persist.TokenID(token.Token_ID.toBase16String())
 		metadata := createMetadata(token)
@@ -539,7 +553,6 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 			return persist.TokenURI(s).IsRenderable()
 		})
 
-		// Create token per holder
 		for _, holder := range token.Holders {
 			agnosticToken := multichain.ChainAgnosticToken{
 				TokenType: persist.TokenTypeERC1155,
@@ -551,17 +564,16 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 				FallbackMedia: persist.FallbackMedia{
 					ImageURL: persist.NullString(firstValidThumbnail),
 				},
-				ContractAddress: agnosticContract.Address,
+				ContractAddress: token.Fa.Contract,
 				Quantity:        persist.HexString(fmt.Sprintf("%x", holder.Quantity)),
 				TokenMetadata:   metadata,
 				OwnerAddress:    holder.Holder_Address,
 				BlockNumber:     persist.BlockNumber(token.Level),
 			}
-			returnTokens = append(returnTokens, agnosticToken)
+			result = append(result, agnosticToken)
 		}
 	}
-
-	return returnTokens, agnosticContract, nil
+	return result
 }
 
 func createMetadata(t token) persist.TokenMetadata {

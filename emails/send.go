@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bsm/redislock"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/gin-gonic/gin"
@@ -134,25 +134,24 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 	}
 }
 
-func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client, r *redislock.Client) error {
+func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client, r *redis.Cache) error {
 	ctx := context.Background()
 	sub := psub.Subscription(env.GetString("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
 
 	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		l, err := r.Obtain(ctx, "send-notification-emails", time.Minute*5, nil)
-		if err != nil {
+		l, _ := r.Get(ctx, "send-notification-emails")
+		if l != nil && len(l) > 0 {
 			msg.Ack()
 			return
 		}
-		defer l.Release(ctx)
-		err = sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
+		r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
+		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
-			msg.Nack()
+			msg.Ack()
 			return
 		}
 		msg.Ack()
-
 	})
 }
 

@@ -1799,7 +1799,7 @@ scores AS (
     FULL OUTER JOIN cm using(actor_id)
     FULL OUTER JOIN cr using(actor_id)
 )
-SELECT *
+SELECT scores.*, users.traits
 FROM scores
 join users on scores.actor_id = users.id
 WHERE users.deleted = false AND users.universal = false
