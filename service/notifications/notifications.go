@@ -1049,7 +1049,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 	case persist.ActionTopActivityBadgeReceived:
 		return UserFacingNotificationData{
 			Actor:  "You",
-			Action: fmt.Sprintf("received a new badge for being in the top %d of active users on Gallery", n.Data.ActivityBadgeThreshold),
+			Action: "received a new badge for being amongst the top active users on Gallery this week!",
 		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
