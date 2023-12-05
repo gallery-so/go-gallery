@@ -109,6 +109,9 @@ var (
 	nodeCloudFlare = func(h *http.Client, s *shell.Shell) HTTPReader {
 		return HTTPReader{Host: "https://cloudflare-ipfs.com", Client: h}
 	}
+	nodeFxHash = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://gateway.fxhash.xyz", Client: h}
+	}
 )
 
 func GetResponse(ctx context.Context, path string) (io.ReadCloser, error) {
@@ -170,21 +173,22 @@ func defaultHTTPClient() *http.Client {
 	}
 }
 
+// BestGatewayNodeFrom rewrites an IPFS URL to a gateway URL using the appropriate gateway
+func BestGatewayNodeFrom(ipfsURL string, isFxHash bool) string {
+	if isFxHash {
+		return PathGatewayFrom(nodeFxHash(nil, nil).Host, ipfsURL)
+	}
+	return DefaultGatewayFrom(ipfsURL)
+}
+
 // DefaultGatewayFrom rewrites an IPFS URL to a gateway URL using the default gateway
 func DefaultGatewayFrom(ipfsURL string) string {
-	// Rewrite Gallery Infura URLs temporarily to ipfs.io while our gateway is down
-	return PathGatewayFrom("https://ipfs.io", ipfsURL, false)
+	return PathGatewayFrom(nodeIpfsIO(nil, nil).Host, ipfsURL)
 }
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
-// If withOutQueryParams is true, the query parameters will be removed from the gateway URL
-func PathGatewayFrom(gatewayHost, ipfsURL string, withOutQueryParams bool) string {
-	return PathGatewayFor(gatewayHost, util.GetURIPath(ipfsURL, withOutQueryParams))
-}
-
-// PathGatewayFor returns the path gateway URL for a CID
-func PathGatewayFor(gatewayHost, cid string) string {
-	return pathURL(gatewayHost, cid)
+func PathGatewayFrom(gatewayHost, ipfsURL string) string {
+	return pathURL(gatewayHost, util.GetURIPath(ipfsURL, false))
 }
 
 // authTransport decorates each request with a basic auth header.
@@ -200,8 +204,20 @@ func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // pathURL returns the gateway URL in path resolution sytle
-func pathURL(host, path string) string {
-	return fmt.Sprintf("%s/ipfs/%s", host, path)
+func pathURL(host, uri string) string {
+	uri = standardizeQueryParams(uri)
+	return fmt.Sprintf("%s/ipfs/%s", host, uri)
+}
+
+// standardizeQueryParams converts a URI with optional params from the format <cid>?key=val&key=val to the format <cid>/?key=val&key=val
+// Most gateways will redirect the former to the latter, but some gateways don't. https://docs.ipfs.tech/concepts/ipfs-gateway/#path
+func standardizeQueryParams(uri string) string {
+	paramIdx := strings.Index(uri, "?")
+	isClean := strings.Index(uri, "/?") != -1
+	if paramIdx != -1 && !isClean {
+		uri = uri[:paramIdx] + "/?" + uri[paramIdx+1:]
+	}
+	return uri
 }
 
 func isInfura(gateway string) bool {
