@@ -201,7 +201,7 @@ func (b *CountAdmiresByTokenIDBatchBatchResults) Close() error {
 }
 
 const countCommentsByFeedEventIDBatch = `-- name: CountCommentsByFeedEventIDBatch :batchone
-SELECT count(*) FROM comments WHERE feed_event_id = $1 AND reply_to is null AND deleted = false
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
 `
 
 type CountCommentsByFeedEventIDBatchBatchResults struct {
@@ -210,6 +210,7 @@ type CountCommentsByFeedEventIDBatchBatchResults struct {
 	closed bool
 }
 
+// returns the amount of replies as well as the top level comments
 func (q *Queries) CountCommentsByFeedEventIDBatch(ctx context.Context, feedEventID []persist.DBID) *CountCommentsByFeedEventIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range feedEventID {
@@ -246,7 +247,7 @@ func (b *CountCommentsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const countCommentsByPostIDBatch = `-- name: CountCommentsByPostIDBatch :batchone
-SELECT count(*) FROM comments WHERE post_id = $1 AND reply_to is null AND deleted = false
+SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false
 `
 
 type CountCommentsByPostIDBatchBatchResults struct {
@@ -255,6 +256,7 @@ type CountCommentsByPostIDBatchBatchResults struct {
 	closed bool
 }
 
+// returns the amount of replies as well as the top level comments
 func (q *Queries) CountCommentsByPostIDBatch(ctx context.Context, postID []persist.DBID) *CountCommentsByPostIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range postID {

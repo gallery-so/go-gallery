@@ -731,8 +731,9 @@ SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
 
+-- returns the amount of replies as well as the top level comments
 -- name: CountCommentsByFeedEventIDBatch :batchone
-SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false;
+SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false;
 
 -- name: PaginateCommentsByPostIDBatch :batchmany
 SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false
@@ -759,8 +760,9 @@ SELECT * FROM comments WHERE
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
 
+-- returns the amount of replies as well as the top level comments
 -- name: CountCommentsByPostIDBatch :batchone
-SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
+SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false;
 
 -- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
