@@ -195,6 +195,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	followerHandler := followerNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	tokenGroupedHandler := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	viewHandler := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	topActivityHandler := topActivityHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 
 	// notification actions that are grouped by owner
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, ownerGroupedHandler)
@@ -209,7 +210,9 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	notifDispatcher.AddHandler(persist.ActionMentionUser, singleHandler)
 	notifDispatcher.AddHandler(persist.ActionMentionCommunity, singleHandler)
 	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, singleHandler)
-	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, singleHandler)
+
+	// notification specifically for ensuring that top users don't get re-notified and users recently notified arent notified again
+	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, topActivityHandler)
 
 	// notification actions that are grouped and inserted by follower
 	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, followerHandler)
@@ -309,6 +312,21 @@ type singleNotificationHandler struct {
 }
 
 func (h singleNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
+}
+
+type topActivityHandler struct {
+	queries    *db.Queries
+	pubSub     *pubsub.Client
+	taskClient *task.Client
+	limiter    *pushLimiter
+}
+
+func (h topActivityHandler) Handle(ctx context.Context, notif db.Notification) error {
+	if !notif.Data.NewTopActiveUser {
+		return nil
+	}
+
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 

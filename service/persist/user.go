@@ -15,7 +15,7 @@ import (
 type TraitType string
 
 const (
-	TraitTypeTop100ActiveUser TraitType = "top_100"
+	TraitTypeTopActiveUser TraitType = "top_active_user"
 )
 
 type Traits map[TraitType]interface{}
