@@ -19,6 +19,7 @@ var emailVerificationStatuses = []string{"Unverified", "Verified", "Failed", "Ad
 const (
 	EmailTypeNotifications EmailType = "notifications"
 	EmailTypeAdmin         EmailType = "admin"
+	EmailTypeDigest        EmailType = "digest"
 )
 
 const (

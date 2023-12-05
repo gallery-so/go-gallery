@@ -44,7 +44,8 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	router.GET("/preverify", middleware.IPRateLimited(preverifyLimiter), preverifyEmail())
 
 	digestGroup := router.Group("/digest")
-	digestGroup.GET("/values", retoolMiddleware, getDigestValues(queries, stg, papi.Feed))
+	digestGroup.GET("/values", retoolMiddleware, getDigestValues(queries, loaders, stg, papi.Feed))
+	digestGroup.POST("/values", retoolMiddleware, updateDigestValues(stg))
 
 	return router
 }

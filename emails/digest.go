@@ -1,6 +1,7 @@
 package emails
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -10,7 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -26,10 +29,15 @@ type GalleryWithUser struct {
 }
 
 type DigestValues struct {
-	TopPosts       []Selected `json:"posts"`
-	TopCollections []Selected `json:"collections"`
-	TopGalleries   []Selected `json:"galleries"`
-	TopFirstPosts  []Selected `json:"first_posts"`
+	TopPosts       IncludedSelected `json:"posts"`
+	TopCommunities IncludedSelected `json:"communities"`
+	TopGalleries   IncludedSelected `json:"galleries"`
+	TopFirstPosts  IncludedSelected `json:"first_posts"`
+}
+
+type IncludedSelected struct {
+	Selected []Selected
+	Include  bool `json:"include"`
 }
 
 type SelectedID struct {
@@ -38,125 +46,237 @@ type SelectedID struct {
 }
 
 type DigestValueOverrides struct {
-	TopPosts        []SelectedID `json:"posts"`
-	TopCollections  []SelectedID `json:"collections"`
-	TopGalleries    []SelectedID `json:"galleries"`
-	TopFirstPosts   []SelectedID `json:"first_posts"`
-	PostCount       int          `json:"post_count"`
-	CollectionCount int          `json:"collection_count"`
-	GalleryCount    int          `json:"gallery_count"`
-	FirstPostCount  int          `json:"first_post_count"`
+	TopPosts              []SelectedID `json:"posts"`
+	TopCommunities        []SelectedID `json:"communities"`
+	TopGalleries          []SelectedID `json:"galleries"`
+	TopFirstPosts         []SelectedID `json:"first_posts"`
+	PostCount             int          `json:"post_count"`
+	CommunityCount        int          `json:"community_count"`
+	GalleryCount          int          `json:"gallery_count"`
+	FirstPostCount        int          `json:"first_post_count"`
+	IncludeTopPosts       *bool        `json:"include_top_posts,omitempty"`
+	IncludeTopCommunities *bool        `json:"include_top_communities,omitempty"`
+	IncludeTopGalleries   *bool        `json:"include_top_galleries,omitempty"`
+	IncludeTopFirstPosts  *bool        `json:"include_top_first,omitempty"`
+}
+
+type UserFacingToken struct {
+	TokenID         persist.DBID `json:"token_id"`
+	Name            string       `json:"name"`
+	Description     string       `json:"description"`
+	PreviewImageURL string       `json:"preview_image_url"`
+}
+type UserFacingPost struct {
+	PostID          persist.DBID      `json:"post_id"`
+	Caption         string            `json:"caption"`
+	Author          string            `json:"author"`
+	Tokens          []UserFacingToken `json:"tokens"`
+	PreviewImageURL string            `json:"preview_image_url"`
+}
+
+type UserFacingContract struct {
+	ContractID      persist.DBID `json:"contract_id"`
+	Name            string       `json:"name"`
+	Description     string       `json:"description"`
+	PreviewImageURL string       `json:"preview_image_url"`
 }
 
 const (
-	defaultPostCount       = 5
-	defaultCollectionCount = 5
-	defaultGalleryCount    = 5
-	defaultFirstPostCount  = 5
+	defaultPostCount             = 5
+	defaultCommunityCount        = 5
+	defaultGalleryCount          = 5
+	defaultFirstPostCount        = 5
+	defaultIncludeTopPosts       = true
+	defaultIncludeTopGaleries    = false
+	defaultIncludeTopCommunities = true
+	defaultIncludeTopFirstPosts  = false
 )
 
 const overrideFile = "email_digest_overrides.json"
 
-func getDigestValues(q *coredb.Queries, stg *storage.Client, f *publicapi.FeedAPI) gin.HandlerFunc {
+func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storage.Client, f *publicapi.FeedAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		// mimic backend auth with no signed in user
-		c.Set("auth.auth_error", nil)
-		c.Set("auth.user_id", persist.DBID(""))
-
-		_, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).Attrs(c)
-		if err != nil && err != storage.ErrObjectNotExist {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error getting overrides attrs: %v", err))
-			return
-		}
-
-		if err == storage.ErrObjectNotExist {
-			w := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewWriter(c)
-			err = json.NewEncoder(w).Encode(DigestValueOverrides{})
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error encoding overrides: %v", err))
-				return
-			}
-			err = w.Close()
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error closing writer: %v", err))
-				return
-			}
-		}
-
-		reader, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewReader(c)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error getting overrides: %v", err))
-			return
-		}
-
-		var overrides DigestValueOverrides
-		err = json.NewDecoder(reader).Decode(&overrides)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error decoding overrides: %v", err))
-			return
-		}
-
-		postCount := defaultPostCount
-		collectionCount := defaultCollectionCount
-
-		if overrides.PostCount != 0 {
-			postCount = overrides.PostCount
-		}
-
-		if overrides.CollectionCount != 0 {
-			collectionCount = overrides.CollectionCount
-		}
-
-		trendingFeed, _, err := f.TrendingFeed(c, nil, nil, util.ToPointer(10), nil)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error getting trending feed: %v", err))
-			return
-		}
-
-		topPosts := util.Filter(util.MapWithoutError(trendingFeed, func(a any) any {
-			if post, ok := a.(coredb.Post); ok {
-				return post
-			}
-			return coredb.Post{}
-		}), func(p any) bool {
-			return p.(coredb.Post).ID != ""
-		}, false)
-
-		selectedPosts := selectResults(topPosts, overrides.TopPosts, func(s SelectedID) Selected {
-			p, err := q.GetPostByID(c, s.ID)
-			if err != nil {
-				return Selected{}
-			}
-			return Selected{
-				Entity:   p,
-				Position: &s.Position,
-			}
-		}, postCount)
-
-		topCollections, err := q.GetTopCommunitiesByPosts(c, 10)
+		result, err := getDigest(c, stg, f, q, loaders)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-
-		selectedCollections := selectResults(util.MapWithoutError(topCollections, func(c coredb.GetTopCommunitiesByPostsRow) any { return c }), overrides.TopCollections, func(s SelectedID) Selected {
-			c, err := q.GetContractByID(c, s.ID)
-			if err != nil {
-				return Selected{}
-			}
-			return Selected{
-				Entity:   c,
-				Position: &s.Position,
-			}
-		}, collectionCount)
-
-		c.JSON(http.StatusOK, DigestValues{
-			TopPosts:       selectedPosts,
-			TopCollections: selectedCollections,
-			// TODO top galleries and top first posts
-		})
+		c.JSON(http.StatusOK, result)
 	}
+}
+
+func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders) (DigestValues, error) {
+	// TODO top galleries and top first posts
+	_, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).Attrs(c)
+	if err != nil && err != storage.ErrObjectNotExist {
+		return DigestValues{}, fmt.Errorf("error getting overrides attrs: %v", err)
+	}
+
+	if err == storage.ErrObjectNotExist {
+		w := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewWriter(c)
+		err = json.NewEncoder(w).Encode(DigestValueOverrides{})
+		if err != nil {
+			return DigestValues{}, fmt.Errorf("error encoding overrides: %v", err)
+		}
+		err = w.Close()
+		if err != nil {
+			return DigestValues{}, fmt.Errorf("error closing writer: %v", err)
+		}
+	}
+
+	reader, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewReader(c)
+	if err != nil {
+		return DigestValues{}, fmt.Errorf("error getting overrides: %v", err)
+	}
+
+	var overrides DigestValueOverrides
+	err = json.NewDecoder(reader).Decode(&overrides)
+	if err != nil {
+		return DigestValues{}, fmt.Errorf("error decoding overrides: %v", err)
+	}
+
+	postCount := defaultPostCount
+	collectionCount := defaultCommunityCount
+
+	if overrides.PostCount != 0 {
+		postCount = overrides.PostCount
+	}
+
+	if overrides.CommunityCount != 0 {
+		collectionCount = overrides.CommunityCount
+	}
+
+	trendingFeed, _, err := f.TrendingFeed(c, nil, nil, util.ToPointer(10), nil)
+	if err != nil {
+		return DigestValues{}, fmt.Errorf("error getting trending feed: %v", err)
+	}
+
+	topPosts := util.Filter(util.MapWithoutError(trendingFeed, func(a any) any {
+		if post, ok := a.(coredb.Post); ok {
+			up, err := postToUserFacing(c, q, post, loaders)
+			if err != nil {
+				logger.For(c).Errorf("error converting post to user facing: %s", err)
+				return nil
+			}
+			return up
+		}
+		return nil
+	}), func(p any) bool {
+		return p.(UserFacingPost).PostID != ""
+	}, false)
+
+	selectedPosts := selectResults(topPosts, overrides.TopPosts, func(s SelectedID) Selected {
+		p, err := q.GetPostByID(c, s.ID)
+		if err != nil {
+			logger.For(c).Errorf("error getting post by id: %s", err)
+			return Selected{}
+		}
+		up, err := postToUserFacing(c, q, p, loaders)
+		if err != nil {
+			logger.For(c).Errorf("error converting post to user facing: %s", err)
+			return Selected{}
+		}
+		return Selected{
+			Entity:   up,
+			Position: &s.Position,
+		}
+	}, postCount)
+
+	topCollectionsDB, err := q.GetTopCommunitiesByPosts(c, 10)
+	if err != nil {
+		return DigestValues{}, err
+	}
+
+	topCollectionsUserFacing := util.MapWithoutError(topCollectionsDB, func(co coredb.GetTopCommunitiesByPostsRow) any {
+		return contractToUserFacing(co.Contract)
+	})
+
+	selectedCollections := selectResults(topCollectionsUserFacing, overrides.TopCommunities, func(s SelectedID) Selected {
+		c, err := q.GetContractByID(c, s.ID)
+		if err != nil {
+			return Selected{}
+		}
+		return Selected{
+			Entity:   contractToUserFacing(c),
+			Position: &s.Position,
+		}
+	}, collectionCount)
+
+	includePosts := defaultIncludeTopPosts
+	includeCommunities := defaultIncludeTopCommunities
+	if overrides.IncludeTopPosts != nil {
+		includePosts = *overrides.IncludeTopPosts
+	}
+	if overrides.IncludeTopCommunities != nil {
+		includeCommunities = *overrides.IncludeTopCommunities
+	}
+
+	result := DigestValues{
+		TopPosts: IncludedSelected{
+			Selected: selectedPosts,
+			Include:  includePosts,
+		},
+		TopCommunities: IncludedSelected{
+			Selected: selectedCollections,
+			Include:  includeCommunities,
+		},
+	}
+	return result, nil
+}
+
+func contractToUserFacing(collection coredb.Contract) UserFacingContract {
+	return UserFacingContract{
+		ContractID:      collection.ID,
+		Name:            collection.Name.String,
+		Description:     collection.Description.String,
+		PreviewImageURL: collection.ProfileImageUrl.String,
+	}
+}
+
+func tokenToUserFacing(c context.Context, tokenID persist.DBID, q *coredb.Queries, loaders *dataloader.Loaders) (UserFacingToken, error) {
+	token, err := q.GetTokenById(c, tokenID)
+	if err != nil {
+		return UserFacingToken{}, fmt.Errorf("error getting token by id: %s", err)
+	}
+	media, err := loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(token.TokenDefinition.TokenMediaID)
+	if err != nil {
+		return UserFacingToken{}, fmt.Errorf("error getting media by id: %s", err)
+	}
+	return UserFacingToken{
+		TokenID:         tokenID,
+		Name:            token.TokenDefinition.Name.String,
+		Description:     token.TokenDefinition.Description.String,
+		PreviewImageURL: media.Media.ThumbnailURL.String(),
+	}, nil
+}
+
+func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, loaders *dataloader.Loaders) (UserFacingPost, error) {
+	user, err := q.GetUserById(c, post.ActorID)
+	if err != nil {
+		return UserFacingPost{}, fmt.Errorf("error getting user by id: %s", err)
+	}
+	var tokens []UserFacingToken
+	for _, t := range post.TokenIds {
+		ut, err := tokenToUserFacing(c, t, q, loaders)
+		if err != nil {
+			return UserFacingPost{}, fmt.Errorf("error getting token by id: %s", err)
+		}
+
+		tokens = append(tokens, ut)
+	}
+	var previewURL string
+	if len(tokens) > 0 {
+		previewURL = tokens[0].PreviewImageURL
+	}
+
+	return UserFacingPost{
+		PostID:          post.ID,
+		Caption:         post.Caption.String,
+		Author:          user.Username.String,
+		Tokens:          tokens,
+		PreviewImageURL: previewURL,
+	}, nil
 }
 
 func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int) []Selected {
@@ -195,4 +315,27 @@ outer:
 		}
 	}
 	return selectedResults
+}
+
+func updateDigestValues(stg *storage.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := DigestValueOverrides{}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("error binding json: %v", err))
+			return
+		}
+
+		w := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewWriter(c)
+		err := json.NewEncoder(w).Encode(&input)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error encoding overrides: %v", err))
+			return
+		}
+		err = w.Close()
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error closing writer: %v", err))
+			return
+		}
+	}
 }

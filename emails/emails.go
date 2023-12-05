@@ -79,6 +79,8 @@ func coreInitServer() *gin.Engine {
 
 	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, nil, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil)
 
+	go autoSendDigestEmails(queries, loaders, sendgridClient, pub, redis.NewCache(redis.EmailThrottleCache), stg, p.Feed)
+
 	return handlersInitServer(router, loaders, queries, sendgridClient, stg, p)
 }
 
@@ -99,8 +101,10 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "865cea98-bf23-4ca3-a8d7-2dc9ea29951b")
 	viper.SetDefault("SENDGRID_NOTIFICATIONS_TEMPLATE_ID", "d-6135d8f36e9946979b0dcf1800363ab4")
 	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
+	viper.SetDefault("SENDGRID_DIGEST_TEMPLATE_ID", "d-0b9b6b0b0b5e4b6e9b0b0b5e4b6e9b0b")
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
 	viper.SetDefault("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "notifications-email-sub")
+	viper.SetDefault("PUBSUB_DIGEST_EMAILS_SUBSCRIPTION", "digest-email-sub")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("ADMIN_PASS", "admin")
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
