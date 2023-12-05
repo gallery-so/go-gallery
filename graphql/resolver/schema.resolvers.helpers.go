@@ -36,7 +36,7 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-const top100ActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
+const topActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
@@ -277,11 +277,11 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits pers
 		result = append(result, contractToBadgeModel(ctx, contract))
 	}
 
-	if _, ok := traits[persist.TraitTypeTop100ActiveUser]; ok {
+	if _, ok := traits[persist.TraitTypeTopActiveUser]; ok {
 
 		result = append(result, &model.Badge{
 			Name:     util.ToPointer("Top Member"),
-			ImageURL: top100ActivityImageURL,
+			ImageURL: topActivityImageURL,
 		})
 	}
 

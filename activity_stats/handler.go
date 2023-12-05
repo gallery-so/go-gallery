@@ -85,6 +85,13 @@ func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgx
 		}
 
 		for _, r := range top {
+			t := persist.Traits{}
+			err = r.Traits.AssignTo(&t)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			s, ok := t[persist.TraitTypeTopActiveUser].(bool)
 			err := event.Dispatch(c, coredb.Event{
 				ID:             persist.GenerateID(),
 				ActorID:        util.ToNullString(r.ActorID.String(), true),
@@ -94,6 +101,7 @@ func calculateTopActivityBadges(q *coredb.Queries, stg *storage.Client, pgx *pgx
 				Action:         persist.ActionTopActivityBadgeReceived,
 				Data: persist.EventData{
 					ActivityBadgeThreshold: int(conf.Total),
+					NewTopActiveUser:       !ok || !s,
 				},
 			})
 			if err != nil {
