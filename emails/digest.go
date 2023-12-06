@@ -36,8 +36,8 @@ type DigestValues struct {
 }
 
 type IncludedSelected struct {
-	Selected []Selected
-	Include  bool `json:"include"`
+	Selected []Selected `json:"selected"`
+	Include  bool       `json:"include"`
 }
 
 type SelectedID struct {
@@ -75,10 +75,12 @@ type UserFacingPost struct {
 }
 
 type UserFacingContract struct {
-	ContractID      persist.DBID `json:"contract_id"`
-	Name            string       `json:"name"`
-	Description     string       `json:"description"`
-	PreviewImageURL string       `json:"preview_image_url"`
+	ContractID      persist.DBID    `json:"contract_id"`
+	ContractAddress persist.Address `json:"contract_address"`
+	Chain           persist.Chain   `json:"chain"`
+	Name            string          `json:"name"`
+	Description     string          `json:"description"`
+	PreviewImageURL string          `json:"preview_image_url"`
 }
 
 const (
@@ -231,6 +233,8 @@ func contractToUserFacing(collection coredb.Contract) UserFacingContract {
 		Name:            collection.Name.String,
 		Description:     collection.Description.String,
 		PreviewImageURL: collection.ProfileImageUrl.String,
+		ContractAddress: collection.Address,
+		Chain:           collection.Chain,
 	}
 }
 

@@ -312,7 +312,7 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeDigest, queries, func(u coredb.PiiUserView) error {
 
-		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, v, s, 10, 5, sendRealEmails)
+		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, v, s, sendRealEmails)
 		if err != nil {
 			return err
 		}
@@ -328,7 +328,7 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 	})
 }
 
-func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, digestValues DigestValues, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
+func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, digestValues DigestValues, s *sendgrid.Client, sendRealEmail bool) (*rest.Response, error) {
 
 	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
 	if err != nil {
