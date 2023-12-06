@@ -190,7 +190,6 @@ func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after 
 	usersActive := make([]db.User, 0)
 	usersHandSelected := make([]db.User, 0)
 	usersFreqRec := make([]db.User, 0)
-
 	userHist := make(map[persist.DBID]*userRec)
 
 	for _, l := range [][]db.User{usersActive, usersFreqRec, usersHandSelected} {

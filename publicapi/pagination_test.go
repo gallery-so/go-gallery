@@ -274,7 +274,7 @@ func TestMain(t *testing.T) {
 
 	t.Run("test keyset pagination", func(t *testing.T) {
 		t.Run("should exclude extra edges", func(t *testing.T) {
-			p := newStubPaginator([]any{"a", "b", "c", "d", "e", "extra"})
+			p := newStubPaginator([]string{"a", "b", "c", "d", "e", "extra"})
 			expected := []string{"a", "b", "c", "d", "e"}
 			first := 5
 
@@ -282,7 +282,7 @@ func TestMain(t *testing.T) {
 
 			actual := make([]string, len(ret))
 			for i, v := range ret {
-				actual[i] = v.(string)
+				actual[i] = v
 			}
 
 			assert.NoError(t, err)
@@ -290,7 +290,7 @@ func TestMain(t *testing.T) {
 		})
 
 		t.Run("should return expected page info when paging forward", func(t *testing.T) {
-			p := newStubPaginator([]any{"a", "b", "c", "d", "e", "extra"})
+			p := newStubPaginator([]string{"a", "b", "c", "d", "e", "extra"})
 			first := 5
 
 			_, pageInfo, err := p.paginate(nil, nil, &first, nil)
@@ -303,7 +303,7 @@ func TestMain(t *testing.T) {
 		})
 
 		t.Run("should return expected edge order when paging backwards", func(t *testing.T) {
-			p := newStubPaginator([]any{"e", "d", "c", "b", "a", "extra"})
+			p := newStubPaginator([]string{"e", "d", "c", "b", "a", "extra"})
 			expected := []string{"a", "b", "c", "d", "e"}
 			last := 5
 
@@ -311,7 +311,7 @@ func TestMain(t *testing.T) {
 
 			actual := make([]string, len(ret))
 			for i, v := range ret {
-				actual[i] = v.(string)
+				actual[i] = v
 			}
 
 			assert.NoError(t, err)
@@ -319,7 +319,7 @@ func TestMain(t *testing.T) {
 		})
 
 		t.Run("should return expected page info when paging backwards", func(t *testing.T) {
-			p := newStubPaginator([]any{"e", "d", "c", "b", "a", "extra"})
+			p := newStubPaginator([]string{"e", "d", "c", "b", "a", "extra"})
 			last := 5
 
 			_, pageInfo, err := p.paginate(nil, nil, nil, &last)
@@ -338,12 +338,12 @@ type stubCursor struct{ ID string }
 func (p stubCursor) Pack() (string, error) { return p.ID, nil }
 func (p stubCursor) Unpack(s string) error { panic("not implemented") }
 
-var stubbedCursor = func(node any) (c cursorer, err error) { return stubCursor{ID: node.(string)}, nil }
+var stubbedCursor = func(node string) (c cursorer, err error) { return stubCursor{ID: node}, nil }
 
-func newStubPaginator(ret []any) keysetPaginator {
-	var p keysetPaginator
+func newStubPaginator(ret []string) keysetPaginator[string] {
+	var p keysetPaginator[string]
 
-	p.QueryFunc = func(int32, bool) ([]any, error) {
+	p.QueryFunc = func(int32, bool) ([]string, error) {
 		return ret, nil
 	}
 
