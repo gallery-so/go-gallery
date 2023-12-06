@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 
-	"cloud.google.com/go/pubsub"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -24,7 +23,6 @@ import (
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 // InitServer initializes the mediaprocessing server
@@ -61,27 +59,10 @@ func coreInitServer() *gin.Engine {
 
 	logger.For(nil).Info("Registering handlers...")
 
-	var pub *pubsub.Client
-	var err error
-	if env.GetString("ENV") == "local" {
-		pub, err = pubsub.NewClient(context.Background(), env.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		pub, err = pubsub.NewClient(context.Background(), env.GetString("GOOGLE_CLOUD_PROJECT"))
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	go autoSendNotificationEmails(queries, sendgridClient, pub, redis.NewCache(redis.EmailThrottleCache))
-
+	r := redis.NewCache(redis.EmailThrottleCache)
 	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, nil, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil)
 
-	go autoSendDigestEmails(queries, loaders, sendgridClient, pub, redis.NewCache(redis.EmailThrottleCache), stg, p.Feed)
-
-	return handlersInitServer(router, loaders, queries, sendgridClient, stg, p)
+	return handlersInitServer(router, loaders, queries, sendgridClient, r, stg, p)
 }
 
 func setDefaults() {
@@ -103,8 +84,7 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
 	viper.SetDefault("SENDGRID_DIGEST_TEMPLATE_ID", "d-0b9b6b0b0b5e4b6e9b0b0b5e4b6e9b0b")
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
-	viper.SetDefault("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "notifications-email-sub")
-	viper.SetDefault("PUBSUB_DIGEST_EMAILS_SUBSCRIPTION", "digest-email-sub")
+	viper.SetDefault("SCHEDULER_AUDIENCE", "")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("ADMIN_PASS", "admin")
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")

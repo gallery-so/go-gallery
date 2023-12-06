@@ -158,6 +158,22 @@ func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psu
 	})
 }
 
+func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		l, _ := r.Get(ctx, "send-notification-emails")
+		if l != nil && len(l) > 0 {
+			logger.For(ctx).Infof("notification emails already being sent")
+			return
+		}
+		r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
+		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
+		if err != nil {
+			logger.For(ctx).Errorf("error sending notification emails: %s", err)
+			return
+		}
+	}
+}
+
 func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {
 
 	emailsSent := new(atomic.Uint64)
@@ -302,6 +318,26 @@ func autoSendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, 
 			return
 		}
 	})
+}
+func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, fapi *publicapi.FeedAPI) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		l, _ := r.Get(ctx, "send-digest-emails")
+		if l != nil && len(l) > 0 {
+			logger.For(ctx).Infof("digest emails already being sent")
+			return
+		}
+		r.Set(ctx, "send-digest-emails", []byte("sending"), 1*time.Hour)
+		vals, err := getDigest(ctx, stg, fapi, queries, loaders)
+		if err != nil {
+			logger.For(ctx).Errorf("error getting digest values: %s", err)
+			return
+		}
+		err = sendDigestEmailsToAllUsers(ctx, vals, queries, s, env.GetString("ENV") == "production")
+		if err != nil {
+			logger.For(ctx).Errorf("error sending notification emails: %s", err)
+			return
+		}
+	}
 }
 
 func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {

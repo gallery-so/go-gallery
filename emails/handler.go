@@ -14,12 +14,11 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/redis"
 )
 
-func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client, stg *storage.Client, papi *publicapi.PublicAPI) *gin.Engine {
+func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, papi *publicapi.PublicAPI) *gin.Engine {
 	sendGroup := router.Group("/send")
 
 	sendGroup.POST("/notifications", middleware.AdminRequired(), adminSendNotificationEmail(queries, s))
@@ -44,16 +43,12 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	router.GET("/preverify", middleware.IPRateLimited(preverifyLimiter), preverifyEmail())
 
 	digestGroup := router.Group("/digest")
-	digestGroup.GET("/values", retoolMiddleware, getDigestValues(queries, loaders, stg, papi.Feed))
-	digestGroup.POST("/values", retoolMiddleware, updateDigestValues(stg))
+	digestGroup.GET("/values", middleware.RetoolMiddleware, getDigestValues(queries, loaders, stg, papi.Feed))
+	digestGroup.POST("/values", middleware.RetoolMiddleware, updateDigestValues(stg))
+	digestGroup.POST("/send", middleware.CloudSchedulerMiddleware, sendDigestEmails(queries, loaders, s, r, stg, papi.Feed))
+
+	notificationsGroup := router.Group("/notifications")
+	notificationsGroup.GET("/send", middleware.CloudSchedulerMiddleware, sendNotificationEmails(queries, s, r))
 
 	return router
-}
-
-func retoolMiddleware(ctx *gin.Context) {
-	if err := auth.RetoolAuthorized(ctx); err != nil {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-	ctx.Next()
 }
