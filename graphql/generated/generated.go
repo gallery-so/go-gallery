@@ -989,18 +989,19 @@ type ComplexityRoot struct {
 	}
 
 	Post struct {
-		Admires      func(childComplexity int, before *string, after *string, first *int, last *int) int
-		Author       func(childComplexity int) int
-		Caption      func(childComplexity int) int
-		Comments     func(childComplexity int, before *string, after *string, first *int, last *int) int
-		CreationTime func(childComplexity int) int
-		Dbid         func(childComplexity int) int
-		ID           func(childComplexity int) int
-		Interactions func(childComplexity int, before *string, after *string, first *int, last *int) int
-		IsFirstPost  func(childComplexity int) int
-		Mentions     func(childComplexity int) int
-		Tokens       func(childComplexity int) int
-		ViewerAdmire func(childComplexity int) int
+		Admires          func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Author           func(childComplexity int) int
+		Caption          func(childComplexity int) int
+		Comments         func(childComplexity int, before *string, after *string, first *int, last *int) int
+		CreationTime     func(childComplexity int) int
+		Dbid             func(childComplexity int) int
+		ID               func(childComplexity int) int
+		Interactions     func(childComplexity int, before *string, after *string, first *int, last *int) int
+		IsFirstPost      func(childComplexity int) int
+		Mentions         func(childComplexity int) int
+		Tokens           func(childComplexity int) int
+		UserAddedMintURL func(childComplexity int) int
+		ViewerAdmire     func(childComplexity int) int
 	}
 
 	PostAdmireEdge struct {
@@ -6134,6 +6135,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Post.Tokens(childComplexity), true
 
+	case "Post.userAddedMintURL":
+		if e.complexity.Post.UserAddedMintURL == nil {
+			break
+		}
+
+		return e.complexity.Post.UserAddedMintURL(childComplexity), true
+
 	case "Post.viewerAdmire":
 		if e.complexity.Post.ViewerAdmire == nil {
 			break
@@ -10224,6 +10232,7 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
 
   viewerAdmire: Admire @goField(forceResolver: true)
   isFirstPost: Boolean!
+  userAddedMintURL: String
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -11855,6 +11864,7 @@ input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
   mentions: [MentionInput!]
+  mintURL: String
 }
 
 type PostTokensPayload {
@@ -11866,6 +11876,7 @@ union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAut
 input ReferralPostTokenInput {
   token: ChainAddressTokenInput!
   caption: String
+  mintURL: String
 }
 
 type ReferralPostTokenPayload {
@@ -16692,6 +16703,8 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -21651,6 +21664,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_post(ctx context.C
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -24885,6 +24900,8 @@ func (ec *executionContext) fieldContext_Entity_findPostByDbid(ctx context.Conte
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -42254,6 +42271,47 @@ func (ec *executionContext) fieldContext_Post_isFirstPost(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Post_userAddedMintURL(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Post_userAddedMintURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserAddedMintURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Post_userAddedMintURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PostAdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmireEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PostAdmireEdge_node(ctx, field)
 	if err != nil {
@@ -43021,6 +43079,8 @@ func (ec *executionContext) fieldContext_PostTokensPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -45822,6 +45882,8 @@ func (ec *executionContext) fieldContext_ReferralPostTokenPayload_post(ctx conte
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -46348,6 +46410,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_post(ctx context.Co
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -46539,6 +46603,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_post(ctx context.C
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -49070,6 +49136,8 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_post
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -50229,6 +50297,8 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -51714,6 +51784,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_post(
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -52836,6 +52908,8 @@ func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNot
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			case "isFirstPost":
 				return ec.fieldContext_Post_isFirstPost(ctx, field)
+			case "userAddedMintURL":
+				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -65580,7 +65654,7 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokenIds", "caption", "mentions"}
+	fieldsInOrder := [...]string{"tokenIds", "caption", "mentions", "mintURL"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -65614,6 +65688,15 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 				return it, err
 			}
 			it.Mentions = data
+		case "mintURL":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mintURL"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MintURL = data
 		}
 	}
 
@@ -65788,7 +65871,7 @@ func (ec *executionContext) unmarshalInputReferralPostTokenInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"token", "caption"}
+	fieldsInOrder := [...]string{"token", "caption", "mintURL"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -65813,6 +65896,15 @@ func (ec *executionContext) unmarshalInputReferralPostTokenInput(ctx context.Con
 				return it, err
 			}
 			it.Caption = data
+		case "mintURL":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mintURL"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MintURL = data
 		}
 	}
 
@@ -77663,6 +77755,10 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "userAddedMintURL":
+
+			out.Values[i] = ec._Post_userAddedMintURL(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

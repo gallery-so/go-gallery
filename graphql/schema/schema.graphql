@@ -1054,6 +1054,7 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
 
   viewerAdmire: Admire @goField(forceResolver: true)
   isFirstPost: Boolean!
+  userAddedMintURL: String
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -2685,6 +2686,7 @@ input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
   mentions: [MentionInput!]
+  mintURL: String
 }
 
 type PostTokensPayload {
@@ -2696,6 +2698,7 @@ union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAut
 input ReferralPostTokenInput {
   token: ChainAddressTokenInput!
   caption: String
+  mintURL: String
 }
 
 type ReferralPostTokenPayload {

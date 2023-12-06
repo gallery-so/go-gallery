@@ -655,6 +655,13 @@ func ToNullString(s string, emptyIsNull bool) sql.NullString {
 	return sql.NullString{String: s, Valid: true}
 }
 
+func ToSQLNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{}
+	}
+	return ToNullString(*s, true)
+}
+
 func ToNullInt32(i *int) sql.NullInt32 {
 	if i == nil {
 		return sql.NullInt32{Int32: 0, Valid: false}

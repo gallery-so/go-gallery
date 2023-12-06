@@ -128,26 +128,19 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	return &post, nil
 }
 
-func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, mentions []*model.MentionInput, caption *string) (persist.DBID, error) {
+func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, mentions []*model.MentionInput, caption, mintURL *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenIDs": validate.WithTag(tokenIDs, "required"),
 		// caption can be null but less than 600 chars
 		"caption": validate.WithTag(caption, "max=600"),
+		"mintURL": validate.WithTag(mintURL, "omitempty,http"),
 	}); err != nil {
 		return "", err
 	}
 	actorID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
-	}
-
-	var c sql.NullString
-	if caption != nil {
-		c = sql.NullString{
-			String: *caption,
-			Valid:  true,
-		}
 	}
 
 	contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
@@ -172,7 +165,8 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		TokenIds:    tokenIDs,
 		ContractIds: contractIDs,
 		ActorID:     actorID,
-		Caption:     c,
+		Caption:     util.ToSQLNullString(caption),
+		UserMintUrl: util.ToSQLNullString(mintURL),
 	})
 	if err != nil {
 		return "", err
@@ -278,12 +272,13 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 	return postID, nil
 }
 
-func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
+func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption, mintURL *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"token": validate.WithTag(t, "required"),
 		// caption can be null but less than 600 chars
 		"caption": validate.WithTag(caption, "max=600"),
+		"mintURL": validate.WithTag(mintURL, "omitempty,http"),
 	}); err != nil {
 		return "", err
 	}
@@ -296,15 +291,6 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	user, err := api.repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return "", err
-	}
-
-	var c sql.NullString
-
-	if caption != nil {
-		c = sql.NullString{
-			String: *caption,
-			Valid:  true,
-		}
 	}
 
 	r, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
@@ -321,7 +307,8 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			TokenIds:    []persist.DBID{r.Token.ID},
 			ContractIds: []persist.DBID{r.Contract.ID},
 			ActorID:     user.ID,
-			Caption:     c,
+			Caption:     util.ToSQLNullString(caption),
+			UserMintUrl: util.ToSQLNullString(mintURL),
 		})
 		if err != nil {
 			return postID, err
@@ -376,7 +363,8 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		TokenIds:    []persist.DBID{synced.Instance.ID},
 		ContractIds: []persist.DBID{synced.Contract.ID},
 		ActorID:     user.ID,
-		Caption:     c,
+		Caption:     util.ToSQLNullString(caption),
+		UserMintUrl: util.ToSQLNullString(mintURL),
 	})
 	if err != nil {
 		return postID, err

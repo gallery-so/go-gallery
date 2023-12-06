@@ -1832,17 +1832,18 @@ func (PDFMedia) IsMedia()        {}
 
 type Post struct {
 	HelperPostData
-	Dbid         persist.DBID            `json:"dbid"`
-	Author       *GalleryUser            `json:"author"`
-	CreationTime *time.Time              `json:"creationTime"`
-	Tokens       []*Token                `json:"tokens"`
-	Caption      *string                 `json:"caption"`
-	Mentions     []*Mention              `json:"mentions"`
-	Admires      *PostAdmiresConnection  `json:"admires"`
-	Comments     *PostCommentsConnection `json:"comments"`
-	Interactions *InteractionsConnection `json:"interactions"`
-	ViewerAdmire *Admire                 `json:"viewerAdmire"`
-	IsFirstPost  bool                    `json:"isFirstPost"`
+	Dbid             persist.DBID            `json:"dbid"`
+	Author           *GalleryUser            `json:"author"`
+	CreationTime     *time.Time              `json:"creationTime"`
+	Tokens           []*Token                `json:"tokens"`
+	Caption          *string                 `json:"caption"`
+	Mentions         []*Mention              `json:"mentions"`
+	Admires          *PostAdmiresConnection  `json:"admires"`
+	Comments         *PostCommentsConnection `json:"comments"`
+	Interactions     *InteractionsConnection `json:"interactions"`
+	ViewerAdmire     *Admire                 `json:"viewerAdmire"`
+	IsFirstPost      bool                    `json:"isFirstPost"`
+	UserAddedMintURL *string                 `json:"userAddedMintURL"`
 }
 
 func (Post) IsAdmireSource()     {}
@@ -1896,6 +1897,7 @@ type PostTokensInput struct {
 	TokenIds []persist.DBID  `json:"tokenIds"`
 	Caption  *string         `json:"caption"`
 	Mentions []*MentionInput `json:"mentions"`
+	MintURL  *string         `json:"mintURL"`
 }
 
 type PostTokensPayload struct {
@@ -1969,6 +1971,7 @@ func (ReferralPostPreflightPayload) IsReferralPostPreflightPayloadOrError() {}
 type ReferralPostTokenInput struct {
 	Token   *ChainAddressTokenInput `json:"token"`
 	Caption *string                 `json:"caption"`
+	MintURL *string                 `json:"mintURL"`
 }
 
 type ReferralPostTokenPayload struct {
