@@ -135,8 +135,8 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params boolTimeIDPagingParams) ([]db.Token, error) {
-		rows, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
+	queryFunc := func(params boolTimeIDPagingParams) ([]db.GetTokensByContractIdPaginateRow, error) {
+		return api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			ID:                 contractID,
 			Limit:              params.Limit,
 			GalleryUsersOnly:   onlyGalleryUsers,
@@ -148,10 +148,6 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 			CurAfterID:         params.CursorAfterID,
 			PagingForward:      params.PagingForward,
 		})
-		if err != nil {
-			return nil, err
-		}
-		return util.MapWithoutError(rows, func(r db.GetTokensByContractIdPaginateRow) db.Token { return r.Token }), nil
 	}
 
 	countFunc := func() (int, error) {
@@ -162,21 +158,19 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 		return int(total), err
 	}
 
-	cursorFunc := func(t db.Token) (bool, time.Time, persist.DBID, error) {
-		owner, err := api.loaders.GetTokenOwnerByIDBatch.Load(t.ID)
-		if err != nil {
-			return false, time.Time{}, "", err
-		}
-		return owner.Universal, t.CreatedAt, t.ID, nil
+	cursorFunc := func(r db.GetTokensByContractIdPaginateRow) (bool, time.Time, persist.DBID, error) {
+		return r.User.Universal, r.Token.CreatedAt, r.Token.ID, nil
 	}
 
-	paginator := boolTimeIDPaginator[db.Token]{
+	paginator := boolTimeIDPaginator[db.GetTokensByContractIdPaginateRow]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+	tokens := util.MapWithoutError(results, func(r db.GetTokensByContractIdPaginateRow) db.Token { return r.Token })
+	return tokens, pageInfo, err
 }
 
 func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {

@@ -58,7 +58,6 @@ type Loaders struct {
 	GetTokenByIdIgnoreDisplayableBatch       *GetTokenByIdIgnoreDisplayableBatch
 	GetTokenByUserTokenIdentifiersBatch      *GetTokenByUserTokenIdentifiersBatch
 	GetTokenDefinitionByIdBatch              *GetTokenDefinitionByIdBatch
-	GetTokenOwnerByIDBatch                   *GetTokenOwnerByIDBatch
 	GetTokensByCollectionIdBatch             *GetTokensByCollectionIdBatch
 	GetTokensByUserIdBatch                   *GetTokensByUserIdBatch
 	GetTokensByWalletIdsBatch                *GetTokensByWalletIdsBatch
@@ -130,7 +129,6 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetTokenByIdIgnoreDisplayableBatch = newGetTokenByIdIgnoreDisplayableBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByIdIgnoreDisplayableBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokenByUserTokenIdentifiersBatch = newGetTokenByUserTokenIdentifiersBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByUserTokenIdentifiersBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokenDefinitionByIdBatch = newGetTokenDefinitionByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenDefinitionByIdBatch(q), preFetchHook, postFetchHook)
-	loaders.GetTokenOwnerByIDBatch = newGetTokenOwnerByIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenOwnerByIDBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokensByCollectionIdBatch = newGetTokensByCollectionIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokensByCollectionIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokensByUserIdBatch = newGetTokensByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokensByUserIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokensByWalletIdsBatch = newGetTokensByWalletIdsBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokensByWalletIdsBatch(q), preFetchHook, postFetchHook)
@@ -226,6 +224,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetSharedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.GetSharedContractsBatchPaginateRow) {
+		for _, entry := range result {
+			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
+		}
+	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
 		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result.Contract), result.Contract)
 	})
@@ -296,35 +299,6 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	})
 	loaders.GetFollowersByUserIdBatch.RegisterResultSubscriber(func(result []coredb.User) {
 		for _, entry := range result {
-			loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(entry), entry)
-		}
-	})
-	loaders.GetFollowingByUserIdBatch.RegisterResultSubscriber(func(result []coredb.User) {
-		for _, entry := range result {
-			loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(entry), entry)
-		}
-	})
-	loaders.GetOwnersByContractIdBatchPaginate.RegisterResultSubscriber(func(result []coredb.User) {
-		for _, entry := range result {
-			loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(entry), entry)
-		}
-	})
-	loaders.GetUserByAddressAndL1Batch.RegisterResultSubscriber(func(result coredb.User) {
-		loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(result), result)
-	})
-	loaders.GetUserByIdBatch.RegisterResultSubscriber(func(result coredb.User) {
-		loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(result), result)
-	})
-	loaders.GetUserByUsernameBatch.RegisterResultSubscriber(func(result coredb.User) {
-		loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(result), result)
-	})
-	loaders.GetUsersWithTraitBatch.RegisterResultSubscriber(func(result []coredb.User) {
-		for _, entry := range result {
-			loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(entry), entry)
-		}
-	})
-	loaders.GetFollowersByUserIdBatch.RegisterResultSubscriber(func(result []coredb.User) {
-		for _, entry := range result {
 			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
 		}
 	})
@@ -338,8 +312,10 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokenOwnerByIDBatch.RegisterResultSubscriber(func(result coredb.User) {
-		loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(result), result)
+	loaders.GetSharedFollowersBatchPaginate.RegisterResultSubscriber(func(result []coredb.GetSharedFollowersBatchPaginateRow) {
+		for _, entry := range result {
+			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry.User), entry.User)
+		}
 	})
 	loaders.GetUserByAddressAndL1Batch.RegisterResultSubscriber(func(result coredb.User) {
 		loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(result), result)
@@ -367,8 +343,10 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokenOwnerByIDBatch.RegisterResultSubscriber(func(result coredb.User) {
-		loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(result), result)
+	loaders.GetSharedFollowersBatchPaginate.RegisterResultSubscriber(func(result []coredb.GetSharedFollowersBatchPaginateRow) {
+		for _, entry := range result {
+			loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(entry.User), entry.User)
+		}
 	})
 	loaders.GetUserByAddressAndL1Batch.RegisterResultSubscriber(func(result coredb.User) {
 		loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(result), result)
@@ -402,6 +380,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCreatedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.Contract) {
 		for _, entry := range result {
 			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetSharedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.GetSharedContractsBatchPaginateRow) {
+		for _, entry := range result {
+			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry.Contract), entry.Contract)
 		}
 	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
@@ -1191,25 +1174,6 @@ func loadGetTokenDefinitionByIdBatch(q *coredb.Queries) func(context.Context, *G
 		defer b.Close()
 
 		b.QueryRow(func(i int, r coredb.TokenDefinition, err error) {
-			results[i], errors[i] = r, err
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = d.getNotFoundError(params[i])
-			}
-		})
-
-		return results, errors
-	}
-}
-
-func loadGetTokenOwnerByIDBatch(q *coredb.Queries) func(context.Context, *GetTokenOwnerByIDBatch, []persist.DBID) ([]coredb.User, []error) {
-	return func(ctx context.Context, d *GetTokenOwnerByIDBatch, params []persist.DBID) ([]coredb.User, []error) {
-		results := make([]coredb.User, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokenOwnerByIDBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, r coredb.User, err error) {
 			results[i], errors[i] = r, err
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = d.getNotFoundError(params[i])

@@ -4179,40 +4179,8 @@ func (q *Queries) GetTokenFullDetailsByUserTokenIdentifiers(ctx context.Context,
 	return i, err
 }
 
-const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from tokens t
-    join users u on u.id = t.owner_user_id
-    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false
-`
-
-func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User, error) {
-	row := q.db.QueryRow(ctx, getTokenOwnerByID, id)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Username,
-		&i.UsernameIdempotent,
-		&i.Wallets,
-		&i.Bio,
-		&i.Traits,
-		&i.Universal,
-		&i.NotificationSettings,
-		&i.EmailVerified,
-		&i.EmailUnsubscriptions,
-		&i.FeaturedGallery,
-		&i.PrimaryWalletID,
-		&i.UserExperiences,
-		&i.ProfileImageID,
-	)
-	return i, err
-}
-
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from tokens t
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain, u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from tokens t
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
@@ -4246,6 +4214,7 @@ type GetTokensByContractIdPaginateRow struct {
 	Token           Token           `db:"token" json:"token"`
 	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
 	Contract        Contract        `db:"contract" json:"contract"`
+	User            User            `db:"user" json:"user"`
 }
 
 func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetTokensByContractIdPaginateParams) ([]GetTokensByContractIdPaginateRow, error) {
@@ -4320,6 +4289,24 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.Contract.ParentID,
 			&i.Contract.OverrideCreatorUserID,
 			&i.Contract.L1Chain,
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailVerified,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
 		); err != nil {
 			return nil, err
 		}

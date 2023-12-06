@@ -315,7 +315,7 @@ where t.owned_by_wallets && $1 and t.displayable and t.deleted = false and td.de
 order by t.created_at desc, td.name desc, t.id desc;
 
 -- name: GetTokensByContractIdPaginate :many
-select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from tokens t
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c), sqlc.embed(u) from tokens t
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
@@ -368,16 +368,6 @@ select count(distinct users.id) from users, tokens, contracts
     and tokens.displayable
     and (not @gallery_users_only::bool or users.universal = false)
     and tokens.deleted = false and users.deleted = false and contracts.deleted = false;
-
--- name: GetTokenOwnerByID :one
-select u.* from tokens t
-    join users u on u.id = t.owner_user_id
-    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
-
--- name: GetTokenOwnerByIDBatch :batchone
-select u.* from tokens t
-    join users u on u.id = t.owner_user_id
-    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
 select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url

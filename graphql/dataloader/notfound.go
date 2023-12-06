@@ -113,10 +113,6 @@ func (*GetTokenByUserTokenIdentifiersBatch) getNotFoundError(key coredb.GetToken
 	}
 }
 
-func (*GetTokenOwnerByIDBatch) getNotFoundError(key persist.DBID) error {
-	return pgx.ErrNoRows
-}
-
 func (*GetUserByAddressAndL1Batch) getNotFoundError(key coredb.GetUserByAddressAndL1BatchParams) error {
 	return persist.ErrUserNotFound{L1ChainAddress: persist.NewL1ChainAddress(key.Address, persist.Chain(key.L1Chain))}
 }

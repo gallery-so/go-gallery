@@ -1700,47 +1700,6 @@ func (*GetTokenDefinitionByIdBatch) getKeyForResult(result coredb.TokenDefinitio
 	return result.ID
 }
 
-// GetTokenOwnerByIDBatch batches and caches requests
-type GetTokenOwnerByIDBatch struct {
-	generator.Dataloader[persist.DBID, coredb.User]
-}
-
-// newGetTokenOwnerByIDBatch creates a new GetTokenOwnerByIDBatch with the given settings, functions, and options
-func newGetTokenOwnerByIDBatch(
-	ctx context.Context,
-	maxBatchSize int,
-	batchTimeout time.Duration,
-	cacheResults bool,
-	publishResults bool,
-	fetch func(context.Context, *GetTokenOwnerByIDBatch, []persist.DBID) ([]coredb.User, []error),
-	preFetchHook PreFetchHook,
-	postFetchHook PostFetchHook,
-) *GetTokenOwnerByIDBatch {
-	d := &GetTokenOwnerByIDBatch{}
-
-	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.User, []error) {
-		// Allow the preFetchHook to modify and return a new context
-		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetTokenOwnerByIDBatch")
-		}
-
-		results, errors := fetch(ctx, d, keys)
-
-		if postFetchHook != nil {
-			postFetchHook(ctx, "GetTokenOwnerByIDBatch")
-		}
-
-		return results, errors
-	}
-
-	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-	return d
-}
-
-func (*GetTokenOwnerByIDBatch) getKeyForResult(result coredb.User) persist.DBID {
-	return result.ID
-}
-
 // GetTokensByCollectionIdBatch batches and caches requests
 type GetTokensByCollectionIdBatch struct {
 	generator.Dataloader[coredb.GetTokensByCollectionIdBatchParams, []coredb.Token]
