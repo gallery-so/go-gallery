@@ -338,16 +338,13 @@ type stubCursor struct{ ID string }
 func (p stubCursor) Pack() (string, error) { return p.ID, nil }
 func (p stubCursor) Unpack(s string) error { panic("not implemented") }
 
-var stubbedCursor = func(node string) (c cursorer, err error) { return stubCursor{ID: node}, nil }
+var stubbedCursor = func(node string) (c stubCursor, err error) { return stubCursor{ID: node}, nil }
 
-func newStubPaginator(ret []string) keysetPaginator[string] {
-	var p keysetPaginator[string]
-
+func newStubPaginator(ret []string) keysetPaginator[string, stubCursor] {
+	var p keysetPaginator[string, stubCursor]
 	p.QueryFunc = func(int32, bool) ([]string, error) {
 		return ret, nil
 	}
-
 	p.Cursorable = stubbedCursor
-
 	return p
 }

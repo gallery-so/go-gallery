@@ -1,7 +1,7 @@
 package publicapi
 
 import (
-	heappkg "container/heap"
+	"container/heap"
 	"context"
 	"database/sql"
 	"fmt"
@@ -1055,14 +1055,13 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 	for _, node := range scores {
 		// Add first n items in the heap
 		if h.Len() < n {
-			heappkg.Push(h, node)
+			heap.Push(h, node)
 			continue
 		}
-
-		// If the score is greater than the smallest score in the heap, replace it
+// If the score is greater than the smallest score in the heap, replace it
 		if node.s > (*h)[0].s {
-			heappkg.Pop(h)
-			heappkg.Push(h, node)
+			heap.Pop(h)
+			heap.Push(h, node)
 		}
 	}
 
@@ -1072,7 +1071,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 	// such that the highest score is first
 	i := h.Len() - 1
 	for h.Len() > 0 {
-		node := heappkg.Pop(h)
+		node := heap.Pop(h)
 		scoredEntities[i] = node.(db.FeedEntityScore)
 		i--
 	}

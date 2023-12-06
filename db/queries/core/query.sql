@@ -1807,6 +1807,20 @@ SET traits = CASE
              END
 WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 
+-- name: GetTopActiveUsers :many
+select * from users where (traits->>'top_activity')::bool and not deleted and not universal;
+
+-- name: GetFrequentlyRecommendedUsers :many
+with top_n as (
+	select recommended_user_id id
+	from recommendation_results
+	group by recommended_user_id
+	order by sum(recommended_count) desc
+	limit 100
+)
+select users.* from users join top_n using(id) where not users.deleted and not users.universal;
+
+
 -- name: InsertMention :one
 INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
 

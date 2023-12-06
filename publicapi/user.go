@@ -1,6 +1,7 @@
 package publicapi
 
 import (
+	"container/heap"
 	"context"
 	"encoding/json"
 	"errors"
@@ -172,6 +173,7 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 type userRec struct {
 	User db.User
 	Freq int
+	r    int
 }
 
 func (u userRec) Less(a any) bool {
@@ -183,27 +185,45 @@ func (u userRec) Less(a any) bool {
 		return u.Freq < other.Freq
 	}
 	// Break ties randomly
-	return rand.Int() < rand.Int()
+	return u.r < other.r
 }
 
 func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
-	usersActive := make([]db.User, 0)
+	usersActive, err := api.queries.GetTopActiveUsers(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+	usersFreqRec, err := api.queries.GetFrequentlyRecommendedUsers(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
 	usersHandSelected := make([]db.User, 0)
-	usersFreqRec := make([]db.User, 0)
+
 	userHist := make(map[persist.DBID]*userRec)
 
-	for _, l := range [][]db.User{usersActive, usersFreqRec, usersHandSelected} {
-		for _, u := range l {
+	for _, list := range [][]db.User{usersActive, usersFreqRec, usersHandSelected} {
+		for _, u := range list {
 			if _, ok := userHist[u.ID]; !ok {
-				userHist[u.ID] = &userRec{User: u, Freq: 1}
+				userHist[u.ID] = &userRec{User: u, Freq: 1, r: rand.Int()}
 			}
 			userHist[u.ID].Freq += 1
 		}
 	}
 
-	h := sort.Heap[userRec]{}
+	h := &sort.Heap[userRec]{}
+
+	// TODO: Ensure the pop order is correct
 	for _, u := range userHist {
-		h.Push(u)
+		// Add first 100 users to heap
+		if h.Len() < 100 {
+			h.Push(u)
+		}
+		// If the score is greater than the smallest score in the heap, replace it
+		if !u.Less((*h)[0]) {
+			heap.Pop(h)
+			heap.Push(h, u)
+		}
 	}
 
 	users := make([]db.User, 0)

@@ -2375,6 +2375,56 @@ func (q *Queries) GetFeedEventsByIds(ctx context.Context, ids []string) ([]FeedE
 	return items, nil
 }
 
+const getFrequentlyRecommendedUsers = `-- name: GetFrequentlyRecommendedUsers :many
+with top_n as (
+	select recommended_user_id id
+	from recommendation_results
+	group by recommended_user_id
+	order by sum(recommended_count) desc
+	limit 100
+)
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join top_n using(id) where not users.deleted and not users.universal
+`
+
+func (q *Queries) GetFrequentlyRecommendedUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, getFrequentlyRecommendedUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getGalleriesByUserId = `-- name: GetGalleriesByUserId :many
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position FROM galleries WHERE owner_user_id = $1 AND deleted = false order by position
 `
@@ -4307,6 +4357,49 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.User.PrimaryWalletID,
 			&i.User.UserExperiences,
 			&i.User.ProfileImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTopActiveUsers = `-- name: GetTopActiveUsers :many
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id from users where (traits->>'top_activity')::bool and not deleted and not universal
+`
+
+func (q *Queries) GetTopActiveUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, getTopActiveUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
 		); err != nil {
 			return nil, err
 		}
