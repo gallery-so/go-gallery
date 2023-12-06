@@ -1246,7 +1246,7 @@ where case when @only_unfollowing::bool then f.id is null else true end;
 insert into follows (id, follower, followee, deleted) select unnest(@ids::varchar[]), @follower, unnest(@followees::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at;
 
 -- name: GetSharedFollowersBatchPaginate :batchmany
-select users.*, a.created_at followed_on
+select sqlc.embed(users), a.created_at followed_on
 from users, follows a, follows b
 where a.follower = @follower
 	and a.followee = b.follower
@@ -1273,7 +1273,7 @@ where a.follower = @follower
 	and users.deleted = false;
 
 -- name: GetSharedContractsBatchPaginate :batchmany
-select contracts.*, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+select sqlc.embed(contracts), a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = @user_a_id

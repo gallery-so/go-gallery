@@ -540,7 +540,7 @@ func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *stri
 		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[any]{
 		QueryFunc:  queryFunc,
 		CursorFunc: feedCursor,
 	}
@@ -548,7 +548,7 @@ func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *stri
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Post, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
@@ -560,8 +560,8 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]any, error) {
-		posts, err := api.queries.PaginatePostsByUserID(ctx, db.PaginatePostsByUserIDParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Post, error) {
+		return api.queries.PaginatePostsByUserID(ctx, db.PaginatePostsByUserIDParams{
 			UserID:        userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -570,7 +570,6 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-		return util.MapWithoutError(posts, func(p db.Post) any { return p }), err
 	}
 
 	countFunc := func() (int, error) {
@@ -578,9 +577,13 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 		return int(c), err
 	}
 
-	paginator := timeIDPaginator{
+	cursorFunc := func(p db.Post) (time.Time, persist.DBID, error) {
+		return p.CreatedAt, p.ID, nil
+	}
+
+	paginator := timeIDPaginator[db.Post]{
 		QueryFunc:  queryFunc,
-		CursorFunc: feedCursor,
+		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
@@ -593,7 +596,8 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 		return nil, PageInfo{}, err
 	}
 	viewerID, _ := getAuthenticatedUserID(ctx)
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+
+	queryFunc := func(params timeIDPagingParams) ([]any, error) {
 		keys, err := api.queries.PaginateGlobalFeed(ctx, db.PaginateGlobalFeedParams{
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -611,7 +615,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[any]{
 		QueryFunc:  queryFunc,
 		CursorFunc: feedCursor,
 	}
@@ -740,7 +744,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			return nil, PageInfo{}, err
 		}
 
-		// Create cursor from cached data.
+		// Create cursor from cached data
 		cursor := cursors.NewFeedPositionCursor()
 		cursor.CurrentPosition = 0
 		cursor.EntityTypes = postTypes
@@ -1148,7 +1152,7 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 		return nil, PageInfo{}, err
 	}
 
-	return pageFrom(results, nil, cursorables.NewFeedPositionCursorer(p.CursorFunc), before, after, first, last)
+	return pageFrom(results, nil, newFeedPositionCursor(p.CursorFunc), before, after, first, last)
 }
 
 type feedCache struct {

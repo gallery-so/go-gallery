@@ -11,7 +11,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -2622,28 +2621,10 @@ type GetSharedContractsBatchPaginateParams struct {
 }
 
 type GetSharedContractsBatchPaginateRow struct {
-	ID                    persist.DBID    `db:"id" json:"id"`
-	Deleted               bool            `db:"deleted" json:"deleted"`
-	Version               sql.NullInt32   `db:"version" json:"version"`
-	CreatedAt             time.Time       `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time       `db:"last_updated" json:"last_updated"`
-	Name                  sql.NullString  `db:"name" json:"name"`
-	Symbol                sql.NullString  `db:"symbol" json:"symbol"`
-	Address               persist.Address `db:"address" json:"address"`
-	CreatorAddress        persist.Address `db:"creator_address" json:"creator_address"`
-	Chain                 persist.Chain   `db:"chain" json:"chain"`
-	ProfileBannerUrl      sql.NullString  `db:"profile_banner_url" json:"profile_banner_url"`
-	ProfileImageUrl       sql.NullString  `db:"profile_image_url" json:"profile_image_url"`
-	BadgeUrl              sql.NullString  `db:"badge_url" json:"badge_url"`
-	Description           sql.NullString  `db:"description" json:"description"`
-	OwnerAddress          persist.Address `db:"owner_address" json:"owner_address"`
-	IsProviderMarkedSpam  bool            `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
-	ParentID              persist.DBID    `db:"parent_id" json:"parent_id"`
-	OverrideCreatorUserID persist.DBID    `db:"override_creator_user_id" json:"override_creator_user_id"`
-	L1Chain               persist.L1Chain `db:"l1_chain" json:"l1_chain"`
-	DisplayedByUserA      bool            `db:"displayed_by_user_a" json:"displayed_by_user_a"`
-	DisplayedByUserB      bool            `db:"displayed_by_user_b" json:"displayed_by_user_b"`
-	OwnedCount            int64           `db:"owned_count" json:"owned_count"`
+	Contract         Contract `db:"contract" json:"contract"`
+	DisplayedByUserA bool     `db:"displayed_by_user_a" json:"displayed_by_user_a"`
+	DisplayedByUserB bool     `db:"displayed_by_user_b" json:"displayed_by_user_b"`
+	OwnedCount       int64    `db:"owned_count" json:"owned_count"`
 }
 
 func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
@@ -2688,25 +2669,25 @@ func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSha
 			for rows.Next() {
 				var i GetSharedContractsBatchPaginateRow
 				if err := rows.Scan(
-					&i.ID,
-					&i.Deleted,
-					&i.Version,
-					&i.CreatedAt,
-					&i.LastUpdated,
-					&i.Name,
-					&i.Symbol,
-					&i.Address,
-					&i.CreatorAddress,
-					&i.Chain,
-					&i.ProfileBannerUrl,
-					&i.ProfileImageUrl,
-					&i.BadgeUrl,
-					&i.Description,
-					&i.OwnerAddress,
-					&i.IsProviderMarkedSpam,
-					&i.ParentID,
-					&i.OverrideCreatorUserID,
-					&i.L1Chain,
+					&i.Contract.ID,
+					&i.Contract.Deleted,
+					&i.Contract.Version,
+					&i.Contract.CreatedAt,
+					&i.Contract.LastUpdated,
+					&i.Contract.Name,
+					&i.Contract.Symbol,
+					&i.Contract.Address,
+					&i.Contract.CreatorAddress,
+					&i.Contract.Chain,
+					&i.Contract.ProfileBannerUrl,
+					&i.Contract.ProfileImageUrl,
+					&i.Contract.BadgeUrl,
+					&i.Contract.Description,
+					&i.Contract.OwnerAddress,
+					&i.Contract.IsProviderMarkedSpam,
+					&i.Contract.ParentID,
+					&i.Contract.OverrideCreatorUserID,
+					&i.Contract.L1Chain,
 					&i.DisplayedByUserA,
 					&i.DisplayedByUserB,
 					&i.OwnedCount,
@@ -2763,25 +2744,8 @@ type GetSharedFollowersBatchPaginateParams struct {
 }
 
 type GetSharedFollowersBatchPaginateRow struct {
-	ID                   persist.DBID                     `db:"id" json:"id"`
-	Deleted              bool                             `db:"deleted" json:"deleted"`
-	Version              sql.NullInt32                    `db:"version" json:"version"`
-	LastUpdated          time.Time                        `db:"last_updated" json:"last_updated"`
-	CreatedAt            time.Time                        `db:"created_at" json:"created_at"`
-	Username             sql.NullString                   `db:"username" json:"username"`
-	UsernameIdempotent   sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
-	Wallets              persist.WalletList               `db:"wallets" json:"wallets"`
-	Bio                  sql.NullString                   `db:"bio" json:"bio"`
-	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
-	Universal            bool                             `db:"universal" json:"universal"`
-	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
-	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
-	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
-	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
-	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
-	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
-	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
-	FollowedOn           time.Time                        `db:"followed_on" json:"followed_on"`
+	User       User      `db:"user" json:"user"`
+	FollowedOn time.Time `db:"followed_on" json:"followed_on"`
 }
 
 func (q *Queries) GetSharedFollowersBatchPaginate(ctx context.Context, arg []GetSharedFollowersBatchPaginateParams) *GetSharedFollowersBatchPaginateBatchResults {
@@ -2822,24 +2786,24 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Query(f func(int, []GetSha
 			for rows.Next() {
 				var i GetSharedFollowersBatchPaginateRow
 				if err := rows.Scan(
-					&i.ID,
-					&i.Deleted,
-					&i.Version,
-					&i.LastUpdated,
-					&i.CreatedAt,
-					&i.Username,
-					&i.UsernameIdempotent,
-					&i.Wallets,
-					&i.Bio,
-					&i.Traits,
-					&i.Universal,
-					&i.NotificationSettings,
-					&i.EmailVerified,
-					&i.EmailUnsubscriptions,
-					&i.FeaturedGallery,
-					&i.PrimaryWalletID,
-					&i.UserExperiences,
-					&i.ProfileImageID,
+					&i.User.ID,
+					&i.User.Deleted,
+					&i.User.Version,
+					&i.User.LastUpdated,
+					&i.User.CreatedAt,
+					&i.User.Username,
+					&i.User.UsernameIdempotent,
+					&i.User.Wallets,
+					&i.User.Bio,
+					&i.User.Traits,
+					&i.User.Universal,
+					&i.User.NotificationSettings,
+					&i.User.EmailVerified,
+					&i.User.EmailUnsubscriptions,
+					&i.User.FeaturedGallery,
+					&i.User.PrimaryWalletID,
+					&i.User.UserExperiences,
+					&i.User.ProfileImageID,
 					&i.FollowedOn,
 				); err != nil {
 					return err

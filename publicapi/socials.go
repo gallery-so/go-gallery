@@ -112,7 +112,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 		return nil, PageInfo{}, fmt.Errorf("unsupported social provider: %s", socialProvider)
 	}
 
-	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+	queryFunc := func(params boolTimeIDPagingParams) ([]model.SocialConnection, error) {
 		usernames, _ := util.Map(initialConnections, func(m model.SocialConnection) (string, error) {
 			return m.SocialUsername, nil
 		})
@@ -142,7 +142,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 		if err != nil {
 			return nil, fmt.Errorf("error getting social connections: %w", err)
 		}
-		return util.Map(results, func(r db.GetSocialConnectionsPaginateRow) (interface{}, error) {
+		return util.Map(results, func(r db.GetSocialConnectionsPaginateRow) (model.SocialConnection, error) {
 			m := model.SocialConnection{
 				GalleryUser:        &model.GalleryUser{Dbid: r.UserID},
 				CurrentlyFollowing: r.AlreadyFollowing,
@@ -174,30 +174,17 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 		return int(c), nil
 	}
 
-	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
-		if conn, ok := i.(model.SocialConnection); ok {
-			return conn.CurrentlyFollowing, conn.UserCreatedAt, conn.GalleryUser.Dbid, nil
-		}
-		return false, time.Time{}, "", fmt.Errorf("interface{} is not a social connection")
+	cursorFunc := func(c model.SocialConnection) (bool, time.Time, persist.DBID, error) {
+		return c.CurrentlyFollowing, c.UserCreatedAt, c.GalleryUser.Dbid, nil
 	}
 
-	paginator := boolTimeIDPaginator{
+	paginator := boolTimeIDPaginator[model.SocialConnection]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	connections, _ := util.Map(results, func(i interface{}) (model.SocialConnection, error) {
-		return i.(model.SocialConnection), nil
-	})
-
-	return connections, pageInfo, nil
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api SocialAPI) GetConnections(ctx context.Context, socialProvider persist.SocialProvider, onlyUnfollowing *bool) ([]model.SocialConnection, error) {

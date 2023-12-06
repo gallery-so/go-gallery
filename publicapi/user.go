@@ -20,7 +20,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
-	"github.com/jinzhu/copier"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -141,9 +140,8 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		users, err := api.queries.GetUsersByIDs(ctx, db.GetUsersByIDsParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.User, error) {
+		return api.queries.GetUsersByIDs(ctx, db.GetUsersByIDsParams{
 			Limit:         params.Limit,
 			UserIds:       userIDs,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -152,45 +150,23 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-		if err != nil {
-			return nil, err
-		}
-
-		interfaces := make([]interface{}, len(users))
-		for i, user := range users {
-			interfaces[i] = user
-		}
-
-		return interfaces, nil
 	}
 
 	countFunc := func() (int, error) {
 		return len(userIDs), nil
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if user, ok := i.(db.User); ok {
-			return user.CreatedAt, user.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an user")
+	cursorFunc := func(u db.User) (time.Time, persist.DBID, error) {
+		return u.CreatedAt, u.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.User]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	users := make([]db.User, len(results))
-	for i, result := range results {
-		if user, ok := result.(db.User); ok {
-			users[i] = user
-		}
-	}
-
-	return users, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 type userRec struct {
@@ -206,6 +182,7 @@ func (u userRec) Less(a any) bool {
 	if u.Freq != other.Freq {
 		return u.Freq < other.Freq
 	}
+	// Break ties randomly
 	return rand.Int() < rand.Int()
 }
 
@@ -213,18 +190,6 @@ func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after 
 	usersActive := make([]db.User, 0)
 	usersHandSelected := make([]db.User, 0)
 	usersFreqRec := make([]db.User, 0)
-	// XXX usersActive, err := api.GetActiveUsers(ctx)
-	// XXX if err != nil {
-	// XXX 	return nil, PageInfo{}, err
-	// XXX }
-	// XXX usersFreqRec, err := api.GetFrequentlyRecommendedUsers(ctx)
-	// XXX if err != nil {
-	// XXX 	return nil, PageInfo{}, err
-	// XXX }
-	// XXX usersHandSelected, err := api.GetHandPickedUsers(ctx)
-	// XXX if err != nil {
-	// XXX 	return nil, PageInfo{}, err
-	// XXX }
 
 	userHist := make(map[persist.DBID]*userRec)
 
@@ -242,34 +207,33 @@ func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after 
 		h.Push(u)
 	}
 
-	result := make([]db.User, 0)
+	users := make([]db.User, 0)
+	userIDs := make([]persist.DBID, 0)
+	positions := make(map[persist.DBID]int64)
+
 	for i := 0; h.Len() > 0; i++ {
-		result[i] = h.Pop().(userRec).User
+		users[i] = h.Pop().(userRec).User
+		userIDs[i] = users[i].ID
+		positions[users[i].ID] = int64(i)
 	}
 
-	// Create a cursor from the computed result
-	cursor, _ := cursorables.NewPositionCursorer(func(any) (int64, []persist.DBID, error) {
-		userIDs := make([]persist.DBID, len(result))
-		for i, u := range result {
-			userIDs[i] = u.ID
-		}
-		return 0, userIDs, nil
-	})(nil)
+	cursor := cursors.NewPositionCursor()
+	cursor.CurrentPosition = 0
+	cursor.IDs = userIDs
+	cursor.Positions = positions
 
-	var paginator positionPaginator
+	var paginator positionPaginator[db.User]
 
 	// We already did the work to fetch the users above so we can just return them here
-	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
-		return util.MapWithoutError(result, func(u db.User) any { return u }), nil
+	paginator.QueryFunc = func(params positionPagingParams) ([]db.User, error) {
+		return users, nil
 	}
 
-	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
-		user := node.(db.User)
-		posCur := cursor.(*positionCursor)
-		return posCur.Positions[user.ID], posCur.IDs, nil
+	paginator.CursorFunc = func(u db.User) (int64, []persist.DBID, error) {
+		return cursor.Positions[u.ID], cursor.IDs, nil
 	}
 
-	return result, PageInfo{}, nil
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
@@ -447,8 +411,8 @@ func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role,
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params lexicalPagingParams) ([]interface{}, error) {
-		keys, err := api.queries.GetUsersWithRolePaginate(ctx, db.GetUsersWithRolePaginateParams{
+	queryFunc := func(params lexicalPagingParams) ([]db.User, error) {
+		return api.queries.GetUsersWithRolePaginate(ctx, db.GetUsersWithRolePaginateParams{
 			Role:          role,
 			Limit:         params.Limit,
 			CurBeforeKey:  params.CursorBeforeKey,
@@ -457,39 +421,18 @@ func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
 	}
 
-	cursorFunc := func(i interface{}) (string, persist.DBID, error) {
-		if row, ok := i.(db.User); ok {
-			return row.UsernameIdempotent.String, row.ID, nil
-		}
-		return "", "", fmt.Errorf("interface{} is not a db.User")
+	cursorFunc := func(u db.User) (string, persist.DBID, error) {
+		return u.UsernameIdempotent.String, u.ID, nil
 	}
 
-	paginator := lexicalPaginator{
+	paginator := lexicalPaginator[db.User]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	users := make([]db.User, len(results))
-	for i, result := range results {
-		users[i] = result.(db.User)
-	}
-
-	return users, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
@@ -907,8 +850,8 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]any, error) {
-		keys, err := api.loaders.GetSharedFollowersBatchPaginate.Load(db.GetSharedFollowersBatchPaginateParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.GetSharedFollowersBatchPaginateRow, error) {
+		return api.loaders.GetSharedFollowersBatchPaginate.Load(db.GetSharedFollowersBatchPaginateParams{
 			Follower:      curUserID,
 			Followee:      userID,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -918,16 +861,6 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]any, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -938,15 +871,12 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 		return int(total), err
 	}
 
-	cursorFunc := func(i any) (time.Time, persist.DBID, error) {
-		if row, ok := i.(db.GetSharedFollowersBatchPaginateRow); ok {
-			return row.FollowedOn, row.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("node is not a db.GetSharedFollowersBatchPaginateRow")
+	cursorFunc := func(r db.GetSharedFollowersBatchPaginateRow) (time.Time, persist.DBID, error) {
+		return r.FollowedOn, r.User.ID, nil
 	}
 
-	paginator := sharedFollowersPaginator{
-		timeIDPaginator{
+	paginator := sharedFollowersPaginator[db.GetSharedFollowersBatchPaginateRow]{
+		timeIDPaginator[db.GetSharedFollowersBatchPaginateRow]{
 			QueryFunc:  queryFunc,
 			CursorFunc: cursorFunc,
 			CountFunc:  countFunc,
@@ -954,16 +884,7 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	users := make([]db.User, len(results))
-	for i, result := range results {
-		if row, ok := result.(db.GetSharedFollowersBatchPaginateRow); ok {
-			var u db.User
-			copier.Copy(&u, &row)
-			users[i] = u
-		}
-	}
-
+	users := util.MapWithoutError(results, func(r db.GetSharedFollowersBatchPaginateRow) db.User { return r.User })
 	return users, pageInfo, err
 }
 
@@ -986,8 +907,8 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params sharedContractsPaginatorParams) ([]any, error) {
-		keys, err := api.loaders.GetSharedContractsBatchPaginate.Load(db.GetSharedContractsBatchPaginateParams{
+	queryFunc := func(params sharedContractsPaginatorParams) ([]db.GetSharedContractsBatchPaginateRow, error) {
+		return api.loaders.GetSharedContractsBatchPaginate.Load(db.GetSharedContractsBatchPaginateParams{
 			UserAID:                   curUserID,
 			UserBID:                   userID,
 			CurBeforeDisplayedByUserA: params.CursorBeforeDisplayedByUserA,
@@ -1001,16 +922,6 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 			PagingForward:             params.PagingForward,
 			Limit:                     params.Limit,
 		})
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]any, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -1021,30 +932,18 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		return int(total), err
 	}
 
-	cursorFunc := func(i any) (bool, bool, int64, persist.DBID, error) {
-		if row, ok := i.(db.GetSharedContractsBatchPaginateRow); ok {
-			return row.DisplayedByUserA, row.DisplayedByUserB, int64(row.OwnedCount), row.ID, nil
-		}
-		return false, false, 0, "", fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
+	cursorFunc := func(r db.GetSharedContractsBatchPaginateRow) (bool, bool, int64, persist.DBID, error) {
+		return r.DisplayedByUserA, r.DisplayedByUserB, int64(r.OwnedCount), r.Contract.ID, nil
 	}
 
-	paginator := sharedContractsPaginator{
+	paginator := sharedContractsPaginator[db.GetSharedContractsBatchPaginateRow]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	contracts := make([]db.Contract, len(results))
-	for i, result := range results {
-		if row, ok := result.(db.GetSharedContractsBatchPaginateRow); ok {
-			var c db.Contract
-			copier.Copy(&c, &row)
-			contracts[i] = c
-		}
-	}
-
+	contracts := util.MapWithoutError(results, func(r db.GetSharedContractsBatchPaginateRow) db.Contract { return r.Contract })
 	return contracts, pageInfo, err
 }
 
@@ -1059,12 +958,12 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+	queryFunc := func(params timeIDPagingParams) ([]db.Contract, error) {
 		serializedChains := make([]string, len(includeChains))
 		for i, c := range includeChains {
 			serializedChains[i] = strconv.Itoa(int(c))
 		}
-		keys, err := api.loaders.GetCreatedContractsBatchPaginate.Load(db.GetCreatedContractsBatchPaginateParams{
+		return api.loaders.GetCreatedContractsBatchPaginate.Load(db.GetCreatedContractsBatchPaginateParams{
 			UserID:           userID,
 			Chains:           strings.Join(serializedChains, ","),
 			CurBeforeTime:    params.CursorBeforeTime,
@@ -1075,41 +974,18 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 			Limit:            params.Limit,
 			IncludeAllChains: len(includeChains) == 0,
 		})
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]any, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
 	}
 
-	cursorFunc := func(node any) (time.Time, persist.DBID, error) {
-		if row, ok := node.(db.Contract); ok {
-			return row.CreatedAt, row.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("node is not a db.Contract")
+	cursorFunc := func(c db.Contract) (time.Time, persist.DBID, error) {
+		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Contract]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	contracts := make([]db.Contract, len(results))
-	for i, result := range results {
-		contracts[i] = result.(db.Contract)
-	}
-
-	return contracts, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
@@ -1479,14 +1355,15 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 			return nil, PageInfo{}, err
 		}
 
-		c, _ := cursorables.NewPositionCursorer(func(any) (int64, []persist.DBID, error) { return 0, ids, err })(nil)
-		cursor = c.(*positionCursor)
+		cursor.CurrentPosition = 0
+		cursor.IDs = ids
+		cursor.Positions = make(map[persist.DBID]int64)
 	}
 
-	var paginator positionPaginator
+	var paginator positionPaginator[db.User]
 
-	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
-		keys, err := api.queries.GetUsersByPositionPaginate(ctx, db.GetUsersByPositionPaginateParams{
+	paginator.QueryFunc = func(params positionPagingParams) ([]db.User, error) {
+		return api.queries.GetUsersByPositionPaginate(ctx, db.GetUsersByPositionPaginateParams{
 			UserIds: util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() }),
 			// Postgres uses 1-based indexing
 			CurBeforePos:  params.CursorBeforePos + 1,
@@ -1494,16 +1371,13 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		return util.MapWithoutError(keys, func(u db.User) any { return u }), err
 	}
 
-	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
-		return cursor.Positions[node.(db.User).ID], cursor.IDs, nil
+	paginator.CursorFunc = func(u db.User) (int64, []persist.DBID, error) {
+		return cursor.Positions[u.ID], cursor.IDs, nil
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	users := util.MapWithoutError(results, func(u any) db.User { return u.(db.User) })
-	return users, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 // CreatePushTokenForUser adds a push token to a user, or returns the existing push token if it's already been

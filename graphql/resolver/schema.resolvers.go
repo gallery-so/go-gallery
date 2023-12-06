@@ -682,12 +682,12 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 
 // Feed is the resolver for the feed field.
 func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.UserFeed(ctx, obj.Dbid, before, after, first, last)
+	posts, pageInfo, err := publicapi.For(ctx).Feed.UserFeed(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	edges, err := entitiesToFeedEdges(events)
+	edges, err := entitiesToFeedEdges(util.MapWithoutError(posts, func(p coredb.Post) any { return p }))
 	if err != nil {
 		return nil, err
 	}

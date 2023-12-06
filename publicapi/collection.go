@@ -150,32 +150,25 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 		cursor.Positions = util.SliceToMapIndex(cursor.IDs)
 	}
 
-	var paginator positionPaginator
+	var paginator positionPaginator[db.Collection]
 
-	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
-		cIDs := util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() })
-		collections, err := api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
-			CollectionIds: cIDs,
+	paginator.QueryFunc = func(params positionPagingParams) ([]db.Collection, error) {
+		return api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
+			CollectionIds: util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() }),
 			// Postgres uses 1-based indexing
 			CurBeforePos:  params.CursorBeforePos + 1,
 			CurAfterPos:   params.CursorAfterPos + 1,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		collectionsAny := util.MapWithoutError(collections, func(c db.Collection) any { return c })
-		return collectionsAny, err
 	}
 
-	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
-		return cursor.Positions[node.(db.Collection).ID], cursor.IDs, nil
-	}
+	paginator.CursorFunc = func(c db.Collection) (int64, []persist.DBID, error) { return cursor.Positions[c.ID], cursor.IDs, nil }
 
 	// The collections are sorted by ascending rank so we need to switch the cursor positions
 	// so that the default before position (position that comes after any other position) has the largest idx
 	// and the default after position (position that comes before any other position) has the smallest idx
-	results, pageInfo, err := paginator.paginate(before, after, first, last, positionOpts.WithStartingCursors(math.MaxInt32, -1))
-	collections := util.MapWithoutError(results, func(r any) db.Collection { return r.(db.Collection) })
-	return collections, pageInfo, err
+	return paginator.paginate(before, after, first, last, positionOpts.WithStartingCursors(math.MaxInt32, -1))
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {
