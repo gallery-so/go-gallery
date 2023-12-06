@@ -373,6 +373,7 @@ type PostTokensInput struct {
 	TokenIds []persist.DBID `json:"tokenIds"`
 	Caption  *string        `json:"caption"`
 	Mentions []MentionInput `json:"mentions"`
+	MintURL  *string        `json:"mintURL"`
 }
 
 // GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
@@ -383,6 +384,9 @@ func (v *PostTokensInput) GetCaption() *string { return v.Caption }
 
 // GetMentions returns PostTokensInput.Mentions, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
+
+// GetMintURL returns PostTokensInput.MintURL, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetMintURL() *string { return v.MintURL }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`
