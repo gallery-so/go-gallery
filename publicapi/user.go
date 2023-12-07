@@ -1,17 +1,13 @@
 package publicapi
 
 import (
-	"container/heap"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mikeydub/go-gallery/service/task"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -36,12 +32,13 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/socialauth"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/util/sort"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -61,6 +58,7 @@ type UserAPI struct {
 	storageClient      *storage.Client
 	multichainProvider *multichain.Provider
 	taskClient         *task.Client
+	cache              *redis.Cache
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -170,86 +168,87 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 	return paginator.paginate(before, after, first, last)
 }
 
-type userRec struct {
-	User db.User
-	Freq int
-	r    int
+func (api UserAPI) paginatorFromCursorStr(ctx context.Context, c string, q *db.Queries) (positionPaginator[db.User], error) {
+	cur := cursors.NewPositionCursor()
+	err := cur.Unpack(c)
+	if err != nil {
+		return positionPaginator[db.User]{}, err
+	}
+	return api.paginatorFromCursor(ctx, cur, q), nil
 }
 
-func (u userRec) Less(a any) bool {
-	other, ok := a.(userRec)
-	if !ok {
-		return false
-	}
-	if u.Freq != other.Freq {
-		return u.Freq < other.Freq
-	}
-	// Break ties randomly
-	return u.r < other.r
+func (api UserAPI) paginatorFromCursor(ctx context.Context, c *positionCursor, q *db.Queries) positionPaginator[db.User] {
+	return api.paginatorWithQuery(c, func(p positionPagingParams) ([]db.User, error) {
+		return q.GetUsersByPositionPaginate(ctx, db.GetUsersByPositionPaginateParams{
+			UserIds: util.MapWithoutError(c.IDs, func(id persist.DBID) string { return id.String() }),
+			// Postgres uses 1-based indexing
+			CurBeforePos: p.CursorBeforePos + 1,
+			CurAfterPos:  p.CursorAfterPos + 1,
+		})
+	})
+}
+
+func (api UserAPI) paginatorFromResults(ctx context.Context, c *positionCursor, users []db.User) positionPaginator[db.User] {
+	queryF := func(positionPagingParams) ([]db.User, error) { return users, nil }
+	return api.paginatorWithQuery(c, queryF)
+}
+
+func (api UserAPI) paginatorWithQuery(c *positionCursor, queryF func(positionPagingParams) ([]db.User, error)) positionPaginator[db.User] {
+	var paginator positionPaginator[db.User]
+	paginator.QueryFunc = queryF
+	paginator.CursorFunc = func(u db.User) (int64, []persist.DBID, error) { return c.Positions[u.ID], c.IDs, nil }
+	return paginator
 }
 
 func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
-	usersActive, err := api.queries.GetTopActiveUsers(ctx)
-	if err != nil {
+	// Validate
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
-	}
-	usersFreqRec, err := api.queries.GetFrequentlyRecommendedUsers(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	usersHandSelected := make([]db.User, 0)
-
-	userHist := make(map[persist.DBID]*userRec)
-
-	for _, list := range [][]db.User{usersActive, usersFreqRec, usersHandSelected} {
-		for _, u := range list {
-			if _, ok := userHist[u.ID]; !ok {
-				userHist[u.ID] = &userRec{User: u, Freq: 1, r: rand.Int()}
-			}
-			userHist[u.ID].Freq += 1
-		}
-	}
-
-	h := &sort.Heap[userRec]{}
-
-	// TODO: Ensure the pop order is correct
-	for _, u := range userHist {
-		// Add first 100 users to heap
-		if h.Len() < 100 {
-			h.Push(u)
-		}
-		// If the score is greater than the smallest score in the heap, replace it
-		if !u.Less((*h)[0]) {
-			heap.Pop(h)
-			heap.Push(h, u)
-		}
-	}
-
-	users := make([]db.User, 0)
-	userIDs := make([]persist.DBID, 0)
-	positions := make(map[persist.DBID]int64)
-
-	for i := 0; h.Len() > 0; i++ {
-		users[i] = h.Pop().(userRec).User
-		userIDs[i] = users[i].ID
-		positions[users[i].ID] = int64(i)
 	}
 
 	cursor := cursors.NewPositionCursor()
-	cursor.CurrentPosition = 0
-	cursor.IDs = userIDs
-	cursor.Positions = positions
+	paginator := positionPaginator[db.User]{}
 
-	var paginator positionPaginator[db.User]
-
-	// We already did the work to fetch the users above so we can just return them here
-	paginator.QueryFunc = func(params positionPagingParams) ([]db.User, error) {
-		return users, nil
+	if before != nil {
+		paginator, err := api.paginatorFromCursorStr(ctx, *before, api.queries)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+		return paginator.paginate(before, after, first, last)
 	}
 
-	paginator.CursorFunc = func(u db.User) (int64, []persist.DBID, error) {
-		return cursor.Positions[u.ID], cursor.IDs, nil
+	if after != nil {
+		paginator, err := api.paginatorFromCursorStr(ctx, *after, api.queries)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+		return paginator.paginate(before, after, first, last)
+	}
+
+	// Not currently paging, so we need to check the cache and possibly re-calculate the recommendations
+	var users []db.User
+	var err error
+
+	cache := newDBIDCache(api.cache, "new_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
+		users, err = api.queries.GetNewUserUserRecommendations(ctx, 100)
+		userIDs := util.MapWithoutError(users, func(u db.User) persist.DBID { return u.ID })
+		return userIDs, err
+	})
+
+	userIDs, err := cache.Load(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	cursor.CurrentPosition = 0
+	cursor.IDs = userIDs
+	cursor.Positions = util.SliceToMapIndex(userIDs)
+
+	// We already did the work to fetch the users when re-calculating the recommendations, so we can just return them here
+	if users != nil {
+		paginator = api.paginatorFromResults(ctx, cursor, users)
+	} else {
+		paginator = api.paginatorFromCursor(ctx, cursor, api.queries)
 	}
 
 	return paginator.paginate(before, after, first, last)
@@ -1340,7 +1339,7 @@ func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType mode
 	})
 }
 
-func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+func (api UserAPI) GetExploreRecommendedUsers(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -1376,26 +1375,10 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 
 		cursor.CurrentPosition = 0
 		cursor.IDs = ids
-		cursor.Positions = make(map[persist.DBID]int64)
+		cursor.Positions = util.SliceToMapIndex(ids)
 	}
 
-	var paginator positionPaginator[db.User]
-
-	paginator.QueryFunc = func(params positionPagingParams) ([]db.User, error) {
-		return api.queries.GetUsersByPositionPaginate(ctx, db.GetUsersByPositionPaginateParams{
-			UserIds: util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() }),
-			// Postgres uses 1-based indexing
-			CurBeforePos:  params.CursorBeforePos + 1,
-			CurAfterPos:   params.CursorAfterPos + 1,
-			PagingForward: params.PagingForward,
-			Limit:         params.Limit,
-		})
-	}
-
-	paginator.CursorFunc = func(u db.User) (int64, []persist.DBID, error) {
-		return cursor.Positions[u.ID], cursor.IDs, nil
-	}
-
+	paginator := api.paginatorFromCursor(ctx, cursor, api.queries)
 	return paginator.paginate(before, after, first, last)
 }
 

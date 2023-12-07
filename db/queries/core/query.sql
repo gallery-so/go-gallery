@@ -585,12 +585,12 @@ and posts.deleted = false;
 -- name: GetFeedEventsByIds :many
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
--- name: GetPostsByIds :many
+-- name: GetPostsByIdsPaginate :many
 select posts.*
 from posts
 join unnest(@post_ids::varchar(255)[]) with ordinality t(id, pos) using(id)
-where not posts.deleted
-order by pos asc;
+where not posts.deleted and t.pos > @cur_before_pos::int and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
+order by t.pos asc;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
@@ -980,12 +980,11 @@ select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = 
     limit $1;
 
 -- name: GetUsersByPositionPaginate :many
-select u.* from users u join unnest(@user_ids::text[]) with ordinality t(id, pos) using(id) where u.deleted = false
-  and t.pos > @cur_before_pos::int
-  and t.pos < @cur_after_pos::int
-  order by case when @paging_forward::bool then t.pos end desc,
-          case when not @paging_forward::bool then t.pos end asc
-  limit sqlc.arg('limit');
+select u.*
+from users u
+join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
+where not u.deleted and not u.universal and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
+order by t.pos asc;
 
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
@@ -1546,9 +1545,8 @@ select collections.id from collections join ranking using(id) where score <= 100
 -- name: GetVisibleCollectionsByIDsPaginate :many
 select collections.*
 from collections, unnest(@collection_ids::varchar[]) with ordinality as t(id, pos)
-where collections.id = t.id and not deleted and not hidden and t.pos < @cur_before_pos::int and t.pos > @cur_after_pos::int
-order by case when @paging_forward::bool then t.pos end asc, case when not @paging_forward::bool then t.pos end desc
-limit $1;
+where collections.id = t.id and not deleted and not hidden and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
+order by t.pos asc;
 
 -- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = @creator_user_id, last_updated = now() where id = @contract_id and deleted = false;
@@ -1807,19 +1805,13 @@ SET traits = CASE
              END
 WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 
--- name: GetTopActiveUsers :many
-select * from users where (traits->>'top_activity')::bool and not deleted and not universal;
-
--- name: GetFrequentlyRecommendedUsers :many
-with top_n as (
-	select recommended_user_id id
-	from recommendation_results
-	group by recommended_user_id
-	order by sum(recommended_count) desc
-	limit 100
-)
-select users.* from users join top_n using(id) where not users.deleted and not users.universal;
-
+-- name: GetNewUserUserRecommendations :many
+with sources as (
+    select id from users where (traits->>'top_activity')::bool
+    union all select recommended_user_id from top_recommended_users
+    union all select user_id from user_internal_recommendations
+), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
+select users.* from users join top_recs using(id) where not users.deleted and not users.universal limit $1;
 
 -- name: InsertMention :one
 INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;

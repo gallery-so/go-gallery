@@ -30,9 +30,9 @@ var (
 	defaultCursorAfterKey = ""
 
 	// Some position that comes after any other position
-	defaultCursorBeforePosition = -1
+	defaultCursorBeforePosition = math.MaxInt32 - 1
 	// Some position that comes before any other position
-	defaultCursorAfterPosition = math.MaxInt16
+	defaultCursorAfterPosition = -1
 )
 
 type PageInfo struct {
@@ -548,81 +548,50 @@ type positionPaginator[T any] struct {
 	CountFunc func() (count int, err error)
 }
 
-type positionPaginatorArgs struct {
-	CurBeforePos int
-	CurAfterPos  int
-}
-
-type positionPaginatorOpts struct{}
-
-var positionOpts positionPaginatorOpts
-
-// WithDefaultCursors configures the starting cursors to use when none are provided
-func (positionPaginatorOpts) WithStartingCursors(before, after int) func(a *positionPaginatorArgs) {
-	return func(a *positionPaginatorArgs) {
-		a.CurBeforePos = before
-		a.CurAfterPos = after
-	}
-}
-
 type positionPagingParams struct {
-	Limit           int32
 	CursorBeforePos int32
 	CursorAfterPos  int32
-	PagingForward   bool
 	IDs             []persist.DBID
 }
 
-func (p *positionPaginator[T]) paginate(before *string, after *string, first *int, last *int, opts ...func(*positionPaginatorArgs)) ([]T, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]T, error) {
-		var ids []persist.DBID
-
-		args := positionPaginatorArgs{
-			CurBeforePos: defaultCursorBeforePosition,
-			CurAfterPos:  defaultCursorAfterPosition,
-		}
-
-		beforeCur := cursors.NewPositionCursor()
-		afterCur := cursors.NewPositionCursor()
-
-		for _, opt := range opts {
-			opt(&args)
-		}
-
-		if before != nil {
-			if err := beforeCur.Unpack(*before); err != nil {
-				return nil, err
-			}
-			args.CurBeforePos = int(beforeCur.CurrentPosition)
-			ids = beforeCur.IDs
-		}
-
-		if after != nil {
-			if err := afterCur.Unpack(*after); err != nil {
-				return nil, err
-			}
-			args.CurAfterPos = int(afterCur.CurrentPosition)
-			ids = afterCur.IDs
-		}
-
-		queryParams := positionPagingParams{
-			Limit:           limit,
-			CursorBeforePos: int32(args.CurBeforePos),
-			CursorAfterPos:  int32(args.CurAfterPos),
-			PagingForward:   pagingForward,
-			IDs:             ids,
-		}
-
-		return p.QueryFunc(queryParams)
+func (p positionPaginator[T]) cursorsToArgs(before, after *string) (positionPagingParams, error) {
+	args := positionPagingParams{
+		CursorBeforePos: int32(defaultCursorBeforePosition),
+		CursorAfterPos:  int32(defaultCursorAfterPosition),
 	}
 
-	paginator := keysetPaginator[T, *positionCursor]{
-		QueryFunc:  queryFunc,
-		Cursorable: newPositionCursor(p.CursorFunc),
-		CountFunc:  p.CountFunc,
+	beforeCur := cursors.NewPositionCursor()
+	afterCur := cursors.NewPositionCursor()
+
+	if before != nil {
+		if err := beforeCur.Unpack(*before); err != nil {
+			return args, err
+		}
+		args.CursorBeforePos = int32(beforeCur.CurrentPosition)
+		args.IDs = beforeCur.IDs
 	}
 
-	return paginator.paginate(before, after, first, last)
+	if after != nil {
+		if err := afterCur.Unpack(*after); err != nil {
+			return args, err
+		}
+		args.CursorAfterPos = int32(afterCur.CurrentPosition)
+		args.IDs = afterCur.IDs
+	}
+
+	return args, nil
+}
+
+func (p *positionPaginator[T]) paginate(before *string, after *string, first *int, last *int) ([]T, PageInfo, error) {
+	args, err := p.cursorsToArgs(before, after)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+	results, err := p.QueryFunc(args)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+	return pageFrom(results, nil, newPositionCursor(p.CursorFunc), before, after, first, last)
 }
 
 type intTimeIDPaginator[T any] struct {
@@ -892,7 +861,7 @@ type baseCursor struct {
 }
 
 // cursorable is a function that creates a cursor N from a node of type T
-type cursorable[T any, K cursor] func(T) (c K, err error)
+type cursorable[T any, K cursor] func(T) (K, error)
 
 type cursorN struct{} // namespace for available cursors
 

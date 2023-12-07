@@ -3251,7 +3251,7 @@ func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer)
 
 // SuggestedUsers is the resolver for the suggestedUsers field.
 func (r *viewerResolver) SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
-	users, pageInfo, err := publicapi.For(ctx).User.RecommendUsers(ctx, before, after, first, last)
+	users, pageInfo, err := publicapi.For(ctx).User.GetExploreRecommendedUsers(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}

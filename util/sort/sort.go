@@ -12,7 +12,6 @@ func (h *Heap[T]) Pop() any {
 	old := *h
 	n := len(old)
 	item := old[n-1]
-	old = nil
 	*h = old[:n-1]
 	return item
 }

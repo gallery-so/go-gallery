@@ -627,6 +627,14 @@ type UserBlocklist struct {
 	Active        sql.NullBool `db:"active" json:"active"`
 }
 
+type UserInternalRecommendation struct {
+	ID          persist.DBID `db:"id" json:"id"`
+	UserID      persist.DBID `db:"user_id" json:"user_id"`
+	CreatedAt   time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
+	Deleted     bool         `db:"deleted" json:"deleted"`
+}
+
 type UserRelevance struct {
 	ID    persist.DBID `db:"id" json:"id"`
 	Score int32        `db:"score" json:"score"`

@@ -2375,56 +2375,6 @@ func (q *Queries) GetFeedEventsByIds(ctx context.Context, ids []string) ([]FeedE
 	return items, nil
 }
 
-const getFrequentlyRecommendedUsers = `-- name: GetFrequentlyRecommendedUsers :many
-with top_n as (
-	select recommended_user_id id
-	from recommendation_results
-	group by recommended_user_id
-	order by sum(recommended_count) desc
-	limit 100
-)
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join top_n using(id) where not users.deleted and not users.universal
-`
-
-func (q *Queries) GetFrequentlyRecommendedUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.Query(ctx, getFrequentlyRecommendedUsers)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []User
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.ProfileImageID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getGalleriesByUserId = `-- name: GetGalleriesByUserId :many
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position FROM galleries WHERE owner_user_id = $1 AND deleted = false order by position
 `
@@ -3014,6 +2964,54 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDTokenIDForAction(ctx context
 	return i, err
 }
 
+const getNewUserUserRecommendations = `-- name: GetNewUserUserRecommendations :many
+with sources as (
+    select id from users where (traits->>'top_activity')::bool
+    union all select recommended_user_id from top_recommended_users
+    union all select user_id from user_internal_recommendations
+), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join top_recs using(id) where not users.deleted and not users.universal limit $1
+`
+
+func (q *Queries) GetNewUserUserRecommendations(ctx context.Context, limit int32) ([]User, error) {
+	rows, err := q.db.Query(ctx, getNewUserUserRecommendations, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getNotificationByID = `-- name: GetNotificationByID :one
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE id = $1 AND deleted = false
 `
@@ -3118,16 +3116,22 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 	return i, err
 }
 
-const getPostsByIds = `-- name: GetPostsByIds :many
+const getPostsByIdsPaginate = `-- name: GetPostsByIdsPaginate :many
 select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
 from posts
 join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
-where not posts.deleted
-order by pos asc
+where not posts.deleted and t.pos > $2::int and t.pos > $3::int and t.pos < $2::int
+order by t.pos asc
 `
 
-func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsByIds, postIds)
+type GetPostsByIdsPaginateParams struct {
+	PostIds      []string `db:"post_ids" json:"post_ids"`
+	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
+	CurAfterPos  int32    `db:"cur_after_pos" json:"cur_after_pos"`
+}
+
+func (q *Queries) GetPostsByIdsPaginate(ctx context.Context, arg GetPostsByIdsPaginateParams) ([]Post, error) {
+	rows, err := q.db.Query(ctx, getPostsByIdsPaginate, arg.PostIds, arg.CurBeforePos, arg.CurAfterPos)
 	if err != nil {
 		return nil, err
 	}
@@ -4368,49 +4372,6 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 	return items, nil
 }
 
-const getTopActiveUsers = `-- name: GetTopActiveUsers :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id from users where (traits->>'top_activity')::bool and not deleted and not universal
-`
-
-func (q *Queries) GetTopActiveUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.Query(ctx, getTopActiveUsers)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []User
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.ProfileImageID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTopCollectionsForCommunity = `-- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (
 	select t.id, t.owner_user_id
@@ -5073,30 +5034,21 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 }
 
 const getUsersByPositionPaginate = `-- name: GetUsersByPositionPaginate :many
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u join unnest($1::text[]) with ordinality t(id, pos) using(id) where u.deleted = false
-  and t.pos > $2::int
-  and t.pos < $3::int
-  order by case when $4::bool then t.pos end desc,
-          case when not $4::bool then t.pos end asc
-  limit $5
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
+from users u
+join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
+where not u.deleted and not u.universal and t.pos > $2::int and t.pos < $3::int
+order by t.pos asc
 `
 
 type GetUsersByPositionPaginateParams struct {
-	UserIds       []string `db:"user_ids" json:"user_ids"`
-	CurBeforePos  int32    `db:"cur_before_pos" json:"cur_before_pos"`
-	CurAfterPos   int32    `db:"cur_after_pos" json:"cur_after_pos"`
-	PagingForward bool     `db:"paging_forward" json:"paging_forward"`
-	Limit         int32    `db:"limit" json:"limit"`
+	UserIds      []string `db:"user_ids" json:"user_ids"`
+	CurAfterPos  int32    `db:"cur_after_pos" json:"cur_after_pos"`
+	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
 }
 
 func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersByPositionPaginateParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getUsersByPositionPaginate,
-		arg.UserIds,
-		arg.CurBeforePos,
-		arg.CurAfterPos,
-		arg.PagingForward,
-		arg.Limit,
-	)
+	rows, err := q.db.Query(ctx, getUsersByPositionPaginate, arg.UserIds, arg.CurAfterPos, arg.CurBeforePos)
 	if err != nil {
 		return nil, err
 	}
@@ -5543,28 +5495,19 @@ func (q *Queries) GetUsersWithoutSocials(ctx context.Context) ([]GetUsersWithout
 
 const getVisibleCollectionsByIDsPaginate = `-- name: GetVisibleCollectionsByIDsPaginate :many
 select collections.id, collections.deleted, collections.owner_user_id, collections.nfts, collections.version, collections.last_updated, collections.created_at, collections.hidden, collections.collectors_note, collections.name, collections.layout, collections.token_settings, collections.gallery_id
-from collections, unnest($2::varchar[]) with ordinality as t(id, pos)
-where collections.id = t.id and not deleted and not hidden and t.pos < $3::int and t.pos > $4::int
-order by case when $5::bool then t.pos end asc, case when not $5::bool then t.pos end desc
-limit $1
+from collections, unnest($1::varchar[]) with ordinality as t(id, pos)
+where collections.id = t.id and not deleted and not hidden and t.pos > $2::int and t.pos < $3::int
+order by t.pos asc
 `
 
 type GetVisibleCollectionsByIDsPaginateParams struct {
-	Limit         int32    `db:"limit" json:"limit"`
 	CollectionIds []string `db:"collection_ids" json:"collection_ids"`
-	CurBeforePos  int32    `db:"cur_before_pos" json:"cur_before_pos"`
 	CurAfterPos   int32    `db:"cur_after_pos" json:"cur_after_pos"`
-	PagingForward bool     `db:"paging_forward" json:"paging_forward"`
+	CurBeforePos  int32    `db:"cur_before_pos" json:"cur_before_pos"`
 }
 
 func (q *Queries) GetVisibleCollectionsByIDsPaginate(ctx context.Context, arg GetVisibleCollectionsByIDsPaginateParams) ([]Collection, error) {
-	rows, err := q.db.Query(ctx, getVisibleCollectionsByIDsPaginate,
-		arg.Limit,
-		arg.CollectionIds,
-		arg.CurBeforePos,
-		arg.CurAfterPos,
-		arg.PagingForward,
-	)
+	rows, err := q.db.Query(ctx, getVisibleCollectionsByIDsPaginate, arg.CollectionIds, arg.CurAfterPos, arg.CurBeforePos)
 	if err != nil {
 		return nil, err
 	}

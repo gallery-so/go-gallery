@@ -4,22 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/util"
-
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/validate"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 const (
@@ -150,25 +148,17 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 		cursor.Positions = util.SliceToMapIndex(cursor.IDs)
 	}
 
-	var paginator positionPaginator[db.Collection]
-
+	paginator := positionPaginator[db.Collection]{}
 	paginator.QueryFunc = func(params positionPagingParams) ([]db.Collection, error) {
 		return api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
 			CollectionIds: util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() }),
 			// Postgres uses 1-based indexing
-			CurBeforePos:  params.CursorBeforePos + 1,
-			CurAfterPos:   params.CursorAfterPos + 1,
-			PagingForward: params.PagingForward,
-			Limit:         params.Limit,
+			CurBeforePos: params.CursorBeforePos + 1,
+			CurAfterPos:  params.CursorAfterPos + 1,
 		})
 	}
-
 	paginator.CursorFunc = func(c db.Collection) (int64, []persist.DBID, error) { return cursor.Positions[c.ID], cursor.IDs, nil }
-
-	// The collections are sorted by ascending rank so we need to switch the cursor positions
-	// so that the default before position (position that comes after any other position) has the largest idx
-	// and the default after position (position that comes before any other position) has the smallest idx
-	return paginator.paginate(before, after, first, last, positionOpts.WithStartingCursors(math.MaxInt32, -1))
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {
