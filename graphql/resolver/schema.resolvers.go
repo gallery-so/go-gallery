@@ -3141,13 +3141,21 @@ func (r *tokenDefinitionResolver) TokenMetadata(ctx context.Context, obj *model.
 
 // Community is the resolver for the community field.
 func (r *tokenDefinitionResolver) Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
+	communities, err := resolveCommunitiesByTokenDefinitionID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(communities) > 0 {
+		return communities[0], nil
+	}
+
+	return nil, nil
 }
 
 // Communities is the resolver for the communities field.
 func (r *tokenDefinitionResolver) Communities(ctx context.Context, obj *model.TokenDefinition) ([]*model.Community, error) {
-	// TODO: This :/
-	panic(fmt.Errorf("not implemented: Communities - communities"))
+	return resolveCommunitiesByTokenDefinitionID(ctx, obj.Dbid)
 }
 
 // Wallets is the resolver for the wallets field.

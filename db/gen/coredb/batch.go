@@ -1157,6 +1157,98 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getCommunitiesByTokenDefinitionID = `-- name: GetCommunitiesByTokenDefinitionID :batchmany
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted from communities
+    join token_definitions on token_definitions.contract_id = communities.contract_id
+    where community_type = 0
+        and token_definitions.id = $1
+        and not communities.deleted
+        and not token_definitions.deleted
+
+union all
+
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted from communities
+    join token_community_memberships on token_community_memberships.community_id = communities.id
+    where community_type != 0
+        and token_community_memberships.token_definition_id = $1
+        and not communities.deleted
+        and not token_community_memberships.deleted
+`
+
+type GetCommunitiesByTokenDefinitionIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionID []persist.DBID) *GetCommunitiesByTokenDefinitionIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range tokenDefinitionID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getCommunitiesByTokenDefinitionID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCommunitiesByTokenDefinitionIDBatchResults{br, len(tokenDefinitionID), false}
+}
+
+func (b *GetCommunitiesByTokenDefinitionIDBatchResults) Query(f func(int, []Community, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Community
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Community
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.CommunityType,
+					&i.Key1,
+					&i.Key2,
+					&i.Key3,
+					&i.Key4,
+					&i.Name,
+					&i.OverrideName,
+					&i.Description,
+					&i.OverrideDescription,
+					&i.ProfileImageUrl,
+					&i.OverrideProfileImageUrl,
+					&i.BadgeUrl,
+					&i.OverrideBadgeUrl,
+					&i.ContractID,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetCommunitiesByTokenDefinitionIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getCommunityByID = `-- name: GetCommunityByID :batchone
 select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted from communities
     where id = $1

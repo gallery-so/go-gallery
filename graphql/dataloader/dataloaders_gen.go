@@ -743,6 +743,43 @@ func (*GetCommentByCommentIDBatch) getKeyForResult(result coredb.Comment) persis
 	return result.ID
 }
 
+// GetCommunitiesByTokenDefinitionID batches and caches requests
+type GetCommunitiesByTokenDefinitionID struct {
+	generator.Dataloader[persist.DBID, []coredb.Community]
+}
+
+// newGetCommunitiesByTokenDefinitionID creates a new GetCommunitiesByTokenDefinitionID with the given settings, functions, and options
+func newGetCommunitiesByTokenDefinitionID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetCommunitiesByTokenDefinitionID, []persist.DBID) ([][]coredb.Community, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetCommunitiesByTokenDefinitionID {
+	d := &GetCommunitiesByTokenDefinitionID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Community, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetCommunitiesByTokenDefinitionID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetCommunitiesByTokenDefinitionID")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetCommunityByID batches and caches requests
 type GetCommunityByID struct {
 	generator.Dataloader[persist.DBID, coredb.Community]

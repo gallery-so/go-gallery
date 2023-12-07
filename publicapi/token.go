@@ -651,6 +651,16 @@ func (api TokenAPI) GetTokenDefinitionByID(ctx context.Context, id persist.DBID)
 	return api.loaders.GetTokenDefinitionByIdBatch.Load(id)
 }
 
+func (api TokenAPI) GetCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) ([]db.Community, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDefinitionID": validate.WithTag(tokenDefinitionID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+	return api.loaders.GetCommunitiesByTokenDefinitionID.Load(tokenDefinitionID)
+}
+
 // syncableChains returns a list of chains that the user is allowed to sync, and a callback to release the locks for those chains.
 func syncableChains(ctx context.Context, userID persist.DBID, chains []persist.Chain, throttler *throttle.Locker) ([]persist.Chain, func(), error) {
 	chainsToSync := make([]persist.Chain, 0, len(chains))

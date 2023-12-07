@@ -33,6 +33,7 @@ type Loaders struct {
 	GetCollectionByIdBatch                   *GetCollectionByIdBatch
 	GetCollectionsByGalleryIdBatch           *GetCollectionsByGalleryIdBatch
 	GetCommentByCommentIDBatch               *GetCommentByCommentIDBatch
+	GetCommunitiesByTokenDefinitionID        *GetCommunitiesByTokenDefinitionID
 	GetCommunityByID                         *GetCommunityByID
 	GetCommunityByKey                        *GetCommunityByKey
 	GetContractByChainAddressBatch           *GetContractByChainAddressBatch
@@ -111,6 +112,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCollectionByIdBatch = newGetCollectionByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCollectionByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetCollectionsByGalleryIdBatch = newGetCollectionsByGalleryIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCollectionsByGalleryIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetCommentByCommentIDBatch = newGetCommentByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommentByCommentIDBatch(q), preFetchHook, postFetchHook)
+	loaders.GetCommunitiesByTokenDefinitionID = newGetCommunitiesByTokenDefinitionID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommunitiesByTokenDefinitionID(q), preFetchHook, postFetchHook)
 	loaders.GetCommunityByID = newGetCommunityByID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommunityByID(q), preFetchHook, postFetchHook)
 	loaders.GetCommunityByKey = newGetCommunityByKey(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommunityByKey(q), preFetchHook, postFetchHook)
 	loaders.GetContractByChainAddressBatch = newGetContractByChainAddressBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractByChainAddressBatch(q), preFetchHook, postFetchHook)
@@ -221,6 +223,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.PaginateRepliesByCommentIDBatch.RegisterResultSubscriber(func(result []coredb.Comment) {
 		for _, entry := range result {
 			loaders.GetCommentByCommentIDBatch.Prime(loaders.GetCommentByCommentIDBatch.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetCommunitiesByTokenDefinitionID.RegisterResultSubscriber(func(result []coredb.Community) {
+		for _, entry := range result {
+			loaders.GetCommunityByID.Prime(loaders.GetCommunityByID.getKeyForResult(entry), entry)
 		}
 	})
 	loaders.GetCommunityByKey.RegisterResultSubscriber(func(result coredb.Community) {
@@ -806,6 +813,22 @@ func loadGetCommentByCommentIDBatch(q *coredb.Queries) func(context.Context, *Ge
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = d.getNotFoundError(params[i])
 			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCommunitiesByTokenDefinitionID(q *coredb.Queries) func(context.Context, *GetCommunitiesByTokenDefinitionID, []persist.DBID) ([][]coredb.Community, []error) {
+	return func(ctx context.Context, d *GetCommunitiesByTokenDefinitionID, params []persist.DBID) ([][]coredb.Community, []error) {
+		results := make([][]coredb.Community, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCommunitiesByTokenDefinitionID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Community, err error) {
+			results[i], errors[i] = r, err
 		})
 
 		return results, errors

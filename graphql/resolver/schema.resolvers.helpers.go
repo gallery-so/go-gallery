@@ -596,6 +596,20 @@ func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Communit
 	return communityToModel(ctx, *community), nil
 }
 
+func resolveCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) ([]*model.Community, error) {
+	communities, err := publicapi.For(ctx).Token.GetCommunitiesByTokenDefinitionID(ctx, tokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.Community, len(communities))
+	for i, c := range communities {
+		result[i] = communityToModel(ctx, c)
+	}
+
+	return result, nil
+}
+
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {
 	communityKey := persist.CommunityKey{
 		Type: persist.CommunityTypeContract,
