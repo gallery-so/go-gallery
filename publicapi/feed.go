@@ -690,15 +690,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		}
 	} else {
 		var posts []db.Post
-		var viewerID persist.DBID
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.For(ctx).Errorf("error getting authenticated user id: %v", r)
-				}
-			}()
-			viewerID, _ = getAuthenticatedUserID(ctx)
-		}()
+		viewerID, _ := getAuthenticatedUserID(ctx)
 		cacheCalcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
 			postScores, err := fetchFeedEntityScores(ctx, api.queries, viewerID)
 			if err != nil {

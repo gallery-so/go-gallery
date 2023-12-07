@@ -276,6 +276,10 @@ type digestEmailDynamicTemplateData struct {
 
 func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, fapi *publicapi.FeedAPI) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		// mimic backend auth
+		ctx.Set("auth.user_id", persist.DBID(""))
+		ctx.Set("auth.auth_error", nil)
+
 		l, _ := r.Get(ctx, "send-digest-emails")
 		if l != nil && len(l) > 0 {
 			logger.For(ctx).Infof("digest emails already being sent")

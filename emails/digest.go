@@ -99,6 +99,10 @@ const overrideFile = "email_digest_overrides.json"
 func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storage.Client, f *publicapi.FeedAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
+		// mimic backend auth
+		c.Set("auth.user_id", persist.DBID(""))
+		c.Set("auth.auth_error", nil)
+
 		result, err := getDigest(c, stg, f, q, loaders)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
