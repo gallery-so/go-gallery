@@ -184,6 +184,28 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countCommentsAndRepliesByFeedEventID = `-- name: CountCommentsAndRepliesByFeedEventID :one
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountCommentsAndRepliesByFeedEventID(ctx context.Context, feedEventID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsAndRepliesByFeedEventID, feedEventID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countCommentsAndRepliesByPostID = `-- name: CountCommentsAndRepliesByPostID :one
+SELECT count(*) FROM comments WHERE post_id = $1 is null AND deleted = false
+`
+
+func (q *Queries) CountCommentsAndRepliesByPostID(ctx context.Context, postID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsAndRepliesByPostID, postID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countFollowersByUserID = `-- name: CountFollowersByUserID :one
 SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false
 `

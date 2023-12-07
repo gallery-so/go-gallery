@@ -1392,6 +1392,7 @@ type FeedEvent struct {
 	EventData             FeedEventData                `json:"eventData"`
 	Admires               *FeedEventAdmiresConnection  `json:"admires"`
 	Comments              *FeedEventCommentsConnection `json:"comments"`
+	TotalComments         *int                         `json:"totalComments"`
 	Caption               *string                      `json:"caption"`
 	Interactions          *InteractionsConnection      `json:"interactions"`
 	ViewerAdmire          *Admire                      `json:"viewerAdmire"`
@@ -1840,6 +1841,7 @@ type Post struct {
 	Mentions         []*Mention              `json:"mentions"`
 	Admires          *PostAdmiresConnection  `json:"admires"`
 	Comments         *PostCommentsConnection `json:"comments"`
+	TotalComments    *int                    `json:"totalComments"`
 	Interactions     *InteractionsConnection `json:"interactions"`
 	ViewerAdmire     *Admire                 `json:"viewerAdmire"`
 	IsFirstPost      bool                    `json:"isFirstPost"`

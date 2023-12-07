@@ -482,6 +482,11 @@ func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, 
 	}, nil
 }
 
+// TotalComments is the resolver for the totalComments field.
+func (r *feedEventResolver) TotalComments(ctx context.Context, obj *model.FeedEvent) (*int, error) {
+	return publicapi.For(ctx).Interaction.GetTotalCommentsByFeedEventID(ctx, obj.Dbid)
+}
+
 // Interactions is the resolver for the interactions field.
 func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error) {
 	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByFeedEventID(ctx, obj.Dbid, before, after, first, last)
@@ -2229,6 +2234,11 @@ func (r *postResolver) Comments(ctx context.Context, obj *model.Post, before *st
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+// TotalComments is the resolver for the totalComments field.
+func (r *postResolver) TotalComments(ctx context.Context, obj *model.Post) (*int, error) {
+	return publicapi.For(ctx).Interaction.GetTotalCommentsByPostID(ctx, obj.Dbid)
 }
 
 // Interactions is the resolver for the interactions field.

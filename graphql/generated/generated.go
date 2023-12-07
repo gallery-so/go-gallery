@@ -592,6 +592,7 @@ type ComplexityRoot struct {
 		HasViewerAdmiredEvent func(childComplexity int) int
 		ID                    func(childComplexity int) int
 		Interactions          func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TotalComments         func(childComplexity int) int
 		ViewerAdmire          func(childComplexity int) int
 	}
 
@@ -1000,6 +1001,7 @@ type ComplexityRoot struct {
 		IsFirstPost      func(childComplexity int) int
 		Mentions         func(childComplexity int) int
 		Tokens           func(childComplexity int) int
+		TotalComments    func(childComplexity int) int
 		UserAddedMintURL func(childComplexity int) int
 		ViewerAdmire     func(childComplexity int) int
 	}
@@ -1827,6 +1829,7 @@ type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
 	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
 	Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error)
+	TotalComments(ctx context.Context, obj *model.FeedEvent) (*int, error)
 
 	Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.FeedEvent) (*model.Admire, error)
@@ -1975,6 +1978,7 @@ type PostResolver interface {
 	Mentions(ctx context.Context, obj *model.Post) ([]*model.Mention, error)
 	Admires(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostAdmiresConnection, error)
 	Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostCommentsConnection, error)
+	TotalComments(ctx context.Context, obj *model.Post) (*int, error)
 	Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.Post) (*model.Admire, error)
 }
@@ -3825,6 +3829,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FeedEvent.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
+	case "FeedEvent.totalComments":
+		if e.complexity.FeedEvent.TotalComments == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.TotalComments(childComplexity), true
 
 	case "FeedEvent.viewerAdmire":
 		if e.complexity.FeedEvent.ViewerAdmire == nil {
@@ -6134,6 +6145,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Post.Tokens(childComplexity), true
+
+	case "Post.totalComments":
+		if e.complexity.Post.TotalComments == nil {
+			break
+		}
+
+		return e.complexity.Post.TotalComments(childComplexity), true
 
 	case "Post.userAddedMintURL":
 		if e.complexity.Post.UserAddedMintURL == nil {
@@ -10198,6 +10216,9 @@ type FeedEvent implements Node @key(fields: "dbid") {
     @goField(forceResolver: true)
   comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection
     @goField(forceResolver: true)
+
+  totalComments: Int @goField(forceResolver: true)
+
   caption: String
 
   interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
@@ -10226,6 +10247,8 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
   comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
     @goField(forceResolver: true)
+
+  totalComments: Int @goField(forceResolver: true)
 
   interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
     @goField(forceResolver: true)
@@ -16565,6 +16588,8 @@ func (ec *executionContext) fieldContext_AdmireFeedEventPayload_feedEvent(ctx co
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -16697,6 +16722,8 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -21526,6 +21553,8 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_feedEvent(ctx
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -21658,6 +21687,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_post(ctx context.C
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -23944,6 +23975,8 @@ func (ec *executionContext) fieldContext_CreateCollectionPayload_feedEvent(ctx c
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -24811,6 +24844,8 @@ func (ec *executionContext) fieldContext_Entity_findFeedEventByDbid(ctx context.
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -24894,6 +24929,8 @@ func (ec *executionContext) fieldContext_Entity_findPostByDbid(ctx context.Conte
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -27184,6 +27221,47 @@ func (ec *executionContext) fieldContext_FeedEvent_comments(ctx context.Context,
 	if fc.Args, err = ec.field_FeedEvent_comments_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEvent_totalComments(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEvent_totalComments(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FeedEvent().TotalComments(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEvent_totalComments(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -42114,6 +42192,47 @@ func (ec *executionContext) fieldContext_Post_comments(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Post_totalComments(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Post_totalComments(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Post().TotalComments(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Post_totalComments(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Post_interactions(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_interactions(ctx, field)
 	if err != nil {
@@ -43073,6 +43192,8 @@ func (ec *executionContext) fieldContext_PostTokensPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -45876,6 +45997,8 @@ func (ec *executionContext) fieldContext_ReferralPostTokenPayload_post(ctx conte
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -46335,6 +46458,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_feedEvent(ctx conte
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -46404,6 +46529,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_post(ctx context.Co
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -46528,6 +46655,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_feedEvent(ctx cont
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -46597,6 +46726,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_post(ctx context.C
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -48751,6 +48882,8 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourFeedEventNotification
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -49130,6 +49263,8 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_post
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -49942,6 +50077,8 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourFeedEventNotifica
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -50291,6 +50428,8 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -51778,6 +51917,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_post(
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -52902,6 +53043,8 @@ func (ec *executionContext) fieldContext_SomeoneYouFollowPostedTheirFirstPostNot
 				return ec.fieldContext_Post_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_Post_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_Post_totalComments(ctx, field)
 			case "interactions":
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
@@ -58645,6 +58788,8 @@ func (ec *executionContext) fieldContext_UpdateCollectionTokensPayload_feedEvent
 				return ec.fieldContext_FeedEvent_admires(ctx, field)
 			case "comments":
 				return ec.fieldContext_FeedEvent_comments(ctx, field)
+			case "totalComments":
+				return ec.fieldContext_FeedEvent_totalComments(ctx, field)
 			case "caption":
 				return ec.fieldContext_FeedEvent_caption(ctx, field)
 			case "interactions":
@@ -74891,6 +75036,23 @@ func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet
 				return innerFunc(ctx)
 
 			})
+		case "totalComments":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedEvent_totalComments(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "caption":
 
 			out.Values[i] = ec._FeedEvent_caption(ctx, field, obj)
@@ -77707,6 +77869,23 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._Post_comments(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "totalComments":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Post_totalComments(ctx, field, obj)
 				return res
 			}
 
