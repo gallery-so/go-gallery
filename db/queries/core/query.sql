@@ -426,7 +426,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), $6, $7, $8, $9) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, comment_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), sqlc.narg('comment'), $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
@@ -513,14 +513,16 @@ select exists(
 );
 
 -- name: PaginateGlobalFeed :many
-SELECT *
-FROM feed_entities
-WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
-LIMIT sqlc.arg('limit');
+select fe.*
+from feed_entities fe
+left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and (fb.user_id is null or @viewer_id = fb.user_id)
+order by
+    case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
+    case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
+limit sqlc.arg('limit');
 
 -- name: PaginatePersonalFeedByUserID :many
 select fe.* from feed_entities fe, follows fl
@@ -647,14 +649,15 @@ select * from feed_events where deleted = false
     order by event_time desc
     limit 1;
 
--- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false);
+-- name: GetUserIsBlockedFromFeed :one
+select exists(select 1 from feed_blocklist where user_id = $1 and not deleted and active);
 
 -- name: BlockUserFromFeed :exec
-INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3);
+insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, sqlc.narg('reason'), true)
+on conflict(user_id) where not deleted do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now();
 
 -- name: UnblockUserFromFeed :exec
-UPDATE feed_blocklist SET deleted = true WHERE user_id = $1;
+update feed_blocklist set active = false where user_id = $1 and not deleted;
 
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
@@ -701,6 +704,16 @@ SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_a
 -- name: CountAdmiresByTokenIDBatch :batchone
 SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
+-- name: PaginateAdmiresByCommentIDBatch :batchmany
+select * from admires where comment_id = sqlc.arg('comment_id') and deleted = false
+    and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    order by case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
+             case when not sqlc.arg('paging_forward')::bool then (created_at, id) end desc
+    limit sqlc.arg('limit');
+
+-- name: CountAdmiresByCommentIDBatch :batchone
+select count(*) from admires where comment_id = $1 and deleted = false;
+
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
@@ -731,9 +744,15 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null 
 
 -- name: PaginateRepliesByCommentIDBatch :batchmany
 SELECT * FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
-        or 
-        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    ) AND deleted = false
     AND (comments.created_at, comments.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (comments.created_at, comments.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -745,9 +764,15 @@ SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to i
 
 -- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = sqlc.arg('comment_id')) 
-        or 
-        (reply_to is not null and reply_to = sqlc.arg('comment_id')) AND deleted = false;
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
+        AND top_level_comment_id = sqlc.arg('comment_id') 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
+        AND reply_to = sqlc.arg('comment_id') 
+    ) AND deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
@@ -795,6 +820,7 @@ select * from notifications
     and deleted = false
     and (not @only_for_feed_event::bool or feed_event_id = $3)
     and (not @only_for_post::bool or post_id = $4)
+    and (not @only_for_comment::bool or comment_id = $5)
     order by created_at desc
     limit 1;
 
@@ -831,13 +857,13 @@ SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
 
 -- name: CreateUserPostedFirstPostNotifications :many
 WITH 
-id_with_row_number AS (
-    SELECT unnest(sqlc.arg('ids')::varchar[]) AS id, row_number() OVER () AS rn
-),
 follower_with_row_number AS (
     SELECT follower, row_number() OVER () AS rn
     FROM follows
     WHERE followee = @actor_id AND deleted = false
+),
+id_with_row_number AS (
+    SELECT unnest(@ids::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest(@ids::varchar(255)[])) AS rn
 )
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
 SELECT 
@@ -919,8 +945,14 @@ SELECT * FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false;
 -- name: GetAdmireByActorIDAndTokenID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND token_id = $2 AND deleted = false;
 
+-- name: GetAdmireByActorIDAndCommentID :batchone
+SELECT * FROM admires WHERE actor_id = $1 AND comment_id = $2 AND deleted = false;
+
 -- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id;
+insert into posts(id, token_ids, contract_ids, actor_id, caption, user_mint_url, is_first_post, created_at)
+values ($1, $2, $3, $4, $5, $6, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
+on conflict (actor_id, is_first_post) where is_first_post do update set is_first_post = false
+returning id;
 
 -- name: DeletePostByID :exec
 update posts set deleted = true where id = $1;
@@ -1724,6 +1756,67 @@ select * from mentions where id = @id and not deleted;
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
 
+-- name: GetMostActiveUsers :many
+WITH ag AS (
+    SELECT actor_id, COUNT(*) AS admire_given
+    FROM admires
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false
+    GROUP BY actor_id
+),
+ar AS (
+    SELECT p.actor_id, COUNT(*) AS admire_received
+    FROM posts p
+    JOIN admires a ON p.id = a.post_id
+    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND a.deleted = false
+    GROUP BY p.actor_id
+),
+cm AS (
+    SELECT actor_id, COUNT(id) AS comments_made
+    FROM comments
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
+    GROUP BY actor_id
+),
+cr AS (
+    SELECT p.actor_id, COUNT(c.id) AS comments_received
+    FROM posts p
+    JOIN comments c ON p.id = c.post_id
+    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND c.deleted = false and c.removed = false
+    GROUP BY p.actor_id
+),
+scores AS (
+    SELECT 
+        ((COALESCE(ar.admire_received, 0) * @admire_received_weight::int) + 
+        (COALESCE(ag.admire_given, 0) * @admire_given_weight::int) + 
+        (COALESCE(cm.comments_made, 0) * @comments_made_weight::int) + 
+        (COALESCE(cr.comments_received, 0) * @comments_received_weight::int)) AS score,
+        COALESCE(nullif(ag.actor_id,''), nullif(ar.actor_id,''), nullif(cm.actor_id,''), nullif(cr.actor_id,'')) AS actor_id,
+        COALESCE(ag.admire_given, 0) AS admires_given,
+        COALESCE(ar.admire_received, 0) AS admires_received,
+        COALESCE(cm.comments_made, 0) AS comments_made,
+        COALESCE(cr.comments_received, 0) AS comments_received
+    FROM ag
+    FULL OUTER JOIN ar using(actor_id)
+    FULL OUTER JOIN cm using(actor_id)
+    FULL OUTER JOIN cr using(actor_id)
+)
+SELECT scores.*, users.traits
+FROM scores
+join users on scores.actor_id = users.id
+WHERE users.deleted = false AND users.universal = false
+AND scores.actor_id IS NOT NULL AND scores.score > 0
+ORDER BY scores.score DESC
+LIMIT $1;
+
+-- name: UpdateTopActiveUsers :exec
+UPDATE users
+SET traits = CASE 
+                WHEN id = ANY(@top_user_ids) THEN 
+                    COALESCE(traits, '{}'::jsonb) || '{"top_activity": true}'::jsonb
+                ELSE 
+                    traits - 'top_activity'
+             END
+WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
+
 -- name: InsertMention :one
 INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
 
@@ -1744,3 +1837,16 @@ RETURNING ID;
 
 -- name: RemoveComment :exec
 UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;
+
+-- name: ReportPost :one
+with offending_post as (select id from posts where posts.id = @post_id and not deleted)
+insert into reported_posts (id, post_id, reporter_id, reason) (select @id, offending_post.id, sqlc.narg(reporter), sqlc.narg(reason) from offending_post)
+on conflict(post_id, reporter_id, reason) where not deleted do update set last_updated = now() returning id;
+
+-- name: BlockUser :one
+with user_to_block as (select id from users where users.id = @blocked_user_id and not deleted and not universal)
+insert into user_blocklist (id, user_id, blocked_user_id, active) (select @id, @user_id, user_to_block.id, true from user_to_block)
+on conflict(user_id, blocked_user_id) where not deleted do update set active = true, last_updated = now() returning id;
+
+-- name: UnblockUser :exec
+update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;

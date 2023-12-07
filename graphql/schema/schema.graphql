@@ -91,7 +91,6 @@ type GalleryUser implements Node @goEmbedHelper {
   profileImage: ProfileImage @goField(forceResolver: true)
   potentialEnsProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
-  traits: String
   universal: Boolean
   roles: [Role] @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)
@@ -683,6 +682,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  mintURL: String
   isSpam: Boolean
 }
 
@@ -877,7 +877,7 @@ union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | Err
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 union CommunityByKeyOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
-union AdmireSource = Post | FeedEvent
+union AdmireSource = Post | FeedEvent | Comment
 
 type Admire implements Node @goEmbedHelper {
   id: ID!
@@ -905,6 +905,19 @@ type Comment implements Node @goEmbedHelper {
 
   # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
   deleted: Boolean
+  viewerAdmire: Admire @goField(forceResolver: true)
+  admires(before: String, after: String, first: Int, last: Int): CommentAdmiresConnection
+    @goField(forceResolver: true)
+}
+
+type CommentAdmiresConnection {
+  edges: [CommentAdmireEdge]
+  pageInfo: PageInfo
+}
+
+type CommentAdmireEdge {
+  node: Admire
+  cursor: String
 }
 
 union MentionEntity = GalleryUser | Community
@@ -1067,6 +1080,8 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
+  isFirstPost: Boolean!
+  userAddedMintURL: String
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -2106,6 +2121,20 @@ type SomeoneAdmiredYourTokenNotification implements Notification & Node & Groupe
     @goField(forceResolver: true)
 }
 
+type SomeoneAdmiredYourCommentNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  comment: Comment @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
+}
+
 type SomeoneCommentedOnYourPostNotification implements Notification & Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
@@ -2210,6 +2239,16 @@ type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & 
   updatedTime: Time
 
   post: Post @goField(forceResolver: true)
+}
+
+type YouReceivedTopActivityBadgeNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  threshold: Int!
 }
 
 type ClearAllNotificationsPayload {
@@ -2678,6 +2717,7 @@ input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
   mentions: [MentionInput!]
+  mintURL: String
 }
 
 type PostTokensPayload {
@@ -2689,6 +2729,7 @@ union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAut
 input ReferralPostTokenInput {
   token: ChainAddressTokenInput!
   caption: String
+  mintURL: String
 }
 
 type ReferralPostTokenPayload {
@@ -2707,7 +2748,11 @@ type AdmirePostPayload {
   admire: Admire @goField(forceResolver: true)
 }
 
-union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
+union AdmirePostPayloadOrError =
+    AdmirePostPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrPostNotFound
 
 type AdmireTokenPayload {
   viewer: Viewer
@@ -2720,6 +2765,18 @@ union AdmireTokenPayloadOrError =
   | ErrTokenNotFound
   | ErrInvalidInput
   | ErrNotAuthorized
+
+union AdmireCommentPayloadOrError =
+    AdmireCommentPayload
+  | ErrCommentNotFound
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+type AdmireCommentPayload {
+  viewer: Viewer
+  comment: Comment @goField(forceResolver: true)
+  admire: Admire @goField(forceResolver: true)
+}
 
 type CommentOnPostPayload {
   viewer: Viewer
@@ -2757,6 +2814,38 @@ type ReferralPostPreflightPayload {
 
 union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload | ErrInvalidInput
 
+type ReportPostPayload {
+  postId: DBID!
+}
+
+union ReportPostPayloadOrError = ReportPostPayload | ErrInvalidInput | ErrPostNotFound
+
+enum ReportReason {
+  INAPPROPRIATE_CONTENT
+  SPAM_AND_OR_BOT
+  SOMETHING_ELSE
+}
+
+type BlockUserPayload {
+  userId: DBID!
+}
+
+union BlockUserPayloadOrError =
+    BlockUserPayload
+  | ErrUserNotFound
+  | ErrNotAuthorized
+  | ErrInvalidInput
+
+type UnblockUserPayload {
+  userId: DBID!
+}
+
+union UnblockUserPayloadOrError =
+    UnblockUserPayload
+  | ErrUserNotFound
+  | ErrNotAuthorized
+  | ErrInvalidInput
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2769,6 +2858,9 @@ type Mutation {
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
   setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
   removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
+  reportPost(postId: DBID!, reason: ReportReason!): ReportPostPayloadOrError
+  blockUser(userId: DBID!): BlockUserPayloadOrError @authRequired
+  unblockUser(userId: DBID!): UnblockUserPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(
@@ -2834,6 +2926,7 @@ type Mutation {
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired
   admireToken(tokenId: DBID!): AdmireTokenPayloadOrError @authRequired
+  admireComment(commentId: DBID!): AdmireCommentPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(
     feedEventId: DBID!
@@ -2897,7 +2990,8 @@ type Mutation {
     username: String!
     chainAddress: ChainAddressInput!
   ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
-  banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
+  banUserFromFeed(username: String!, reason: ReportReason!): BanUserFromFeedPayloadOrError
+    @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!

@@ -89,18 +89,38 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
+const blockUser = `-- name: BlockUser :one
+with user_to_block as (select id from users where users.id = $3 and not deleted and not universal)
+insert into user_blocklist (id, user_id, blocked_user_id, active) (select $1, $2, user_to_block.id, true from user_to_block)
+on conflict(user_id, blocked_user_id) where not deleted do update set active = true, last_updated = now() returning id
+`
+
+type BlockUserParams struct {
+	ID            persist.DBID `db:"id" json:"id"`
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
+}
+
+func (q *Queries) BlockUser(ctx context.Context, arg BlockUserParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, blockUser, arg.ID, arg.UserID, arg.BlockedUserID)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
-INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
+insert into feed_blocklist (id, user_id, reason, active) values ($1, $2, $3, true)
+on conflict(user_id) where not deleted do update set reason = coalesce(excluded.reason, feed_blocklist.reason), active = true, last_updated = now()
 `
 
 type BlockUserFromFeedParams struct {
-	ID     persist.DBID   `db:"id" json:"id"`
-	UserID persist.DBID   `db:"user_id" json:"user_id"`
-	Action persist.Action `db:"action" json:"action"`
+	ID     persist.DBID         `db:"id" json:"id"`
+	UserID persist.DBID         `db:"user_id" json:"user_id"`
+	Reason persist.ReportReason `db:"reason" json:"reason"`
 }
 
 func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedParams) error {
-	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Action)
+	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Reason)
 	return err
 }
 
@@ -345,7 +365,7 @@ func (q *Queries) CountUserUnseenNotifications(ctx context.Context, ownerID pers
 }
 
 const createAdmireEvent = `-- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $12, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, comment_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $12, $13, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateAdmireEventParams struct {
@@ -361,6 +381,7 @@ type CreateAdmireEventParams struct {
 	FeedEvent      sql.NullString       `db:"feed_event" json:"feed_event"`
 	Post           sql.NullString       `db:"post" json:"post"`
 	Token          sql.NullString       `db:"token" json:"token"`
+	Comment        sql.NullString       `db:"comment" json:"comment"`
 }
 
 func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventParams) (Event, error) {
@@ -377,6 +398,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 		arg.FeedEvent,
 		arg.Post,
 		arg.Token,
+		arg.Comment,
 	)
 	var i Event
 	err := row.Scan(
@@ -1247,13 +1269,13 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 
 const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
 WITH 
-id_with_row_number AS (
-    SELECT unnest($5::varchar[]) AS id, row_number() OVER () AS rn
-),
 follower_with_row_number AS (
     SELECT follower, row_number() OVER () AS rn
     FROM follows
-    WHERE followee = $6 AND deleted = false
+    WHERE followee = $5 AND deleted = false
+),
+id_with_row_number AS (
+    SELECT unnest($6::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($6::varchar(255)[])) AS rn
 )
 INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
 SELECT 
@@ -1275,8 +1297,8 @@ type CreateUserPostedFirstPostNotificationsParams struct {
 	Data     persist.NotificationData `db:"data" json:"data"`
 	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
 	PostID   persist.DBID             `db:"post_id" json:"post_id"`
-	Ids      []string                 `db:"ids" json:"ids"`
 	ActorID  persist.DBID             `db:"actor_id" json:"actor_id"`
+	Ids      []string                 `db:"ids" json:"ids"`
 }
 
 func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, arg CreateUserPostedFirstPostNotificationsParams) ([]Notification, error) {
@@ -1285,8 +1307,8 @@ func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, ar
 		arg.Data,
 		arg.EventIds,
 		arg.PostID,
-		arg.Ids,
 		arg.ActorID,
+		arg.Ids,
 	)
 	if err != nil {
 		return nil, err
@@ -1490,7 +1512,7 @@ func (q *Queries) GetActorForGroup(ctx context.Context, groupID sql.NullString) 
 }
 
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Admire, error) {
@@ -1506,12 +1528,13 @@ func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Adm
 		&i.LastUpdated,
 		&i.PostID,
 		&i.TokenID,
+		&i.CommentID,
 	)
 	return i, err
 }
 
 const getAdmiresByActorID = `-- name: GetAdmiresByActorID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID) ([]Admire, error) {
@@ -1533,6 +1556,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		); err != nil {
 			return nil, err
 		}
@@ -1545,7 +1569,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 }
 
 const getAdmiresByAdmireIDs = `-- name: GetAdmiresByAdmireIDs :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id from admires WHERE id = ANY($1) AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id from admires WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.DBIDList) ([]Admire, error) {
@@ -1567,6 +1591,7 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		); err != nil {
 			return nil, err
 		}
@@ -2721,13 +2746,118 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 	return discount_code, err
 }
 
+const getMostActiveUsers = `-- name: GetMostActiveUsers :many
+WITH ag AS (
+    SELECT actor_id, COUNT(*) AS admire_given
+    FROM admires
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false
+    GROUP BY actor_id
+),
+ar AS (
+    SELECT p.actor_id, COUNT(*) AS admire_received
+    FROM posts p
+    JOIN admires a ON p.id = a.post_id
+    WHERE a.created_at >= NOW() - INTERVAL '7 days' AND a.deleted = false
+    GROUP BY p.actor_id
+),
+cm AS (
+    SELECT actor_id, COUNT(id) AS comments_made
+    FROM comments
+    WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted = false and removed = false
+    GROUP BY actor_id
+),
+cr AS (
+    SELECT p.actor_id, COUNT(c.id) AS comments_received
+    FROM posts p
+    JOIN comments c ON p.id = c.post_id
+    WHERE p.created_at >= NOW() - INTERVAL '7 days' AND c.deleted = false and c.removed = false
+    GROUP BY p.actor_id
+),
+scores AS (
+    SELECT 
+        ((COALESCE(ar.admire_received, 0) * $2::int) + 
+        (COALESCE(ag.admire_given, 0) * $3::int) + 
+        (COALESCE(cm.comments_made, 0) * $4::int) + 
+        (COALESCE(cr.comments_received, 0) * $5::int)) AS score,
+        COALESCE(nullif(ag.actor_id,''), nullif(ar.actor_id,''), nullif(cm.actor_id,''), nullif(cr.actor_id,'')) AS actor_id,
+        COALESCE(ag.admire_given, 0) AS admires_given,
+        COALESCE(ar.admire_received, 0) AS admires_received,
+        COALESCE(cm.comments_made, 0) AS comments_made,
+        COALESCE(cr.comments_received, 0) AS comments_received
+    FROM ag
+    FULL OUTER JOIN ar using(actor_id)
+    FULL OUTER JOIN cm using(actor_id)
+    FULL OUTER JOIN cr using(actor_id)
+)
+SELECT scores.score, scores.actor_id, scores.admires_given, scores.admires_received, scores.comments_made, scores.comments_received, users.traits
+FROM scores
+join users on scores.actor_id = users.id
+WHERE users.deleted = false AND users.universal = false
+AND scores.actor_id IS NOT NULL AND scores.score > 0
+ORDER BY scores.score DESC
+LIMIT $1
+`
+
+type GetMostActiveUsersParams struct {
+	Limit                  int32 `db:"limit" json:"limit"`
+	AdmireReceivedWeight   int32 `db:"admire_received_weight" json:"admire_received_weight"`
+	AdmireGivenWeight      int32 `db:"admire_given_weight" json:"admire_given_weight"`
+	CommentsMadeWeight     int32 `db:"comments_made_weight" json:"comments_made_weight"`
+	CommentsReceivedWeight int32 `db:"comments_received_weight" json:"comments_received_weight"`
+}
+
+type GetMostActiveUsersRow struct {
+	Score            int32        `db:"score" json:"score"`
+	ActorID          persist.DBID `db:"actor_id" json:"actor_id"`
+	AdmiresGiven     int64        `db:"admires_given" json:"admires_given"`
+	AdmiresReceived  int64        `db:"admires_received" json:"admires_received"`
+	CommentsMade     int64        `db:"comments_made" json:"comments_made"`
+	CommentsReceived int64        `db:"comments_received" json:"comments_received"`
+	Traits           pgtype.JSONB `db:"traits" json:"traits"`
+}
+
+func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsersParams) ([]GetMostActiveUsersRow, error) {
+	rows, err := q.db.Query(ctx, getMostActiveUsers,
+		arg.Limit,
+		arg.AdmireReceivedWeight,
+		arg.AdmireGivenWeight,
+		arg.CommentsMadeWeight,
+		arg.CommentsReceivedWeight,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMostActiveUsersRow
+	for rows.Next() {
+		var i GetMostActiveUsersRow
+		if err := rows.Scan(
+			&i.Score,
+			&i.ActorID,
+			&i.AdmiresGiven,
+			&i.AdmiresReceived,
+			&i.CommentsMade,
+			&i.CommentsReceived,
+			&i.Traits,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id from notifications
     where owner_id = $1
     and action = $2
     and deleted = false
-    and (not $5::bool or feed_event_id = $3)
-    and (not $6::bool or post_id = $4)
+    and (not $6::bool or feed_event_id = $3)
+    and (not $7::bool or post_id = $4)
+    and (not $8::bool or comment_id = $5)
     order by created_at desc
     limit 1
 `
@@ -2737,8 +2867,10 @@ type GetMostRecentNotificationByOwnerIDForActionParams struct {
 	Action           persist.Action `db:"action" json:"action"`
 	FeedEventID      persist.DBID   `db:"feed_event_id" json:"feed_event_id"`
 	PostID           persist.DBID   `db:"post_id" json:"post_id"`
+	CommentID        persist.DBID   `db:"comment_id" json:"comment_id"`
 	OnlyForFeedEvent bool           `db:"only_for_feed_event" json:"only_for_feed_event"`
 	OnlyForPost      bool           `db:"only_for_post" json:"only_for_post"`
+	OnlyForComment   bool           `db:"only_for_comment" json:"only_for_comment"`
 }
 
 func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
@@ -2747,8 +2879,10 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 		arg.Action,
 		arg.FeedEventID,
 		arg.PostID,
+		arg.CommentID,
 		arg.OnlyForFeedEvent,
 		arg.OnlyForPost,
+		arg.OnlyForComment,
 	)
 	var i Notification
 	err := row.Scan(
@@ -2912,7 +3046,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostByID = `-- name: GetPostByID :one
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url FROM posts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error) {
@@ -2928,12 +3062,14 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 		&i.CreatedAt,
 		&i.LastUpdated,
 		&i.Deleted,
+		&i.IsFirstPost,
+		&i.UserMintUrl,
 	)
 	return i, err
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
 from posts
 join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
 where not posts.deleted
@@ -2959,6 +3095,8 @@ func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, 
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
+			&i.UserMintUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -4489,6 +4627,17 @@ func (q *Queries) GetUserExperiencesByUserID(ctx context.Context, id persist.DBI
 	return user_experiences, err
 }
 
+const getUserIsBlockedFromFeed = `-- name: GetUserIsBlockedFromFeed :one
+select exists(select 1 from feed_blocklist where user_id = $1 and not deleted and active)
+`
+
+func (q *Queries) GetUserIsBlockedFromFeed(ctx context.Context, userID persist.DBID) (bool, error) {
+	row := q.db.QueryRow(ctx, getUserIsBlockedFromFeed, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getUserNotifications = `-- name: GetUserNotifications :many
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
@@ -5678,7 +5827,10 @@ func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) (p
 }
 
 const insertPost = `-- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id
+insert into posts(id, token_ids, contract_ids, actor_id, caption, user_mint_url, is_first_post, created_at)
+values ($1, $2, $3, $4, $5, $6, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
+on conflict (actor_id, is_first_post) where is_first_post do update set is_first_post = false
+returning id
 `
 
 type InsertPostParams struct {
@@ -5687,6 +5839,7 @@ type InsertPostParams struct {
 	ContractIds persist.DBIDList `db:"contract_ids" json:"contract_ids"`
 	ActorID     persist.DBID     `db:"actor_id" json:"actor_id"`
 	Caption     sql.NullString   `db:"caption" json:"caption"`
+	UserMintUrl sql.NullString   `db:"user_mint_url" json:"user_mint_url"`
 }
 
 func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist.DBID, error) {
@@ -5696,6 +5849,7 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist
 		arg.ContractIds,
 		arg.ActorID,
 		arg.Caption,
+		arg.UserMintUrl,
 	)
 	var id persist.DBID
 	err := row.Scan(&id)
@@ -6066,22 +6220,6 @@ func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.Nul
 	return exists, err
 }
 
-const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false)
-`
-
-type IsFeedUserActionBlockedParams struct {
-	UserID persist.DBID   `db:"user_id" json:"user_id"`
-	Action persist.Action `db:"action" json:"action"`
-}
-
-func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserActionBlockedParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isFeedUserActionBlocked, arg.UserID, arg.Action)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
 with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = $2)
 select exists(
@@ -6108,14 +6246,16 @@ func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommuni
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
-SELECT id, feed_entity_type, created_at, actor_id
-FROM feed_entities
-WHERE (created_at, id) < ($1, $2)
-        AND (created_at, id) > ($3, $4)
-ORDER BY 
-    CASE WHEN $5::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $5::bool THEN (created_at, id) END DESC
-LIMIT $6
+select fe.id, fe.feed_entity_type, fe.created_at, fe.actor_id
+from feed_entities fe
+left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fe.created_at, fe.id) < ($1, $2)
+        and (fe.created_at, fe.id) > ($3, $4)
+        and (fb.user_id is null or $5 = fb.user_id)
+order by
+    case when $6::bool then (fe.created_at, fe.id) end asc,
+    case when not $6::bool then (fe.created_at, fe.id) end desc
+limit $7
 `
 
 type PaginateGlobalFeedParams struct {
@@ -6123,6 +6263,7 @@ type PaginateGlobalFeedParams struct {
 	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
 	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
 	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	ViewerID      persist.DBID `db:"viewer_id" json:"viewer_id"`
 	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
 	Limit         int32        `db:"limit" json:"limit"`
 }
@@ -6133,6 +6274,7 @@ func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeed
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
+		arg.ViewerID,
 		arg.PagingForward,
 		arg.Limit,
 	)
@@ -6229,7 +6371,7 @@ with valid_post_ids as (
     WHERE $7 = ANY(posts.contract_ids)
       AND posts.deleted = false
 )
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted from posts
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url from posts
     join valid_post_ids on posts.id = valid_post_ids.id
 WHERE (posts.created_at, posts.id) < ($1, $2)
   AND (posts.created_at, posts.id) > ($3, $4)
@@ -6278,6 +6420,8 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
+			&i.UserMintUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -6290,7 +6434,7 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 }
 
 const paginatePostsByUserID = `-- name: PaginatePostsByUserID :many
-select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted
+select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url
 from posts
 where actor_id = $1
         and (created_at, id) < ($2, $3)
@@ -6339,6 +6483,8 @@ func (q *Queries) PaginatePostsByUserID(ctx context.Context, arg PaginatePostsBy
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
+			&i.UserMintUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -6465,6 +6611,31 @@ func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFr
 	return err
 }
 
+const reportPost = `-- name: ReportPost :one
+with offending_post as (select id from posts where posts.id = $4 and not deleted)
+insert into reported_posts (id, post_id, reporter_id, reason) (select $1, offending_post.id, $2, $3 from offending_post)
+on conflict(post_id, reporter_id, reason) where not deleted do update set last_updated = now() returning id
+`
+
+type ReportPostParams struct {
+	ID       persist.DBID         `db:"id" json:"id"`
+	Reporter sql.NullString       `db:"reporter" json:"reporter"`
+	Reason   persist.ReportReason `db:"reason" json:"reason"`
+	PostID   persist.DBID         `db:"post_id" json:"post_id"`
+}
+
+func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, reportPost,
+		arg.ID,
+		arg.Reporter,
+		arg.Reason,
+		arg.PostID,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = $1, last_updated = now() where id = $2 and deleted = false
 `
@@ -6562,8 +6733,22 @@ func (q *Queries) SetProfileImageToToken(ctx context.Context, arg SetProfileImag
 	return err
 }
 
+const unblockUser = `-- name: UnblockUser :exec
+update user_blocklist set active = false, last_updated = now() where user_id = $1 and blocked_user_id = $2 and not deleted
+`
+
+type UnblockUserParams struct {
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
+}
+
+func (q *Queries) UnblockUser(ctx context.Context, arg UnblockUserParams) error {
+	_, err := q.db.Exec(ctx, unblockUser, arg.UserID, arg.BlockedUserID)
+	return err
+}
+
 const unblockUserFromFeed = `-- name: UnblockUserFromFeed :exec
-UPDATE feed_blocklist SET deleted = true WHERE user_id = $1
+update feed_blocklist set active = false where user_id = $1 and not deleted
 `
 
 func (q *Queries) UnblockUserFromFeed(ctx context.Context, userID persist.DBID) error {
@@ -6885,6 +7070,22 @@ type UpdateTokensAsUserMarkedSpamParams struct {
 
 func (q *Queries) UpdateTokensAsUserMarkedSpam(ctx context.Context, arg UpdateTokensAsUserMarkedSpamParams) error {
 	_, err := q.db.Exec(ctx, updateTokensAsUserMarkedSpam, arg.IsUserMarkedSpam, arg.OwnerUserID, arg.TokenIds)
+	return err
+}
+
+const updateTopActiveUsers = `-- name: UpdateTopActiveUsers :exec
+UPDATE users
+SET traits = CASE 
+                WHEN id = ANY($1) THEN 
+                    COALESCE(traits, '{}'::jsonb) || '{"top_activity": true}'::jsonb
+                ELSE 
+                    traits - 'top_activity'
+             END
+WHERE id = ANY($1) OR traits ? 'top_activity'
+`
+
+func (q *Queries) UpdateTopActiveUsers(ctx context.Context, topUserIds persist.DBIDList) error {
+	_, err := q.db.Exec(ctx, updateTopActiveUsers, topUserIds)
 	return err
 }
 

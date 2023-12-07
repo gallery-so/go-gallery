@@ -13,7 +13,8 @@ import (
 
 	"blockwatch.cc/tzgo/tezos"
 	"github.com/gammazero/workerpool"
-	"github.com/machinebox/graphql"
+	mgql "github.com/machinebox/graphql"
+	sgql "github.com/shurcooL/graphql"
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/mikeydub/go-gallery/env"
@@ -27,21 +28,37 @@ import (
 
 const (
 	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
+	objktCom  = "KT19xbD2xn6A81an18S35oKtnkFNr9CVwY5m"
 	fxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
 	fxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
+	fxHash3   = "KT1EfsNuqwLAWDd3o4pvfUx1CAh5GMdTrRvr"
+	fxHash4   = "KT1GtbuswcNMGhHF2TSuH1Yfaqn16do8Qtva"
 )
 
+var hicContracts = []persist.Address{
+	persist.Address(hicEtNunc),
+	persist.Address(objktCom),
+}
+
+var fxContracts = []persist.Address{
+	persist.Address(fxHash),
+	persist.Address(fxHash2),
+	persist.Address(fxHash3),
+	persist.Address(fxHash4),
+}
+
 func IsHicEtNunc(contract persist.Address) bool {
-	return contract == hicEtNunc
+	return util.Contains(hicContracts, contract)
 }
 
 func IsFxHash(contract persist.Address) bool {
-	return contract == fxHash || contract == fxHash2
+	return util.Contains(fxContracts, contract)
 }
 
 const pageSize = 1000
 
 const tezDomainsApiURL = "https://api.tezos.domains/graphql"
+const fxHashGQLApiURL = "https://api.fxhash.xyz/graphql"
 
 type tokenStandard string
 
@@ -118,17 +135,19 @@ type tzktContract struct {
 
 // Provider is an the struct for retrieving data from the Tezos blockchain
 type Provider struct {
-	apiURL     string
-	httpClient *http.Client
-	graphQL    *graphql.Client
+	apiURL       string
+	httpClient   *http.Client
+	tzDomainsGQL *mgql.Client
+	fxGQL        *sgql.Client
 }
 
 // NewProvider creates a new Tezos Provider
 func NewProvider(httpClient *http.Client) *Provider {
 	return &Provider{
-		apiURL:     env.GetString("TEZOS_API_URL"),
-		httpClient: httpClient,
-		graphQL:    graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
+		apiURL:       env.GetString("TEZOS_API_URL"),
+		httpClient:   httpClient,
+		tzDomainsGQL: mgql.NewClient(tezDomainsApiURL, mgql.WithHTTPClient(httpClient)),
+		fxGQL:        sgql.NewClient(fxHashGQLApiURL, http.DefaultClient),
 	}
 }
 
@@ -286,7 +305,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	if len(contractAddress) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address: %s", contractAddress)
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tez contract found for address: %s", contractAddress)
 	}
 	contract := contracts[0]
 
@@ -339,7 +358,7 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	if len(contractAddress) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address: %s", contractAddress)
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tez contract found for address: %s", contractAddress)
 	}
 	contract := contracts[0]
 
@@ -494,6 +513,187 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
+/*
+	{
+	      "type":"origination",
+	      "id":105425282269184,
+	      "level":1810181,
+	      "timestamp":"2021-10-26T14:03:54Z",
+	      "block":"BM6K7gb9sc2mX5MFyEYBb1usiMVxKgb4nHWDBew33NKehXxGLZo",
+	      "hash":"oo9UKfbsWiAyB6ju8HvjLeistxRNYirVQ6Lf1ypdoFW2aBn4pM2",
+	      "counter":32520298,
+	      "sender":{
+	         "alias":"FXHASH Admin",
+	         "address":"tz1fepn7jZsCYBqCDhpM63hzh9g2Ytqk4Tpv"
+	      },
+	      "gasLimit":2456,
+	      "gasUsed":2356,
+	      "storageLimit":4275,
+	      "storageUsed":4018,
+	      "bakerFee":4358,
+	      "storageFee":1004500,
+	      "allocationFee":64250,
+	      "contractBalance":0,
+	      "status":"applied",
+	      "originatedContract":{
+	         "kind":"asset",
+	         "address":"KT1LhC3ZcG8bnDbqvyDv3F7TPWkBSQ5fCqCs",
+	         "typeHash":-266181292,
+	         "codeHash":956470470,
+	         "tzips":[
+	            "fa2"
+	         ]
+	      }
+	   }
+*/
+type tzktOrigination struct {
+	Type      string `json:"type"`
+	ID        uint64 `json:"id"`
+	Level     uint64 `json:"level"`
+	Timestamp string `json:"timestamp"`
+	Block     string `json:"block"`
+	Hash      string `json:"hash"`
+	Sender    struct {
+		Alias   string          `json:"alias"`
+		Address persist.Address `json:"address"`
+	} `json:"sender"`
+	OriginatedContract struct {
+		Kind     string `json:"kind"`
+		Address  string `json:"address"`
+		Alias    string `json:"alias"`
+		TypeHash int    `json:"typeHash"`
+		CodeHash int    `json:"codeHash"`
+		Tzips    []string
+	} `json:"originatedContract"`
+}
+
+// GetContractsByOwnerAddress retrieves ethereum contracts by their owner address
+func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/operations/originations?sender=%s", d.apiURL, addr.String()), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := retry.RetryRequest(d.httpClient, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, util.GetErrFromResp(resp)
+	}
+	var originations []tzktOrigination
+	if err := json.NewDecoder(resp.Body).Decode(&originations); err != nil {
+		return nil, err
+	}
+
+	filtered := util.Filter(originations, func(o tzktOrigination) bool {
+		return o.OriginatedContract.Kind == "asset" && (util.ContainsString(o.OriginatedContract.Tzips, "fa2") || util.ContainsString(o.OriginatedContract.Tzips, "fa1.2"))
+	}, false)
+
+	contracts := make([]multichain.ChainAgnosticContract, 0, len(filtered))
+	for _, o := range filtered {
+		contracts = append(contracts, multichain.ChainAgnosticContract{
+			Address: persist.Address(o.OriginatedContract.Address),
+			Descriptors: multichain.ChainAgnosticContractDescriptors{
+				Name:         o.OriginatedContract.Alias,
+				OwnerAddress: addr,
+			},
+		})
+	}
+
+	return contracts, nil
+}
+
+/*
+fxHash owned collections query:
+query account($usernameOrAddress: String ) {
+  account(usernameOrAddress: $usernameOrAddress) {
+    username
+    generativeTokens {
+      gentkContractAddress
+      issuerContractAddress
+      name
+      slug
+      thumbnailUri
+
+      author {
+        account {
+          wallets {
+            address
+          }
+        }
+      }
+    }
+  }
+}
+
+
+*/
+
+type fxhashGenerativeToken struct {
+	GentkContractAddress string `json:"gentkContractAddress"`
+	Name                 string `json:"name"`
+	Slug                 string `json:"slug"`
+	ThumbnailUri         string `json:"thumbnailUri"`
+}
+
+type fxhashAccount struct {
+	Username         string
+	GenerativeTokens []fxhashGenerativeToken
+}
+
+type accountWithCollectionsQuery struct {
+	Account fxhashAccount `graphql:"account(usernameOrAddress: $usernameOrAddress)"`
+}
+
+// TODO will be removed along with the ChildContract and Parent types, but this is how you would do it
+func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
+	// fxhash and objkt are two known omnibus contracts, let objkt provider handle objkt
+	var query accountWithCollectionsQuery
+
+	if err := retry.RetryQuery(ctx, p.fxGQL, &query, inputArgs{
+		"usernameOrAddress": sgql.String(creatorAddress),
+	}); err != nil {
+		return nil, err
+	}
+
+	// No matching query results
+	if len(query.Account.GenerativeTokens) < 1 {
+		return nil, fmt.Errorf("no child contracts found for creator")
+	}
+
+	groups := util.GroupBy(query.Account.GenerativeTokens, func(gt fxhashGenerativeToken) string {
+		return gt.GentkContractAddress
+	})
+
+	edges := make([]multichain.ParentToChildEdge, 0, len(query.Account.GenerativeTokens))
+	for gtca, ts := range groups {
+
+		// get the contract
+		contract, err := p.GetContractByAddress(ctx, persist.Address(gtca))
+		if err != nil {
+			return nil, err
+		}
+
+		children := make([]multichain.ChildContract, 0, len(ts))
+		for _, t := range ts {
+			children = append(children, multichain.ChildContract{
+				ChildID:        fmt.Sprintf("%s:%s", contract.Address, t.Slug),
+				Name:           t.Name,
+				CreatorAddress: creatorAddress,
+				Tokens:         nil, // expensive to fetch, we can sort tokens from an owner into these collections
+			})
+		}
+		edges = append(edges, multichain.ParentToChildEdge{
+			Parent:   contract,
+			Children: children,
+		})
+	}
+
+	return edges, nil
+}
+
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
@@ -612,7 +812,7 @@ type tezDomainResponse struct {
 }
 
 func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
-	req := graphql.NewRequest(fmt.Sprintf(`{
+	req := mgql.NewRequest(fmt.Sprintf(`{
 	  "query": "query ($addresses: [String!]) {
 		reverseRecords(
 			where: {
@@ -636,7 +836,7 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	}`, addr.String()))
 
 	resp := tezDomainResponse{}
-	err := d.graphQL.Run(ctx, req, &resp)
+	err := d.tzDomainsGQL.Run(ctx, req, &resp)
 	if err != nil {
 		return addr.String()
 	}

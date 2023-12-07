@@ -8,23 +8,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/limiters"
-	"github.com/mikeydub/go-gallery/service/redis"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/sourcegraph/conc/pool"
-
 	"cloud.google.com/go/pubsub"
 	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
 	"github.com/googleapis/gax-go/v2/apierror"
+	"github.com/sourcegraph/conc/pool"
+	"golang.org/x/net/html"
+	"google.golang.org/grpc/codes"
+
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
-	"google.golang.org/grpc/codes"
 )
 
 type lockKey struct {
@@ -51,6 +52,7 @@ type pushLimiter struct {
 	follows      *limiters.KeyRateLimiter
 	tokens       *limiters.KeyRateLimiter
 	feedEntities *limiters.KeyRateLimiter
+	users        *limiters.KeyRateLimiter
 }
 
 func newPushLimiter() *pushLimiter {
@@ -62,6 +64,7 @@ func newPushLimiter() *pushLimiter {
 		follows:      limiters.NewKeyRateLimiter(ctx, cache, "follows", 1, time.Minute*10),
 		tokens:       limiters.NewKeyRateLimiter(ctx, cache, "tokens", 1, time.Minute*10),
 		feedEntities: limiters.NewKeyRateLimiter(ctx, cache, "feedEntities", 5, time.Minute),
+		users:        limiters.NewKeyRateLimiter(ctx, cache, "users", 5, time.Minute),
 	}
 }
 
@@ -107,6 +110,20 @@ func (p *pushLimiter) tryAdmire(ctx context.Context, sendingUserID persist.DBID,
 	}
 }
 
+func (p *pushLimiter) tryAdmireComment(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, commentID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), commentID.String())
+	if p.isActionAllowed(ctx, p.admires, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.admires.Name(),
+		senderID:    sendingUserID,
+		receiverID:  receivingUserID,
+		commentID:   commentID,
+	}
+}
+
 func (p *pushLimiter) tryAdmireToken(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, tokenID persist.DBID) error {
 	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), tokenID.String())
 	if p.isActionAllowed(ctx, p.admires, key) {
@@ -146,6 +163,18 @@ func (p *pushLimiter) tryTokens(ctx context.Context, sendingUserID persist.DBID,
 	}
 }
 
+func (p *pushLimiter) tryUsers(ctx context.Context, sendingUserID persist.DBID) error {
+	key := fmt.Sprintf("%s", sendingUserID)
+	if p.isActionAllowed(ctx, p.users, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.users.Name(),
+		senderID:    sendingUserID,
+	}
+}
+
 func (p *pushLimiter) isActionAllowed(ctx context.Context, limiter *limiters.KeyRateLimiter, key string) bool {
 	canContinue, _, err := limiter.ForKey(ctx, key)
 	if err != nil {
@@ -157,44 +186,49 @@ func (p *pushLimiter) isActionAllowed(ctx context.Context, limiter *limiters.Key
 }
 
 // New registers specific notification handlers
-func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock *redislock.Client) *NotificationHandlers {
+func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock *redislock.Client, listen bool) *NotificationHandlers {
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
 	limiter := newPushLimiter()
 
-	def := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	group := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	follower := followerNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	tokenIDGrouped := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	view := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	singleHandler := singleNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	ownerGroupedHandler := ownerGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	followerHandler := followerNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	tokenGroupedHandler := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	viewHandler := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	topActivityHandler := topActivityHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 
-	// grouped notification actions
-	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
-	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, group)
-	notifDispatcher.AddHandler(persist.ActionAdmiredPost, group)
-	notifDispatcher.AddHandler(persist.ActionAdmiredToken, group)
+	// notification actions that are grouped by owner
+	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, ownerGroupedHandler)
+	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, ownerGroupedHandler)
+	notifDispatcher.AddHandler(persist.ActionAdmiredPost, ownerGroupedHandler)
+	notifDispatcher.AddHandler(persist.ActionAdmiredComment, ownerGroupedHandler)
 
-	// single notification actions (default)
-	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
-	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, def)
-	notifDispatcher.AddHandler(persist.ActionReplyToComment, def)
-	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
-	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
-	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, def)
+	// single notification actions
+	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionReplyToComment, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionMentionUser, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionMentionCommunity, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, singleHandler)
+
+	// notification specifically for ensuring that top users don't get re-notified and users recently notified arent notified again
+	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, topActivityHandler)
 
 	// notification actions that are grouped and inserted by follower
-	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, follower)
+	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, followerHandler)
 
 	// notification actions that are grouped by token id
-	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
+	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenGroupedHandler)
+	notifDispatcher.AddHandler(persist.ActionAdmiredToken, tokenGroupedHandler)
 
 	// viewed notifications are handled separately
-	notifDispatcher.AddHandler(persist.ActionViewedGallery, view)
+	notifDispatcher.AddHandler(persist.ActionViewedGallery, viewHandler)
 
 	new := map[persist.DBID]chan db.Notification{}
 	updated := map[persist.DBID]chan db.Notification{}
 
 	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher, UserNewNotifications: new, UserUpdatedNotifications: updated, pubSub: pub}
-	if pub != nil {
+	if pub != nil && listen {
 		go notificationHandlers.receiveNewNotificationsFromPubSub()
 		go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
 	} else {
@@ -270,14 +304,29 @@ func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notifica
 	return nil
 }
 
-type defaultNotificationHandler struct {
+type singleNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
 	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
-func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+func (h singleNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
+}
+
+type topActivityHandler struct {
+	queries    *db.Queries
+	pubSub     *pubsub.Client
+	taskClient *task.Client
+	limiter    *pushLimiter
+}
+
+func (h topActivityHandler) Handle(ctx context.Context, notif db.Notification) error {
+	if !notif.Data.NewTopActiveUser {
+		return nil
+	}
+
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 
@@ -292,19 +341,19 @@ func (h followerNotificationHandler) Handle(ctx context.Context, notif db.Notifi
 	return insertAndPublishFollowerNotifs(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 
-type groupedNotificationHandler struct {
+type ownerGroupedNotificationHandler struct {
 	queries    *db.Queries
 	pubSub     *pubsub.Client
 	taskClient *task.Client
 	limiter    *pushLimiter
 }
 
-func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+func (h ownerGroupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	var curNotif db.Notification
-
-	// Bucket notifications on the feed event if it has one
+	// Bucket notifications on a specific resource if it has one
 	onlyForFeed := notif.FeedEventID != ""
 	onlyForPost := notif.PostID != ""
+	onlyForComment := notif.CommentID != ""
 	curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
 		OwnerID:          notif.OwnerID,
 		Action:           notif.Action,
@@ -312,6 +361,8 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		FeedEventID:      notif.FeedEventID,
 		PostID:           notif.PostID,
 		OnlyForPost:      onlyForPost,
+		CommentID:        notif.CommentID,
+		OnlyForComment:   onlyForComment,
 	})
 
 	if time.Since(curNotif.CreatedAt) < groupedWindow {
@@ -320,7 +371,6 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 	}
 	logger.For(ctx).Infof("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
-
 }
 
 type tokenIDGroupedNotificationHandler struct {
@@ -583,11 +633,20 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if admirer.Username.String == "" {
-			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", admirer.ID)
+		if err = limiter.tryAdmireToken(ctx, admirer.ID, notif.OwnerID, notif.TokenID); err != nil {
+			return task.PushNotificationMessage{}, err
 		}
 
-		if err = limiter.tryAdmireToken(ctx, admirer.ID, notif.OwnerID, notif.TokenID); err != nil {
+		return message, nil
+	}
+
+	if notif.Action == persist.ActionAdmiredComment {
+		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if err = limiter.tryAdmireComment(ctx, admirer.ID, notif.OwnerID, notif.TokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
@@ -712,6 +771,14 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		return message, nil
 	}
 
+	if notif.Action == persist.ActionTopActivityBadgeReceived {
+		if err := limiter.tryUsers(ctx, notif.OwnerID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		return message, nil
+	}
+
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 }
 
@@ -731,13 +798,13 @@ func (u UserFacingNotificationData) String() string {
 	if u.PreviewText != "" {
 		cur = fmt.Sprintf("%s: %s", cur, u.PreviewText)
 	}
-	return cur
+	return html.UnescapeString(cur)
 }
 
 func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (UserFacingNotificationData, error) {
 
 	switch n.Action {
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken, persist.ActionAdmiredComment:
 		data := UserFacingNotificationData{}
 		if n.Action == persist.ActionAdmiredFeedEvent {
 			feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
@@ -754,6 +821,8 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			}
 		} else if n.Action == persist.ActionAdmiredToken {
 			data.Action = "admired your token"
+		} else if n.Action == persist.ActionAdmiredComment {
+			data.Action = "admired your comment"
 		} else {
 			data.Action = "admired your post"
 		}
@@ -995,6 +1064,11 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			Action:      "posted their first post",
 			PreviewText: util.TruncateWithEllipsis(post.Caption.String, 40),
 		}, nil
+	case persist.ActionTopActivityBadgeReceived:
+		return UserFacingNotificationData{
+			Actor:  "You",
+			Action: "received a new badge for being amongst the top active users on Gallery this week!",
+		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
 	}
@@ -1016,6 +1090,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 		return true
 	case persist.ActionAdmiredToken:
 		return true
+	case persist.ActionAdmiredComment:
+		return true
 	case persist.ActionUserPostedYourWork:
 		return true
 	case persist.ActionMentionUser:
@@ -1024,6 +1100,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 		return true
 	case persist.ActionUserPostedFirstPost:
 		return true
+	case persist.ActionTopActivityBadgeReceived:
+		return false
 	default:
 		return false
 	}
@@ -1132,7 +1210,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	var amount = notif.Amount
 	resultData := mostRecentNotif.Data.Concat(notif.Data)
 	switch notif.Action {
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken, persist.ActionAdmiredComment:
 		amount = int32(len(resultData.AdmirerIDs))
 	case persist.ActionViewedGallery:
 		amount = int32(len(resultData.AuthedViewerIDs) + len(resultData.UnauthedViewerIDs))
@@ -1223,6 +1301,15 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			EventIds: notif.EventIds,
 			Token:    sql.NullString{String: notif.TokenID.String(), Valid: true},
 		})
+	case persist.ActionAdmiredComment:
+		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			CommentID: notif.CommentID,
+		})
 	case persist.ActionCommentedOnPost:
 		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
 			ID:        id,
@@ -1233,7 +1320,7 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Post:      sql.NullString{String: notif.PostID.String(), Valid: true},
 			CommentID: notif.CommentID,
 		})
-	case persist.ActionUserFollowedUsers:
+	case persist.ActionUserFollowedUsers, persist.ActionTopActivityBadgeReceived:
 		return queries.CreateSimpleNotification(ctx, db.CreateSimpleNotificationParams{
 			ID:       id,
 			OwnerID:  notif.OwnerID,
@@ -1374,12 +1461,16 @@ type errRateLimited struct {
 	receiverID  persist.DBID
 	feedEventID persist.DBID
 	tokenID     persist.DBID
+	commentID   persist.DBID
 }
 
 func (e errRateLimited) Error() string {
 	str := fmt.Sprintf("rate limit exceeded for limiter=%s, sender=%s, receiver=%s", e.limiterName, e.senderID, e.receiverID)
 	if e.feedEventID != "" {
 		str += fmt.Sprintf(", feedEvent=%s", e.feedEventID)
+	}
+	if e.commentID != "" {
+		str += fmt.Sprintf(", commentID=%s", e.commentID)
 	}
 	return str
 }

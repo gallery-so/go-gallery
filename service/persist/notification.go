@@ -5,15 +5,17 @@ import (
 )
 
 type NotificationData struct {
-	AuthedViewerIDs   []DBID    `json:"viewer_ids,omitempty"`
-	UnauthedViewerIDs []string  `json:"unauthed_viewer_ids,omitempty"`
-	FollowerIDs       []DBID    `json:"follower_ids,omitempty"`
-	AdmirerIDs        []DBID    `json:"admirer_ids,omitempty"`
-	FollowedBack      NullBool  `json:"followed_back,omitempty"`
-	Refollowed        NullBool  `json:"refollowed,omitempty"`
-	NewTokenID        DBID      `json:"new_token_id,omitempty"`
-	NewTokenQuantity  HexString `json:"new_token_quantity,omitempty"`
-	OriginalCommentID DBID      `json:"original_comment_id,omitempty"`
+	AuthedViewerIDs        []DBID    `json:"viewer_ids,omitempty"`
+	UnauthedViewerIDs      []string  `json:"unauthed_viewer_ids,omitempty"`
+	FollowerIDs            []DBID    `json:"follower_ids,omitempty"`
+	AdmirerIDs             []DBID    `json:"admirer_ids,omitempty"`
+	FollowedBack           NullBool  `json:"followed_back,omitempty"`
+	Refollowed             NullBool  `json:"refollowed,omitempty"`
+	NewTokenID             DBID      `json:"new_token_id,omitempty"`
+	NewTokenQuantity       HexString `json:"new_token_quantity,omitempty"`
+	OriginalCommentID      DBID      `json:"original_comment_id,omitempty"`
+	ActivityBadgeThreshold int       `json:"activity_badge_threshold,omitempty"`
+	NewTopActiveUser       bool      `json:"new_top_active_user,omitempty"`
 }
 
 func (n NotificationData) Validate() NotificationData {
@@ -25,6 +27,10 @@ func (n NotificationData) Validate() NotificationData {
 	result.NewTokenID = n.NewTokenID
 	result.NewTokenQuantity = n.NewTokenQuantity
 	result.OriginalCommentID = n.OriginalCommentID
+	result.FollowedBack = n.FollowedBack
+	result.Refollowed = n.Refollowed
+	result.ActivityBadgeThreshold = n.ActivityBadgeThreshold
+	result.NewTopActiveUser = n.NewTopActiveUser
 
 	return result
 }
@@ -40,6 +46,10 @@ func (n NotificationData) Concat(other NotificationData) NotificationData {
 	result.NewTokenQuantity = other.NewTokenQuantity.Add(n.NewTokenQuantity)
 	result.NewTokenID = DBID(util.FirstNonEmptyString(other.NewTokenID.String(), n.NewTokenID.String()))
 	result.OriginalCommentID = DBID(util.FirstNonEmptyString(other.OriginalCommentID.String(), n.OriginalCommentID.String()))
+	result.ActivityBadgeThreshold, _ = util.FindFirst([]int{other.ActivityBadgeThreshold, n.ActivityBadgeThreshold}, func(i int) bool {
+		return i > 0
+	})
+	result.NewTopActiveUser = other.NewTopActiveUser || n.NewTopActiveUser
 
 	return result.Validate()
 }

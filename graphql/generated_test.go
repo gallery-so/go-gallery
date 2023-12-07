@@ -373,6 +373,7 @@ type PostTokensInput struct {
 	TokenIds []persist.DBID `json:"tokenIds"`
 	Caption  *string        `json:"caption"`
 	Mentions []MentionInput `json:"mentions"`
+	MintURL  *string        `json:"mintURL"`
 }
 
 // GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
@@ -383,6 +384,9 @@ func (v *PostTokensInput) GetCaption() *string { return v.Caption }
 
 // GetMentions returns PostTokensInput.Mentions, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
+
+// GetMintURL returns PostTokensInput.MintURL, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetMintURL() *string { return v.MintURL }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`
@@ -577,6 +581,14 @@ func (v *__addUserWalletMutationInput) GetChainAddress() ChainAddressInput { ret
 
 // GetAuthMechanism returns __addUserWalletMutationInput.AuthMechanism, and is useful for accessing the field via an interface.
 func (v *__addUserWalletMutationInput) GetAuthMechanism() AuthMechanism { return v.AuthMechanism }
+
+// __admireCommentMutationInput is used internally by genqlient
+type __admireCommentMutationInput struct {
+	CommentId persist.DBID `json:"commentId"`
+}
+
+// GetCommentId returns __admireCommentMutationInput.CommentId, and is useful for accessing the field via an interface.
+func (v *__admireCommentMutationInput) GetCommentId() persist.DBID { return v.CommentId }
 
 // __admireFeedEventMutationInput is used internally by genqlient
 type __admireFeedEventMutationInput struct {
@@ -1183,6 +1195,247 @@ func (v *addUserWalletMutationResponse) __premarshalJSON() (*__premarshaladdUser
 	return &retval, nil
 }
 
+// admireCommentMutationAdmireCommentAdmireCommentPayload includes the requested fields of the GraphQL type AdmireCommentPayload.
+type admireCommentMutationAdmireCommentAdmireCommentPayload struct {
+	Typename *string                                                        `json:"__typename"`
+	Comment  *admireCommentMutationAdmireCommentAdmireCommentPayloadComment `json:"comment"`
+}
+
+// GetTypename returns admireCommentMutationAdmireCommentAdmireCommentPayload.Typename, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentAdmireCommentPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetComment returns admireCommentMutationAdmireCommentAdmireCommentPayload.Comment, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentAdmireCommentPayload) GetComment() *admireCommentMutationAdmireCommentAdmireCommentPayloadComment {
+	return v.Comment
+}
+
+// admireCommentMutationAdmireCommentAdmireCommentPayloadComment includes the requested fields of the GraphQL type Comment.
+type admireCommentMutationAdmireCommentAdmireCommentPayloadComment struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns admireCommentMutationAdmireCommentAdmireCommentPayloadComment.Dbid, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentAdmireCommentPayloadComment) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// admireCommentMutationAdmireCommentAdmireCommentPayloadOrError includes the requested fields of the GraphQL interface AdmireCommentPayloadOrError.
+//
+// admireCommentMutationAdmireCommentAdmireCommentPayloadOrError is implemented by the following types:
+// admireCommentMutationAdmireCommentAdmireCommentPayload
+// admireCommentMutationAdmireCommentErrCommentNotFound
+// admireCommentMutationAdmireCommentErrInvalidInput
+// admireCommentMutationAdmireCommentErrNotAuthorized
+type admireCommentMutationAdmireCommentAdmireCommentPayloadOrError interface {
+	implementsGraphQLInterfaceadmireCommentMutationAdmireCommentAdmireCommentPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *admireCommentMutationAdmireCommentAdmireCommentPayload) implementsGraphQLInterfaceadmireCommentMutationAdmireCommentAdmireCommentPayloadOrError() {
+}
+func (v *admireCommentMutationAdmireCommentErrCommentNotFound) implementsGraphQLInterfaceadmireCommentMutationAdmireCommentAdmireCommentPayloadOrError() {
+}
+func (v *admireCommentMutationAdmireCommentErrInvalidInput) implementsGraphQLInterfaceadmireCommentMutationAdmireCommentAdmireCommentPayloadOrError() {
+}
+func (v *admireCommentMutationAdmireCommentErrNotAuthorized) implementsGraphQLInterfaceadmireCommentMutationAdmireCommentAdmireCommentPayloadOrError() {
+}
+
+func __unmarshaladmireCommentMutationAdmireCommentAdmireCommentPayloadOrError(b []byte, v *admireCommentMutationAdmireCommentAdmireCommentPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "AdmireCommentPayload":
+		*v = new(admireCommentMutationAdmireCommentAdmireCommentPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrCommentNotFound":
+		*v = new(admireCommentMutationAdmireCommentErrCommentNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(admireCommentMutationAdmireCommentErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(admireCommentMutationAdmireCommentErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing AdmireCommentPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for admireCommentMutationAdmireCommentAdmireCommentPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaladmireCommentMutationAdmireCommentAdmireCommentPayloadOrError(v *admireCommentMutationAdmireCommentAdmireCommentPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *admireCommentMutationAdmireCommentAdmireCommentPayload:
+		typename = "AdmireCommentPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireCommentMutationAdmireCommentAdmireCommentPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireCommentMutationAdmireCommentErrCommentNotFound:
+		typename = "ErrCommentNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireCommentMutationAdmireCommentErrCommentNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireCommentMutationAdmireCommentErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireCommentMutationAdmireCommentErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireCommentMutationAdmireCommentErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireCommentMutationAdmireCommentErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for admireCommentMutationAdmireCommentAdmireCommentPayloadOrError: "%T"`, v)
+	}
+}
+
+// admireCommentMutationAdmireCommentErrCommentNotFound includes the requested fields of the GraphQL type ErrCommentNotFound.
+type admireCommentMutationAdmireCommentErrCommentNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireCommentMutationAdmireCommentErrCommentNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentErrCommentNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns admireCommentMutationAdmireCommentErrCommentNotFound.Message, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentErrCommentNotFound) GetMessage() string { return v.Message }
+
+// admireCommentMutationAdmireCommentErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type admireCommentMutationAdmireCommentErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireCommentMutationAdmireCommentErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admireCommentMutationAdmireCommentErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentErrInvalidInput) GetMessage() string { return v.Message }
+
+// admireCommentMutationAdmireCommentErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type admireCommentMutationAdmireCommentErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireCommentMutationAdmireCommentErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admireCommentMutationAdmireCommentErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationAdmireCommentErrNotAuthorized) GetMessage() string { return v.Message }
+
+// admireCommentMutationResponse is returned by admireCommentMutation on success.
+type admireCommentMutationResponse struct {
+	AdmireComment *admireCommentMutationAdmireCommentAdmireCommentPayloadOrError `json:"-"`
+}
+
+// GetAdmireComment returns admireCommentMutationResponse.AdmireComment, and is useful for accessing the field via an interface.
+func (v *admireCommentMutationResponse) GetAdmireComment() *admireCommentMutationAdmireCommentAdmireCommentPayloadOrError {
+	return v.AdmireComment
+}
+
+func (v *admireCommentMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*admireCommentMutationResponse
+		AdmireComment json.RawMessage `json:"admireComment"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.admireCommentMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.AdmireComment
+		src := firstPass.AdmireComment
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(admireCommentMutationAdmireCommentAdmireCommentPayloadOrError)
+			err = __unmarshaladmireCommentMutationAdmireCommentAdmireCommentPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal admireCommentMutationResponse.AdmireComment: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaladmireCommentMutationResponse struct {
+	AdmireComment json.RawMessage `json:"admireComment"`
+}
+
+func (v *admireCommentMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *admireCommentMutationResponse) __premarshalJSON() (*__premarshaladmireCommentMutationResponse, error) {
+	var retval __premarshaladmireCommentMutationResponse
+
+	{
+
+		dst := &retval.AdmireComment
+		src := v.AdmireComment
+		if src != nil {
+			var err error
+			*dst, err = __marshaladmireCommentMutationAdmireCommentAdmireCommentPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal admireCommentMutationResponse.AdmireComment: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 // admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload includes the requested fields of the GraphQL type AdmireFeedEventPayload.
 type admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload struct {
 	Typename  *string                                                                `json:"__typename"`
@@ -1482,6 +1735,7 @@ func (v *admirePostMutationAdmirePostAdmirePostPayload) GetPost() *admirePostMut
 // admirePostMutationAdmirePostAdmirePostPayload
 // admirePostMutationAdmirePostErrInvalidInput
 // admirePostMutationAdmirePostErrNotAuthorized
+// admirePostMutationAdmirePostErrPostNotFound
 type admirePostMutationAdmirePostAdmirePostPayloadOrError interface {
 	implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -1493,6 +1747,8 @@ func (v *admirePostMutationAdmirePostAdmirePostPayload) implementsGraphQLInterfa
 func (v *admirePostMutationAdmirePostErrInvalidInput) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
 }
 func (v *admirePostMutationAdmirePostErrNotAuthorized) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
+}
+func (v *admirePostMutationAdmirePostErrPostNotFound) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
 }
 
 func __unmarshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(b []byte, v *admirePostMutationAdmirePostAdmirePostPayloadOrError) error {
@@ -1517,6 +1773,9 @@ func __unmarshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(b []byte, v
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(admirePostMutationAdmirePostErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(admirePostMutationAdmirePostErrPostNotFound)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -1553,6 +1812,14 @@ func __marshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(v *admirePost
 		result := struct {
 			TypeName string `json:"__typename"`
 			*admirePostMutationAdmirePostErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *admirePostMutationAdmirePostErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admirePostMutationAdmirePostErrPostNotFound
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -1594,6 +1861,18 @@ func (v *admirePostMutationAdmirePostErrNotAuthorized) GetTypename() *string { r
 
 // GetMessage returns admirePostMutationAdmirePostErrNotAuthorized.Message, and is useful for accessing the field via an interface.
 func (v *admirePostMutationAdmirePostErrNotAuthorized) GetMessage() string { return v.Message }
+
+// admirePostMutationAdmirePostErrPostNotFound includes the requested fields of the GraphQL type ErrPostNotFound.
+type admirePostMutationAdmirePostErrPostNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admirePostMutationAdmirePostErrPostNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrPostNotFound) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admirePostMutationAdmirePostErrPostNotFound.Message, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrPostNotFound) GetMessage() string { return v.Message }
 
 // admirePostMutationResponse is returned by admirePostMutation on success.
 type admirePostMutationResponse struct {
@@ -1910,6 +2189,7 @@ func (v *admireTokenMutationResponse) __premarshalJSON() (*__premarshaladmireTok
 type commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload struct {
 	Typename  *string                                                                         `json:"__typename"`
 	FeedEvent *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent `json:"feedEvent"`
+	Comment   *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadComment   `json:"comment"`
 }
 
 // GetTypename returns commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload.Typename, and is useful for accessing the field via an interface.
@@ -1920,6 +2200,21 @@ func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload) 
 // GetFeedEvent returns commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload.FeedEvent, and is useful for accessing the field via an interface.
 func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload) GetFeedEvent() *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent {
 	return v.FeedEvent
+}
+
+// GetComment returns commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload.Comment, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload) GetComment() *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadComment {
+	return v.Comment
+}
+
+// commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadComment includes the requested fields of the GraphQL type Comment.
+type commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadComment struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadComment.Dbid, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadComment) GetDbid() persist.DBID {
+	return v.Dbid
 }
 
 // commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent includes the requested fields of the GraphQL type FeedEvent.
@@ -11375,6 +11670,50 @@ func addUserWalletMutation(
 	return &data, err
 }
 
+// The query or mutation executed by admireCommentMutation.
+const admireCommentMutation_Operation = `
+mutation admireCommentMutation ($commentId: DBID!) {
+	admireComment(commentId: $commentId) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on AdmireCommentPayload {
+			comment {
+				dbid
+			}
+		}
+	}
+}
+`
+
+func admireCommentMutation(
+	ctx context.Context,
+	client graphql.Client,
+	commentId persist.DBID,
+) (*admireCommentMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "admireCommentMutation",
+		Query:  admireCommentMutation_Operation,
+		Variables: &__admireCommentMutationInput{
+			CommentId: commentId,
+		},
+	}
+	var err error
+
+	var data admireCommentMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 // The query or mutation executed by admireFeedEventMutation.
 const admireFeedEventMutation_Operation = `
 mutation admireFeedEventMutation ($feedEventId: DBID!) {
@@ -11518,6 +11857,9 @@ mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
 		}
 		... on CommentOnFeedEventPayload {
 			feedEvent {
+				dbid
+			}
+			comment {
 				dbid
 			}
 		}

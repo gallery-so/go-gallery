@@ -22,6 +22,7 @@ type Admire struct {
 	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
 	PostID      persist.DBID `db:"post_id" json:"post_id"`
 	TokenID     persist.DBID `db:"token_id" json:"token_id"`
+	CommentID   persist.DBID `db:"comment_id" json:"comment_id"`
 }
 
 type AlchemySpamContract struct {
@@ -202,12 +203,13 @@ type ExternalSocialConnection struct {
 }
 
 type FeedBlocklist struct {
-	ID          persist.DBID   `db:"id" json:"id"`
-	UserID      persist.DBID   `db:"user_id" json:"user_id"`
-	Action      persist.Action `db:"action" json:"action"`
-	LastUpdated time.Time      `db:"last_updated" json:"last_updated"`
-	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
-	Deleted     bool           `db:"deleted" json:"deleted"`
+	ID          persist.DBID         `db:"id" json:"id"`
+	UserID      persist.DBID         `db:"user_id" json:"user_id"`
+	LastUpdated time.Time            `db:"last_updated" json:"last_updated"`
+	CreatedAt   time.Time            `db:"created_at" json:"created_at"`
+	Deleted     bool                 `db:"deleted" json:"deleted"`
+	Reason      persist.ReportReason `db:"reason" json:"reason"`
+	Active      sql.NullBool         `db:"active" json:"active"`
 }
 
 type FeedEntity struct {
@@ -458,6 +460,8 @@ type Post struct {
 	CreatedAt   time.Time        `db:"created_at" json:"created_at"`
 	LastUpdated time.Time        `db:"last_updated" json:"last_updated"`
 	Deleted     bool             `db:"deleted" json:"deleted"`
+	IsFirstPost bool             `db:"is_first_post" json:"is_first_post"`
+	UserMintUrl sql.NullString   `db:"user_mint_url" json:"user_mint_url"`
 }
 
 type ProfileImage struct {
@@ -501,6 +505,16 @@ type RecommendationResult struct {
 	CreatedAt         time.Time     `db:"created_at" json:"created_at"`
 	LastUpdated       time.Time     `db:"last_updated" json:"last_updated"`
 	Deleted           bool          `db:"deleted" json:"deleted"`
+}
+
+type ReportedPost struct {
+	ID          persist.DBID         `db:"id" json:"id"`
+	CreatedAt   time.Time            `db:"created_at" json:"created_at"`
+	LastUpdated time.Time            `db:"last_updated" json:"last_updated"`
+	Deleted     bool                 `db:"deleted" json:"deleted"`
+	ReporterID  persist.DBID         `db:"reporter_id" json:"reporter_id"`
+	PostID      persist.DBID         `db:"post_id" json:"post_id"`
+	Reason      persist.ReportReason `db:"reason" json:"reason"`
 }
 
 type ReprocessJob struct {
@@ -668,6 +682,16 @@ type User struct {
 	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
 	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
 	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+}
+
+type UserBlocklist struct {
+	ID            persist.DBID `db:"id" json:"id"`
+	CreatedAt     time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated   time.Time    `db:"last_updated" json:"last_updated"`
+	Deleted       bool         `db:"deleted" json:"deleted"`
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	BlockedUserID persist.DBID `db:"blocked_user_id" json:"blocked_user_id"`
+	Active        sql.NullBool `db:"active" json:"active"`
 }
 
 type UserRelevance struct {

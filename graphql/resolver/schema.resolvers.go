@@ -33,13 +33,25 @@ func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model
 // Source is the resolver for the source field.
 func (r *admireResolver) Source(ctx context.Context, obj *model.Admire) (model.AdmireSource, error) {
 	if obj.PostID != nil {
-		return resolvePostByPostID(ctx, *obj.PostID)
+		return resolvePostByPostID(ctx, *obj.HelperAdmireData.PostID)
 	}
 	if obj.FeedEventID != nil {
-		return resolveFeedEventByEventID(ctx, *obj.FeedEventID)
+		return resolveFeedEventByEventID(ctx, *obj.HelperAdmireData.FeedEventID)
 	}
-
+	if obj.CommentID != nil {
+		return resolveCommentByCommentID(ctx, *obj.HelperAdmireData.CommentID)
+	}
 	return nil, fmt.Errorf("admire source not found")
+}
+
+// Comment is the resolver for the comment field.
+func (r *admireCommentPayloadResolver) Comment(ctx context.Context, obj *model.AdmireCommentPayload) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.Comment.Dbid)
+}
+
+// Admire is the resolver for the admire field.
+func (r *admireCommentPayloadResolver) Admire(ctx context.Context, obj *model.AdmireCommentPayload) (*model.Admire, error) {
+	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
 }
 
 // Admire is the resolver for the admire field.
@@ -226,6 +238,45 @@ func (r *commentResolver) Source(ctx context.Context, obj *model.Comment) (model
 	return nil, fmt.Errorf("comment has no source")
 }
 
+// ViewerAdmire is the resolver for the viewerAdmire field.
+func (r *commentResolver) ViewerAdmire(ctx context.Context, obj *model.Comment) (*model.Admire, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+
+	admire, err := api.Interaction.GetAdmireByActorIDAndCommentID(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting the admire fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns an admire (if it can find one) or nil.
+		return nil, nil
+	}
+
+	return admireToModel(ctx, *admire), nil
+}
+
+// Admires is the resolver for the admires field.
+func (r *commentResolver) Admires(ctx context.Context, obj *model.Comment, before *string, after *string, first *int, last *int) (*model.CommentAdmiresConnection, error) {
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByCommentID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.CommentAdmireEdge
+	for _, admire := range admires {
+		edges = append(edges, &model.CommentAdmireEdge{Node: admireToModel(ctx, admire)})
+	}
+
+	return &model.CommentAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 // Comment is the resolver for the comment field.
 func (r *commentOnFeedEventPayloadResolver) Comment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error) {
 	return resolveCommentByCommentID(ctx, obj.Comment.Dbid)
@@ -233,6 +284,9 @@ func (r *commentOnFeedEventPayloadResolver) Comment(ctx context.Context, obj *mo
 
 // ReplyToComment is the resolver for the replyToComment field.
 func (r *commentOnFeedEventPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error) {
+	if obj.ReplyToComment == nil {
+		return nil, nil
+	}
 	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
@@ -253,6 +307,9 @@ func (r *commentOnPostPayloadResolver) Comment(ctx context.Context, obj *model.C
 
 // ReplyToComment is the resolver for the replyToComment field.
 func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
+	if obj.ReplyToComment == nil {
+		return nil, nil
+	}
 	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
@@ -618,7 +675,7 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 
 // Badges is the resolver for the badges field.
 func (r *galleryUserResolver) Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error) {
-	return resolveBadgesByUserID(ctx, obj.Dbid)
+	return resolveBadgesByUserID(ctx, obj.Dbid, obj.Traits)
 }
 
 // Followers is the resolver for the followers field.
@@ -817,6 +874,33 @@ func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.Remove
 		return nil, err
 	}
 	return &model.RemoveProfileImagePayload{Viewer: resolveViewer(ctx)}, nil
+}
+
+// ReportPost is the resolver for the reportPost field.
+func (r *mutationResolver) ReportPost(ctx context.Context, postID persist.DBID, reason persist.ReportReason) (model.ReportPostPayloadOrError, error) {
+	err := publicapi.For(ctx).Interaction.ReportPost(ctx, postID, reason)
+	if err != nil {
+		return nil, err
+	}
+	return model.ReportPostPayload{PostID: postID}, nil
+}
+
+// BlockUser is the resolver for the blockUser field.
+func (r *mutationResolver) BlockUser(ctx context.Context, userID persist.DBID) (model.BlockUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.BlockUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.BlockUserPayload{UserID: userID}, nil
+}
+
+// UnblockUser is the resolver for the unblockUser field.
+func (r *mutationResolver) UnblockUser(ctx context.Context, userID persist.DBID) (model.UnblockUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UnblockUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.UnblockUserPayload{UserID: userID}, nil
 }
 
 // UpdateGalleryCollections is the resolver for the updateGalleryCollections field.
@@ -1402,6 +1486,20 @@ func (r *mutationResolver) AdmireToken(ctx context.Context, tokenID persist.DBID
 	return output, nil
 }
 
+// AdmireComment is the resolver for the admireComment field.
+func (r *mutationResolver) AdmireComment(ctx context.Context, commentID persist.DBID) (model.AdmireCommentPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Interaction.AdmireComment(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.AdmireCommentPayload{
+		Viewer:  resolveViewer(ctx),
+		Admire:  &model.Admire{Dbid: id},
+		Comment: &model.Comment{Dbid: commentID},
+	}
+	return output, nil
+}
+
 // RemoveAdmire is the resolver for the removeAdmire field.
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
 	feedEventID, postID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
@@ -1488,7 +1586,7 @@ func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBI
 
 // PostTokens is the resolver for the postTokens field.
 func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, input.Mentions, input.Caption)
+	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, input.Mentions, input.Caption, input.MintURL)
 	if err != nil {
 		return nil, err
 	}
@@ -1512,7 +1610,7 @@ func (r *mutationResolver) ReferralPostToken(ctx context.Context, input model.Re
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
 	}
-	id, err := publicapi.For(ctx).Feed.ReferralPostToken(ctx, token, input.Caption)
+	id, err := publicapi.For(ctx).Feed.ReferralPostToken(ctx, token, input.Caption, input.MintURL)
 	if err != nil {
 		return nil, err
 	}
@@ -1939,15 +2037,13 @@ func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx c
 }
 
 // BanUserFromFeed is the resolver for the banUserFromFeed field.
-func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error) {
+func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, reason persist.ReportReason) (model.BanUserFromFeedPayloadOrError, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
-
 	if err != nil {
 		return nil, err
 	}
 
-	err = publicapi.For(ctx).Feed.BlockUser(ctx, user.ID, persist.Action(action))
-
+	err = publicapi.For(ctx).Feed.BanUser(ctx, user.ID, reason)
 	if err != nil {
 		return nil, err
 	}
@@ -1958,13 +2054,11 @@ func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string,
 // UnbanUserFromFeed is the resolver for the unbanUserFromFeed field.
 func (r *mutationResolver) UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
-
 	if err != nil {
 		return nil, err
 	}
 
-	err = publicapi.For(ctx).Feed.UnBlockUser(ctx, user.ID)
-
+	err = publicapi.For(ctx).Feed.UnbanUser(ctx, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -2693,6 +2787,16 @@ func (r *socialQueriesResolver) SocialConnections(ctx context.Context, obj *mode
 	}, nil
 }
 
+// Comment is the resolver for the comment field.
+func (r *someoneAdmiredYourCommentNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneAdmiredYourCommentNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.HelperSomeoneAdmiredYourCommentNotificationData.CommentID)
+}
+
+// Admirers is the resolver for the admirers field.
+func (r *someoneAdmiredYourCommentNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourCommentNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *someoneAdmiredYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEventID)
@@ -3216,6 +3320,11 @@ func (r *chainPubKeyInputResolver) Chain(ctx context.Context, obj *persist.Chain
 // Admire returns generated.AdmireResolver implementation.
 func (r *Resolver) Admire() generated.AdmireResolver { return &admireResolver{r} }
 
+// AdmireCommentPayload returns generated.AdmireCommentPayloadResolver implementation.
+func (r *Resolver) AdmireCommentPayload() generated.AdmireCommentPayloadResolver {
+	return &admireCommentPayloadResolver{r}
+}
+
 // AdmireFeedEventPayload returns generated.AdmireFeedEventPayloadResolver implementation.
 func (r *Resolver) AdmireFeedEventPayload() generated.AdmireFeedEventPayloadResolver {
 	return &admireFeedEventPayloadResolver{r}
@@ -3373,6 +3482,11 @@ func (r *Resolver) SocialConnection() generated.SocialConnectionResolver {
 // SocialQueries returns generated.SocialQueriesResolver implementation.
 func (r *Resolver) SocialQueries() generated.SocialQueriesResolver { return &socialQueriesResolver{r} }
 
+// SomeoneAdmiredYourCommentNotification returns generated.SomeoneAdmiredYourCommentNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourCommentNotification() generated.SomeoneAdmiredYourCommentNotificationResolver {
+	return &someoneAdmiredYourCommentNotificationResolver{r}
+}
+
 // SomeoneAdmiredYourFeedEventNotification returns generated.SomeoneAdmiredYourFeedEventNotificationResolver implementation.
 func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAdmiredYourFeedEventNotificationResolver {
 	return &someoneAdmiredYourFeedEventNotificationResolver{r}
@@ -3494,6 +3608,7 @@ func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
 }
 
 type admireResolver struct{ *Resolver }
+type admireCommentPayloadResolver struct{ *Resolver }
 type admireFeedEventPayloadResolver struct{ *Resolver }
 type admirePostPayloadResolver struct{ *Resolver }
 type admireTokenPayloadResolver struct{ *Resolver }
@@ -3531,6 +3646,7 @@ type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
 type socialConnectionResolver struct{ *Resolver }
 type socialQueriesResolver struct{ *Resolver }
+type someoneAdmiredYourCommentNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourPostNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourTokenNotificationResolver struct{ *Resolver }

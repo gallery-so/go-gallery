@@ -62,6 +62,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredPost, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionAdmiredComment, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnPost, notificationHandler)
@@ -71,6 +72,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, followerNotificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionTopActivityBadgeReceived, notificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
@@ -458,7 +460,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 	}
 
 	// Don't notify the user on self events
-	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && persistedEvent.Action != persist.ActionNewTokensReceived {
+	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && (persistedEvent.Action != persist.ActionNewTokensReceived && persistedEvent.Action != persist.ActionTopActivityBadgeReceived) {
 		return nil
 	}
 
@@ -481,6 +483,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		MentionID:   persistedEvent.MentionID,
 	})
 }
+
 func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
@@ -510,7 +513,6 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 			}
 			return post.ActorID, nil
 		}
-
 	case persist.ResourceTypeAdmire:
 		if event.Action == persist.ActionAdmiredToken {
 			token, err := h.dataloaders.GetTokenByIdBatch.Load(event.SubjectID)
@@ -530,6 +532,12 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 				return "", err
 			}
 			return post.ActorID, nil
+		} else if event.CommentID != "" {
+			comment, err := h.dataloaders.GetCommentByCommentIDBatch.Load(event.CommentID)
+			if err != nil {
+				return "", err
+			}
+			return comment.ActorID, nil
 		}
 	case persist.ResourceTypeUser:
 		return event.SubjectID, nil
@@ -558,7 +566,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		if event.ExternalID.String != "" {
 			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
 		}
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken, persist.ActionAdmiredComment:
 		if event.ActorID.String != "" {
 			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}
@@ -573,7 +581,9 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
 	case persist.ActionReplyToComment:
 		data.OriginalCommentID = event.SubjectID
-
+	case persist.ActionTopActivityBadgeReceived:
+		data.ActivityBadgeThreshold = event.Data.ActivityBadgeThreshold
+		data.NewTopActiveUser = event.Data.NewTopActiveUser
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}

@@ -20,6 +20,51 @@ var (
 	ErrBatchAlreadyClosed = errors.New("batch already closed")
 )
 
+const countAdmiresByCommentIDBatch = `-- name: CountAdmiresByCommentIDBatch :batchone
+select count(*) from admires where comment_id = $1 and deleted = false
+`
+
+type CountAdmiresByCommentIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) CountAdmiresByCommentIDBatch(ctx context.Context, commentID []persist.DBID) *CountAdmiresByCommentIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range commentID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(countAdmiresByCommentIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &CountAdmiresByCommentIDBatchBatchResults{br, len(commentID), false}
+}
+
+func (b *CountAdmiresByCommentIDBatchBatchResults) QueryRow(f func(int, int64, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var count int64
+		if b.closed {
+			if f != nil {
+				f(t, count, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&count)
+		if f != nil {
+			f(t, count, err)
+		}
+	}
+}
+
+func (b *CountAdmiresByCommentIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const countAdmiresByFeedEventIDBatch = `-- name: CountAdmiresByFeedEventIDBatch :batchone
 SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false
 `
@@ -393,9 +438,15 @@ func (b *CountInteractionsByPostIDBatchBatchResults) Close() error {
 
 const countRepliesByCommentIDBatch = `-- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = $1) 
-        or 
-        (reply_to is not null and reply_to = $1) AND deleted = false
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = $1) IS NULL 
+        AND top_level_comment_id = $1 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = $1) IS NOT NULL 
+        AND reply_to = $1 
+    ) AND deleted = false
 `
 
 type CountRepliesByCommentIDBatchBatchResults struct {
@@ -439,8 +490,70 @@ func (b *CountRepliesByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getAdmireByActorIDAndCommentID = `-- name: GetAdmireByActorIDAndCommentID :batchone
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND comment_id = $2 AND deleted = false
+`
+
+type GetAdmireByActorIDAndCommentIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetAdmireByActorIDAndCommentIDParams struct {
+	ActorID   persist.DBID `db:"actor_id" json:"actor_id"`
+	CommentID persist.DBID `db:"comment_id" json:"comment_id"`
+}
+
+func (q *Queries) GetAdmireByActorIDAndCommentID(ctx context.Context, arg []GetAdmireByActorIDAndCommentIDParams) *GetAdmireByActorIDAndCommentIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ActorID,
+			a.CommentID,
+		}
+		batch.Queue(getAdmireByActorIDAndCommentID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetAdmireByActorIDAndCommentIDBatchResults{br, len(arg), false}
+}
+
+func (b *GetAdmireByActorIDAndCommentIDBatchResults) QueryRow(f func(int, Admire, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Admire
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.PostID,
+			&i.TokenID,
+			&i.CommentID,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetAdmireByActorIDAndCommentIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getAdmireByActorIDAndFeedEventID = `-- name: GetAdmireByActorIDAndFeedEventID :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
 `
 
 type GetAdmireByActorIDAndFeedEventIDBatchResults struct {
@@ -488,6 +601,7 @@ func (b *GetAdmireByActorIDAndFeedEventIDBatchResults) QueryRow(f func(int, Admi
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -501,7 +615,7 @@ func (b *GetAdmireByActorIDAndFeedEventIDBatchResults) Close() error {
 }
 
 const getAdmireByActorIDAndPostID = `-- name: GetAdmireByActorIDAndPostID :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false
 `
 
 type GetAdmireByActorIDAndPostIDBatchResults struct {
@@ -549,6 +663,7 @@ func (b *GetAdmireByActorIDAndPostIDBatchResults) QueryRow(f func(int, Admire, e
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -562,7 +677,7 @@ func (b *GetAdmireByActorIDAndPostIDBatchResults) Close() error {
 }
 
 const getAdmireByActorIDAndTokenID = `-- name: GetAdmireByActorIDAndTokenID :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND token_id = $2 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND token_id = $2 AND deleted = false
 `
 
 type GetAdmireByActorIDAndTokenIDBatchResults struct {
@@ -610,6 +725,7 @@ func (b *GetAdmireByActorIDAndTokenIDBatchResults) QueryRow(f func(int, Admire, 
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -623,7 +739,7 @@ func (b *GetAdmireByActorIDAndTokenIDBatchResults) Close() error {
 }
 
 const getAdmireByAdmireIDBatch = `-- name: GetAdmireByAdmireIDBatch :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE id = $1 AND deleted = false
 `
 
 type GetAdmireByAdmireIDBatchBatchResults struct {
@@ -665,6 +781,7 @@ func (b *GetAdmireByAdmireIDBatchBatchResults) QueryRow(f func(int, Admire, erro
 			&i.LastUpdated,
 			&i.PostID,
 			&i.TokenID,
+			&i.CommentID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -678,7 +795,7 @@ func (b *GetAdmireByAdmireIDBatchBatchResults) Close() error {
 }
 
 const getAdmiresByActorIDBatch = `-- name: GetAdmiresByActorIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetAdmiresByActorIDBatchBatchResults struct {
@@ -727,6 +844,7 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Query(f func(int, []Admire, error
 					&i.LastUpdated,
 					&i.PostID,
 					&i.TokenID,
+					&i.CommentID,
 				); err != nil {
 					return err
 				}
@@ -2544,7 +2662,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url FROM posts WHERE id = $1 AND deleted = false
 `
 
 type GetPostByIdBatchBatchResults struct {
@@ -2586,6 +2704,8 @@ func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.IsFirstPost,
+			&i.UserMintUrl,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4224,8 +4344,97 @@ func (b *GetWalletsByUserIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const paginateAdmiresByCommentIDBatch = `-- name: PaginateAdmiresByCommentIDBatch :batchmany
+select id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id from admires where comment_id = $1 and deleted = false
+    and (created_at, id) < ($2, $3) and (created_at, id) > ($4, $5)
+    order by case when $6::bool then (created_at, id) end asc,
+             case when not $6::bool then (created_at, id) end desc
+    limit $7
+`
+
+type PaginateAdmiresByCommentIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginateAdmiresByCommentIDBatchParams struct {
+	CommentID     persist.DBID `db:"comment_id" json:"comment_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
+}
+
+func (q *Queries) PaginateAdmiresByCommentIDBatch(ctx context.Context, arg []PaginateAdmiresByCommentIDBatchParams) *PaginateAdmiresByCommentIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CommentID,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(paginateAdmiresByCommentIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateAdmiresByCommentIDBatchBatchResults{br, len(arg), false}
+}
+
+func (b *PaginateAdmiresByCommentIDBatchBatchResults) Query(f func(int, []Admire, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Admire
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Admire
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.FeedEventID,
+					&i.ActorID,
+					&i.Deleted,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.PostID,
+					&i.TokenID,
+					&i.CommentID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginateAdmiresByCommentIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const paginateAdmiresByFeedEventIDBatch = `-- name: PaginateAdmiresByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3) AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
@@ -4294,6 +4503,7 @@ func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Query(f func(int, []Admi
 					&i.LastUpdated,
 					&i.PostID,
 					&i.TokenID,
+					&i.CommentID,
 				); err != nil {
 					return err
 				}
@@ -4313,7 +4523,7 @@ func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginateAdmiresByPostIDBatch = `-- name: PaginateAdmiresByPostIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE post_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE post_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3) AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
@@ -4382,6 +4592,7 @@ func (b *PaginateAdmiresByPostIDBatchBatchResults) Query(f func(int, []Admire, e
 					&i.LastUpdated,
 					&i.PostID,
 					&i.TokenID,
+					&i.CommentID,
 				); err != nil {
 					return err
 				}
@@ -4401,7 +4612,7 @@ func (b *PaginateAdmiresByPostIDBatchBatchResults) Close() error {
 }
 
 const paginateAdmiresByTokenIDBatch = `-- name: PaginateAdmiresByTokenIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE token_id = $1 AND (not $2::bool or actor_id = $3) AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id, comment_id FROM admires WHERE token_id = $1 AND (not $2::bool or actor_id = $3) AND deleted = false
     AND (created_at, id) < ($4, $5) AND (created_at, id) > ($6, $7)
     ORDER BY CASE WHEN $8::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
@@ -4474,6 +4685,7 @@ func (b *PaginateAdmiresByTokenIDBatchBatchResults) Query(f func(int, []Admire, 
 					&i.LastUpdated,
 					&i.PostID,
 					&i.TokenID,
+					&i.CommentID,
 				); err != nil {
 					return err
 				}
@@ -5013,7 +5225,7 @@ with community_data as (
 )
 
 (
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
     from community_data, posts
     where community_data.community_type = 0
         and community_data.contract_id = any(posts.contract_ids)
@@ -5029,7 +5241,7 @@ select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor
 union all
 
 (
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
     from community_data, posts
         join tokens on tokens.id = any(posts.token_ids) and not tokens.deleted
         join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
@@ -5108,6 +5320,8 @@ func (b *PaginatePostsByCommunityIDBatchResults) Query(f func(int, []Post, error
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.Deleted,
+					&i.IsFirstPost,
+					&i.UserMintUrl,
 				); err != nil {
 					return err
 				}
@@ -5127,7 +5341,7 @@ func (b *PaginatePostsByCommunityIDBatchResults) Close() error {
 }
 
 const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
 FROM posts
 WHERE $1 = ANY(posts.contract_ids)
 AND posts.deleted = false
@@ -5201,6 +5415,8 @@ func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.Deleted,
+					&i.IsFirstPost,
+					&i.UserMintUrl,
 				); err != nil {
 					return err
 				}
@@ -5221,9 +5437,15 @@ func (b *PaginatePostsByContractIDBatchResults) Close() error {
 
 const paginateRepliesByCommentIDBatch = `-- name: PaginateRepliesByCommentIDBatch :batchmany
 SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id FROM comments WHERE 
-    (reply_to is null and top_level_comment_id = $1) 
-        or 
-        (reply_to is not null and reply_to = $1) AND deleted = false
+    (
+        (SELECT reply_to FROM comments WHERE comments.id = $1) IS NULL 
+        AND top_level_comment_id = $1 
+    ) 
+    OR 
+    ( 
+        (SELECT reply_to FROM comments WHERE id = $1) IS NOT NULL 
+        AND reply_to = $1 
+    ) AND deleted = false
     AND (comments.created_at, comments.id) < ($2, $3)
     AND (comments.created_at, comments.id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,

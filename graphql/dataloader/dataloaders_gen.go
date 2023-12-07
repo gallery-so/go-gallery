@@ -28,6 +28,43 @@ type notFoundErrorProvider[TKey any] interface {
 type PreFetchHook func(context.Context, string) context.Context
 type PostFetchHook func(context.Context, string)
 
+// CountAdmiresByCommentIDBatch batches and caches requests
+type CountAdmiresByCommentIDBatch struct {
+	generator.Dataloader[persist.DBID, int64]
+}
+
+// newCountAdmiresByCommentIDBatch creates a new CountAdmiresByCommentIDBatch with the given settings, functions, and options
+func newCountAdmiresByCommentIDBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *CountAdmiresByCommentIDBatch, []persist.DBID) ([]int64, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *CountAdmiresByCommentIDBatch {
+	d := &CountAdmiresByCommentIDBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "CountAdmiresByCommentIDBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "CountAdmiresByCommentIDBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // CountAdmiresByFeedEventIDBatch batches and caches requests
 type CountAdmiresByFeedEventIDBatch struct {
 	generator.Dataloader[persist.DBID, int64]
@@ -315,6 +352,43 @@ func newCountRepliesByCommentIDBatch(
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "CountRepliesByCommentIDBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetAdmireByActorIDAndCommentID batches and caches requests
+type GetAdmireByActorIDAndCommentID struct {
+	generator.Dataloader[coredb.GetAdmireByActorIDAndCommentIDParams, coredb.Admire]
+}
+
+// newGetAdmireByActorIDAndCommentID creates a new GetAdmireByActorIDAndCommentID with the given settings, functions, and options
+func newGetAdmireByActorIDAndCommentID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetAdmireByActorIDAndCommentID, []coredb.GetAdmireByActorIDAndCommentIDParams) ([]coredb.Admire, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetAdmireByActorIDAndCommentID {
+	d := &GetAdmireByActorIDAndCommentID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetAdmireByActorIDAndCommentIDParams) ([]coredb.Admire, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetAdmireByActorIDAndCommentID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetAdmireByActorIDAndCommentID")
 		}
 
 		return results, errors
@@ -2151,6 +2225,43 @@ func newGetWalletsByUserIDBatch(
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetWalletsByUserIDBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// PaginateAdmiresByCommentIDBatch batches and caches requests
+type PaginateAdmiresByCommentIDBatch struct {
+	generator.Dataloader[coredb.PaginateAdmiresByCommentIDBatchParams, []coredb.Admire]
+}
+
+// newPaginateAdmiresByCommentIDBatch creates a new PaginateAdmiresByCommentIDBatch with the given settings, functions, and options
+func newPaginateAdmiresByCommentIDBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *PaginateAdmiresByCommentIDBatch, []coredb.PaginateAdmiresByCommentIDBatchParams) ([][]coredb.Admire, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *PaginateAdmiresByCommentIDBatch {
+	d := &PaginateAdmiresByCommentIDBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateAdmiresByCommentIDBatchParams) ([][]coredb.Admire, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "PaginateAdmiresByCommentIDBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "PaginateAdmiresByCommentIDBatch")
 		}
 
 		return results, errors

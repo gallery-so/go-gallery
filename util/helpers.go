@@ -338,6 +338,15 @@ func Chunk[T any](s []T, chunkSize int) [][]T {
 	return chunks
 }
 
+func GroupBy[T any, K comparable](s []T, f func(T) K) map[K][]T {
+	m := make(map[K][]T)
+	for _, v := range s {
+		key := f(v)
+		m[key] = append(m[key], v)
+	}
+	return m
+}
+
 // StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
 func StringToPointerIfNotEmpty(str string) *string {
 	if str == "" {
@@ -652,6 +661,13 @@ func ToNullString(s string, emptyIsNull bool) sql.NullString {
 		return sql.NullString{String: "", Valid: false}
 	}
 	return sql.NullString{String: s, Valid: true}
+}
+
+func ToSQLNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{}
+	}
+	return ToNullString(*s, true)
 }
 
 func ToNullInt32(i *int) sql.NullInt32 {

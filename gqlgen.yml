@@ -115,6 +115,9 @@ models:
   TokenId:
     model:
       - github.com/mikeydub/go-gallery/service/persist.TokenID
+  ReportReason:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ReportReason
 directives:
   goGqlId:
     skip_runtime: true

@@ -18,6 +18,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"AdmireCommentPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdmireCommentPayloadOrError)
+		return obj, ok
+	},
+
 	"AdmireFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AdmireFeedEventPayloadOrError)
 		return obj, ok
@@ -45,6 +50,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"BanUserFromFeedPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(BanUserFromFeedPayloadOrError)
+		return obj, ok
+	},
+
+	"BlockUserPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(BlockUserPayloadOrError)
 		return obj, ok
 	},
 
@@ -338,6 +348,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"ReportPostPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ReportPostPayloadOrError)
+		return obj, ok
+	},
+
 	"ResendVerificationEmailPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(ResendVerificationEmailPayloadOrError)
 		return obj, ok
@@ -435,6 +450,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"UnbanUserFromFeedPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UnbanUserFromFeedPayloadOrError)
+		return obj, ok
+	},
+
+	"UnblockUserPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UnblockUserPayloadOrError)
 		return obj, ok
 	},
 

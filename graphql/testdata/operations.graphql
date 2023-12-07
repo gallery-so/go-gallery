@@ -440,6 +440,20 @@ mutation admireFeedEventMutation($feedEventId: DBID!) {
   }
 }
 
+mutation admireCommentMutation($commentId: DBID!) {
+  admireComment(commentId: $commentId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AdmireCommentPayload {
+      comment {
+        dbid
+      }
+    }
+  }
+}
+
 mutation commentOnFeedEventMutation($feedEventId: DBID!, $comment: String!) {
   commentOnFeedEvent(feedEventId: $feedEventId, comment: $comment) {
     ... on Error {
@@ -448,6 +462,9 @@ mutation commentOnFeedEventMutation($feedEventId: DBID!, $comment: String!) {
     }
     ... on CommentOnFeedEventPayload {
       feedEvent {
+        dbid
+      }
+      comment {
         dbid
       }
     }
@@ -699,8 +716,8 @@ query notificationsForViewerQuery {
       __typename
       message
     }
-    ...on Viewer {
-      notifications(last:1, before:null) {
+    ... on Viewer {
+      notifications(last: 1, before: null) {
         unseenCount
       }
     }

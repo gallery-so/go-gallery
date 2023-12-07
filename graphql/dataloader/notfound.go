@@ -18,6 +18,10 @@ func (*CountAdmiresByTokenIDBatch) getNotFoundError(key persist.DBID) error {
 	return pgx.ErrNoRows
 }
 
+func (*CountAdmiresByCommentIDBatch) getNotFoundError(key persist.DBID) error {
+	return pgx.ErrNoRows
+}
+
 func (*CountCommentsByFeedEventIDBatch) getNotFoundError(key persist.DBID) error {
 	return pgx.ErrNoRows
 }
@@ -31,19 +35,23 @@ func (*CountRepliesByCommentIDBatch) getNotFoundError(key persist.DBID) error {
 }
 
 func (*GetAdmireByActorIDAndFeedEventID) getNotFoundError(key coredb.GetAdmireByActorIDAndFeedEventIDParams) error {
-	return persist.ErrAdmireFeedEventNotFound{ActorID: key.ActorID, FeedEventID: key.FeedEventID}
+	return persist.ErrAdmireNotFoundByActorIDFeedEventID{ActorID: key.ActorID, FeedEventID: key.FeedEventID}
 }
 
 func (*GetAdmireByActorIDAndPostID) getNotFoundError(key coredb.GetAdmireByActorIDAndPostIDParams) error {
-	return persist.ErrAdmirePostNotFound{ActorID: key.ActorID, PostID: key.PostID}
+	return persist.ErrAdmireNotFoundByActorIDPostID{ActorID: key.ActorID, PostID: key.PostID}
 }
 
 func (*GetAdmireByActorIDAndTokenID) getNotFoundError(key coredb.GetAdmireByActorIDAndTokenIDParams) error {
-	return persist.ErrAdmireTokenNotFound{ActorID: key.ActorID, TokenID: key.TokenID}
+	return persist.ErrAdmireNotFoundByActorIDTokenID{ActorID: key.ActorID, TokenID: key.TokenID}
+}
+
+func (*GetAdmireByActorIDAndCommentID) getNotFoundError(key coredb.GetAdmireByActorIDAndCommentIDParams) error {
+	return persist.ErrAdmireNotFoundByActorIDCommentID{ActorID: key.ActorID, CommentID: key.CommentID}
 }
 
 func (*GetAdmireByAdmireIDBatch) getNotFoundError(key persist.DBID) error {
-	return pgx.ErrNoRows
+	return persist.ErrAdmireNotFoundByID{ID: key}
 }
 
 func (*GetCollectionByIdBatch) getNotFoundError(key persist.DBID) error {
@@ -51,7 +59,7 @@ func (*GetCollectionByIdBatch) getNotFoundError(key persist.DBID) error {
 }
 
 func (*GetCommentByCommentIDBatch) getNotFoundError(key persist.DBID) error {
-	return pgx.ErrNoRows
+	return persist.ErrCommentNotFoundByID{ID: key}
 }
 
 func (*GetContractByChainAddressBatch) getNotFoundError(key coredb.GetContractByChainAddressBatchParams) error {

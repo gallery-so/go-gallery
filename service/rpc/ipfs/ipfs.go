@@ -10,10 +10,8 @@ import (
 
 	"github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 func init() {
@@ -25,47 +23,51 @@ type ErrInfuraQuotaExceeded struct {
 	Err error
 }
 
+func (r ErrInfuraQuotaExceeded) Unwrap() error { return r.Err }
 func (r ErrInfuraQuotaExceeded) Error() string {
 	return fmt.Sprintf("quota exceeded: %s", r.Err.Error())
-}
-
-func (r ErrInfuraQuotaExceeded) Unwrap() error {
-	return r.Err
-}
-
-type Reader interface {
-	Do(ctx context.Context, path string) (io.ReadCloser, error)
 }
 
 // HTTPReader is a reader that uses a HTTP gateway to read from
 type HTTPReader struct {
 	Host   string
-	Client http.Client
+	Client *http.Client
 }
 
 func (r HTTPReader) Do(ctx context.Context, path string) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pathURL(r.Host, path), nil)
+	path = pathURL(r.Host, path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
-
 	resp, err := r.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-
 	if isInfura(path) && resp.StatusCode == http.StatusTooManyRequests {
 		return nil, ErrInfuraQuotaExceeded{Err: err}
 	}
-
 	if resp.StatusCode != http.StatusOK {
-		return nil, util.ErrHTTP{
-			Status: resp.StatusCode,
-			URL:    path,
-		}
+		return nil, util.ErrHTTP{Status: resp.StatusCode, URL: path}
 	}
-
 	return resp.Body, nil
+}
+
+func (r HTTPReader) Head(ctx context.Context, path string) (http.Header, error) {
+	path = pathURL(r.Host, path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := r.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, util.ErrHTTP{Status: resp.StatusCode, URL: path}
+	}
+	return resp.Header, nil
 }
 
 // IPFSReader is a reader that uses an IPFS shell to read from IPFS
@@ -75,16 +77,10 @@ type IPFSReader struct {
 
 func (r IPFSReader) Do(ctx context.Context, path string) (io.ReadCloser, error) {
 	reader, err := r.Client.Cat(path)
-
 	if err != nil && isInfura(path) && strings.Contains(err.Error(), "transfer quota reached") {
 		return nil, ErrInfuraQuotaExceeded{Err: err}
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return reader, nil
+	return reader, err
 }
 
 // NewShell returns an IPFS shell with default configuration
@@ -94,51 +90,75 @@ func NewShell() *shell.Shell {
 	return sh
 }
 
-func GetIPFSResponse(ctx context.Context, httpClient http.Client, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
-	infuraReader := HTTPReader{
-		Host:   env.GetString("IPFS_URL"),
-		Client: httpClient,
+var (
+	nodeGallery = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: env.GetString("FALLBACK_IPFS_URL"), Client: h}
 	}
-	galleryReader := HTTPReader{
-		Host:   env.GetString("FALLBACK_IPFS_URL"),
-		Client: httpClient,
+	nodeIPFS = func(h *http.Client, s *shell.Shell) IPFSReader {
+		return IPFSReader{Client: s}
 	}
-	ipfsReader := IPFSReader{
-		Client: ipfsClient,
+	nodeIpfsIO = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://ipfs.io", Client: h}
 	}
+	nodePinata = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://gateway.pinata.cloud", Client: h}
+	}
+	nodeNftStorage = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://nftstorage.link", Client: h}
+	}
+	nodeCloudFlare = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://cloudflare-ipfs.com", Client: h}
+	}
+	nodeFxHash = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://gateway.fxhash.xyz", Client: h}
+	}
+)
 
-	logStatus := func(readerName, path string, err error) {
-		if err == nil {
-			logger.For(ctx).Infof("read CID: %s using [%s]", path, readerName)
-		} else {
-			logger.For(ctx).Warnf("failed to read CID: %s with [%s]: %s", path, readerName, err)
-		}
-	}
-
-	r, err := util.FirstNonErrorWithValue(ctx, false, retry.HTTPErrNotFound,
+func GetResponse(ctx context.Context, path string) (io.ReadCloser, error) {
+	httpClient := defaultHTTPClient()
+	ipfsClient := NewShell()
+	return util.FirstNonErrorWithValue(ctx, false, nil,
 		func(ctx context.Context) (io.ReadCloser, error) {
-			r, err := infuraReader.Do(ctx, path)
-			logStatus("infuraNode", path, err)
-			return r, err
+			return nodeGallery(httpClient, ipfsClient).Do(ctx, path)
 		},
 		func(ctx context.Context) (io.ReadCloser, error) {
-			r, err := galleryReader.Do(ctx, path)
-			logStatus("galleryNode", path, err)
-			return r, err
+			return nodeIPFS(httpClient, ipfsClient).Do(ctx, path)
 		},
 		func(ctx context.Context) (io.ReadCloser, error) {
-			r, err := ipfsReader.Do(ctx, path)
-			logStatus("ipfsNode", path, err)
-			return r, err
+			return nodeIpfsIO(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodePinata(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodeNftStorage(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodeCloudFlare(httpClient, ipfsClient).Do(ctx, path)
 		},
 	)
+}
 
-	if err == nil {
-		return r, nil
-	}
-
-	logger.For(ctx).Warnf("failed to read CID: %s from any node, using fallback: %s", path, err)
-	return HTTPReader{Host: "https://ipfs.io", Client: httpClient}.Do(ctx, path)
+func GetHeader(ctx context.Context, path string) (http.Header, error) {
+	httpClient := defaultHTTPClient()
+	ipfsClient := NewShell()
+	return util.FirstNonErrorWithValue(ctx, true, nil,
+		func(ctx context.Context) (http.Header, error) {
+			return nodeGallery(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodeIpfsIO(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodePinata(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodeNftStorage(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodeCloudFlare(httpClient, ipfsClient).Head(ctx, path)
+		},
+	)
 }
 
 // defaultHTTPClient returns an http.Client configured with default settings intended for IPFS calls.
@@ -153,20 +173,22 @@ func defaultHTTPClient() *http.Client {
 	}
 }
 
+// BestGatewayNodeFrom rewrites an IPFS URL to a gateway URL using the appropriate gateway
+func BestGatewayNodeFrom(ipfsURL string, isFxHash bool) string {
+	if isFxHash {
+		return PathGatewayFrom(nodeFxHash(nil, nil).Host, ipfsURL)
+	}
+	return DefaultGatewayFrom(ipfsURL)
+}
+
 // DefaultGatewayFrom rewrites an IPFS URL to a gateway URL using the default gateway
 func DefaultGatewayFrom(ipfsURL string) string {
-	return PathGatewayFrom(env.GetString("IPFS_URL"), ipfsURL, true)
+	return PathGatewayFrom(nodeIpfsIO(nil, nil).Host, ipfsURL)
 }
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
-// If includeQueryParams is true, the query parameters will be included in the gateway URL
-func PathGatewayFrom(gatewayHost, ipfsURL string, includeQueryParams bool) string {
-	return PathGatewayFor(gatewayHost, util.GetURIPath(ipfsURL, includeQueryParams))
-}
-
-// PathGatewayFor returns the path gateway URL for a CID
-func PathGatewayFor(gatewayHost, cid string) string {
-	return fmt.Sprintf("%s/ipfs/%s", gatewayHost, cid)
+func PathGatewayFrom(gatewayHost, ipfsURL string) string {
+	return pathURL(gatewayHost, util.GetURIPath(ipfsURL, false))
 }
 
 // authTransport decorates each request with a basic auth header.
@@ -182,8 +204,20 @@ func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // pathURL returns the gateway URL in path resolution sytle
-func pathURL(host, path string) string {
-	return fmt.Sprintf("%s/ipfs/%s", host, path)
+func pathURL(host, uri string) string {
+	uri = standardizeQueryParams(uri)
+	return fmt.Sprintf("%s/ipfs/%s", host, uri)
+}
+
+// standardizeQueryParams converts a URI with optional params from the format <cid>?key=val&key=val to the format <cid>/?key=val&key=val
+// Most gateways will redirect the former to the latter, but some gateways don't. https://docs.ipfs.tech/concepts/ipfs-gateway/#path
+func standardizeQueryParams(uri string) string {
+	paramIdx := strings.Index(uri, "?")
+	isClean := strings.Index(uri, "/?") != -1
+	if paramIdx != -1 && !isClean {
+		uri = uri[:paramIdx] + "/?" + uri[paramIdx+1:]
+	}
+	return uri
 }
 
 func isInfura(gateway string) bool {

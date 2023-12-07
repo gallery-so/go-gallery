@@ -30,6 +30,7 @@ const (
 	ActionAdmiredFeedEvent                Action = "AdmiredFeedEvent"
 	ActionAdmiredPost                     Action = "AdmiredPost"
 	ActionAdmiredToken                    Action = "AdmiredToken"
+	ActionAdmiredComment                  Action = "AdmiredComment"
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
 	ActionReplyToComment                  Action = "RepliedToComment"
@@ -41,6 +42,7 @@ const (
 	ActionGalleryUpdated                  Action = "GalleryUpdated"
 	ActionGalleryInfoUpdated              Action = "GalleryInfoUpdated"
 	ActionNewTokensReceived               Action = "NewTokensReceived"
+	ActionTopActivityBadgeReceived        Action = "ActivityBadgeReceived"
 )
 
 type EventData struct {
@@ -61,6 +63,8 @@ type EventData struct {
 	GalleryNewTokenIDs                  map[DBID]DBIDList `json:"gallery_new_token_ids"`
 	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`
 	GalleryNewTokenCollectorsNotes      map[DBID]string   `json:"gallery_new_token_collectors_notes"`
+	ActivityBadgeThreshold              int               `json:"activity_badge_threshold"`
+	NewTopActiveUser                    bool              `json:"new_top_active_user"`
 }
 
 type FeedEventData struct {
@@ -88,20 +92,32 @@ type FeedEventData struct {
 	GalleryNewCollectionTokenCollectorsNotes map[DBID]map[DBID]string `json:"gallery_new_collection_token_collectors_notes"`
 }
 
-type ErrFeedEventNotFoundByID struct {
-	ID DBID
-}
+var errFeedEventNotFound ErrFeedEventNotFound
 
+type ErrFeedEventNotFound struct{}
+
+func (e ErrFeedEventNotFound) Unwrap() error { return notFoundError }
+func (e ErrFeedEventNotFound) Error() string { return "feed event not found" }
+
+type ErrFeedEventNotFoundByID struct{ ID DBID }
+
+func (e ErrFeedEventNotFoundByID) Unwrap() error { return errFeedEventNotFound }
 func (e ErrFeedEventNotFoundByID) Error() string {
-	return fmt.Sprintf("event not found by id: %s", e.ID)
+	return fmt.Sprintf("event not found by id=%s", e.ID)
 }
 
-type ErrPostNotFoundByID struct {
-	ID DBID
-}
+var errPostNotFound ErrPostNotFound
 
+type ErrPostNotFound struct{}
+
+func (e ErrPostNotFound) Unwrap() error { return notFoundError }
+func (e ErrPostNotFound) Error() string { return "post not found" }
+
+type ErrPostNotFoundByID struct{ ID DBID }
+
+func (e ErrPostNotFoundByID) Unwrap() error { return errPostNotFound }
 func (e ErrPostNotFoundByID) Error() string {
-	return fmt.Sprintf("post not found by id: %s", e.ID)
+	return fmt.Sprintf("post not found by id=%s", e.ID)
 }
 
 type ErrUnknownAction struct {

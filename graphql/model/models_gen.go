@@ -23,6 +23,10 @@ type AdminAddWalletPayloadOrError interface {
 	IsAdminAddWalletPayloadOrError()
 }
 
+type AdmireCommentPayloadOrError interface {
+	IsAdmireCommentPayloadOrError()
+}
+
 type AdmireFeedEventPayloadOrError interface {
 	IsAdmireFeedEventPayloadOrError()
 }
@@ -45,6 +49,10 @@ type AuthorizationError interface {
 
 type BanUserFromFeedPayloadOrError interface {
 	IsBanUserFromFeedPayloadOrError()
+}
+
+type BlockUserPayloadOrError interface {
+	IsBlockUserPayloadOrError()
 }
 
 type CollectionByIDOrError interface {
@@ -283,6 +291,10 @@ type RemoveUserWalletsPayloadOrError interface {
 	IsRemoveUserWalletsPayloadOrError()
 }
 
+type ReportPostPayloadOrError interface {
+	IsReportPostPayloadOrError()
+}
+
 type ResendVerificationEmailPayloadOrError interface {
 	IsResendVerificationEmailPayloadOrError()
 }
@@ -361,6 +373,10 @@ type TrendingUsersPayloadOrError interface {
 
 type UnbanUserFromFeedPayloadOrError interface {
 	IsUnbanUserFromFeedPayloadOrError()
+}
+
+type UnblockUserPayloadOrError interface {
+	IsUnblockUserPayloadOrError()
 }
 
 type UnfollowUserPayloadOrError interface {
@@ -509,6 +525,14 @@ type Admire struct {
 func (Admire) IsNode()        {}
 func (Admire) IsInteraction() {}
 
+type AdmireCommentPayload struct {
+	Viewer  *Viewer  `json:"viewer"`
+	Comment *Comment `json:"comment"`
+	Admire  *Admire  `json:"admire"`
+}
+
+func (AdmireCommentPayload) IsAdmireCommentPayloadOrError() {}
+
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
 	Admire    *Admire    `json:"admire"`
@@ -584,6 +608,12 @@ type BanUserFromFeedPayload struct {
 }
 
 func (BanUserFromFeedPayload) IsBanUserFromFeedPayloadOrError() {}
+
+type BlockUserPayload struct {
+	UserID persist.DBID `json:"userId"`
+}
+
+func (BlockUserPayload) IsBlockUserPayloadOrError() {}
 
 type ChainAddressTokenInput struct {
 	ChainAddress *persist.ChainAddress `json:"chainAddress"`
@@ -711,21 +741,34 @@ func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}
 
 type Comment struct {
 	HelperCommentData
-	Dbid         persist.DBID        `json:"dbid"`
-	CreationTime *time.Time          `json:"creationTime"`
-	LastUpdated  *time.Time          `json:"lastUpdated"`
-	ReplyTo      *Comment            `json:"replyTo"`
-	Commenter    *GalleryUser        `json:"commenter"`
-	Comment      *string             `json:"comment"`
-	Mentions     []*Mention          `json:"mentions"`
-	Replies      *CommentsConnection `json:"replies"`
-	Source       CommentSource       `json:"source"`
-	Deleted      *bool               `json:"deleted"`
+	Dbid         persist.DBID              `json:"dbid"`
+	CreationTime *time.Time                `json:"creationTime"`
+	LastUpdated  *time.Time                `json:"lastUpdated"`
+	ReplyTo      *Comment                  `json:"replyTo"`
+	Commenter    *GalleryUser              `json:"commenter"`
+	Comment      *string                   `json:"comment"`
+	Mentions     []*Mention                `json:"mentions"`
+	Replies      *CommentsConnection       `json:"replies"`
+	Source       CommentSource             `json:"source"`
+	Deleted      *bool                     `json:"deleted"`
+	ViewerAdmire *Admire                   `json:"viewerAdmire"`
+	Admires      *CommentAdmiresConnection `json:"admires"`
 }
 
+func (Comment) IsAdmireSource()  {}
 func (Comment) IsNode()          {}
 func (Comment) IsInteraction()   {}
 func (Comment) IsMentionSource() {}
+
+type CommentAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+}
+
+type CommentAdmiresConnection struct {
+	Edges    []*CommentAdmireEdge `json:"edges"`
+	PageInfo *PageInfo            `json:"pageInfo"`
+}
 
 type CommentEdge struct {
 	Node   *Comment `json:"node"`
@@ -812,6 +855,7 @@ type Contract struct {
 	ProfileImageURL  *string               `json:"profileImageURL"`
 	ProfileBannerURL *string               `json:"profileBannerURL"`
 	BadgeURL         *string               `json:"badgeURL"`
+	MintURL          *string               `json:"mintURL"`
 	IsSpam           *bool                 `json:"isSpam"`
 }
 
@@ -1009,6 +1053,7 @@ type ErrCommentNotFound struct {
 
 func (ErrCommentNotFound) IsError()                       {}
 func (ErrCommentNotFound) IsRemoveCommentPayloadOrError() {}
+func (ErrCommentNotFound) IsAdmireCommentPayloadOrError() {}
 
 type ErrCommunityNotFound struct {
 	Message string `json:"message"`
@@ -1138,9 +1183,13 @@ func (ErrInvalidInput) IsPostTokensPayloadOrError()                             
 func (ErrInvalidInput) IsReferralPostTokenPayloadOrError()                               {}
 func (ErrInvalidInput) IsAdmirePostPayloadOrError()                                      {}
 func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                                     {}
+func (ErrInvalidInput) IsAdmireCommentPayloadOrError()                                   {}
 func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                                   {}
 func (ErrInvalidInput) IsDeletePostPayloadOrError()                                      {}
 func (ErrInvalidInput) IsReferralPostPreflightPayloadOrError()                           {}
+func (ErrInvalidInput) IsReportPostPayloadOrError()                                      {}
+func (ErrInvalidInput) IsBlockUserPayloadOrError()                                       {}
+func (ErrInvalidInput) IsUnblockUserPayloadOrError()                                     {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1233,16 +1282,21 @@ func (ErrNotAuthorized) IsPostTokensPayloadOrError()                            
 func (ErrNotAuthorized) IsReferralPostTokenPayloadOrError()                               {}
 func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                                      {}
 func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                                     {}
+func (ErrNotAuthorized) IsAdmireCommentPayloadOrError()                                   {}
 func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                                   {}
 func (ErrNotAuthorized) IsDeletePostPayloadOrError()                                      {}
+func (ErrNotAuthorized) IsBlockUserPayloadOrError()                                       {}
+func (ErrNotAuthorized) IsUnblockUserPayloadOrError()                                     {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrPostNotFound) IsPostOrError()      {}
-func (ErrPostNotFound) IsError()            {}
-func (ErrPostNotFound) IsFeedEventOrError() {}
+func (ErrPostNotFound) IsPostOrError()              {}
+func (ErrPostNotFound) IsError()                    {}
+func (ErrPostNotFound) IsFeedEventOrError()         {}
+func (ErrPostNotFound) IsAdmirePostPayloadOrError() {}
+func (ErrPostNotFound) IsReportPostPayloadOrError() {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1316,6 +1370,8 @@ func (ErrUserNotFound) IsUnfollowUserPayloadOrError()       {}
 func (ErrUserNotFound) IsAdminAddWalletPayloadOrError()     {}
 func (ErrUserNotFound) IsSetProfileImagePayloadOrError()    {}
 func (ErrUserNotFound) IsRemoveProfileImagePayloadOrError() {}
+func (ErrUserNotFound) IsBlockUserPayloadOrError()          {}
+func (ErrUserNotFound) IsUnblockUserPayloadOrError()        {}
 
 type ErrUsernameNotAvailable struct {
 	Message string `json:"message"`
@@ -1483,7 +1539,6 @@ type GalleryUser struct {
 	ProfileImage             ProfileImage           `json:"profileImage"`
 	PotentialEnsProfileImage *EnsProfileImage       `json:"potentialEnsProfileImage"`
 	Bio                      *string                `json:"bio"`
-	Traits                   *string                `json:"traits"`
 	Universal                *bool                  `json:"universal"`
 	Roles                    []*persist.Role        `json:"roles"`
 	SocialAccounts           *SocialAccounts        `json:"socialAccounts"`
@@ -1807,16 +1862,18 @@ func (PDFMedia) IsMedia()        {}
 
 type Post struct {
 	HelperPostData
-	Dbid         persist.DBID            `json:"dbid"`
-	Author       *GalleryUser            `json:"author"`
-	CreationTime *time.Time              `json:"creationTime"`
-	Tokens       []*Token                `json:"tokens"`
-	Caption      *string                 `json:"caption"`
-	Mentions     []*Mention              `json:"mentions"`
-	Admires      *PostAdmiresConnection  `json:"admires"`
-	Comments     *PostCommentsConnection `json:"comments"`
-	Interactions *InteractionsConnection `json:"interactions"`
-	ViewerAdmire *Admire                 `json:"viewerAdmire"`
+	Dbid             persist.DBID            `json:"dbid"`
+	Author           *GalleryUser            `json:"author"`
+	CreationTime     *time.Time              `json:"creationTime"`
+	Tokens           []*Token                `json:"tokens"`
+	Caption          *string                 `json:"caption"`
+	Mentions         []*Mention              `json:"mentions"`
+	Admires          *PostAdmiresConnection  `json:"admires"`
+	Comments         *PostCommentsConnection `json:"comments"`
+	Interactions     *InteractionsConnection `json:"interactions"`
+	ViewerAdmire     *Admire                 `json:"viewerAdmire"`
+	IsFirstPost      bool                    `json:"isFirstPost"`
+	UserAddedMintURL *string                 `json:"userAddedMintURL"`
 }
 
 func (Post) IsAdmireSource()     {}
@@ -1870,6 +1927,7 @@ type PostTokensInput struct {
 	TokenIds []persist.DBID  `json:"tokenIds"`
 	Caption  *string         `json:"caption"`
 	Mentions []*MentionInput `json:"mentions"`
+	MintURL  *string         `json:"mintURL"`
 }
 
 type PostTokensPayload struct {
@@ -1943,6 +2001,7 @@ func (ReferralPostPreflightPayload) IsReferralPostPreflightPayloadOrError() {}
 type ReferralPostTokenInput struct {
 	Token   *ChainAddressTokenInput `json:"token"`
 	Caption *string                 `json:"caption"`
+	MintURL *string                 `json:"mintURL"`
 }
 
 type ReferralPostTokenPayload struct {
@@ -2003,6 +2062,12 @@ type RemoveUserWalletsPayload struct {
 }
 
 func (RemoveUserWalletsPayload) IsRemoveUserWalletsPayloadOrError() {}
+
+type ReportPostPayload struct {
+	PostID persist.DBID `json:"postId"`
+}
+
+func (ReportPostPayload) IsReportPostPayloadOrError() {}
 
 type ResendVerificationEmailPayload struct {
 	Viewer *Viewer `json:"viewer"`
@@ -2098,6 +2163,21 @@ type SocialQueries struct {
 }
 
 func (SocialQueries) IsSocialQueriesOrError() {}
+
+type SomeoneAdmiredYourCommentNotification struct {
+	HelperSomeoneAdmiredYourCommentNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Comment      *Comment                          `json:"comment"`
+	Admirers     *GroupNotificationUsersConnection `json:"admirers"`
+}
+
+func (SomeoneAdmiredYourCommentNotification) IsNotification()        {}
+func (SomeoneAdmiredYourCommentNotification) IsNode()                {}
+func (SomeoneAdmiredYourCommentNotification) IsGroupedNotification() {}
 
 type SomeoneAdmiredYourFeedEventNotification struct {
 	HelperSomeoneAdmiredYourFeedEventNotificationData
@@ -2491,6 +2571,12 @@ type UnbanUserFromFeedPayload struct {
 
 func (UnbanUserFromFeedPayload) IsUnbanUserFromFeedPayloadOrError() {}
 
+type UnblockUserPayload struct {
+	UserID persist.DBID `json:"userId"`
+}
+
+func (UnblockUserPayload) IsUnblockUserPayloadOrError() {}
+
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
 	User   *GalleryUser `json:"user"`
@@ -2852,6 +2938,17 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
+
+type YouReceivedTopActivityBadgeNotification struct {
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Threshold    int          `json:"threshold"`
+}
+
+func (YouReceivedTopActivityBadgeNotification) IsNotification() {}
+func (YouReceivedTopActivityBadgeNotification) IsNode()         {}
 
 type TopCollectionsForCommunityInput struct {
 	ChainAddress *persist.ChainAddress `json:"chainAddress"`

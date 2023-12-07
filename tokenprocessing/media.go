@@ -424,7 +424,7 @@ func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, err
 func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), mediaURL, false)
+		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), mediaURL)
 	case persist.URITypeArweave:
 		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("https://arweave.net/%s", path)

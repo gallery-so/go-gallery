@@ -27,6 +27,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
@@ -35,6 +36,8 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
+
+const topActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
@@ -64,6 +67,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneAdmiredYourFeedEventNotification:          fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
 	OnSomeoneCommentedOnYourFeedEventNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
 	OnSomeoneAdmiredYourPostNotification:               fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
+	OnSomeoneAdmiredYourCommentNotification:            fetchNotificationByID[model.SomeoneAdmiredYourCommentNotification],
 	OnSomeoneCommentedOnYourPostNotification:           fetchNotificationByID[model.SomeoneCommentedOnYourPostNotification],
 	OnSomeoneFollowedYouBackNotification:               fetchNotificationByID[model.SomeoneFollowedYouBackNotification],
 	OnSomeoneFollowedYouNotification:                   fetchNotificationByID[model.SomeoneFollowedYouNotification],
@@ -75,6 +79,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneAdmiredYourTokenNotification:              fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
 	OnSomeonePostedYourWorkNotification:                fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
+	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -104,7 +109,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
 
 	switch {
-	case util.ErrorIs[auth.ErrAuthenticationFailed](err):
+	case util.ErrorIs[auth.ErrAuthenticationFailed](err) || errors.Is(err, publicapi.ErrOnlyRemoveOwnAdmire) || errors.Is(err, publicapi.ErrOnlyRemoveOwnComment):
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
 	case util.ErrorIs[auth.ErrDoesNotOwnRequiredNFT](err):
 		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
@@ -124,18 +129,18 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case util.ErrorIs[persist.ErrAddressOwnedByUser](err):
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case util.ErrorIs[persist.ErrAdmireNotFound](err) || util.ErrorIs[persist.ErrAdmireFeedEventNotFound](err) || util.ErrorIs[persist.ErrAdmirePostNotFound](err) || util.ErrorIs[persist.ErrAdmireTokenNotFound](err):
+	case util.ErrorIs[persist.ErrAdmireNotFound](err):
 		mappedErr = model.ErrAdmireNotFound{Message: message}
-	case util.ErrorIs[persist.ErrAdmireAlreadyExists](err):
-		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
 	case util.ErrorIs[persist.ErrCommentNotFound](err):
 		mappedErr = model.ErrCommentNotFound{Message: message}
+	case util.ErrorIs[persist.ErrPostNotFound](err):
+		mappedErr = model.ErrPostNotFound{Message: message}
 	case util.ErrorIs[publicapi.ErrTokenRefreshFailed](err):
 		mappedErr = model.ErrSyncFailed{Message: message}
 	case util.ErrorIs[validate.ErrInvalidInput](err):
 		errTyp := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: errTyp.Parameters, Reasons: errTyp.Reasons}
-	case util.ErrorIs[persist.ErrFeedEventNotFoundByID](err):
+	case util.ErrorIs[persist.ErrFeedEventNotFound](err):
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
 	case util.ErrorIs[persist.ErrUnknownAction](err):
 		mappedErr = model.ErrUnknownAction{Message: message}
@@ -262,9 +267,8 @@ func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.G
 	return models, nil
 }
 
-func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
+func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits persist.Traits) ([]*model.Badge, error) {
 	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -272,6 +276,14 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.B
 	var result []*model.Badge
 	for _, contract := range contracts {
 		result = append(result, contractToBadgeModel(ctx, contract))
+	}
+
+	if _, ok := traits[persist.TraitTypeTopActiveUser]; ok {
+
+		result = append(result, &model.Badge{
+			Name:     util.ToPointer("Top Member"),
+			ImageURL: topActivityImageURL,
+		})
 	}
 
 	return result, nil
@@ -676,32 +688,9 @@ func holdersToConnection(ctx context.Context, owners []db.User, contractID persi
 func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.DBID, pageInfo publicapi.PageInfo) model.PostsConnection {
 	edges := make([]*model.PostEdge, len(posts))
 	for i, post := range posts {
-
 		po := post
-
-		cval, _ := po.Caption.Value()
-
-		var caption *string
-		if cval != nil {
-			caption = util.ToPointer(cval.(string))
-		}
-
 		edges[i] = &model.PostEdge{
-			Node: &model.Post{
-				HelperPostData: model.HelperPostData{
-					TokenIDs: po.TokenIds,
-					AuthorID: po.ActorID,
-				},
-				CreationTime: &po.CreatedAt,
-				Dbid:         po.ID,
-				Tokens:       nil, // handled by dedicated resolver
-				Caption:      caption,
-				Admires:      nil, // handled by dedicated resolver
-				Comments:     nil, // handled by dedicated resolver
-				Interactions: nil, // handled by dedicated resolver
-				ViewerAdmire: nil, // handled by dedicated resolver
-
-			},
+			Node:   postToModel(&po),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
@@ -778,7 +767,7 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 		return nil, err
 	}
 
-	return postToModel(post)
+	return postToModel(post), nil
 }
 
 func resolveTokenDefinitionByID(ctx context.Context, dbid persist.DBID) (*model.TokenDefinition, error) {
@@ -1077,7 +1066,28 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			UpdatedTime:  &notif.LastUpdated,
 			Post:         nil, // handled by dedicated resolver
 		}, nil
-
+	case persist.ActionTopActivityBadgeReceived:
+		return model.YouReceivedTopActivityBadgeNotification{
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Threshold:    notif.Data.ActivityBadgeThreshold,
+		}, nil
+	case persist.ActionAdmiredComment:
+		return model.SomeoneAdmiredYourCommentNotification{
+			HelperSomeoneAdmiredYourCommentNotificationData: model.HelperSomeoneAdmiredYourCommentNotificationData{
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Comment:      nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
@@ -1407,21 +1417,7 @@ func feedEntityToModel(event any) (model.FeedEventOrError, error) {
 
 	switch event := event.(type) {
 	case db.Post:
-		caption, _ := event.Caption.Value()
-
-		var captionVal *string
-		if caption != nil {
-			captionVal = util.ToPointer(caption.(string))
-		}
-		return &model.Post{
-			HelperPostData: model.HelperPostData{
-				TokenIDs: event.TokenIds,
-				AuthorID: event.ActorID,
-			},
-			CreationTime: &event.CreatedAt,
-			Dbid:         event.ID,
-			Caption:      captionVal,
-		}, nil
+		return postToModel(&event), nil
 	case db.FeedEvent:
 		var groupID sql.NullString
 		if event.GroupID.String != "" {
@@ -1716,9 +1712,9 @@ func entitiesToFeedEdges(events []any) ([]*model.FeedEdge, error) {
 	return edges, nil
 }
 
-func postToModel(event *db.Post) (*model.Post, error) {
+func postToModel(post *db.Post) *model.Post {
 	// Value always returns a nil error so we can safely ignore it.
-	caption, _ := event.Caption.Value()
+	caption, _ := post.Caption.Value()
 
 	var captionVal *string
 	if caption != nil {
@@ -1727,14 +1723,20 @@ func postToModel(event *db.Post) (*model.Post, error) {
 
 	return &model.Post{
 		HelperPostData: model.HelperPostData{
-			TokenIDs: event.TokenIds,
-			AuthorID: event.ActorID,
+			TokenIDs: post.TokenIds,
+			AuthorID: post.ActorID,
 		},
-		Dbid:         event.ID,
-		CreationTime: &event.CreatedAt,
-		Caption:      captionVal,
-	}, nil
-
+		Dbid:             post.ID,
+		Tokens:           nil, // handled by dedicated resolver
+		CreationTime:     &post.CreatedAt,
+		Caption:          captionVal,
+		Admires:          nil, // handled by dedicated resolver
+		Comments:         nil, // handled by dedicated resolver
+		Interactions:     nil, // handled by dedicated resolver
+		ViewerAdmire:     nil, // handled by dedicated resolver
+		IsFirstPost:      post.IsFirstPost,
+		UserAddedMintURL: &post.UserMintUrl.String,
+	}
 }
 
 func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
@@ -1793,10 +1795,14 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
+	var traits persist.Traits
+	user.Traits.AssignTo(&traits)
+
 	return &model.GalleryUser{
 		HelperGalleryUserData: model.HelperGalleryUserData{
 			UserID:            user.ID,
 			FeaturedGalleryID: user.FeaturedGallery,
+			Traits:            traits,
 		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
@@ -1829,24 +1835,21 @@ func usersToEdges(ctx context.Context, users []db.User) []*model.UserEdge {
 
 // admireToModel converts a db.Admire to a model.Admire
 func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
-
-	var postID, feedEventID *persist.DBID
-	if admire.PostID != "" {
-		postID = &admire.PostID
+	var data model.HelperAdmireData
+	switch postID, feedEventID, commentID := admire.PostID, admire.FeedEventID, admire.CommentID; {
+	case postID != "":
+		data.PostID = &postID
+	case feedEventID != "":
+		data.FeedEventID = &feedEventID
+	case commentID != "":
+		data.CommentID = &commentID
 	}
-	if admire.FeedEventID != "" {
-		feedEventID = &admire.FeedEventID
-	}
-
 	return &model.Admire{
-		HelperAdmireData: model.HelperAdmireData{
-			PostID:      postID,
-			FeedEventID: feedEventID,
-		},
-		Dbid:         admire.ID,
-		CreationTime: &admire.CreatedAt,
-		LastUpdated:  &admire.LastUpdated,
-		Admirer:      &model.GalleryUser{Dbid: admire.ActorID}, // remaining fields handled by dedicated resolver
+		HelperAdmireData: data,
+		Dbid:             admire.ID,
+		CreationTime:     &admire.CreatedAt,
+		LastUpdated:      &admire.LastUpdated,
+		Admirer:          &model.GalleryUser{Dbid: admire.ActorID}, // remaining fields handled by dedicated resolver
 	}
 }
 
@@ -1914,6 +1917,20 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 	})
 	creator := persist.NewChainAddress(creatorAddress, chain)
 
+	var mintURL string
+
+	if contract.Address != "" && !contract.IsProviderMarkedSpam {
+		if contract.Chain == persist.ChainZora {
+			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", contract.Address)
+		} else if contract.Chain == persist.ChainBase {
+			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+		} else if contract.Chain == persist.ChainOptimism {
+			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+		} else if contract.Chain == persist.ChainETH {
+			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+		}
+	}
+
 	return &model.Contract{
 		Dbid:             contract.ID,
 		ContractAddress:  &addr,
@@ -1924,6 +1941,7 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 		ProfileImageURL:  &contract.ProfileImageUrl.String,
 		ProfileBannerURL: &contract.ProfileBannerUrl.String,
 		BadgeURL:         &contract.BadgeUrl.String,
+		MintURL:          &mintURL,
 		IsSpam:           &contract.IsProviderMarkedSpam,
 	}
 }
@@ -2171,16 +2189,11 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 }
 
 func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
-	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := td.FallbackMedia.ImageURL.String(); strings.HasPrefix(fallback, "ipfs://") {
-		td.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
-	} else if strings.HasPrefix(fallback, "ar://") {
-		td.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
-	}
+	isFxHash := tezos.IsFxHash(td.ContractAddress)
 
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2194,7 +2207,7 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
@@ -2204,10 +2217,24 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 }
 
-func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
+func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool, isFxHash bool) model.MediaSubtype {
+	// Rewrite fallback IPFS and Arweave URLs to HTTP
+
+	if fallbackURL := fallback.ImageURL.String(); strings.HasPrefix(fallbackURL, "ipfs://") || strings.HasPrefix(fallbackURL, "https://gallery.infura-ipfs.io") {
+		fallback.ImageURL = persist.NullString(ipfs.BestGatewayNodeFrom(fallbackURL, isFxHash))
+	} else if strings.HasPrefix(fallbackURL, "ar://") {
+		fallback.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
+	}
+
+	if mediaURL := tokenMedia.Media.MediaURL.String(); strings.HasPrefix(mediaURL, "ipfs://") || strings.HasPrefix(mediaURL, "https://gallery.infura-ipfs.io") {
+		tokenMedia.Media.MediaURL = persist.NullString(ipfs.BestGatewayNodeFrom(mediaURL, isFxHash))
+	} else if strings.HasPrefix(mediaURL, "ar://") {
+		tokenMedia.Media.MediaURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(mediaURL, false)))
+	}
+
 	fallbackMedia := getFallbackMedia(ctx, fallback)
 
 	switch media := tokenMedia.Media; media.MediaType {
