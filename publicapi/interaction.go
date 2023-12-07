@@ -549,6 +549,38 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 	return comments, pageInfo, err
 }
 
+func (api InteractionAPI) GetTotalCommentsByPostID(ctx context.Context, postID persist.DBID) (*int, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	count, err := api.queries.CountCommentsAndRepliesByPostID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(int(count)), nil
+}
+
+func (api InteractionAPI) GetTotalCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) (*int, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"feedEventID": validate.WithTag(feedEventID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	count, err := api.queries.CountCommentsAndRepliesByFeedEventID(ctx, feedEventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(int(count)), nil
+}
+
 func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]db.Admire, PageInfo, error) {
 	// Validate

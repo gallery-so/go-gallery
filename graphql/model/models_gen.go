@@ -1392,6 +1392,7 @@ type FeedEvent struct {
 	EventData             FeedEventData                `json:"eventData"`
 	Admires               *FeedEventAdmiresConnection  `json:"admires"`
 	Comments              *FeedEventCommentsConnection `json:"comments"`
+	TotalComments         *int                         `json:"totalComments"`
 	Caption               *string                      `json:"caption"`
 	Interactions          *InteractionsConnection      `json:"interactions"`
 	ViewerAdmire          *Admire                      `json:"viewerAdmire"`
@@ -1832,17 +1833,18 @@ func (PDFMedia) IsMedia()        {}
 
 type Post struct {
 	HelperPostData
-	Dbid         persist.DBID            `json:"dbid"`
-	Author       *GalleryUser            `json:"author"`
-	CreationTime *time.Time              `json:"creationTime"`
-	Tokens       []*Token                `json:"tokens"`
-	Caption      *string                 `json:"caption"`
-	Mentions     []*Mention              `json:"mentions"`
-	Admires      *PostAdmiresConnection  `json:"admires"`
-	Comments     *PostCommentsConnection `json:"comments"`
-	Interactions *InteractionsConnection `json:"interactions"`
-	ViewerAdmire *Admire                 `json:"viewerAdmire"`
-	IsFirstPost  bool                    `json:"isFirstPost"`
+	Dbid          persist.DBID            `json:"dbid"`
+	Author        *GalleryUser            `json:"author"`
+	CreationTime  *time.Time              `json:"creationTime"`
+	Tokens        []*Token                `json:"tokens"`
+	Caption       *string                 `json:"caption"`
+	Mentions      []*Mention              `json:"mentions"`
+	Admires       *PostAdmiresConnection  `json:"admires"`
+	Comments      *PostCommentsConnection `json:"comments"`
+	TotalComments *int                    `json:"totalComments"`
+	Interactions  *InteractionsConnection `json:"interactions"`
+	ViewerAdmire  *Admire                 `json:"viewerAdmire"`
+	IsFirstPost   bool                    `json:"isFirstPost"`
 }
 
 func (Post) IsAdmireSource()     {}
