@@ -191,16 +191,16 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 	}
 
 	topCollectionsUserFacing := util.MapWithoutError(topCollectionsDB, func(co coredb.GetTopCommunitiesByPostsRow) any {
-		return contractToUserFacing(co.Contract)
+		return contractToUserFacing(c, q, loaders, co.Contract)
 	})
 
 	selectedCollections := selectResults(topCollectionsUserFacing, overrides.TopCommunities, func(s SelectedID) Selected {
-		c, err := q.GetContractByID(c, s.ID)
+		co, err := q.GetContractByID(c, s.ID)
 		if err != nil {
 			return Selected{}
 		}
 		return Selected{
-			Entity:   contractToUserFacing(c),
+			Entity:   contractToUserFacing(c, q, loaders, co),
 			Position: &s.Position,
 		}
 	}, collectionCount)
@@ -227,7 +227,21 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 	return result, nil
 }
 
-func contractToUserFacing(collection coredb.Contract) UserFacingContract {
+func contractToUserFacing(ctx context.Context, q *coredb.Queries, l *dataloader.Loaders, collection coredb.Contract) UserFacingContract {
+	if collection.ProfileImageUrl.String == "" {
+		tokens, err := q.GetTokensByContractIdPaginate(ctx, coredb.GetTokensByContractIdPaginateParams{
+			ID:               collection.ID,
+			Limit:            1,
+			GalleryUsersOnly: true,
+		})
+		if err == nil && len(tokens) > 0 {
+			media, err := l.GetMediaByMediaIdIgnoringStatusBatch.Load(tokens[0].TokenDefinition.TokenMediaID)
+			if err == nil {
+				collection.ProfileImageUrl.String = util.FirstNonEmptyString(media.Media.ThumbnailURL.String(), media.Media.MediaURL.String())
+			}
+		}
+
+	}
 	return UserFacingContract{
 		ContractID:      collection.ID,
 		Name:            collection.Name.String,
@@ -251,7 +265,7 @@ func tokenToUserFacing(c context.Context, tokenID persist.DBID, q *coredb.Querie
 		TokenID:         tokenID,
 		Name:            token.TokenDefinition.Name.String,
 		Description:     token.TokenDefinition.Description.String,
-		PreviewImageURL: media.Media.ThumbnailURL.String(),
+		PreviewImageURL: util.FirstNonEmptyString(media.Media.ThumbnailURL.String(), media.Media.MediaURL.String()),
 	}, nil
 }
 
