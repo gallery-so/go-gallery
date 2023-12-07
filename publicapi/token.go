@@ -659,7 +659,7 @@ func syncableChains(ctx context.Context, userID persist.DBID, chains []persist.C
 	for _, chain := range chains {
 		k := fmt.Sprintf("sync:owned:%d:%s", chain, userID)
 		err := throttler.Lock(ctx, k)
-		if err != nil && util.ErrorAs[throttle.ErrThrottleLocked](err) {
+		if err != nil && util.ErrorIs[throttle.ErrThrottleLocked](err) {
 			continue
 		}
 		if err != nil {

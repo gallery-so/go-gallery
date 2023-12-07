@@ -39,8 +39,15 @@ type HelperViewerData struct {
 }
 
 type HelperCommunityData struct {
-	ForceRefresh *bool
-	ParentID     persist.DBID
+	Community db.Community
+}
+
+type HelperContractCommunityData struct {
+	Community db.Community
+}
+
+type HelperArtBlocksCommunityData struct {
+	Community db.Community
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {

@@ -64,16 +64,39 @@ type Comment struct {
 }
 
 type Community struct {
-	ID               persist.DBID          `db:"id" json:"id"`
-	Version          int32                 `db:"version" json:"version"`
-	Name             string                `db:"name" json:"name"`
-	Description      string                `db:"description" json:"description"`
-	CommunityType    persist.CommunityType `db:"community_type" json:"community_type"`
-	CommunitySubtype string                `db:"community_subtype" json:"community_subtype"`
-	CommunityKey     string                `db:"community_key" json:"community_key"`
-	CreatedAt        time.Time             `db:"created_at" json:"created_at"`
-	LastUpdated      time.Time             `db:"last_updated" json:"last_updated"`
-	Deleted          bool                  `db:"deleted" json:"deleted"`
+	ID                      persist.DBID          `db:"id" json:"id"`
+	Version                 int32                 `db:"version" json:"version"`
+	CommunityType           persist.CommunityType `db:"community_type" json:"community_type"`
+	Key1                    string                `db:"key1" json:"key1"`
+	Key2                    string                `db:"key2" json:"key2"`
+	Key3                    string                `db:"key3" json:"key3"`
+	Key4                    string                `db:"key4" json:"key4"`
+	Name                    string                `db:"name" json:"name"`
+	OverrideName            sql.NullString        `db:"override_name" json:"override_name"`
+	Description             string                `db:"description" json:"description"`
+	OverrideDescription     sql.NullString        `db:"override_description" json:"override_description"`
+	ProfileImageUrl         sql.NullString        `db:"profile_image_url" json:"profile_image_url"`
+	OverrideProfileImageUrl sql.NullString        `db:"override_profile_image_url" json:"override_profile_image_url"`
+	BadgeImageUrl           sql.NullString        `db:"badge_image_url" json:"badge_image_url"`
+	OverrideBadgeImageUrl   sql.NullString        `db:"override_badge_image_url" json:"override_badge_image_url"`
+	ContractID              persist.DBID          `db:"contract_id" json:"contract_id"`
+	CreatedAt               time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated             time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted                 bool                  `db:"deleted" json:"deleted"`
+}
+
+type CommunityCreator struct {
+	ID                    persist.DBID                 `db:"id" json:"id"`
+	Version               int32                        `db:"version" json:"version"`
+	CreatorType           persist.CommunityCreatorType `db:"creator_type" json:"creator_type"`
+	CommunityID           persist.DBID                 `db:"community_id" json:"community_id"`
+	CreatorUserID         persist.DBID                 `db:"creator_user_id" json:"creator_user_id"`
+	CreatorAddress        persist.Address              `db:"creator_address" json:"creator_address"`
+	CreatorAddressL1Chain persist.L1Chain              `db:"creator_address_l1_chain" json:"creator_address_l1_chain"`
+	CreatorAddressChain   persist.Chain                `db:"creator_address_chain" json:"creator_address_chain"`
+	CreatedAt             time.Time                    `db:"created_at" json:"created_at"`
+	LastUpdated           time.Time                    `db:"last_updated" json:"last_updated"`
+	Deleted               bool                         `db:"deleted" json:"deleted"`
 }
 
 type Contract struct {
@@ -106,6 +129,17 @@ type ContractCommunityMembership struct {
 	CreatedAt   time.Time    `db:"created_at" json:"created_at"`
 	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
 	Deleted     bool         `db:"deleted" json:"deleted"`
+}
+
+type ContractCommunityType struct {
+	ID            persist.DBID          `db:"id" json:"id"`
+	Version       int32                 `db:"version" json:"version"`
+	ContractID    persist.DBID          `db:"contract_id" json:"contract_id"`
+	CommunityType persist.CommunityType `db:"community_type" json:"community_type"`
+	IsValidType   bool                  `db:"is_valid_type" json:"is_valid_type"`
+	CreatedAt     time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated   time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted       bool                  `db:"deleted" json:"deleted"`
 }
 
 type ContractCreator struct {
@@ -533,6 +567,16 @@ type Token struct {
 	TokenDefinitionID persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
 	IsHolderToken     bool              `db:"is_holder_token" json:"is_holder_token"`
 	Displayable       bool              `db:"displayable" json:"displayable"`
+}
+
+type TokenCommunityMembership struct {
+	ID                persist.DBID `db:"id" json:"id"`
+	Version           int32        `db:"version" json:"version"`
+	TokenDefinitionID persist.DBID `db:"token_definition_id" json:"token_definition_id"`
+	CommunityID       persist.DBID `db:"community_id" json:"community_id"`
+	CreatedAt         time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time    `db:"last_updated" json:"last_updated"`
+	Deleted           bool         `db:"deleted" json:"deleted"`
 }
 
 type TokenDefinition struct {

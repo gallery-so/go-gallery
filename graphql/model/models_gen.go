@@ -75,6 +75,10 @@ type CommunityByKeyOrError interface {
 	IsCommunityByKeyOrError()
 }
 
+type CommunitySubtype interface {
+	IsCommunitySubtype()
+}
+
 type ConnectSocialAccountPayloadOrError interface {
 	IsConnectSocialAccountPayloadOrError()
 }
@@ -529,6 +533,19 @@ type AdmireTokenPayload struct {
 
 func (AdmireTokenPayload) IsAdmireTokenPayloadOrError() {}
 
+type ArtBlocksCommunity struct {
+	HelperArtBlocksCommunityData
+	Contract  *Contract `json:"contract"`
+	ProjectID *string   `json:"projectID"`
+}
+
+func (ArtBlocksCommunity) IsCommunitySubtype() {}
+
+type ArtBlocksCommunityKeyInput struct {
+	Contract  *persist.ChainAddress `json:"contract"`
+	ProjectID string                `json:"projectID"`
+}
+
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -745,25 +762,24 @@ type CommunitiesConnection struct {
 
 type Community struct {
 	HelperCommunityData
-	Dbid                  persist.DBID            `json:"dbid"`
-	LastUpdated           *time.Time              `json:"lastUpdated"`
-	Contract              *Contract               `json:"contract"`
-	ContractAddress       *persist.ChainAddress   `json:"contractAddress"`
-	CreatorAddress        *persist.ChainAddress   `json:"creatorAddress"`
-	Creator               GalleryUserOrAddress    `json:"creator"`
-	Chain                 *persist.Chain          `json:"chain"`
-	Name                  *string                 `json:"name"`
-	Description           *string                 `json:"description"`
-	PreviewImage          *string                 `json:"previewImage"`
-	ProfileImageURL       *string                 `json:"profileImageURL"`
-	ProfileBannerURL      *string                 `json:"profileBannerURL"`
-	BadgeURL              *string                 `json:"badgeURL"`
-	ParentCommunity       *CommunityLink          `json:"parentCommunity"`
-	SubCommunities        *CommunitiesConnection  `json:"subCommunities"`
-	TokensInCommunity     *TokensConnection       `json:"tokensInCommunity"`
-	Owners                *TokenHoldersConnection `json:"owners"`
-	Posts                 *PostsConnection        `json:"posts"`
-	TmpPostsWithProjectID *PostsConnection        `json:"tmpPostsWithProjectID"`
+	Dbid              persist.DBID            `json:"dbid"`
+	LastUpdated       *time.Time              `json:"lastUpdated"`
+	Name              *string                 `json:"name"`
+	Description       *string                 `json:"description"`
+	ProfileImageURL   *string                 `json:"profileImageURL"`
+	BadgeURL          *string                 `json:"badgeURL"`
+	Subtype           CommunitySubtype        `json:"subtype"`
+	Creators          []GalleryUserOrAddress  `json:"creators"`
+	Holders           *TokenHoldersConnection `json:"holders"`
+	Tokens            *TokensConnection       `json:"tokens"`
+	Posts             *PostsConnection        `json:"posts"`
+	Contract          *Contract               `json:"contract"`
+	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
+	Chain             *persist.Chain          `json:"chain"`
+	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Creator           GalleryUserOrAddress    `json:"creator"`
+	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
+	Owners            *TokenHoldersConnection `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
@@ -774,12 +790,6 @@ func (Community) IsMentionEntity()             {}
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
-}
-
-type CommunityKeyInput struct {
-	Type    persist.CommunityType `json:"type"`
-	Subtype *string               `json:"subtype"`
-	Key     string                `json:"key"`
 }
 
 type CommunityLink struct {
@@ -810,6 +820,17 @@ type Contract struct {
 }
 
 func (Contract) IsNode() {}
+
+type ContractCommunity struct {
+	HelperContractCommunityData
+	Contract *Contract `json:"contract"`
+}
+
+func (ContractCommunity) IsCommunitySubtype() {}
+
+type ContractCommunityKeyInput struct {
+	Contract *persist.ChainAddress `json:"contract"`
+}
 
 type CreateCollectionInGalleryInput struct {
 	Name           string                          `json:"name"`
@@ -2390,6 +2411,7 @@ type TokenDefinition struct {
 	TokenID       *string        `json:"tokenId"`
 	TokenMetadata *string        `json:"tokenMetadata"`
 	Community     *Community     `json:"community"`
+	Communities   []*Community   `json:"communities"`
 	ExternalURL   *string        `json:"externalUrl"`
 }
 

@@ -277,7 +277,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractAddress": validate.WithTag(contractID, "required"),
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}

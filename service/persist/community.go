@@ -10,21 +10,28 @@ type CommunityType int
 
 const (
 	CommunityTypeContract CommunityType = iota
-	CommunityTypeProhibition
+	CommunityTypeArtBlocks
+)
+
+type CommunityCreatorType int
+
+const (
+	CommunityCreatorTypeOverride CommunityCreatorType = iota
+	CommunityCreatorTypeProvider
 )
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (c *CommunityType) UnmarshalGQL(v interface{}) error {
 	n, ok := v.(string)
 	if !ok {
-		return fmt.Errorf("Chain must be an string")
+		return fmt.Errorf("chain must be a string")
 	}
 
 	switch strings.ToLower(n) {
 	case "contract":
 		*c = CommunityTypeContract
-	case "prohibition":
-		*c = CommunityTypeProhibition
+	case "artblocks":
+		*c = CommunityTypeArtBlocks
 	}
 	return nil
 }
@@ -34,19 +41,21 @@ func (c CommunityType) MarshalGQL(w io.Writer) {
 	switch c {
 	case CommunityTypeContract:
 		w.Write([]byte(`"Contract"`))
-	case CommunityTypeProhibition:
-		w.Write([]byte(`"Prohibition"`))
+	case CommunityTypeArtBlocks:
+		w.Write([]byte(`"ArtBlocks"`))
 	}
 }
 
 type CommunityKey struct {
-	Type    CommunityType
-	Subtype string
-	Key     string
+	Type CommunityType
+	Key1 string
+	Key2 string
+	Key3 string
+	Key4 string
 }
 
 func (k CommunityKey) String() string {
-	return fmt.Sprintf("%d:%s:%s", k.Type, k.Subtype, k.Key)
+	return fmt.Sprintf("%d:%s:%s:%s:%s", k.Type, k.Key1, k.Key2, k.Key3, k.Key4)
 }
 
 type ErrCommunityNotFound struct {

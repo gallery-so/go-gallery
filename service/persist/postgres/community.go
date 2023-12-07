@@ -23,17 +23,13 @@ func (c *CommunityRepository) UpsertCommunities(ctx context.Context, communities
 		return []db.Community{}, nil
 	}
 
-	type communityKey struct {
-		Type    persist.CommunityType
-		Subtype string
-		Key     string
-	}
-
-	communities = util.DedupeWithTranslate(communities, false, func(c db.Community) communityKey {
-		return communityKey{
-			Type:    c.CommunityType,
-			Subtype: c.CommunitySubtype,
-			Key:     c.CommunityKey,
+	communities = util.DedupeWithTranslate(communities, false, func(c db.Community) persist.CommunityKey {
+		return persist.CommunityKey{
+			Type: c.CommunityType,
+			Key1: c.Key1,
+			Key2: c.Key2,
+			Key3: c.Key3,
+			Key4: c.Key4,
 		}
 	})
 
@@ -43,10 +39,14 @@ func (c *CommunityRepository) UpsertCommunities(ctx context.Context, communities
 		params.Ids = append(params.Ids, persist.GenerateID().String())
 		params.Version = append(params.Version, c.Version)
 		params.CommunityType = append(params.CommunityType, int32(c.CommunityType))
-		params.CommunitySubtype = append(params.CommunitySubtype, c.CommunitySubtype)
-		params.CommunityKey = append(params.CommunityKey, c.CommunityKey)
+		params.Key1 = append(params.Key1, c.Key1)
+		params.Key2 = append(params.Key2, c.Key2)
+		params.Key3 = append(params.Key3, c.Key3)
+		params.Key4 = append(params.Key4, c.Key4)
 		params.Name = append(params.Name, c.Name)
 		params.Description = append(params.Description, c.Description)
+		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageUrl.String)
+		params.ContractID = append(params.ContractID, c.ContractID.String())
 	}
 
 	return c.queries.UpsertCommunities(ctx, params)

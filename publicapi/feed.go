@@ -347,7 +347,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	}
 
 	// Unexpected error
-	if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+	if err != nil && !util.ErrorIs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
 		return "", err
 	}
 
@@ -960,7 +960,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 			pos := idToPosition[eventsFetch[i]]
 			err := batchErrs[i]
 			entities[pos] = batchResults[i]
-			if err != nil && !util.ErrorAs[persist.ErrFeedEventNotFoundByID](err) {
+			if err != nil && !util.ErrorIs[persist.ErrFeedEventNotFoundByID](err) {
 				logger.For(ctx).Errorf("failed to fetch event %s: %s", eventsFetch[i], err)
 				eventsErr <- pos
 			}
@@ -975,7 +975,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 			pos := idToPosition[postsFetch[i]]
 			err := batchErrs[i]
 			entities[pos] = batchResults[i]
-			if err != nil && !util.ErrorAs[persist.ErrPostNotFoundByID](err) {
+			if err != nil && !util.ErrorIs[persist.ErrPostNotFoundByID](err) {
 				logger.For(ctx).Errorf("failed to fetch post %s: %s", postsFetch[i], err)
 				postsErr <- pos
 			}

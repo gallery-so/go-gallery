@@ -143,8 +143,14 @@ func (*GetTokenDefinitionByIdBatch) getNotFoundError(key persist.DBID) error {
 
 func (*GetCommunityByKey) getNotFoundError(key coredb.GetCommunityByKeyParams) error {
 	return persist.ErrCommunityNotFound{Key: persist.CommunityKey{
-		Type:    persist.CommunityType(key.Type),
-		Subtype: key.Subtype,
-		Key:     key.Key,
+		Type: persist.CommunityType(key.Type),
+		Key1: key.Key1,
+		Key2: key.Key2,
+		Key3: key.Key3,
+		Key4: key.Key4,
 	}}
+}
+
+func (*GetCommunityByID) getNotFoundError(key persist.DBID) error {
+	return persist.ErrCommunityNotFound{ID: key}
 }

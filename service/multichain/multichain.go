@@ -154,12 +154,12 @@ type errWithPriority struct {
 	priority int
 }
 
-type communityInfo struct {
-	Name        string
-	Description string
-	Type        persist.CommunityType
-	Subtype     string
-	Key         string
+type communityInfo interface {
+	GetKey() persist.CommunityKey
+	GetName() string
+	GetDescription() string
+	GetProfileImageURL() string
+	GetCreatorAddresses() []persist.ChainAddress
 }
 
 // Configurer maintains provider settings
@@ -551,7 +551,7 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 			return nil
 		}
 		// Unexpected error
-		if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+		if err != nil && !util.ErrorIs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
 			return err
 		}
 		// Try to sync the token from each wallet. This treats SyncTokensByUserIDAndTokenIdentifiers as a black box: it runs each
@@ -954,32 +954,14 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	return err
 }
 
-func (p *Provider) processTokenCommunities(ctx context.Context, contracts []persist.ContractGallery, tokens []persist.TokenGallery) error {
-	// TODO: Configure actual providers by chain via wire
-	return p.processProhibitionTokenCommunities(ctx, contracts, tokens)
+func (p *Provider) processTokenCommunities(ctx context.Context, contracts []db.Contract, tokens []op.TokenFullDetails) error {
+	// TODO: Probably set these up in more of a "multichain provider" way (possibly via wire)
+	knownTypes, err := p.Queries.GetContractCommunityTypes(ctx, util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID }))
+	if err != nil {
+		return fmt.Errorf("failed to retrieve contract community types: %w", err)
+	}
+	return p.processArtBlocksTokenCommunities(ctx, knownTypes, tokens)
 }
-
-// TODO: Post-merge cleanup
-//func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, existingTokens []persist.TokenGallery, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
-//	providerTokens := tokensToNewDedupedTokens(tokensFromProviders, existingTokens, contracts, user)
-//
-//	tokenLookup := make(map[persist.TokenIdentifiers]persist.TokenGallery)
-//	for _, token := range existingTokens {
-//		tokenLookup[token.TokenIdentifiers()] = token
-//	}
-//
-//	newTokens := make(map[persist.TokenIdentifiers]bool)
-//
-//	for _, token := range providerTokens {
-//		existingToken, exists := tokenLookup[token.TokenIdentifiers()]
-//
-//		if !exists || existingToken.TokenMediaID == "" {
-//			newTokens[token.TokenIdentifiers()] = true
-//		}
-//	}
-//
-//	return providerTokens, newTokens, nil
-//}
 
 func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens,
 	existingTokensForUsers map[persist.DBID][]op.TokenFullDetails, contracts []db.Contract,
@@ -1010,17 +992,23 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		return nil, nil, err
 	}
 
-    // TODO: Post-merge cleanup
-	//currentUserTokens = make(map[persist.DBID][]persist.TokenGallery)
-	//for _, token := range persistedTokens {
-	//	currentUserTokens[token.OwnerUserID] = append(currentUserTokens[token.OwnerUserID], token)
-	//}
+	// Create a lookup for userID to persisted token IDs
+	currentUserTokens = make(map[persist.DBID][]op.TokenFullDetails)
+	for _, token := range upsertedTokens {
+		currentUserTokens[token.Instance.OwnerUserID] = append(currentUserTokens[token.Instance.OwnerUserID], token)
+	}
 
-	// TODO: Currently checking all tokens since finding Prohibition tokens is fast and doesn't add much
-	// overhead, but we actually want to track token status in a table so we only have to look up tokens
-	// that haven't been assigned to the appropriate communities yet.
-	//communityTokens := persistedTokens
-	//err = p.processTokenCommunities(ctx, contracts, communityTokens)
+	// TODO: Consider tracking (token_definition_id, community_type) in a table so we'd know whether we've already
+	// evaluated a token for a given community type and can avoid checking it again.
+	communityTokens := upsertedTokens
+	err = p.processTokenCommunities(ctx, contracts, communityTokens)
+	if err != nil {
+		// Report errors, but don't return. We can retry token community memberships at some point, but the whole
+		// sync shouldn't fail because a community provider's API was unavailable.
+		err = fmt.Errorf("failed to process token communities: %w", err)
+		logger.For(ctx).WithError(err).Error(err)
+		sentryutil.ReportError(ctx, err)
+	}
 
 	if upsertParams.OptionalDelete != nil {
 		numAffectedRows, err := p.Queries.DeleteTokensBeforeTimestamp(ctx, upsertParams.OptionalDelete.ToParams(upsertTime))
@@ -1028,12 +1016,6 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 			return nil, nil, fmt.Errorf("failed to delete tokens: %w", err)
 		}
 		logger.For(ctx).Infof("deleted %d tokens", numAffectedRows)
-	}
-
-	// Create a lookup for userID to persisted token IDs
-	currentUserTokens = make(map[persist.DBID][]op.TokenFullDetails)
-	for _, token := range upsertedTokens {
-		currentUserTokens[token.Instance.OwnerUserID] = append(currentUserTokens[token.Instance.OwnerUserID], token)
 	}
 
 	newUserTokens = make(map[persist.DBID][]op.TokenFullDetails, len(users))
@@ -1172,42 +1154,6 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	}
 
 	return nil
-}
-
-func (p *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, forceRefresh bool, limit, offset int) ([]TokenHolder, error) {
-
-	cacheKey := fmt.Sprintf("%s-%d-%d", communityIdentifiers.String(), limit, offset)
-	if !forceRefresh {
-		bs, err := p.Cache.Get(ctx, cacheKey)
-		if err == nil && len(bs) > 0 {
-			var owners []TokenHolder
-			err = json.Unmarshal(bs, &owners)
-			if err != nil {
-				return nil, err
-			}
-			return owners, nil
-		}
-	}
-
-	dbHolders, err := p.Repos.ContractRepository.GetOwnersByAddress(ctx, communityIdentifiers.Address(), communityIdentifiers.Chain(), limit, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	holders, err := tokenHoldersToTokenHolders(ctx, dbHolders, p.Repos.UserRepository)
-	if err != nil {
-		return nil, err
-	}
-
-	bs, err := json.Marshal(holders)
-	if err != nil {
-		return nil, err
-	}
-	err = p.Cache.Set(ctx, cacheKey, bs, staleCommunityTime)
-	if err != nil {
-		return nil, err
-	}
-	return holders, nil
 }
 
 func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.ChainAddress, wallet persist.L1ChainAddress, limit, offset int) ([]op.TokenFullDetails, error) {
@@ -1898,18 +1844,23 @@ func (p *Provider) matchingWalletsChain(wallets []persist.Wallet, chain persist.
 	return p.matchingWallets(wallets, []persist.Chain{chain})[chain]
 }
 
-func (d *Provider) processContractCommunities(ctx context.Context, contracts []persist.ContractGallery) ([]db.Community, error) {
+// processContractCommunities ensures that every contract has a corresponding "contract community" in the database.
+// This is the most basic community type, and every token belongs to a contract community (because every token belongs
+// to a contract, and every contract belongs to a contract community).
+func (d *Provider) processContractCommunities(ctx context.Context, contracts []db.Contract) ([]db.Community, error) {
 	communities := make([]db.Community, 0, len(contracts))
 	for _, contract := range contracts {
 		// No need to fill in createdAt, lastUpdated, or deleted. They'll be handled by the upsert.
 		communities = append(communities, db.Community{
-			ID:               persist.GenerateID(),
-			Version:          0,
-			Name:             contract.Name.String(),
-			Description:      contract.Description.String(),
-			CommunityType:    persist.CommunityTypeContract,
-			CommunitySubtype: fmt.Sprintf("%d", contract.Chain),
-			CommunityKey:     contract.Address.String(),
+			ID:              persist.GenerateID(),
+			Version:         0,
+			Name:            contract.Name.String,
+			Description:     contract.Description.String,
+			CommunityType:   persist.CommunityTypeContract,
+			Key1:            fmt.Sprintf("%d", contract.Chain),
+			Key2:            contract.Address.String(),
+			ContractID:      contract.ID,
+			ProfileImageUrl: contract.ProfileImageUrl,
 		})
 	}
 
@@ -1918,29 +1869,61 @@ func (d *Provider) processContractCommunities(ctx context.Context, contracts []p
 		return nil, err
 	}
 
+	communityByContractID := make(map[persist.DBID]db.Community)
 	communityByKey := make(map[persist.CommunityKey]db.Community)
+
 	for _, community := range communities {
+		communityByContractID[community.ContractID] = community
 		communityByKey[persist.CommunityKey{
-			Type:    community.CommunityType,
-			Subtype: community.CommunitySubtype,
-			Key:     community.CommunityKey,
+			Type: community.CommunityType,
+			Key1: community.Key1,
+			Key2: community.Key2,
 		}] = community
+	}
+
+	upsertCreatorsParams := db.UpsertCommunityCreatorsParams{}
+	for _, contract := range contracts {
+		creatorAddress, ok := util.FindFirst([]persist.Address{contract.OwnerAddress, contract.CreatorAddress}, func(a persist.Address) bool {
+			return a != ""
+		})
+
+		if !ok {
+			continue
+		}
+
+		if community, ok := communityByContractID[contract.ID]; ok {
+			upsertCreatorsParams.Ids = append(upsertCreatorsParams.Ids, persist.GenerateID().String())
+			upsertCreatorsParams.CreatorType = append(upsertCreatorsParams.CreatorType, int32(persist.CommunityCreatorTypeProvider))
+			upsertCreatorsParams.CommunityID = append(upsertCreatorsParams.CommunityID, community.ID.String())
+			upsertCreatorsParams.CreatorAddress = append(upsertCreatorsParams.CreatorAddress, creatorAddress.String())
+			upsertCreatorsParams.CreatorAddressChain = append(upsertCreatorsParams.CreatorAddressChain, int32(contract.Chain))
+			upsertCreatorsParams.CreatorAddressL1Chain = append(upsertCreatorsParams.CreatorAddressL1Chain, int32(contract.Chain.L1Chain()))
+		}
+	}
+
+	if len(upsertCreatorsParams.Ids) > 0 {
+		_, err = d.Queries.UpsertCommunityCreators(ctx, upsertCreatorsParams)
+		if err != nil {
+			err := fmt.Errorf("failed to upsert contract community creators: %w", err)
+			logger.For(ctx).WithError(err).Error(err)
+			sentryutil.ReportError(ctx, err)
+		}
 	}
 
 	params := db.UpsertContractCommunityMembershipsParams{}
 
 	for _, contract := range contracts {
 		key := persist.CommunityKey{
-			Type:    persist.CommunityTypeContract,
-			Subtype: fmt.Sprintf("%d", contract.Chain),
-			Key:     contract.Address.String(),
+			Type: persist.CommunityTypeContract,
+			Key1: fmt.Sprintf("%d", contract.Chain),
+			Key2: contract.Address.String(),
 		}
 
 		community, ok := communityByKey[key]
 		if !ok {
 			// This shouldn't happen. By this point, we've successfully upserted communities,
 			// so we should be able to find one matching every contract we have.
-			err = fmt.Errorf("couldn't find community with type: %d, subtype: %s, key: %s for contract ID: %s", key.Type, key.Subtype, key.Key, contract.ID)
+			err = fmt.Errorf("couldn't find community with type: %d, key: %s for contract ID: %s", key.Type, key, contract.ID)
 			sentryutil.ReportError(ctx, err)
 			return nil, err
 		}
@@ -1961,26 +1944,24 @@ func (d *Provider) processContractCommunities(ctx context.Context, contracts []p
 // processContracts deduplicates contracts and upserts them into the database. If canOverwriteOwnerAddress is true, then
 // the owner address of an existing contract will be overwritten if the new contract provides a non-empty owner address.
 // An empty owner address will never overwrite an existing address, even if canOverwriteOwnerAddress is true.
-func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, existingContracts []db.Contract, canOverwriteOwnerAddress bool) (currentContractState []db.Contract, newContracts []db.Contract, err error) {
+func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, existingContracts []db.Contract, canOverwriteOwnerAddress bool) (dbContracts []db.Contract, newContracts []db.Contract, err error) {
 	contractsToUpsert := chainContractsToUpsertableContracts(contractsFromProviders, existingContracts)
 	newUpsertedContracts, err := d.Repos.ContractRepository.BulkUpsert(ctx, contractsToUpsert, canOverwriteOwnerAddress)
 	if err != nil {
 		return nil, nil, err
 	}
 
-    // TODO: Post-merge cleanup
-	//currentContractState = util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c persist.ContractGallery) persist.DBID { return c.ID })
-	//if err != nil {
-	//	return nil, nil, err
-	//}
-    //
-	//_, err = d.processContractCommunities(ctx, currentContractState)
-	//if err != nil {
-	//	return nil, nil, err
-	//}
-    //
-	//return currentContractState, newUpsertedContracts, nil
-	return util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c db.Contract) persist.DBID { return c.ID }), newUpsertedContracts, nil
+	dbContracts = util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c db.Contract) persist.DBID { return c.ID })
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, err = d.processContractCommunities(ctx, dbContracts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return dbContracts, newUpsertedContracts, nil
 }
 
 // chainTokensToUpsertableTokenDefinitions returns a slice of token definitions that are ready to be upserted into the database from a slice of chainTokens.

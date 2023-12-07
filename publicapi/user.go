@@ -1806,7 +1806,7 @@ func standardizeURI(u string) string {
 
 func createNewUserParamsWithAuth(ctx context.Context, authenticator auth.Authenticator, username string, bio string, email *persist.Email) (persist.CreateUserInput, error) {
 	authResult, err := authenticator.Authenticate(ctx)
-	if err != nil && !util.ErrorAs[persist.ErrUserNotFound](err) {
+	if err != nil && !util.ErrorIs[persist.ErrUserNotFound](err) {
 		return persist.CreateUserInput{}, auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
