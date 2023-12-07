@@ -404,6 +404,7 @@ type Post struct {
 	LastUpdated time.Time        `db:"last_updated" json:"last_updated"`
 	Deleted     bool             `db:"deleted" json:"deleted"`
 	IsFirstPost bool             `db:"is_first_post" json:"is_first_post"`
+	UserMintUrl sql.NullString   `db:"user_mint_url" json:"user_mint_url"`
 }
 
 type ProfileImage struct {
