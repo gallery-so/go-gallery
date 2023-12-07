@@ -46,6 +46,7 @@ func (c *CommunityRepository) UpsertCommunities(ctx context.Context, communities
 		params.Name = append(params.Name, c.Name)
 		params.Description = append(params.Description, c.Description)
 		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageUrl.String)
+		params.BadgeUrl = append(params.BadgeUrl, c.BadgeUrl.String)
 		params.ContractID = append(params.ContractID, c.ContractID.String())
 	}
 

@@ -721,44 +721,51 @@ func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.Ga
 
 // SharedCommunities is the resolver for the sharedCommunities field.
 func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: Currently used by frontend, but it's okay if we don't return shared communities for a bit.
+	// Needs to be updated to work with the new communities table.
+	return nil, nil
 
-	edges := make([]*model.CommunityEdge, len(communities))
-	for i, community := range communities {
-		edges[i] = &model.CommunityEdge{
-			Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.CommunitiesConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
+	//communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//edges := make([]*model.CommunityEdge, len(communities))
+	//for i, community := range communities {
+	//	edges[i] = &model.CommunityEdge{
+	//		Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
+	//		Cursor: nil, // not used by relay, but relay will complain without this field existing
+	//	}
+	//}
+	//
+	//return &model.CommunitiesConnection{
+	//	Edges:    edges,
+	//	PageInfo: pageInfoToModel(ctx, pageInfo),
+	//}, nil
 }
 
 // CreatedCommunities is the resolver for the createdCommunities field.
 func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.IncludeChains, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: Not currently used by frontend. Needs to be updated to work with new communities table.
+	return nil, nil
 
-	edges := make([]*model.CommunityEdge, len(communities))
-	for i, community := range communities {
-		edges[i] = &model.CommunityEdge{
-			Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.CommunitiesConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
+	//communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.IncludeChains, before, after, first, last)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//edges := make([]*model.CommunityEdge, len(communities))
+	//for i, community := range communities {
+	//	edges[i] = &model.CommunityEdge{
+	//		Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
+	//		Cursor: nil, // not used by relay, but relay will complain without this field existing
+	//	}
+	//}
+	//
+	//return &model.CommunitiesConnection{
+	//	Edges:    edges,
+	//	PageInfo: pageInfoToModel(ctx, pageInfo),
+	//}, nil
 }
 
 // IsMemberOfCommunity is the resolver for the isMemberOfCommunity field.
@@ -2588,6 +2595,7 @@ func (r *queryResolver) SearchCommunities(ctx context.Context, query string, lim
 		return nil, err
 	}
 
+	// TODO: Convert these to updated communities
 	forceRefresh := false
 
 	results := make([]*model.CommunitySearchResult, len(contracts))

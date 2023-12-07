@@ -12,8 +12,8 @@ create table if not exists communities (
     override_description text,
     profile_image_url text,
     override_profile_image_url text,
-    badge_image_url text,
-    override_badge_image_url text,
+    badge_url text,
+    override_badge_url text,
     contract_id varchar(255) references contracts(id),
     created_at timestamptz not null default current_timestamp,
     last_updated timestamptz not null default current_timestamp,
@@ -85,17 +85,17 @@ create table if not exists community_creators (
 create unique index if not exists community_creators_community_id_type_user_id_address_chain_idx
     on community_creators (community_id, creator_type, creator_user_id, creator_address, creator_address_l1_chain);
 
-create table if not exists contract_community_types (
+create table if not exists community_contract_providers (
     id varchar(255) primary key,
     version int not null default 0,
     contract_id varchar(255) not null references contracts(id),
     community_type int not null,
-    is_valid_type boolean not null,
+    is_valid_provider boolean not null,
     created_at timestamptz not null default current_timestamp,
     last_updated timestamptz not null default current_timestamp,
     deleted boolean not null default false
 );
 
-create unique index if not exists contract_community_types_contract_id_community_type_idx
-    on contract_community_types (contract_id, community_type)
+create unique index if not exists community_contract_providers_contract_id_community_type_idx
+    on community_contract_providers (contract_id, community_type)
     where not deleted;

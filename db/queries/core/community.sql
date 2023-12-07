@@ -10,7 +10,7 @@ insert into communities(id, version, name, description, community_type, key1, ke
          , unnest(@key3::varchar[])
          , unnest(@key4::varchar[])
          , nullif(unnest(@profile_image_url::varchar[]), '')
-         , nullif(unnest(@badge_image_url::varchar[]), '')
+         , nullif(unnest(@badge_url::varchar[]), '')
          , nullif(unnest(@contract_id::varchar[]), '')
          , now()
          , now()
@@ -21,7 +21,7 @@ on conflict (community_type, key1, key2, key3, key4) where not deleted
                 , name = coalesce(nullif(excluded.name, ''), nullif(communities.name, ''), '')
                 , description = coalesce(nullif(excluded.description, ''), nullif(communities.description, ''), '')
                 , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(communities.profile_image_url, ''))
-                , badge_image_url = coalesce(nullif(excluded.badge_image_url, ''), nullif(communities.badge_image_url, ''))
+                , badge_url = coalesce(nullif(excluded.badge_url, ''), nullif(communities.badge_url, ''))
                 , contract_id = coalesce(nullif(excluded.contract_id, ''), nullif(communities.contract_id, ''))
                 , last_updated = now()
                 , deleted = excluded.deleted
@@ -105,26 +105,26 @@ select k.batch_key_index, sqlc.embed(c) from keys k
         and k.key4 = c.key4
     where not c.deleted;
 
--- name: GetContractCommunityTypes :many
-select * from contract_community_types
+-- name: GetCommunityContractProviders :many
+select * from community_contract_providers
     where contract_id = any(@contract_ids)
     and not deleted;
 
--- name: UpsertContractCommunityTypes :exec
+-- name: UpsertCommunityContractProviders :exec
 with entries as (
     select unnest(@ids::varchar[]) as id
          , unnest(@contract_id::varchar[]) as contract_id
          , unnest(@community_type::int[]) as community_type
-         , unnest(@is_valid_type::bool[]) as is_valid_type
+         , unnest(@is_valid_provider::bool[]) as is_valid_provider
          , now() as created_at
          , now() as last_updated
          , false as deleted
 )
-insert into contract_community_types(id, contract_id, community_type, is_valid_type, created_at, last_updated, deleted) (
+insert into community_contract_providers(id, contract_id, community_type, is_valid_provider, created_at, last_updated, deleted) (
     select * from entries
 )
 on conflict (contract_id, community_type) where not deleted
-    do update set is_valid_type = excluded.is_valid_type
+    do update set is_valid_provider = excluded.is_valid_provider
                 , last_updated = now()
 returning *;
 
@@ -391,3 +391,37 @@ insert into community_creators(id, community_id, creator_type, creator_user_id, 
 on conflict (community_id, creator_type, creator_user_id, creator_address, creator_address_l1_chain) where not deleted
     do update set last_updated = now()
 returning *;
+
+-- name: IsMemberOfCommunity :one
+with community_data as (
+    select community_type, contract_id
+    from communities
+    where communities.id = @community_id and not deleted
+),
+
+community_token_definitions as (
+    select td.*
+    from community_data, token_definitions td
+    where community_data.community_type = 0
+        and td.contract_id = community_data.contract_id
+        and not td.deleted
+
+    union all
+
+    select td.*
+    from community_data, token_definitions td
+        join token_community_memberships on td.id = token_community_memberships.token_definition_id
+            and token_community_memberships.community_id = @community_id
+            and not token_community_memberships.deleted
+    where community_data.community_type != 0
+        and not td.deleted
+)
+
+select exists(
+    select 1
+    from tokens, community_token_definitions
+    where tokens.owner_user_id = @user_id
+      and not tokens.deleted
+      and tokens.displayable
+      and tokens.token_definition_id = community_token_definitions.id
+);

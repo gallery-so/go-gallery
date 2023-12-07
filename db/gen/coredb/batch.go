@@ -1158,7 +1158,7 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 }
 
 const getCommunityByID = `-- name: GetCommunityByID :batchone
-select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_image_url, override_badge_image_url, contract_id, created_at, last_updated, deleted from communities
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted from communities
     where id = $1
         and not deleted
 `
@@ -1206,8 +1206,8 @@ func (b *GetCommunityByIDBatchResults) QueryRow(f func(int, Community, error)) {
 			&i.OverrideDescription,
 			&i.ProfileImageUrl,
 			&i.OverrideProfileImageUrl,
-			&i.BadgeImageUrl,
-			&i.OverrideBadgeImageUrl,
+			&i.BadgeUrl,
+			&i.OverrideBadgeUrl,
 			&i.ContractID,
 			&i.CreatedAt,
 			&i.LastUpdated,
@@ -1225,7 +1225,7 @@ func (b *GetCommunityByIDBatchResults) Close() error {
 }
 
 const getCommunityByKey = `-- name: GetCommunityByKey :batchone
-select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_image_url, override_badge_image_url, contract_id, created_at, last_updated, deleted from communities
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted from communities
     where $1 = community_type
         and $2 = key1
         and $3 = key2
@@ -1289,8 +1289,8 @@ func (b *GetCommunityByKeyBatchResults) QueryRow(f func(int, Community, error)) 
 			&i.OverrideDescription,
 			&i.ProfileImageUrl,
 			&i.OverrideProfileImageUrl,
-			&i.BadgeImageUrl,
-			&i.OverrideBadgeImageUrl,
+			&i.BadgeUrl,
+			&i.OverrideBadgeUrl,
 			&i.ContractID,
 			&i.CreatedAt,
 			&i.LastUpdated,

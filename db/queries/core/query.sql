@@ -1715,18 +1715,6 @@ update tokens
       and is_creator_token = true
       and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract_id)
       and not deleted;
-      
--- name: IsMemberOfCommunity :one
-with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = @contract_id)
-select exists(
-    select 1
-    from tokens, contract_tokens
-    where tokens.owner_user_id = @user_id
-        and not tokens.deleted
-        and tokens.displayable
-        and tokens.token_definition_id = contract_tokens.id
-    limit 1
-);
 
 -- name: InsertExternalSocialConnectionsForUser :many
 insert into external_social_connections (id, social_account_type, follower_id, followee_id) 

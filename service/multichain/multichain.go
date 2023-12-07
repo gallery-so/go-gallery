@@ -955,12 +955,13 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 }
 
 func (p *Provider) processTokenCommunities(ctx context.Context, contracts []db.Contract, tokens []op.TokenFullDetails) error {
-	// TODO: Probably set these up in more of a "multichain provider" way (possibly via wire)
-	knownTypes, err := p.Queries.GetContractCommunityTypes(ctx, util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID }))
+	knownProviders, err := p.Queries.GetCommunityContractProviders(ctx, util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID }))
 	if err != nil {
 		return fmt.Errorf("failed to retrieve contract community types: %w", err)
 	}
-	return p.processArtBlocksTokenCommunities(ctx, knownTypes, tokens)
+
+	// TODO: Make this more flexible, allow other providers, etc (possibly via wire)
+	return p.processArtBlocksTokenCommunities(ctx, knownProviders, tokens)
 }
 
 func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens,

@@ -212,11 +212,11 @@ func (a artBlocksCommunityKey) String() string {
 	return fmt.Sprintf("ProjectID=%s:Chain=%d:ContractAddress=%s", a.ProjectID, a.ContractChain, a.ContractAddress)
 }
 
-func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownTypes []db.ContractCommunityType, tokens []op.TokenFullDetails) error {
+func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownProviders []db.CommunityContractProvider, tokens []op.TokenFullDetails) error {
 	artBlocksContracts := make(map[persist.DBID]bool)
-	for _, t := range knownTypes {
+	for _, t := range knownProviders {
 		if t.CommunityType == persist.CommunityTypeArtBlocks {
-			artBlocksContracts[t.ContractID] = t.IsValidType
+			artBlocksContracts[t.ContractID] = t.IsValidProvider
 		}
 	}
 
@@ -358,15 +358,15 @@ func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownTy
 			communityContractTypes[contractByCommunityKey[k].ID] = false
 		}
 
-		typeUpsertParams := db.UpsertContractCommunityTypesParams{}
+		typeUpsertParams := db.UpsertCommunityContractProvidersParams{}
 		for contractID, isValid := range communityContractTypes {
 			typeUpsertParams.Ids = append(typeUpsertParams.Ids, persist.GenerateID().String())
 			typeUpsertParams.ContractID = append(typeUpsertParams.ContractID, contractID.String())
 			typeUpsertParams.CommunityType = append(typeUpsertParams.CommunityType, int32(persist.CommunityTypeArtBlocks))
-			typeUpsertParams.IsValidType = append(typeUpsertParams.IsValidType, isValid)
+			typeUpsertParams.IsValidProvider = append(typeUpsertParams.IsValidProvider, isValid)
 		}
 
-		if err := p.Queries.UpsertContractCommunityTypes(ctx, typeUpsertParams); err != nil {
+		if err := p.Queries.UpsertCommunityContractProviders(ctx, typeUpsertParams); err != nil {
 			logger.For(ctx).Errorf("failed to upsert Art Blocks contract community types: %s", err)
 		}
 	}

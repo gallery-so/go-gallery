@@ -1748,8 +1748,8 @@ func (api UserAPI) IsMemberOfCommunity(ctx context.Context, userID persist.DBID,
 		return false, err
 	}
 	return api.queries.IsMemberOfCommunity(ctx, db.IsMemberOfCommunityParams{
-		UserID:     userID,
-		ContractID: communityID,
+		UserID:      userID,
+		CommunityID: communityID,
 	})
 }
 

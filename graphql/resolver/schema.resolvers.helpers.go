@@ -596,47 +596,19 @@ func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Communit
 	return communityToModel(ctx, *community), nil
 }
 
-// TODO: Have this fetch a contract community by its address
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {
-	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
-
-	if err != nil {
-		return nil, err
+	communityKey := persist.CommunityKey{
+		Type: persist.CommunityTypeContract,
+		Key1: fmt.Sprintf("%d", contractAddress.Chain()),
+		Key2: contractAddress.Address().String(),
 	}
 
-	return contractToCommunityModel(ctx, *community, forceRefresh), nil
-}
-
-func resolveCommunityByKey(ctx context.Context, communityKey persist.CommunityKey) (*model.Community, error) {
 	community, err := publicapi.For(ctx).Community.GetCommunityByKey(ctx, communityKey)
-
 	if err != nil {
 		return nil, err
 	}
 
 	return communityToModel(ctx, *community), nil
-}
-
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokenHoldersConnection, error) {
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
-	if err != nil {
-		return nil, err
-	}
-	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers)
-	if err != nil {
-		return nil, err
-	}
-	connection := holdersToConnection(ctx, owners, contractID, pageInfo)
-	return &connection, nil
-}
-
-func resolveCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.PostsConnection, error) {
-	posts, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityPostsByContractID(ctx, contractID, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
-	connection := postsToConnection(ctx, posts, contractID, pageInfo)
-	return &connection, nil
 }
 
 func resolveCommunityHoldersByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) (*model.TokenHoldersConnection, error) {
@@ -2102,15 +2074,34 @@ func getArtBlocksCommunity(ctx context.Context, community db.Community) *model.A
 }
 
 func communityToModel(ctx context.Context, community db.Community) *model.Community {
+	getStringWithOverride := func(original string, override sql.NullString) *string {
+		if override.Valid {
+			return util.ToPointer(override.String)
+		}
+		return util.ToPointer(original)
+	}
+
+	getNullStringWithOverride := func(original sql.NullString, override sql.NullString) *string {
+		if override.Valid {
+			return util.ToPointer(override.String)
+		}
+
+		if original.Valid {
+			return util.ToPointer(original.String)
+		}
+
+		return nil
+	}
+
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{Community: community},
 
 		Dbid:            community.ID,
 		LastUpdated:     util.ToPointer(community.LastUpdated),
-		Name:            util.ToPointer(community.Name),
-		Description:     util.ToPointer(community.Description),
-		ProfileImageURL: util.ToPointer(community.ProfileImageUrl.String),
-		BadgeURL:        util.ToPointer(community.BadgeImageUrl.String),
+		Name:            getStringWithOverride(community.Name, community.OverrideName),
+		Description:     getStringWithOverride(community.Description, community.OverrideDescription),
+		ProfileImageURL: getNullStringWithOverride(community.ProfileImageUrl, community.OverrideProfileImageUrl),
+		BadgeURL:        getNullStringWithOverride(community.BadgeUrl, community.OverrideBadgeUrl),
 		Subtype:         communityToSubtypeModel(ctx, community),
 
 		Creators: nil, // handled by dedicated resolver
@@ -2143,7 +2134,6 @@ func communityToSubtypeModel(ctx context.Context, community db.Community) model.
 	}
 }
 
-// TODO: Once we've updated all callers to use communityToCommunityModel, we can get rid of this.
 func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRefresh *bool) *model.Community {
 	lastUpdated := contract.LastUpdated
 	contractAddress := persist.NewChainAddress(contract.Address, contract.Chain)
@@ -2158,8 +2148,12 @@ func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRe
 		creatorAddress = &chainAddress
 	}
 
+	// This is extremely hacky and brittle (HelperCommunityData should have a real db.Community reference, Dbid should be
+	// the community's ID, not the contract's ID), but this function is only used for search results, and search results
+	// don't use any of the incorrect fields. Once we update search to use communities directly, we can remove this
+	// whole function.
 	return &model.Community{
-		HelperCommunityData: model.HelperCommunityData{},
+		HelperCommunityData: model.HelperCommunityData{Community: db.Community{ContractID: contract.ID}},
 		Dbid:                contract.ID,
 		LastUpdated:         &lastUpdated,
 		Contract:            contractToModel(ctx, contract),
@@ -2170,7 +2164,7 @@ func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRe
 		Chain:               &chain,
 		ProfileImageURL:     util.ToPointer(contract.ProfileImageUrl.String),
 		BadgeURL:            util.ToPointer(contract.BadgeUrl.String),
-		Subtype:             model.ContractCommunity{Contract: nil},
+		Subtype:             model.ContractCommunity{Contract: contractToModel(ctx, contract)},
 		Owners:              nil, // handled by dedicated resolver
 		Creator:             nil, // handled by dedicated resolver
 		TokensInCommunity:   nil, // handled by dedicated resolver
@@ -2582,7 +2576,6 @@ func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
 	return m
 }
 
-// TODO: Make sure we sort these results
 func resolveCommunityCreatorsByCommunityID(ctx context.Context, communityID persist.DBID) ([]model.GalleryUserOrAddress, error) {
 	creators, err := publicapi.For(ctx).Community.GetCreatorsByCommunityID(ctx, communityID)
 	if err != nil {

@@ -78,12 +78,23 @@ type Community struct {
 	OverrideDescription     sql.NullString        `db:"override_description" json:"override_description"`
 	ProfileImageUrl         sql.NullString        `db:"profile_image_url" json:"profile_image_url"`
 	OverrideProfileImageUrl sql.NullString        `db:"override_profile_image_url" json:"override_profile_image_url"`
-	BadgeImageUrl           sql.NullString        `db:"badge_image_url" json:"badge_image_url"`
-	OverrideBadgeImageUrl   sql.NullString        `db:"override_badge_image_url" json:"override_badge_image_url"`
+	BadgeUrl                sql.NullString        `db:"badge_url" json:"badge_url"`
+	OverrideBadgeUrl        sql.NullString        `db:"override_badge_url" json:"override_badge_url"`
 	ContractID              persist.DBID          `db:"contract_id" json:"contract_id"`
 	CreatedAt               time.Time             `db:"created_at" json:"created_at"`
 	LastUpdated             time.Time             `db:"last_updated" json:"last_updated"`
 	Deleted                 bool                  `db:"deleted" json:"deleted"`
+}
+
+type CommunityContractProvider struct {
+	ID              persist.DBID          `db:"id" json:"id"`
+	Version         int32                 `db:"version" json:"version"`
+	ContractID      persist.DBID          `db:"contract_id" json:"contract_id"`
+	CommunityType   persist.CommunityType `db:"community_type" json:"community_type"`
+	IsValidProvider bool                  `db:"is_valid_provider" json:"is_valid_provider"`
+	CreatedAt       time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated     time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted         bool                  `db:"deleted" json:"deleted"`
 }
 
 type CommunityCreator struct {
@@ -130,17 +141,6 @@ type ContractCommunityMembership struct {
 	CreatedAt   time.Time    `db:"created_at" json:"created_at"`
 	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
 	Deleted     bool         `db:"deleted" json:"deleted"`
-}
-
-type ContractCommunityType struct {
-	ID            persist.DBID          `db:"id" json:"id"`
-	Version       int32                 `db:"version" json:"version"`
-	ContractID    persist.DBID          `db:"contract_id" json:"contract_id"`
-	CommunityType persist.CommunityType `db:"community_type" json:"community_type"`
-	IsValidType   bool                  `db:"is_valid_type" json:"is_valid_type"`
-	CreatedAt     time.Time             `db:"created_at" json:"created_at"`
-	LastUpdated   time.Time             `db:"last_updated" json:"last_updated"`
-	Deleted       bool                  `db:"deleted" json:"deleted"`
 }
 
 type ContractCreator struct {

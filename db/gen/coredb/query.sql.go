@@ -6220,31 +6220,6 @@ func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.Nul
 	return exists, err
 }
 
-const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
-with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = $2)
-select exists(
-    select 1
-    from tokens, contract_tokens
-    where tokens.owner_user_id = $1
-        and not tokens.deleted
-        and tokens.displayable
-        and tokens.token_definition_id = contract_tokens.id
-    limit 1
-)
-`
-
-type IsMemberOfCommunityParams struct {
-	UserID     persist.DBID `db:"user_id" json:"user_id"`
-	ContractID persist.DBID `db:"contract_id" json:"contract_id"`
-}
-
-func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommunityParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isMemberOfCommunity, arg.UserID, arg.ContractID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
 select fe.id, fe.feed_entity_type, fe.created_at, fe.actor_id
 from feed_entities fe
