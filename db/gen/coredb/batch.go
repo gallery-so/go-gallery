@@ -1478,6 +1478,7 @@ select u.id as creator_user_id,
             cc.creator_address = w.address
         left join users u on
             u.deleted = false and
+            u.universal = false and
             (
                 (cc.creator_user_id is not null and cc.creator_user_id = u.id)
                 or

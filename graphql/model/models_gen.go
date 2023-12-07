@@ -792,10 +792,6 @@ type CommunityEdge struct {
 	Cursor *string    `json:"cursor"`
 }
 
-type CommunityLink struct {
-	Node *Community `json:"node"`
-}
-
 type CommunitySearchResult struct {
 	Community *Community `json:"community"`
 }

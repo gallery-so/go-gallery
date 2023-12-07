@@ -262,6 +262,7 @@ insert into communities(id, version, name, description, community_type, key1, ke
          , unnest($9::varchar[])
          , nullif(unnest($10::varchar[]), '')
          , nullif(unnest($11::varchar[]), '')
+         , nullif(unnest($12::varchar[]), '')
          , now()
          , now()
          , false
@@ -271,6 +272,7 @@ on conflict (community_type, key1, key2, key3, key4) where not deleted
                 , name = coalesce(nullif(excluded.name, ''), nullif(communities.name, ''), '')
                 , description = coalesce(nullif(excluded.description, ''), nullif(communities.description, ''), '')
                 , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(communities.profile_image_url, ''))
+                , badge_image_url = coalesce(nullif(excluded.badge_image_url, ''), nullif(communities.badge_image_url, ''))
                 , contract_id = coalesce(nullif(excluded.contract_id, ''), nullif(communities.contract_id, ''))
                 , last_updated = now()
                 , deleted = excluded.deleted
@@ -288,6 +290,7 @@ type UpsertCommunitiesParams struct {
 	Key3            []string `db:"key3" json:"key3"`
 	Key4            []string `db:"key4" json:"key4"`
 	ProfileImageUrl []string `db:"profile_image_url" json:"profile_image_url"`
+	BadgeImageUrl   []string `db:"badge_image_url" json:"badge_image_url"`
 	ContractID      []string `db:"contract_id" json:"contract_id"`
 }
 
@@ -303,6 +306,7 @@ func (q *Queries) UpsertCommunities(ctx context.Context, arg UpsertCommunitiesPa
 		arg.Key3,
 		arg.Key4,
 		arg.ProfileImageUrl,
+		arg.BadgeImageUrl,
 		arg.ContractID,
 	)
 	if err != nil {
