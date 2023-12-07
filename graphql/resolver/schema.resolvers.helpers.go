@@ -1696,15 +1696,16 @@ func postToModel(post *db.Post) *model.Post {
 			TokenIDs: post.TokenIds,
 			AuthorID: post.ActorID,
 		},
-		Dbid:         post.ID,
-		Tokens:       nil, // handled by dedicated resolver
-		CreationTime: &post.CreatedAt,
-		Caption:      captionVal,
-		Admires:      nil, // handled by dedicated resolver
-		Comments:     nil, // handled by dedicated resolver
-		Interactions: nil, // handled by dedicated resolver
-		ViewerAdmire: nil, // handled by dedicated resolver
-		IsFirstPost:  post.IsFirstPost,
+		Dbid:             post.ID,
+		Tokens:           nil, // handled by dedicated resolver
+		CreationTime:     &post.CreatedAt,
+		Caption:          captionVal,
+		Admires:          nil, // handled by dedicated resolver
+		Comments:         nil, // handled by dedicated resolver
+		Interactions:     nil, // handled by dedicated resolver
+		ViewerAdmire:     nil, // handled by dedicated resolver
+		IsFirstPost:      post.IsFirstPost,
+		UserAddedMintURL: &post.UserMintUrl.String,
 	}
 }
 

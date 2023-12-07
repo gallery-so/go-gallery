@@ -2430,7 +2430,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url FROM posts WHERE id = $1 AND deleted = false
 `
 
 type GetPostByIdBatchBatchResults struct {
@@ -2473,6 +2473,7 @@ func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
 			&i.LastUpdated,
 			&i.Deleted,
 			&i.IsFirstPost,
+			&i.UserMintUrl,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4852,7 +4853,7 @@ func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
 }
 
 const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
 FROM posts
 WHERE $1 = ANY(posts.contract_ids)
 AND posts.deleted = false
@@ -4927,6 +4928,7 @@ func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)
 					&i.LastUpdated,
 					&i.Deleted,
 					&i.IsFirstPost,
+					&i.UserMintUrl,
 				); err != nil {
 					return err
 				}
