@@ -14,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/redis"
 
-	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -136,26 +135,6 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 
 		c.Status(http.StatusOK)
 	}
-}
-
-func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client, r *redis.Cache) error {
-	ctx := context.Background()
-	sub := psub.Subscription(env.GetString("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
-
-	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		defer msg.Ack()
-		l, _ := r.Get(ctx, "send-notification-emails")
-		if l != nil && len(l) > 0 {
-			logger.For(ctx).Infof("notification emails already being sent")
-			return
-		}
-		r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
-		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
-		if err != nil {
-			logger.For(ctx).Errorf("error sending notification emails: %s", err)
-			return
-		}
-	})
 }
 
 func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache) gin.HandlerFunc {
@@ -295,30 +274,6 @@ type digestEmailDynamicTemplateData struct {
 	UnsubscribeToken string       `json:"unsubscribeToken"`
 }
 
-func autoSendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *sendgrid.Client, psub *pubsub.Client, r *redis.Cache, stg *storage.Client, fapi *publicapi.FeedAPI) error {
-	ctx := context.Background()
-	sub := psub.Subscription(env.GetString("PUBSUB_DIGEST_EMAILS_SUBSCRIPTION"))
-
-	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		defer msg.Ack()
-		l, _ := r.Get(ctx, "send-digest-emails")
-		if l != nil && len(l) > 0 {
-			logger.For(ctx).Infof("digest emails already being sent")
-			return
-		}
-		r.Set(ctx, "send-digest-emails", []byte("sending"), 1*time.Hour)
-		vals, err := getDigest(ctx, stg, fapi, queries, loaders)
-		if err != nil {
-			logger.For(ctx).Errorf("error getting digest values: %s", err)
-			return
-		}
-		err = sendDigestEmailsToAllUsers(ctx, vals, queries, s, env.GetString("ENV") == "production")
-		if err != nil {
-			logger.For(ctx).Errorf("error sending notification emails: %s", err)
-			return
-		}
-	})
-}
 func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, fapi *publicapi.FeedAPI) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		l, _ := r.Get(ctx, "send-digest-emails")
