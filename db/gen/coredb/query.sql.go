@@ -196,7 +196,7 @@ func (q *Queries) CountCommentsAndRepliesByFeedEventID(ctx context.Context, feed
 }
 
 const countCommentsAndRepliesByPostID = `-- name: CountCommentsAndRepliesByPostID :one
-SELECT count(*) FROM comments WHERE post_id = $1 is null AND deleted = false
+SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false
 `
 
 func (q *Queries) CountCommentsAndRepliesByPostID(ctx context.Context, postID persist.DBID) (int64, error) {

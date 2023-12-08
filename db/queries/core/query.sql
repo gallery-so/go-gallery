@@ -766,7 +766,7 @@ SELECT * FROM comments WHERE
 SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
 
 -- name: CountCommentsAndRepliesByPostID :one
-SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') is null AND deleted = false;
+SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false;
 
 
 -- name: CountRepliesByCommentIDBatch :batchone
