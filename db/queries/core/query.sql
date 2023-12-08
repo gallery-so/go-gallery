@@ -734,6 +734,9 @@ SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply
 -- name: CountCommentsByFeedEventIDBatch :batchone
 SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false;
 
+-- name: CountCommentsAndRepliesByFeedEventID :one
+SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false;
+
 -- name: PaginateCommentsByPostIDBatch :batchmany
 SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -761,6 +764,10 @@ SELECT * FROM comments WHERE
 
 -- name: CountCommentsByPostIDBatch :batchone
 SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
+
+-- name: CountCommentsAndRepliesByPostID :one
+SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') is null AND deleted = false;
+
 
 -- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE 
