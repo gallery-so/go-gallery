@@ -596,6 +596,21 @@ func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Communit
 	return communityToModel(ctx, *community), nil
 }
 
+// Deprecated: use resolveCommunitiesByTokenDefinitionID instead. This helper is only used by deprecated
+// resolvers that expect a single community per token.
+func resolveCommunityByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*model.Community, error) {
+	communities, err := resolveCommunitiesByTokenDefinitionID(ctx, tokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(communities) > 0 {
+		return communities[0], nil
+	}
+
+	return nil, nil
+}
+
 func resolveCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) ([]*model.Community, error) {
 	communities, err := publicapi.For(ctx).Token.GetCommunitiesByTokenDefinitionID(ctx, tokenDefinitionID)
 	if err != nil {

@@ -64,5 +64,5 @@ type ErrCommunityNotFound struct {
 }
 
 func (e ErrCommunityNotFound) Error() string {
-	return fmt.Sprintf("Community not found for contractID %s, key %s", e.ID, e.Key)
+	return fmt.Sprintf("Community not found for communityID %s, key %s", e.ID, e.Key)
 }

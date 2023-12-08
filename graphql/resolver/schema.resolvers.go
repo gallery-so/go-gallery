@@ -3099,7 +3099,7 @@ func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.
 
 // Community is the resolver for the community field.
 func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.HelperTokenData.Token.ContractID)
+	return resolveCommunityByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
 }
 
 // ExternalURL is the resolver for the externalUrl field.
@@ -3141,16 +3141,7 @@ func (r *tokenDefinitionResolver) TokenMetadata(ctx context.Context, obj *model.
 
 // Community is the resolver for the community field.
 func (r *tokenDefinitionResolver) Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error) {
-	communities, err := resolveCommunitiesByTokenDefinitionID(ctx, obj.Dbid)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(communities) > 0 {
-		return communities[0], nil
-	}
-
-	return nil, nil
+	return resolveCommunityByTokenDefinitionID(ctx, obj.Dbid)
 }
 
 // Communities is the resolver for the communities field.
