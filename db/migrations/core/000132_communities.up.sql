@@ -24,6 +24,10 @@ create unique index if not exists communities_community_type_community_subtype_c
     on communities (community_type, key1, key2, key3, key4)
     where not deleted;
 
+create index if not exists communities_contract_id_idx
+    on communities (contract_id)
+    where not deleted;
+
 create table if not exists contract_community_memberships (
     id varchar(255) primary key,
     version int not null default 0,
