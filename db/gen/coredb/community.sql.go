@@ -297,7 +297,7 @@ func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommuni
 }
 
 const upsertCommunities = `-- name: UpsertCommunities :many
-insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, contract_id, created_at, last_updated, deleted) (
+insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, badge_url, contract_id, created_at, last_updated, deleted) (
     select unnest($1::varchar[])
          , unnest($2::int[])
          , unnest($3::varchar[])

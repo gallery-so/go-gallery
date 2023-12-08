@@ -1,5 +1,5 @@
 -- name: UpsertCommunities :many
-insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, contract_id, created_at, last_updated, deleted) (
+insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, badge_url, contract_id, created_at, last_updated, deleted) (
     select unnest(@ids::varchar[])
          , unnest(@version::int[])
          , unnest(@name::varchar[])

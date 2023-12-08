@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"sort"
 	"strings"
 	"time"
 
@@ -621,6 +622,17 @@ func resolveCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionI
 	for i, c := range communities {
 		result[i] = communityToModel(ctx, c)
 	}
+
+	// Sort by descending CommunityType (with Dbid as a tiebreaker so ordering is stable).
+	// We'll probably want to update this as we add more community providers, but for the time being, a simple and
+	// useful ordering is to put contract communities last. If a token is part of multiple communities, it's probably
+	// the ArtBlocksCommunity or similar that is most interesting and should be the canonical "primary" community.
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].HelperCommunityData.Community.CommunityType == result[j].HelperCommunityData.Community.CommunityType {
+			return result[i].Dbid < result[j].Dbid
+		}
+		return result[i].HelperCommunityData.Community.CommunityType > result[j].HelperCommunityData.Community.CommunityType
+	})
 
 	return result, nil
 }
