@@ -951,6 +951,7 @@ func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() 
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
 	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
 }
 
 type EnsProfileImage struct {
@@ -2637,6 +2638,7 @@ type UpdateEmailInput struct {
 type UpdateEmailNotificationSettingsInput struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
 	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
 }
 
 type UpdateEmailNotificationSettingsPayload struct {
@@ -2928,16 +2930,18 @@ type EmailUnsubscriptionType string
 const (
 	EmailUnsubscriptionTypeAll           EmailUnsubscriptionType = "All"
 	EmailUnsubscriptionTypeNotifications EmailUnsubscriptionType = "Notifications"
+	EmailUnsubscriptionTypeDigest        EmailUnsubscriptionType = "Digest"
 )
 
 var AllEmailUnsubscriptionType = []EmailUnsubscriptionType{
 	EmailUnsubscriptionTypeAll,
 	EmailUnsubscriptionTypeNotifications,
+	EmailUnsubscriptionTypeDigest,
 }
 
 func (e EmailUnsubscriptionType) IsValid() bool {
 	switch e {
-	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications:
+	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications, EmailUnsubscriptionTypeDigest:
 		return true
 	}
 	return false
