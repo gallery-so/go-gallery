@@ -1839,7 +1839,6 @@ on conflict(user_id, blocked_user_id) where not deleted do update set active = t
 -- name: UnblockUser :exec
 update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;
 
-
 -- name: GetCommunitiesByTokenDefinitionID :batchmany
 select communities.* from communities
     join token_definitions on token_definitions.contract_id = communities.contract_id

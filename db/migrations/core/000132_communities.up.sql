@@ -87,7 +87,8 @@ create table if not exists community_creators (
 );
 
 create unique index if not exists community_creators_community_id_type_user_id_address_chain_idx
-    on community_creators (community_id, creator_type, creator_user_id, creator_address, creator_address_l1_chain);
+    on community_creators (community_id, creator_type, creator_user_id, creator_address, creator_address_l1_chain)
+    where not deleted;
 
 create table if not exists community_contract_providers (
     id varchar(255) primary key,
