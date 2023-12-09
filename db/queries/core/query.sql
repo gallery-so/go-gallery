@@ -1722,18 +1722,6 @@ update tokens
       and is_creator_token = true
       and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract_id)
       and not deleted;
-      
--- name: IsMemberOfCommunity :one
-with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = @contract_id)
-select exists(
-    select 1
-    from tokens, contract_tokens
-    where tokens.owner_user_id = @user_id
-        and not tokens.deleted
-        and tokens.displayable
-        and tokens.token_definition_id = contract_tokens.id
-    limit 1
-);
 
 -- name: InsertExternalSocialConnectionsForUser :many
 insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
@@ -1857,3 +1845,20 @@ on conflict(user_id, blocked_user_id) where not deleted do update set active = t
 
 -- name: UnblockUser :exec
 update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;
+
+-- name: GetCommunitiesByTokenDefinitionID :batchmany
+select communities.* from communities
+    join token_definitions on token_definitions.contract_id = communities.contract_id
+    where community_type = 0
+        and token_definitions.id = @token_definition_id
+        and not communities.deleted
+        and not token_definitions.deleted
+
+union all
+
+select communities.* from communities
+    join token_community_memberships on token_community_memberships.community_id = communities.id
+    where community_type != 0
+        and token_community_memberships.token_definition_id = @token_definition_id
+        and not communities.deleted
+        and not token_community_memberships.deleted;

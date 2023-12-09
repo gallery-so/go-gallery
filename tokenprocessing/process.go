@@ -113,7 +113,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 		_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(contract))
 
 		if err != nil {
-			if util.ErrorAs[ErrBadToken](err) {
+			if util.ErrorIs[ErrBadToken](err) {
 				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
 				return
 			}
