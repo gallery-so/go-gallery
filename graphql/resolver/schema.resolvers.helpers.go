@@ -1966,7 +1966,6 @@ func contractToBadgeModel(ctx context.Context, contract db.Contract) *model.Badg
 		ImageURL: contract.BadgeUrl.String,
 	}
 }
-
 func collectionToModel(ctx context.Context, collection db.Collection) *model.Collection {
 	version := int(collection.Version.Int32)
 
@@ -2306,17 +2305,18 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 	if pfp.ID == "" {
 		return nil, nil
 	}
-	if pfp.SourceType == persist.ProfileImageSourceToken {
+	switch pfp.SourceType {
+	case persist.ProfileImageSourceToken:
 		token, err := publicapi.For(ctx).Token.GetTokenByIdIgnoreDisplayable(ctx, pfp.TokenID)
 		if err != nil {
 			return nil, err
 		}
 		return &model.TokenProfileImage{Token: tokenToModel(ctx, *token, nil)}, nil
-	}
-	if pfp.SourceType == persist.ProfileImageSourceENS {
+	case persist.ProfileImageSourceENS:
 		return ensProfileImageToModel(ctx, pfp.UserID, pfp.WalletID, pfp.EnsAvatarUri.String, pfp.EnsDomain.String)
+	default:
+		return nil, publicapi.ErrProfileImageUnknownSource
 	}
-	return nil, publicapi.ErrProfileImageUnknownSource
 }
 
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
@@ -2623,7 +2623,7 @@ func resolveCommunityCreatorsByCommunityID(ctx context.Context, communityID pers
 		return nil, err
 	}
 
-	models := make([]model.GalleryUserOrAddress, len(creators))
+	models := make([]model.GalleryUserOrAddress, 0, len(creators))
 	for _, creator := range creators {
 		if creator.CreatorUserID != "" {
 			user, err := resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
