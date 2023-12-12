@@ -243,7 +243,7 @@ func (api UserAPI) GetOnboardingUserRecommendations(ctx context.Context, before,
 
 	cursor.CurrentPosition = 0
 	cursor.IDs = userIDs
-	cursor.Positions = util.SliceToMapIndex(userIDs)
+	cursor.Positions = sliceToMapIndex(userIDs)
 
 	// We already did the work to fetch the users when re-calculating the recommendations, so we can just return them here
 	if users != nil {

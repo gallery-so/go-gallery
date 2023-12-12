@@ -106,15 +106,15 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress, before, after *string, first, last *int) ([]db.Collection, PageInfo, error) {
+func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress, before, after *string, first, last *int) (c []db.Collection, pageInfo PageInfo, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"chainAddress": validate.WithTag(chainAddress, "required"),
 	}); err != nil {
-		return nil, PageInfo{}, err
+		return nil, pageInfo, err
 	}
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, PageInfo{}, err
+		return nil, pageInfo, err
 	}
 
 	cursor := cursors.NewPositionCursor()
@@ -122,11 +122,11 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 	// If a cursor is provided, we can skip querying the cache
 	if before != nil {
 		if err := cursor.Unpack(*before); err != nil {
-			return nil, PageInfo{}, err
+			return nil, pageInfo, err
 		}
 	} else if after != nil {
 		if err := cursor.Unpack(*after); err != nil {
-			return nil, PageInfo{}, err
+			return nil, pageInfo, err
 		}
 	} else {
 		// No cursor provided, need to access the cache
@@ -140,12 +140,12 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 
 		collectionIDs, err := l.Load(ctx)
 		if err != nil {
-			return nil, PageInfo{}, err
+			return nil, pageInfo, err
 		}
 
 		cursor.CurrentPosition = 0
 		cursor.IDs = collectionIDs
-		cursor.Positions = util.SliceToMapIndex(cursor.IDs)
+		cursor.Positions = sliceToMapIndex(cursor.IDs)
 	}
 
 	paginator := positionPaginator[db.Collection]{}

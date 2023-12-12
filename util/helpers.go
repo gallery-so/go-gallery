@@ -398,15 +398,6 @@ func FromPointerSlice[T any](s []*T) []T {
 	return result
 }
 
-// SliceToMapIndex returns a lookup of each element's index in the slice
-func SliceToMapIndex[V comparable](s []V) map[V]int64 {
-	result := make(map[V]int64, len(s))
-	for i, v := range s {
-		result[v] = int64(i)
-	}
-	return result
-}
-
 func StringersToStrings[T fmt.Stringer](stringers []T) []string {
 	strings := make([]string, len(stringers))
 	for i, stringer := range stringers {

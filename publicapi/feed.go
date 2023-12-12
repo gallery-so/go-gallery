@@ -741,7 +741,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		cursor.CurrentPosition = 0
 		cursor.EntityTypes = postTypes
 		cursor.EntityIDs = postIDs
-		cursor.Positions = util.SliceToMapIndex(postIDs)
+		cursor.Positions = sliceToMapIndex(postIDs)
 
 		// We already did the work to fetch the posts when re-calculating the feed, so we can just return them here
 		if posts != nil {
