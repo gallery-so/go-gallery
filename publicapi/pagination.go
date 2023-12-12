@@ -1105,7 +1105,7 @@ func packVal(e *cursorEncoder, val any) error {
 	return nil
 }
 
-func packVals[Node any](e *cursorEncoder, vals ...Node) error {
+func packVals[T any](e *cursorEncoder, vals ...T) error {
 	for _, val := range vals {
 		if err := packVal(e, val); err != nil {
 			return err
@@ -1115,7 +1115,7 @@ func packVals[Node any](e *cursorEncoder, vals ...Node) error {
 }
 
 // Encode the length of the slice as an int64, then encode each val
-func packSlice[Node any](e *cursorEncoder, s ...Node) error {
+func packSlice[T any](e *cursorEncoder, s ...T) error {
 	e.appendInt64(int64(len(s)))
 	return packVals(e, s...)
 }
@@ -1163,7 +1163,7 @@ func unpackVal(d *cursorDecoder, val any) unpackF {
 	}
 }
 
-func unpackVals[Node any](d *cursorDecoder, vals ...Node) []unpackF {
+func unpackVals[T any](d *cursorDecoder, vals ...T) []unpackF {
 	unpackFs := make([]unpackF, len(vals))
 	for i, val := range vals {
 		unpackFs[i] = unpackVal(d, val)
@@ -1171,21 +1171,21 @@ func unpackVals[Node any](d *cursorDecoder, vals ...Node) []unpackF {
 	return unpackFs
 }
 
-func unpackTo[Node any](into *Node, f func() (Node, error)) unpackF {
+func unpackTo[T any](into *T, f func() (T, error)) unpackF {
 	return func() (err error) {
 		(*into), err = f()
 		return err
 	}
 }
 
-func unpackSliceTo[Node any](into *[]Node, d *cursorDecoder, f func() (Node, error)) func() error {
+func unpackSliceTo[T any](into *[]T, d *cursorDecoder, f func() (T, error)) func() error {
 	return func() error {
 		l, err := d.readInt64()
 		if err != nil {
 			return err
 		}
 
-		items := make([]Node, l)
+		items := make([]T, l)
 
 		for i := int64(0); i < l; i++ {
 			id, err := f()
