@@ -142,7 +142,7 @@ with keys as (
          , unnest ($5::varchar[]) as key4
          , generate_subscripts($1::varchar[], 1) as batch_key_index
 )
-select k.batch_key_index, c.id, c.version, c.community_type, c.key1, c.key2, c.key3, c.key4, c.name, c.override_name, c.description, c.override_description, c.profile_image_url, c.override_profile_image_url, c.badge_url, c.override_badge_url, c.contract_id, c.created_at, c.last_updated, c.deleted from keys k
+select k.batch_key_index, c.id, c.version, c.community_type, c.key1, c.key2, c.key3, c.key4, c.name, c.override_name, c.description, c.override_description, c.profile_image_url, c.override_profile_image_url, c.badge_url, c.override_badge_url, c.contract_id, c.created_at, c.last_updated, c.deleted, c.website_url, c.override_website_url from keys k
     join communities c on
         k.type = c.community_type
         and k.key1 = c.key1
@@ -203,6 +203,8 @@ func (q *Queries) GetCommunitiesByKeys(ctx context.Context, arg GetCommunitiesBy
 			&i.Community.CreatedAt,
 			&i.Community.LastUpdated,
 			&i.Community.Deleted,
+			&i.Community.WebsiteUrl,
+			&i.Community.OverrideWebsiteUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -297,7 +299,7 @@ func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommuni
 }
 
 const upsertCommunities = `-- name: UpsertCommunities :many
-insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, badge_url, contract_id, created_at, last_updated, deleted) (
+insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, badge_url, website_url, contract_id, created_at, last_updated, deleted) (
     select unnest($1::varchar[])
          , unnest($2::int[])
          , unnest($3::varchar[])
@@ -310,6 +312,7 @@ insert into communities(id, version, name, description, community_type, key1, ke
          , nullif(unnest($10::varchar[]), '')
          , nullif(unnest($11::varchar[]), '')
          , nullif(unnest($12::varchar[]), '')
+         , nullif(unnest($13::varchar[]), '')
          , now()
          , now()
          , false
@@ -320,10 +323,11 @@ on conflict (community_type, key1, key2, key3, key4) where not deleted
                 , description = coalesce(nullif(excluded.description, ''), nullif(communities.description, ''), '')
                 , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(communities.profile_image_url, ''))
                 , badge_url = coalesce(nullif(excluded.badge_url, ''), nullif(communities.badge_url, ''))
+                , website_url = coalesce(nullif(excluded.website_url, ''), nullif(communities.website_url, ''))
                 , contract_id = coalesce(nullif(excluded.contract_id, ''), nullif(communities.contract_id, ''))
                 , last_updated = now()
                 , deleted = excluded.deleted
-returning id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted
+returning id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url
 `
 
 type UpsertCommunitiesParams struct {
@@ -338,6 +342,7 @@ type UpsertCommunitiesParams struct {
 	Key4            []string `db:"key4" json:"key4"`
 	ProfileImageUrl []string `db:"profile_image_url" json:"profile_image_url"`
 	BadgeUrl        []string `db:"badge_url" json:"badge_url"`
+	WebsiteUrl      []string `db:"website_url" json:"website_url"`
 	ContractID      []string `db:"contract_id" json:"contract_id"`
 }
 
@@ -354,6 +359,7 @@ func (q *Queries) UpsertCommunities(ctx context.Context, arg UpsertCommunitiesPa
 		arg.Key4,
 		arg.ProfileImageUrl,
 		arg.BadgeUrl,
+		arg.WebsiteUrl,
 		arg.ContractID,
 	)
 	if err != nil {
@@ -383,6 +389,8 @@ func (q *Queries) UpsertCommunities(ctx context.Context, arg UpsertCommunitiesPa
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.WebsiteUrl,
+			&i.OverrideWebsiteUrl,
 		); err != nil {
 			return nil, err
 		}

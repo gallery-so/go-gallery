@@ -65,6 +65,7 @@ type artBlocksCommunityInfo struct {
 	PreviewAssetURL string `json:"preview_asset_url"`
 
 	CollectionName string `json:"collection_name"`
+	Website        string `json:"website"`
 
 	RoyaltyInfo struct {
 		ArtistAddress   persist.Address `json:"artistAddress"`
@@ -101,6 +102,10 @@ func (i artBlocksCommunityInfo) GetProfileImageURL() string {
 
 func (i artBlocksCommunityInfo) GetCreatorAddresses() []persist.ChainAddress {
 	return []persist.ChainAddress{persist.NewChainAddress(i.RoyaltyInfo.ArtistAddress, i.Chain)}
+}
+
+func (i artBlocksCommunityInfo) GetWebsiteURL() string {
+	return i.Website
 }
 
 // Art Blocks project IDs are the token ID divided by 1,000,000
@@ -311,6 +316,7 @@ func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownPr
 				upsertParams.Key3 = append(upsertParams.Key3, communityKey.Key3)
 				upsertParams.Key4 = append(upsertParams.Key4, communityKey.Key4)
 				upsertParams.ProfileImageUrl = append(upsertParams.ProfileImageUrl, c.GetProfileImageURL())
+				upsertParams.WebsiteUrl = append(upsertParams.WebsiteUrl, c.GetWebsiteURL())
 				upsertParams.ContractID = append(upsertParams.ContractID, contract.ID.String())
 			}
 

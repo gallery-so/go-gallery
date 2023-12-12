@@ -84,6 +84,8 @@ type Community struct {
 	CreatedAt               time.Time             `db:"created_at" json:"created_at"`
 	LastUpdated             time.Time             `db:"last_updated" json:"last_updated"`
 	Deleted                 bool                  `db:"deleted" json:"deleted"`
+	WebsiteUrl              sql.NullString        `db:"website_url" json:"website_url"`
+	OverrideWebsiteUrl      sql.NullString        `db:"override_website_url" json:"override_website_url"`
 }
 
 type CommunityContractProvider struct {
