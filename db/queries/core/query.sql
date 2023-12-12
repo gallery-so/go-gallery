@@ -585,7 +585,7 @@ and posts.deleted = false;
 -- name: GetFeedEventsByIds :many
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
--- name: GetPostsByIdsPaginate :many
+-- name: GetPostsByIdsPaginateBatch :batchmany
 select posts.*
 from posts
 join unnest(@post_ids::varchar[]) with ordinality t(id, pos) using(id)
@@ -986,7 +986,7 @@ select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = 
              case when not @paging_forward::bool then (u.username_idempotent, u.id) end desc
     limit $1;
 
--- name: GetUsersByPositionPaginate :many
+-- name: GetUsersByPositionPaginateBatch :batchmany
 select u.*
 from users u
 join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
@@ -1549,7 +1549,7 @@ ranking as (
 )
 select collections.id from collections join ranking using(id) where score <= 100 order by score asc;
 
--- name: GetVisibleCollectionsByIDsPaginate :many
+-- name: GetVisibleCollectionsByIDsPaginateBatch :batchmany
 select collections.*
 from collections, unnest(@collection_ids::varchar[]) with ordinality as t(id, pos)
 where collections.id = t.id and not deleted and not hidden and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int

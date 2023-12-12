@@ -168,23 +168,24 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api UserAPI) paginatorFromCursorStr(ctx context.Context, c string, q *db.Queries) (positionPaginator[db.User], error) {
+func (api UserAPI) paginatorFromCursorStr(ctx context.Context, curStr string) (positionPaginator[db.User], error) {
 	cur := cursors.NewPositionCursor()
-	err := cur.Unpack(c)
+	err := cur.Unpack(curStr)
 	if err != nil {
 		return positionPaginator[db.User]{}, err
 	}
-	return api.paginatorFromCursor(ctx, cur, q), nil
+	return api.paginatorFromCursor(ctx, cur), nil
 }
 
-func (api UserAPI) paginatorFromCursor(ctx context.Context, c *positionCursor, q *db.Queries) positionPaginator[db.User] {
+func (api UserAPI) paginatorFromCursor(ctx context.Context, c *positionCursor) positionPaginator[db.User] {
 	return api.paginatorWithQuery(c, func(p positionPagingParams) ([]db.User, error) {
-		return q.GetUsersByPositionPaginate(ctx, db.GetUsersByPositionPaginateParams{
+		params := db.GetUsersByPositionPaginateBatchParams{
 			UserIds: util.MapWithoutError(c.IDs, func(id persist.DBID) string { return id.String() }),
 			// Postgres uses 1-based indexing
 			CurBeforePos: p.CursorBeforePos + 1,
 			CurAfterPos:  p.CursorAfterPos + 1,
-		})
+		}
+		return api.loaders.GetUsersByPositionPaginateBatch.Load(params)
 	})
 }
 
@@ -210,7 +211,7 @@ func (api UserAPI) GetOnboardingUserRecommendations(ctx context.Context, before,
 	paginator := positionPaginator[db.User]{}
 
 	if before != nil {
-		paginator, err := api.paginatorFromCursorStr(ctx, *before, api.queries)
+		paginator, err := api.paginatorFromCursorStr(ctx, *before)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -218,7 +219,7 @@ func (api UserAPI) GetOnboardingUserRecommendations(ctx context.Context, before,
 	}
 
 	if after != nil {
-		paginator, err := api.paginatorFromCursorStr(ctx, *after, api.queries)
+		paginator, err := api.paginatorFromCursorStr(ctx, *after)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -248,7 +249,7 @@ func (api UserAPI) GetOnboardingUserRecommendations(ctx context.Context, before,
 	if users != nil {
 		paginator = api.paginatorFromResults(ctx, cursor, users)
 	} else {
-		paginator = api.paginatorFromCursor(ctx, cursor, api.queries)
+		paginator = api.paginatorFromCursor(ctx, cursor)
 	}
 
 	return paginator.paginate(before, after, first, last)
@@ -1398,7 +1399,7 @@ func (api UserAPI) GetExploreRecommendedUsers(ctx context.Context, before, after
 		paginator = api.paginatorFromResults(ctx, cursor, users)
 	}
 
-	paginator = api.paginatorFromCursor(ctx, cursor, api.queries)
+	paginator = api.paginatorFromCursor(ctx, cursor)
 	return paginator.paginate(before, after, first, last)
 }
 

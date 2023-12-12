@@ -149,13 +149,14 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 	}
 
 	paginator := positionPaginator[db.Collection]{}
-	paginator.QueryFunc = func(params positionPagingParams) ([]db.Collection, error) {
-		return api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
+	paginator.QueryFunc = func(p positionPagingParams) ([]db.Collection, error) {
+		params := db.GetVisibleCollectionsByIDsPaginateBatchParams{
 			CollectionIds: util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() }),
 			// Postgres uses 1-based indexing
-			CurBeforePos: params.CursorBeforePos + 1,
-			CurAfterPos:  params.CursorAfterPos + 1,
-		})
+			CurBeforePos: p.CursorBeforePos + 1,
+			CurAfterPos:  p.CursorAfterPos + 1,
+		}
+		return api.loaders.GetVisibleCollectionsByIDsPaginateBatch.Load(params)
 	}
 	paginator.CursorFunc = func(c db.Collection) (int64, []persist.DBID, error) { return cursor.Positions[c.ID], cursor.IDs, nil }
 	return paginator.paginate(before, after, first, last)

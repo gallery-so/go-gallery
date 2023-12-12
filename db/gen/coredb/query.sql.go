@@ -3144,52 +3144,6 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 	return i, err
 }
 
-const getPostsByIdsPaginate = `-- name: GetPostsByIdsPaginate :many
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
-from posts
-join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
-where not posts.deleted and t.pos > $2::int and t.pos < $3::int
-order by t.pos asc
-`
-
-type GetPostsByIdsPaginateParams struct {
-	PostIds      []string `db:"post_ids" json:"post_ids"`
-	CurAfterPos  int32    `db:"cur_after_pos" json:"cur_after_pos"`
-	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
-}
-
-func (q *Queries) GetPostsByIdsPaginate(ctx context.Context, arg GetPostsByIdsPaginateParams) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsByIdsPaginate, arg.PostIds, arg.CurAfterPos, arg.CurBeforePos)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Post
-	for rows.Next() {
-		var i Post
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.TokenIds,
-			&i.ContractIds,
-			&i.ActorID,
-			&i.Caption,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Deleted,
-			&i.IsFirstPost,
-			&i.UserMintUrl,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getPotentialENSProfileImageByUserId = `-- name: GetPotentialENSProfileImageByUserId :one
 select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.active, token_medias.media, token_medias.processing_job_id, token_medias.deleted, wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain
 from token_definitions, tokens, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
@@ -5061,59 +5015,6 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 	return items, nil
 }
 
-const getUsersByPositionPaginate = `-- name: GetUsersByPositionPaginate :many
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
-from users u
-join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
-where not u.deleted and not u.universal and t.pos > $2::int and t.pos < $3::int
-order by t.pos asc
-`
-
-type GetUsersByPositionPaginateParams struct {
-	UserIds      []string `db:"user_ids" json:"user_ids"`
-	CurAfterPos  int32    `db:"cur_after_pos" json:"cur_after_pos"`
-	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
-}
-
-func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersByPositionPaginateParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getUsersByPositionPaginate, arg.UserIds, arg.CurAfterPos, arg.CurBeforePos)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []User
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.ProfileImageID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getUsersBySocialIDs = `-- name: GetUsersBySocialIDs :many
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view u where u.pii_socials->$1::varchar->>'id' = any($2::varchar[]) and not u.deleted and not u.universal
 `
@@ -5510,53 +5411,6 @@ func (q *Queries) GetUsersWithoutSocials(ctx context.Context) ([]GetUsersWithout
 			&i.Address,
 			&i.Column3,
 			&i.Column4,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getVisibleCollectionsByIDsPaginate = `-- name: GetVisibleCollectionsByIDsPaginate :many
-select collections.id, collections.deleted, collections.owner_user_id, collections.nfts, collections.version, collections.last_updated, collections.created_at, collections.hidden, collections.collectors_note, collections.name, collections.layout, collections.token_settings, collections.gallery_id
-from collections, unnest($1::varchar[]) with ordinality as t(id, pos)
-where collections.id = t.id and not deleted and not hidden and t.pos > $2::int and t.pos < $3::int
-order by t.pos asc
-`
-
-type GetVisibleCollectionsByIDsPaginateParams struct {
-	CollectionIds []string `db:"collection_ids" json:"collection_ids"`
-	CurAfterPos   int32    `db:"cur_after_pos" json:"cur_after_pos"`
-	CurBeforePos  int32    `db:"cur_before_pos" json:"cur_before_pos"`
-}
-
-func (q *Queries) GetVisibleCollectionsByIDsPaginate(ctx context.Context, arg GetVisibleCollectionsByIDsPaginateParams) ([]Collection, error) {
-	rows, err := q.db.Query(ctx, getVisibleCollectionsByIDsPaginate, arg.CollectionIds, arg.CurAfterPos, arg.CurBeforePos)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Collection
-	for rows.Next() {
-		var i Collection
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.OwnerUserID,
-			&i.Nfts,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Hidden,
-			&i.CollectorsNote,
-			&i.Name,
-			&i.Layout,
-			&i.TokenSettings,
-			&i.GalleryID,
 		); err != nil {
 			return nil, err
 		}

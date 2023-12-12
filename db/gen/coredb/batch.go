@@ -2809,6 +2809,88 @@ func (b *GetPostByIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getPostsByIdsPaginateBatch = `-- name: GetPostsByIdsPaginateBatch :batchmany
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
+from posts
+join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
+where not posts.deleted and t.pos > $2::int and t.pos < $3::int
+order by t.pos asc
+`
+
+type GetPostsByIdsPaginateBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetPostsByIdsPaginateBatchParams struct {
+	PostIds      []string `db:"post_ids" json:"post_ids"`
+	CurAfterPos  int32    `db:"cur_after_pos" json:"cur_after_pos"`
+	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
+}
+
+func (q *Queries) GetPostsByIdsPaginateBatch(ctx context.Context, arg []GetPostsByIdsPaginateBatchParams) *GetPostsByIdsPaginateBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.PostIds,
+			a.CurAfterPos,
+			a.CurBeforePos,
+		}
+		batch.Queue(getPostsByIdsPaginateBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetPostsByIdsPaginateBatchBatchResults{br, len(arg), false}
+}
+
+func (b *GetPostsByIdsPaginateBatchBatchResults) Query(f func(int, []Post, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Post
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Post
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.TokenIds,
+					&i.ContractIds,
+					&i.ActorID,
+					&i.Caption,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+					&i.IsFirstPost,
+					&i.UserMintUrl,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetPostsByIdsPaginateBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getProfileImageByID = `-- name: GetProfileImageByID :batchone
 select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain from profile_images pfp
 where pfp.id = $1
@@ -4134,6 +4216,95 @@ func (b *GetUserNotificationsBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getUsersByPositionPaginateBatch = `-- name: GetUsersByPositionPaginateBatch :batchmany
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
+from users u
+join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
+where not u.deleted and not u.universal and t.pos > $2::int and t.pos < $3::int
+order by t.pos asc
+`
+
+type GetUsersByPositionPaginateBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetUsersByPositionPaginateBatchParams struct {
+	UserIds      []string `db:"user_ids" json:"user_ids"`
+	CurAfterPos  int32    `db:"cur_after_pos" json:"cur_after_pos"`
+	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
+}
+
+func (q *Queries) GetUsersByPositionPaginateBatch(ctx context.Context, arg []GetUsersByPositionPaginateBatchParams) *GetUsersByPositionPaginateBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.UserIds,
+			a.CurAfterPos,
+			a.CurBeforePos,
+		}
+		batch.Queue(getUsersByPositionPaginateBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUsersByPositionPaginateBatchBatchResults{br, len(arg), false}
+}
+
+func (b *GetUsersByPositionPaginateBatchBatchResults) Query(f func(int, []User, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []User
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i User
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.LastUpdated,
+					&i.CreatedAt,
+					&i.Username,
+					&i.UsernameIdempotent,
+					&i.Wallets,
+					&i.Bio,
+					&i.Traits,
+					&i.Universal,
+					&i.NotificationSettings,
+					&i.EmailVerified,
+					&i.EmailUnsubscriptions,
+					&i.FeaturedGallery,
+					&i.PrimaryWalletID,
+					&i.UserExperiences,
+					&i.ProfileImageID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetUsersByPositionPaginateBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
@@ -4207,6 +4378,89 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 }
 
 func (b *GetUsersWithTraitBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getVisibleCollectionsByIDsPaginateBatch = `-- name: GetVisibleCollectionsByIDsPaginateBatch :batchmany
+select collections.id, collections.deleted, collections.owner_user_id, collections.nfts, collections.version, collections.last_updated, collections.created_at, collections.hidden, collections.collectors_note, collections.name, collections.layout, collections.token_settings, collections.gallery_id
+from collections, unnest($1::varchar[]) with ordinality as t(id, pos)
+where collections.id = t.id and not deleted and not hidden and t.pos > $2::int and t.pos < $3::int
+order by t.pos asc
+`
+
+type GetVisibleCollectionsByIDsPaginateBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetVisibleCollectionsByIDsPaginateBatchParams struct {
+	CollectionIds []string `db:"collection_ids" json:"collection_ids"`
+	CurAfterPos   int32    `db:"cur_after_pos" json:"cur_after_pos"`
+	CurBeforePos  int32    `db:"cur_before_pos" json:"cur_before_pos"`
+}
+
+func (q *Queries) GetVisibleCollectionsByIDsPaginateBatch(ctx context.Context, arg []GetVisibleCollectionsByIDsPaginateBatchParams) *GetVisibleCollectionsByIDsPaginateBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CollectionIds,
+			a.CurAfterPos,
+			a.CurBeforePos,
+		}
+		batch.Queue(getVisibleCollectionsByIDsPaginateBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetVisibleCollectionsByIDsPaginateBatchBatchResults{br, len(arg), false}
+}
+
+func (b *GetVisibleCollectionsByIDsPaginateBatchBatchResults) Query(f func(int, []Collection, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Collection
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Collection
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.OwnerUserID,
+					&i.Nfts,
+					&i.Version,
+					&i.LastUpdated,
+					&i.CreatedAt,
+					&i.Hidden,
+					&i.CollectorsNote,
+					&i.Name,
+					&i.Layout,
+					&i.TokenSettings,
+					&i.GalleryID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetVisibleCollectionsByIDsPaginateBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

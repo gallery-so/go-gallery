@@ -47,9 +47,10 @@ var feedOpts = struct {
 	GalleryPostHalfLife float64 // controls the decay rate of Gallery posts
 	GalleryDecayPeriod  float64 // time it takes for a Gallery post to reach GalleryPostHalfLife from PostHalfLife
 }{
-	FreshnessFactor:     2.0,
-	FirstPostFactor:     2.0,
-	LookbackWindow:      time.Duration(4 * 24 * time.Hour).Minutes(),
+	FreshnessFactor: 2.0,
+	FirstPostFactor: 2.0,
+	// LookbackWindow:      time.Duration(4 * 24 * time.Hour).Minutes(),
+	LookbackWindow:      time.Duration(30 * 24 * time.Hour).Minutes(),
 	FreshnessWindow:     time.Duration(6 * time.Hour).Minutes(),
 	PostHalfLife:        time.Duration(6 * time.Hour).Minutes(),
 	GalleryPostHalfLife: time.Duration(10 * time.Hour).Minutes(),
@@ -638,25 +639,25 @@ func fetchFeedEntityScores(ctx context.Context, q *db.Queries, viewerID persist.
 	return scoreMap, nil
 }
 
-func (api FeedAPI) paginatorFromCursorStr(ctx context.Context, c string, q *db.Queries) (feedPaginator, error) {
+func (api FeedAPI) paginatorFromCursorStr(ctx context.Context, curStr string) (feedPaginator, error) {
 	cur := cursors.NewFeedPositionCursor()
-	err := cur.Unpack(c)
+	err := cur.Unpack(curStr)
 	if err != nil {
 		return feedPaginator{}, err
 	}
-	paginator := api.paginatorFromCursor(ctx, cur, q)
+	paginator := api.paginatorFromCursor(ctx, cur)
 	return paginator, nil
 }
 
-func (api FeedAPI) paginatorFromCursor(ctx context.Context, c *feedPositionCursor, q *db.Queries) feedPaginator {
+func (api FeedAPI) paginatorFromCursor(ctx context.Context, c *feedPositionCursor) feedPaginator {
 	return api.paginatorWithQuery(c, func(p positionPagingParams) ([]any, error) {
-		params := db.GetPostsByIdsPaginateParams{
+		params := db.GetPostsByIdsPaginateBatchParams{
 			PostIds: util.MapWithoutError(c.EntityIDs, func(i persist.DBID) string { return i.String() }),
 			// Postgres uses 1-based indexing
 			CurAfterPos:  p.CursorAfterPos + 1,
 			CurBeforePos: p.CursorBeforePos + 1,
 		}
-		posts, err := q.GetPostsByIdsPaginate(ctx, params)
+		posts, err := api.loaders.GetPostsByIdsPaginateBatch.Load(params)
 		return util.MapWithoutError(posts, func(p db.Post) any { return p }), err
 	})
 }
@@ -686,12 +687,12 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	var err error
 
 	if before != nil {
-		paginator, err = api.paginatorFromCursorStr(ctx, *before, api.queries)
+		paginator, err = api.paginatorFromCursorStr(ctx, *before)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		paginator, err = api.paginatorFromCursorStr(ctx, *after, api.queries)
+		paginator, err = api.paginatorFromCursorStr(ctx, *after)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -747,7 +748,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		if posts != nil {
 			paginator = api.paginatorFromResults(ctx, cursor, posts)
 		} else {
-			paginator = api.paginatorFromCursor(ctx, cursor, api.queries)
+			paginator = api.paginatorFromCursor(ctx, cursor)
 		}
 	}
 
@@ -770,12 +771,12 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 	var err error
 
 	if before != nil {
-		paginator, err = api.paginatorFromCursorStr(ctx, *before, api.queries)
+		paginator, err = api.paginatorFromCursorStr(ctx, *before)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		paginator, err = api.paginatorFromCursorStr(ctx, *after, api.queries)
+		paginator, err = api.paginatorFromCursorStr(ctx, *after)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}

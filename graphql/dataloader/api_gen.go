@@ -55,6 +55,7 @@ type Loaders struct {
 	GetNotificationByIDBatch                 *GetNotificationByIDBatch
 	GetOwnersByContractIdBatchPaginate       *GetOwnersByContractIdBatchPaginate
 	GetPostByIdBatch                         *GetPostByIdBatch
+	GetPostsByIdsPaginateBatch               *GetPostsByIdsPaginateBatch
 	GetProfileImageByID                      *GetProfileImageByID
 	GetSharedContractsBatchPaginate          *GetSharedContractsBatchPaginate
 	GetSharedFollowersBatchPaginate          *GetSharedFollowersBatchPaginate
@@ -69,7 +70,9 @@ type Loaders struct {
 	GetUserByIdBatch                         *GetUserByIdBatch
 	GetUserByUsernameBatch                   *GetUserByUsernameBatch
 	GetUserNotificationsBatch                *GetUserNotificationsBatch
+	GetUsersByPositionPaginateBatch          *GetUsersByPositionPaginateBatch
 	GetUsersWithTraitBatch                   *GetUsersWithTraitBatch
+	GetVisibleCollectionsByIDsPaginateBatch  *GetVisibleCollectionsByIDsPaginateBatch
 	GetWalletByIDBatch                       *GetWalletByIDBatch
 	GetWalletsByUserIDBatch                  *GetWalletsByUserIDBatch
 	PaginateAdmiresByCommentIDBatch          *PaginateAdmiresByCommentIDBatch
@@ -133,6 +136,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetNotificationByIDBatch = newGetNotificationByIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetNotificationByIDBatch(q), preFetchHook, postFetchHook)
 	loaders.GetOwnersByContractIdBatchPaginate = newGetOwnersByContractIdBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetOwnersByContractIdBatchPaginate(q), preFetchHook, postFetchHook)
 	loaders.GetPostByIdBatch = newGetPostByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetPostByIdBatch(q), preFetchHook, postFetchHook)
+	loaders.GetPostsByIdsPaginateBatch = newGetPostsByIdsPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetPostsByIdsPaginateBatch(q), preFetchHook, postFetchHook)
 	loaders.GetProfileImageByID = newGetProfileImageByID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetProfileImageByID(q), preFetchHook, postFetchHook)
 	loaders.GetSharedContractsBatchPaginate = newGetSharedContractsBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetSharedContractsBatchPaginate(q), preFetchHook, postFetchHook)
 	loaders.GetSharedFollowersBatchPaginate = newGetSharedFollowersBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetSharedFollowersBatchPaginate(q), preFetchHook, postFetchHook)
@@ -147,7 +151,9 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetUserByIdBatch = newGetUserByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUserByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetUserByUsernameBatch = newGetUserByUsernameBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUserByUsernameBatch(q), preFetchHook, postFetchHook)
 	loaders.GetUserNotificationsBatch = newGetUserNotificationsBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUserNotificationsBatch(q), preFetchHook, postFetchHook)
+	loaders.GetUsersByPositionPaginateBatch = newGetUsersByPositionPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUsersByPositionPaginateBatch(q), preFetchHook, postFetchHook)
 	loaders.GetUsersWithTraitBatch = newGetUsersWithTraitBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUsersWithTraitBatch(q), preFetchHook, postFetchHook)
+	loaders.GetVisibleCollectionsByIDsPaginateBatch = newGetVisibleCollectionsByIDsPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetVisibleCollectionsByIDsPaginateBatch(q), preFetchHook, postFetchHook)
 	loaders.GetWalletByIDBatch = newGetWalletByIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetWalletByIDBatch(q), preFetchHook, postFetchHook)
 	loaders.GetWalletsByUserIDBatch = newGetWalletsByUserIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetWalletsByUserIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateAdmiresByCommentIDBatch = newPaginateAdmiresByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateAdmiresByCommentIDBatch(q), preFetchHook, postFetchHook)
@@ -204,6 +210,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		}
 	})
 	loaders.GetCollectionsByGalleryIdBatch.RegisterResultSubscriber(func(result []coredb.Collection) {
+		for _, entry := range result {
+			loaders.GetCollectionByIdBatch.Prime(loaders.GetCollectionByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetVisibleCollectionsByIDsPaginateBatch.RegisterResultSubscriber(func(result []coredb.Collection) {
 		for _, entry := range result {
 			loaders.GetCollectionByIdBatch.Prime(loaders.GetCollectionByIdBatch.getKeyForResult(entry), entry)
 		}
@@ -305,6 +316,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetNotificationByIDBatch.Prime(loaders.GetNotificationByIDBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetPostsByIdsPaginateBatch.RegisterResultSubscriber(func(result []coredb.Post) {
+		for _, entry := range result {
+			loaders.GetPostByIdBatch.Prime(loaders.GetPostByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
 	loaders.PaginatePostsByCommunityID.RegisterResultSubscriber(func(result []coredb.Post) {
 		for _, entry := range result {
 			loaders.GetPostByIdBatch.Prime(loaders.GetPostByIdBatch.getKeyForResult(entry), entry)
@@ -360,6 +376,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetUserByUsernameBatch.RegisterResultSubscriber(func(result coredb.User) {
 		loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(result), result)
 	})
+	loaders.GetUsersByPositionPaginateBatch.RegisterResultSubscriber(func(result []coredb.User) {
+		for _, entry := range result {
+			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
 	loaders.GetUsersWithTraitBatch.RegisterResultSubscriber(func(result []coredb.User) {
 		for _, entry := range result {
 			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
@@ -395,6 +416,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	})
 	loaders.GetUserByIdBatch.RegisterResultSubscriber(func(result coredb.User) {
 		loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(result), result)
+	})
+	loaders.GetUsersByPositionPaginateBatch.RegisterResultSubscriber(func(result []coredb.User) {
+		for _, entry := range result {
+			loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(entry), entry)
+		}
 	})
 	loaders.GetUsersWithTraitBatch.RegisterResultSubscriber(func(result []coredb.User) {
 		for _, entry := range result {
@@ -1179,6 +1205,22 @@ func loadGetPostByIdBatch(q *coredb.Queries) func(context.Context, *GetPostByIdB
 	}
 }
 
+func loadGetPostsByIdsPaginateBatch(q *coredb.Queries) func(context.Context, *GetPostsByIdsPaginateBatch, []coredb.GetPostsByIdsPaginateBatchParams) ([][]coredb.Post, []error) {
+	return func(ctx context.Context, d *GetPostsByIdsPaginateBatch, params []coredb.GetPostsByIdsPaginateBatchParams) ([][]coredb.Post, []error) {
+		results := make([][]coredb.Post, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetPostsByIdsPaginateBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Post, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
 func loadGetProfileImageByID(q *coredb.Queries) func(context.Context, *GetProfileImageByID, []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
 	return func(ctx context.Context, d *GetProfileImageByID, params []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
 		results := make([]coredb.ProfileImage, len(params))
@@ -1427,6 +1469,22 @@ func loadGetUserNotificationsBatch(q *coredb.Queries) func(context.Context, *Get
 	}
 }
 
+func loadGetUsersByPositionPaginateBatch(q *coredb.Queries) func(context.Context, *GetUsersByPositionPaginateBatch, []coredb.GetUsersByPositionPaginateBatchParams) ([][]coredb.User, []error) {
+	return func(ctx context.Context, d *GetUsersByPositionPaginateBatch, params []coredb.GetUsersByPositionPaginateBatchParams) ([][]coredb.User, []error) {
+		results := make([][]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUsersByPositionPaginateBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
 func loadGetUsersWithTraitBatch(q *coredb.Queries) func(context.Context, *GetUsersWithTraitBatch, []string) ([][]coredb.User, []error) {
 	return func(ctx context.Context, d *GetUsersWithTraitBatch, params []string) ([][]coredb.User, []error) {
 		results := make([][]coredb.User, len(params))
@@ -1436,6 +1494,22 @@ func loadGetUsersWithTraitBatch(q *coredb.Queries) func(context.Context, *GetUse
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetVisibleCollectionsByIDsPaginateBatch(q *coredb.Queries) func(context.Context, *GetVisibleCollectionsByIDsPaginateBatch, []coredb.GetVisibleCollectionsByIDsPaginateBatchParams) ([][]coredb.Collection, []error) {
+	return func(ctx context.Context, d *GetVisibleCollectionsByIDsPaginateBatch, params []coredb.GetVisibleCollectionsByIDsPaginateBatchParams) ([][]coredb.Collection, []error) {
+		results := make([][]coredb.Collection, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetVisibleCollectionsByIDsPaginateBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Collection, err error) {
 			results[i], errors[i] = r, err
 		})
 

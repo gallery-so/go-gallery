@@ -1966,6 +1966,7 @@ func contractToBadgeModel(ctx context.Context, contract db.Contract) *model.Badg
 		ImageURL: contract.BadgeUrl.String,
 	}
 }
+
 func collectionToModel(ctx context.Context, collection db.Collection) *model.Collection {
 	version := int(collection.Version.Int32)
 

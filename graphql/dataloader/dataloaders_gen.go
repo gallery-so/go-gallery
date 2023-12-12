@@ -1589,6 +1589,43 @@ func (*GetPostByIdBatch) getKeyForResult(result coredb.Post) persist.DBID {
 	return result.ID
 }
 
+// GetPostsByIdsPaginateBatch batches and caches requests
+type GetPostsByIdsPaginateBatch struct {
+	generator.Dataloader[coredb.GetPostsByIdsPaginateBatchParams, []coredb.Post]
+}
+
+// newGetPostsByIdsPaginateBatch creates a new GetPostsByIdsPaginateBatch with the given settings, functions, and options
+func newGetPostsByIdsPaginateBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetPostsByIdsPaginateBatch, []coredb.GetPostsByIdsPaginateBatchParams) ([][]coredb.Post, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetPostsByIdsPaginateBatch {
+	d := &GetPostsByIdsPaginateBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetPostsByIdsPaginateBatchParams) ([][]coredb.Post, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetPostsByIdsPaginateBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetPostsByIdsPaginateBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetProfileImageByID batches and caches requests
 type GetProfileImageByID struct {
 	generator.Dataloader[coredb.GetProfileImageByIDParams, coredb.ProfileImage]
@@ -2115,6 +2152,43 @@ func newGetUserNotificationsBatch(
 	return d
 }
 
+// GetUsersByPositionPaginateBatch batches and caches requests
+type GetUsersByPositionPaginateBatch struct {
+	generator.Dataloader[coredb.GetUsersByPositionPaginateBatchParams, []coredb.User]
+}
+
+// newGetUsersByPositionPaginateBatch creates a new GetUsersByPositionPaginateBatch with the given settings, functions, and options
+func newGetUsersByPositionPaginateBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetUsersByPositionPaginateBatch, []coredb.GetUsersByPositionPaginateBatchParams) ([][]coredb.User, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetUsersByPositionPaginateBatch {
+	d := &GetUsersByPositionPaginateBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetUsersByPositionPaginateBatchParams) ([][]coredb.User, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetUsersByPositionPaginateBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetUsersByPositionPaginateBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetUsersWithTraitBatch batches and caches requests
 type GetUsersWithTraitBatch struct {
 	generator.Dataloader[string, []coredb.User]
@@ -2149,6 +2223,43 @@ func newGetUsersWithTraitBatch(
 	}
 
 	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetVisibleCollectionsByIDsPaginateBatch batches and caches requests
+type GetVisibleCollectionsByIDsPaginateBatch struct {
+	generator.Dataloader[coredb.GetVisibleCollectionsByIDsPaginateBatchParams, []coredb.Collection]
+}
+
+// newGetVisibleCollectionsByIDsPaginateBatch creates a new GetVisibleCollectionsByIDsPaginateBatch with the given settings, functions, and options
+func newGetVisibleCollectionsByIDsPaginateBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetVisibleCollectionsByIDsPaginateBatch, []coredb.GetVisibleCollectionsByIDsPaginateBatchParams) ([][]coredb.Collection, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetVisibleCollectionsByIDsPaginateBatch {
+	d := &GetVisibleCollectionsByIDsPaginateBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetVisibleCollectionsByIDsPaginateBatchParams) ([][]coredb.Collection, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetVisibleCollectionsByIDsPaginateBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetVisibleCollectionsByIDsPaginateBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 
