@@ -588,8 +588,8 @@ SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = fal
 -- name: GetPostsByIdsPaginate :many
 select posts.*
 from posts
-join unnest(@post_ids::varchar(255)[]) with ordinality t(id, pos) using(id)
-where not posts.deleted and t.pos > @cur_before_pos::int and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
+join unnest(@post_ids::varchar[]) with ordinality t(id, pos) using(id)
+where not posts.deleted and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
 order by t.pos asc;
 
 -- name: GetEventByIdBatch :batchone
@@ -1805,7 +1805,7 @@ SET traits = CASE
              END
 WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 
--- name: GetNewUserUserRecommendations :many
+-- name: GetOnboardingUserRecommendations :many
 with sources as (
     select id from users where (traits->>'top_activity')::bool
     union all select recommended_user_id from top_recommended_users

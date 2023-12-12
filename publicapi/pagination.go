@@ -554,7 +554,7 @@ type positionPagingParams struct {
 	IDs             []persist.DBID
 }
 
-func (p positionPaginator[T]) cursorsToArgs(before, after *string) (positionPagingParams, error) {
+func (p *positionPaginator[T]) paginate(before *string, after *string, first *int, last *int) ([]T, PageInfo, error) {
 	args := positionPagingParams{
 		CursorBeforePos: int32(defaultCursorBeforePosition),
 		CursorAfterPos:  int32(defaultCursorAfterPosition),
@@ -565,7 +565,7 @@ func (p positionPaginator[T]) cursorsToArgs(before, after *string) (positionPagi
 
 	if before != nil {
 		if err := beforeCur.Unpack(*before); err != nil {
-			return args, err
+			return nil, PageInfo{}, err
 		}
 		args.CursorBeforePos = int32(beforeCur.CurrentPosition)
 		args.IDs = beforeCur.IDs
@@ -573,24 +573,17 @@ func (p positionPaginator[T]) cursorsToArgs(before, after *string) (positionPagi
 
 	if after != nil {
 		if err := afterCur.Unpack(*after); err != nil {
-			return args, err
+			return nil, PageInfo{}, err
 		}
 		args.CursorAfterPos = int32(afterCur.CurrentPosition)
 		args.IDs = afterCur.IDs
 	}
 
-	return args, nil
-}
-
-func (p *positionPaginator[T]) paginate(before *string, after *string, first *int, last *int) ([]T, PageInfo, error) {
-	args, err := p.cursorsToArgs(before, after)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
 	results, err := p.QueryFunc(args)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
+
 	return pageFrom(results, nil, newPositionCursor(p.CursorFunc), before, after, first, last)
 }
 

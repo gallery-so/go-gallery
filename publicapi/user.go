@@ -200,7 +200,7 @@ func (api UserAPI) paginatorWithQuery(c *positionCursor, queryF func(positionPag
 	return paginator
 }
 
-func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+func (api UserAPI) GetOnboardingUserRecommendations(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -229,8 +229,8 @@ func (api UserAPI) GetNewUserRecommendations(ctx context.Context, before, after 
 	var users []db.User
 	var err error
 
-	cache := newDBIDCache(api.cache, "new_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
-		users, err = api.queries.GetNewUserUserRecommendations(ctx, 100)
+	cache := newDBIDCache(api.cache, "onboarding_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
+		users, err = api.queries.GetOnboardingUserRecommendations(ctx, 100)
 		userIDs := util.MapWithoutError(users, func(u db.User) persist.DBID { return u.ID })
 		return userIDs, err
 	})

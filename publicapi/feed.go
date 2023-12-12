@@ -650,13 +650,14 @@ func (api FeedAPI) paginatorFromCursorStr(ctx context.Context, c string, q *db.Q
 
 func (api FeedAPI) paginatorFromCursor(ctx context.Context, c *feedPositionCursor, q *db.Queries) feedPaginator {
 	return api.paginatorWithQuery(c, func(p positionPagingParams) ([]any, error) {
+		mapped := util.MapWithoutError(c.EntityIDs, func(i persist.DBID) string { return i.String() })
 		posts, err := q.GetPostsByIdsPaginate(ctx, db.GetPostsByIdsPaginateParams{
-			PostIds:      util.MapWithoutError(p.IDs, func(i persist.DBID) string { return i.String() }),
-			CurBeforePos: p.CursorBeforePos + 1,
+			PostIds: mapped,
+			// Postgres uses 1-based indexing
 			CurAfterPos:  p.CursorAfterPos + 1,
+			CurBeforePos: p.CursorBeforePos + 1,
 		})
-		entities := util.MapWithoutError(posts, func(p db.Post) any { return p })
-		return entities, err
+		return util.MapWithoutError(posts, func(p db.Post) any { return p }), err
 	})
 }
 
@@ -1101,14 +1102,35 @@ type feedPaginator struct {
 }
 
 func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any, PageInfo, error) {
-	args, err := positionPaginator[any]{}.cursorsToArgs(before, after)
-	if err != nil {
-		return nil, PageInfo{}, err
+	args := positionPagingParams{
+		CursorBeforePos: int32(defaultCursorBeforePosition),
+		CursorAfterPos:  int32(defaultCursorAfterPosition),
 	}
+
+	beforeCur := cursors.NewFeedPositionCursor()
+	afterCur := cursors.NewFeedPositionCursor()
+
+	if before != nil {
+		if err := beforeCur.Unpack(*before); err != nil {
+			return nil, PageInfo{}, err
+		}
+		args.CursorBeforePos = int32(beforeCur.CurrentPosition)
+		args.IDs = beforeCur.EntityIDs
+	}
+
+	if after != nil {
+		if err := afterCur.Unpack(*after); err != nil {
+			return nil, PageInfo{}, err
+		}
+		args.CursorAfterPos = int32(afterCur.CurrentPosition)
+		args.IDs = afterCur.EntityIDs
+	}
+
 	results, err := p.QueryFunc(args)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
+
 	return pageFrom(results, nil, newFeedPositionCursor(p.CursorFunc), before, after, first, last)
 }
 

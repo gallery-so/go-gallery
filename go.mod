@@ -67,7 +67,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/wire v0.5.0
 	github.com/james-bowman/sparse v0.0.0-20210729090128-1e6c7dd483e9
-	github.com/jinzhu/copier v0.3.5
 	github.com/miguelmota/go-ethereum-hdwallet v0.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/sourcegraph/conc v0.3.0

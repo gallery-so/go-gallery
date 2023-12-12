@@ -2964,54 +2964,6 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDTokenIDForAction(ctx context
 	return i, err
 }
 
-const getNewUserUserRecommendations = `-- name: GetNewUserUserRecommendations :many
-with sources as (
-    select id from users where (traits->>'top_activity')::bool
-    union all select recommended_user_id from top_recommended_users
-    union all select user_id from user_internal_recommendations
-), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join top_recs using(id) where not users.deleted and not users.universal limit $1
-`
-
-func (q *Queries) GetNewUserUserRecommendations(ctx context.Context, limit int32) ([]User, error) {
-	rows, err := q.db.Query(ctx, getNewUserUserRecommendations, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []User
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.ProfileImageID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getNotificationByID = `-- name: GetNotificationByID :one
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE id = $1 AND deleted = false
 `
@@ -3093,6 +3045,54 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 	return items, nil
 }
 
+const getOnboardingUserRecommendations = `-- name: GetOnboardingUserRecommendations :many
+with sources as (
+    select id from users where (traits->>'top_activity')::bool
+    union all select recommended_user_id from top_recommended_users
+    union all select user_id from user_internal_recommendations
+), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join top_recs using(id) where not users.deleted and not users.universal limit $1
+`
+
+func (q *Queries) GetOnboardingUserRecommendations(ctx context.Context, limit int32) ([]User, error) {
+	rows, err := q.db.Query(ctx, getOnboardingUserRecommendations, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPostByID = `-- name: GetPostByID :one
 SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url FROM posts WHERE id = $1 AND deleted = false
 `
@@ -3119,19 +3119,19 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 const getPostsByIdsPaginate = `-- name: GetPostsByIdsPaginate :many
 select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
 from posts
-join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
-where not posts.deleted and t.pos > $2::int and t.pos > $3::int and t.pos < $2::int
+join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
+where not posts.deleted and t.pos > $2::int and t.pos < $3::int
 order by t.pos asc
 `
 
 type GetPostsByIdsPaginateParams struct {
 	PostIds      []string `db:"post_ids" json:"post_ids"`
-	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
 	CurAfterPos  int32    `db:"cur_after_pos" json:"cur_after_pos"`
+	CurBeforePos int32    `db:"cur_before_pos" json:"cur_before_pos"`
 }
 
 func (q *Queries) GetPostsByIdsPaginate(ctx context.Context, arg GetPostsByIdsPaginateParams) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsByIdsPaginate, arg.PostIds, arg.CurBeforePos, arg.CurAfterPos)
+	rows, err := q.db.Query(ctx, getPostsByIdsPaginate, arg.PostIds, arg.CurAfterPos, arg.CurBeforePos)
 	if err != nil {
 		return nil, err
 	}
