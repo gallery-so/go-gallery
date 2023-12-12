@@ -179,7 +179,7 @@ func findURLsToDownloadFrom(ctx context.Context, tpj *tokenProcessingJob, metada
 }
 
 func wrapWithBadTokenErr(err error) error {
-	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorAs[errInvalidMedia](err) || util.ErrorAs[errNoDataFromReader](err) {
+	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorIs[errInvalidMedia](err) || util.ErrorIs[errNoDataFromReader](err) {
 		err = ErrBadToken{Err: err}
 	}
 	return err

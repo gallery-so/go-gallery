@@ -137,7 +137,7 @@ func mustCreateMediaFromErr(ctx context.Context, err error, job *tokenProcessing
 	if bErr, ok := err.(ErrBadToken); ok {
 		return mustCreateMediaFromErr(ctx, bErr.Unwrap(), job)
 	}
-	if util.ErrorAs[errInvalidMedia](err) {
+	if util.ErrorIs[errInvalidMedia](err) {
 		invalidErr := err.(errInvalidMedia)
 		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}
 	}
@@ -252,7 +252,7 @@ type cacheResult struct {
 // IsSuccess returns true if objects were cached and no error occurred or if the error is errNotCacheable
 // IsSuccess evaluates to false for the zero value of cacheResult
 func (c cacheResult) IsSuccess() bool {
-	if util.ErrorAs[errNotCacheable](c.err) {
+	if util.ErrorIs[errNotCacheable](c.err) {
 		return true
 	}
 	return c.err == nil && len(c.cachedObjects) > 0
@@ -863,7 +863,7 @@ func readerFromURL(ctx context.Context, mediaURL string, mediaType persist.Media
 			return reader, mediaType, err
 		}
 		// The reader is and always will be invalid
-		if util.ErrorAs[util.ErrHTTP](err) || util.ErrorAs[*net.DNSError](err) || util.ErrorAs[*url.Error](err) {
+		if util.ErrorIs[util.ErrHTTP](err) || util.ErrorIs[*net.DNSError](err) || util.ErrorIs[*url.Error](err) {
 			return reader, mediaType, errInvalidMedia{URL: mediaURL, err: err}
 		}
 		return reader, mediaType, errNoDataFromReader{err: err, url: mediaURL}

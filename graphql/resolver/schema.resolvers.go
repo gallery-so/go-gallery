@@ -84,6 +84,11 @@ func (r *admireTokenPayloadResolver) Admire(ctx context.Context, obj *model.Admi
 	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
 }
 
+// Contract is the resolver for the contract field.
+func (r *artBlocksCommunityResolver) Contract(ctx context.Context, obj *model.ArtBlocksCommunity) (*model.Contract, error) {
+	return resolveContractByContractID(ctx, obj.HelperArtBlocksCommunityData.Community.ContractID)
+}
+
 // Gallery is the resolver for the gallery field.
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
@@ -308,109 +313,112 @@ func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *
 	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
-// Creator is the resolver for the creator field.
-func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
-	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
-	if err != nil {
-		if util.ErrorAs[persist.ErrContractCreatorNotFound](err) {
-			// It's normal not to find a creator for a community -- we may not have an address available.
-			// If that happens, just return nil to the frontend to signify that there is no creator.
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	if creator.CreatorUserID != "" {
-		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
-	}
-
-	if creator.CreatorAddress != "" {
-		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
-	}
-
-	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
-	return nil, fmt.Errorf("contract creator for community ID=%s is invalid: must have either an address or a user ID", obj.Dbid)
+// Creators is the resolver for the creators field.
+func (r *communityResolver) Creators(ctx context.Context, obj *model.Community) ([]model.GalleryUserOrAddress, error) {
+	return resolveCommunityCreatorsByCommunityID(ctx, obj.Dbid)
 }
 
-// ParentCommunity is the resolver for the parentCommunity field.
-func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityLink, error) {
-	if obj.HelperCommunityData.ParentID == "" {
-		return nil, nil
-	}
-
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.ParentCommunity.Node.Dbid)
-	if err != nil {
-		return nil, err
-	}
-
-	obj.ParentCommunity.Node = communityToModel(ctx, *contract, obj.ParentCommunity.Node.ForceRefresh)
-	return obj.ParentCommunity, nil
+// Holders is the resolver for the holders field.
+func (r *communityResolver) Holders(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
+	return resolveCommunityHoldersByCommunityID(ctx, obj.Dbid, before, after, first, last)
 }
 
-// SubCommunities is the resolver for the subCommunities field.
-func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	communities, pageInfo, err := publicapi.For(ctx).Contract.GetChildContractsByParentID(ctx, obj.Dbid, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
-
-	edges := make([]*model.CommunityEdge, len(communities))
-	for i, community := range communities {
-		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, util.ToPointer(false)),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.CommunitiesConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-}
-
-// TokensInCommunity is the resolver for the tokensInCommunity field.
-func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
-	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
-
-	if !onlyUsers {
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyUsers)
-}
-
-// Owners is the resolver for the owners field.
-func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
-	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
-
-	if !onlyUsers {
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers)
+// Tokens is the resolver for the tokens field.
+func (r *communityResolver) Tokens(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error) {
+	return resolveCommunityTokensByCommunityID(ctx, obj.Dbid, before, after, first, last)
 }
 
 // Posts is the resolver for the posts field.
 func (r *communityResolver) Posts(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.PostsConnection, error) {
-	return resolveCommunityPostsByContractID(ctx, obj.Dbid, before, after, first, last)
+	return resolveCommunityPostsByCommunityID(ctx, obj.Dbid, before, after, first, last)
 }
 
-// TmpPostsWithProjectID is the resolver for the tmpPostsWithProjectID field.
-func (r *communityResolver) TmpPostsWithProjectID(ctx context.Context, obj *model.Community, projectID int, before *string, after *string, first *int, last *int) (*model.PostsConnection, error) {
-	posts, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityPostsByContractIDAndProjectID(ctx, obj.Dbid, projectID, before, after, first, last)
+// Contract is the resolver for the contract field.
+func (r *communityResolver) Contract(ctx context.Context, obj *model.Community) (*model.Contract, error) {
+	contractID := obj.HelperCommunityData.Community.ContractID
+	if contractID == "" {
+		return nil, nil
+	}
+
+	return resolveContractByContractID(ctx, contractID)
+}
+
+// ContractAddress is the resolver for the contractAddress field.
+func (r *communityResolver) ContractAddress(ctx context.Context, obj *model.Community) (*persist.ChainAddress, error) {
+	contractID := obj.HelperCommunityData.Community.ContractID
+	if contractID == "" {
+		return nil, nil
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	connection := postsToConnection(ctx, posts, obj.Dbid, pageInfo)
-	return &connection, nil
+
+	return util.ToPointer(persist.NewChainAddress(contract.Address, contract.Chain)), nil
+}
+
+// Chain is the resolver for the chain field.
+func (r *communityResolver) Chain(ctx context.Context, obj *model.Community) (*persist.Chain, error) {
+	contractID := obj.HelperCommunityData.Community.ContractID
+	if contractID == "" {
+		return nil, nil
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(contract.Chain), nil
+}
+
+// CreatorAddress is the resolver for the creatorAddress field.
+func (r *communityResolver) CreatorAddress(ctx context.Context, obj *model.Community) (*persist.ChainAddress, error) {
+	contractID := obj.HelperCommunityData.Community.ContractID
+	if contractID == "" {
+		return nil, nil
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	creatorAddress, _ := util.FindFirst([]persist.Address{contract.OwnerAddress, contract.CreatorAddress}, func(a persist.Address) bool {
+		return a != ""
+	})
+
+	return util.ToPointer(persist.NewChainAddress(creatorAddress, contract.Chain)), nil
+}
+
+// Creator is the resolver for the creator field.
+func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
+	creators, err := resolveCommunityCreatorsByCommunityID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(creators) > 0 {
+		return creators[0], nil
+	}
+
+	return nil, nil
+}
+
+// TokensInCommunity is the resolver for the tokensInCommunity field.
+func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
+	return resolveCommunityTokensByCommunityID(ctx, obj.Dbid, before, after, first, last)
+}
+
+// Owners is the resolver for the owners field.
+func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
+	return resolveCommunityHoldersByCommunityID(ctx, obj.Dbid, before, after, first, last)
+}
+
+// Contract is the resolver for the contract field.
+func (r *contractCommunityResolver) Contract(ctx context.Context, obj *model.ContractCommunity) (*model.Contract, error) {
+	return resolveContractByContractID(ctx, obj.HelperContractCommunityData.Community.ContractID)
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -480,6 +488,11 @@ func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, 
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+// TotalComments is the resolver for the totalComments field.
+func (r *feedEventResolver) TotalComments(ctx context.Context, obj *model.FeedEvent) (*int, error) {
+	return publicapi.For(ctx).Interaction.GetTotalCommentsByFeedEventID(ctx, obj.Dbid)
 }
 
 // Interactions is the resolver for the interactions field.
@@ -588,7 +601,7 @@ func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context,
 // ProfileImage is the resolver for the profileImage field.
 func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
 	pfp, err := publicapi.For(ctx).User.GetProfileImageByUserID(ctx, obj.Dbid)
-	if err != nil && util.ErrorAs[persist.ErrProfileImageNotFound](err) {
+	if err != nil && util.ErrorIs[persist.ErrProfileImageNotFound](err) {
 		return nil, nil
 	}
 	if err != nil {
@@ -713,44 +726,51 @@ func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.Ga
 
 // SharedCommunities is the resolver for the sharedCommunities field.
 func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: Currently used by frontend, but it's okay if we don't return shared communities for a bit.
+	// Needs to be updated to work with the new communities table.
+	return nil, nil
 
-	edges := make([]*model.CommunityEdge, len(communities))
-	for i, community := range communities {
-		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, util.ToPointer(false)),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.CommunitiesConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
+	//communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//edges := make([]*model.CommunityEdge, len(communities))
+	//for i, community := range communities {
+	//	edges[i] = &model.CommunityEdge{
+	//		Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
+	//		Cursor: nil, // not used by relay, but relay will complain without this field existing
+	//	}
+	//}
+	//
+	//return &model.CommunitiesConnection{
+	//	Edges:    edges,
+	//	PageInfo: pageInfoToModel(ctx, pageInfo),
+	//}, nil
 }
 
 // CreatedCommunities is the resolver for the createdCommunities field.
 func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.IncludeChains, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: Not currently used by frontend. Needs to be updated to work with new communities table.
+	return nil, nil
 
-	edges := make([]*model.CommunityEdge, len(communities))
-	for i, community := range communities {
-		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, util.ToPointer(false)),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.CommunitiesConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
+	//communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.IncludeChains, before, after, first, last)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//edges := make([]*model.CommunityEdge, len(communities))
+	//for i, community := range communities {
+	//	edges[i] = &model.CommunityEdge{
+	//		Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
+	//		Cursor: nil, // not used by relay, but relay will complain without this field existing
+	//	}
+	//}
+	//
+	//return &model.CommunitiesConnection{
+	//	Edges:    edges,
+	//	PageInfo: pageInfoToModel(ctx, pageInfo),
+	//}, nil
 }
 
 // IsMemberOfCommunity is the resolver for the isMemberOfCommunity field.
@@ -2231,6 +2251,11 @@ func (r *postResolver) Comments(ctx context.Context, obj *model.Post, before *st
 	}, nil
 }
 
+// TotalComments is the resolver for the totalComments field.
+func (r *postResolver) TotalComments(ctx context.Context, obj *model.Post) (*int, error) {
+	return publicapi.For(ctx).Interaction.GetTotalCommentsByPostID(ctx, obj.Dbid)
+}
+
 // Interactions is the resolver for the interactions field.
 func (r *postResolver) Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error) {
 	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByPostID(ctx, obj.Dbid, before, after, first, last)
@@ -2580,12 +2605,13 @@ func (r *queryResolver) SearchCommunities(ctx context.Context, query string, lim
 		return nil, err
 	}
 
+	// TODO: Convert these to updated communities
 	forceRefresh := false
 
 	results := make([]*model.CommunitySearchResult, len(contracts))
 	for i, contract := range contracts {
 		results[i] = &model.CommunitySearchResult{
-			Community: communityToModel(ctx, contract, &forceRefresh),
+			Community: contractToCommunityModel(ctx, contract, &forceRefresh),
 		}
 	}
 
@@ -2691,6 +2717,40 @@ func (r *queryResolver) OnboardingUserRecommendations(ctx context.Context, befor
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+// ContractCommunityByKey is the resolver for the contractCommunityByKey field.
+func (r *queryResolver) ContractCommunityByKey(ctx context.Context, key model.ContractCommunityKeyInput) (model.CommunityByKeyOrError, error) {
+	communityKey := persist.CommunityKey{
+		Type: persist.CommunityTypeContract,
+		Key1: fmt.Sprintf("%d", key.Contract.Chain()),
+		Key2: key.Contract.Address().String(),
+	}
+
+	community, err := publicapi.For(ctx).Community.GetCommunityByKey(ctx, communityKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community), nil
+}
+
+// ArtBlocksCommunityByKey is the resolver for the artBlocksCommunityByKey field.
+func (r *queryResolver) ArtBlocksCommunityByKey(ctx context.Context, key model.ArtBlocksCommunityKeyInput) (model.CommunityByKeyOrError, error) {
+	// TODO: Can we map the input type to our existing artBlocksCommunityKey type, and then use that to derive a generic CommunityKey?
+	communityKey := persist.CommunityKey{
+		Type: persist.CommunityTypeArtBlocks,
+		Key1: fmt.Sprintf("%d", key.Contract.Chain()),
+		Key2: key.Contract.Address().String(),
+		Key3: key.ProjectID,
+	}
+
+	community, err := publicapi.For(ctx).Community.GetCommunityByKey(ctx, communityKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community), nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -2993,7 +3053,7 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 
 	if td.TokenMediaID != "" {
 		media, err = publicapi.For(ctx).Token.GetMediaByMediaID(ctx, td.TokenMediaID)
-		if util.ErrorAs[persist.ErrMediaNotFound](err) {
+		if util.ErrorIs[persist.ErrMediaNotFound](err) {
 			err = nil
 		}
 	}
@@ -3067,7 +3127,7 @@ func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.
 
 // Community is the resolver for the community field.
 func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.HelperTokenData.Token.ContractID)
+	return resolveCommunityByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
 }
 
 // ExternalURL is the resolver for the externalUrl field.
@@ -3109,7 +3169,12 @@ func (r *tokenDefinitionResolver) TokenMetadata(ctx context.Context, obj *model.
 
 // Community is the resolver for the community field.
 func (r *tokenDefinitionResolver) Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
+	return resolveCommunityByTokenDefinitionID(ctx, obj.Dbid)
+}
+
+// Communities is the resolver for the communities field.
+func (r *tokenDefinitionResolver) Communities(ctx context.Context, obj *model.TokenDefinition) ([]*model.Community, error) {
+	return resolveCommunitiesByTokenDefinitionID(ctx, obj.Dbid)
 }
 
 // Wallets is the resolver for the wallets field.
@@ -3310,6 +3375,11 @@ func (r *Resolver) AdmireTokenPayload() generated.AdmireTokenPayloadResolver {
 	return &admireTokenPayloadResolver{r}
 }
 
+// ArtBlocksCommunity returns generated.ArtBlocksCommunityResolver implementation.
+func (r *Resolver) ArtBlocksCommunity() generated.ArtBlocksCommunityResolver {
+	return &artBlocksCommunityResolver{r}
+}
+
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
@@ -3353,6 +3423,11 @@ func (r *Resolver) CommentOnPostPayload() generated.CommentOnPostPayloadResolver
 
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
+
+// ContractCommunity returns generated.ContractCommunityResolver implementation.
+func (r *Resolver) ContractCommunity() generated.ContractCommunityResolver {
+	return &contractCommunityResolver{r}
+}
 
 // CreateCollectionPayload returns generated.CreateCollectionPayloadResolver implementation.
 func (r *Resolver) CreateCollectionPayload() generated.CreateCollectionPayloadResolver {
@@ -3572,6 +3647,7 @@ type admireCommentPayloadResolver struct{ *Resolver }
 type admireFeedEventPayloadResolver struct{ *Resolver }
 type admirePostPayloadResolver struct{ *Resolver }
 type admireTokenPayloadResolver struct{ *Resolver }
+type artBlocksCommunityResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
@@ -3582,6 +3658,7 @@ type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type commentOnPostPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
+type contractCommunityResolver struct{ *Resolver }
 type createCollectionPayloadResolver struct{ *Resolver }
 type ensProfileImageResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }

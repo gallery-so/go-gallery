@@ -184,6 +184,28 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countCommentsAndRepliesByFeedEventID = `-- name: CountCommentsAndRepliesByFeedEventID :one
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountCommentsAndRepliesByFeedEventID(ctx context.Context, feedEventID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsAndRepliesByFeedEventID, feedEventID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countCommentsAndRepliesByPostID = `-- name: CountCommentsAndRepliesByPostID :one
+SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountCommentsAndRepliesByPostID(ctx context.Context, postID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsAndRepliesByPostID, postID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countFollowersByUserID = `-- name: CountFollowersByUserID :one
 SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false
 `
@@ -6244,31 +6266,6 @@ SELECT exists(
 
 func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.NullString) (bool, error) {
 	row := q.db.QueryRow(ctx, isFeedEventExistsForGroup, groupID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
-const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
-with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = $2)
-select exists(
-    select 1
-    from tokens, contract_tokens
-    where tokens.owner_user_id = $1
-        and not tokens.deleted
-        and tokens.displayable
-        and tokens.token_definition_id = contract_tokens.id
-    limit 1
-)
-`
-
-type IsMemberOfCommunityParams struct {
-	UserID     persist.DBID `db:"user_id" json:"user_id"`
-	ContractID persist.DBID `db:"contract_id" json:"contract_id"`
-}
-
-func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommunityParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isMemberOfCommunity, arg.UserID, arg.ContractID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
