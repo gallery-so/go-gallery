@@ -650,13 +650,13 @@ func (api FeedAPI) paginatorFromCursorStr(ctx context.Context, c string, q *db.Q
 
 func (api FeedAPI) paginatorFromCursor(ctx context.Context, c *feedPositionCursor, q *db.Queries) feedPaginator {
 	return api.paginatorWithQuery(c, func(p positionPagingParams) ([]any, error) {
-		mapped := util.MapWithoutError(c.EntityIDs, func(i persist.DBID) string { return i.String() })
-		posts, err := q.GetPostsByIdsPaginate(ctx, db.GetPostsByIdsPaginateParams{
-			PostIds: mapped,
+		params := db.GetPostsByIdsPaginateParams{
+			PostIds: util.MapWithoutError(c.EntityIDs, func(i persist.DBID) string { return i.String() }),
 			// Postgres uses 1-based indexing
 			CurAfterPos:  p.CursorAfterPos + 1,
 			CurBeforePos: p.CursorBeforePos + 1,
-		})
+		}
+		posts, err := q.GetPostsByIdsPaginate(ctx, params)
 		return util.MapWithoutError(posts, func(p db.Post) any { return p }), err
 	})
 }
