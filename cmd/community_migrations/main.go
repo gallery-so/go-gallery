@@ -342,7 +342,7 @@ func processCreatorAddresses(ctx context.Context, db *sql.DB, addresses []creato
 	
 	insert into community_creators (id, creator_type, community_id, creator_address, creator_address_chain, creator_address_l1_chain, created_at, last_updated, deleted)
 		select id, 1, community_id, address, chain, l1chain, now(), now(), false from to_insert
-	on conflict (community_id, creator_type, creator_user_id, creator_address, creator_address_l1_chain) where not deleted
+	on conflict (community_id, creator_type, creator_address, creator_address_l1_chain) where not deleted and creator_user_id is null
 		do nothing;
 	`
 
@@ -375,7 +375,7 @@ func processCreatorOverrideUsers(ctx context.Context, db *sql.DB, users []creato
 	
 	insert into community_creators (id, creator_type, community_id, creator_user_id, created_at, last_updated, deleted)
 		select id, 0, community_id, creator_user_id, now(), now(), false from to_insert
-	on conflict (community_id, creator_type, creator_user_id, creator_address, creator_address_l1_chain) where not deleted
+	on conflict (community_id, creator_type, creator_user_id) where not deleted and creator_user_id is not null
 		do nothing;
 	`
 

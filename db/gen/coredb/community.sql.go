@@ -447,8 +447,7 @@ with entries as (
 insert into community_creators(id, community_id, creator_type, creator_user_id, creator_address, creator_address_chain, creator_address_l1_chain, created_at, last_updated, deleted) (
     select id, community_id, creator_type, creator_user_id, creator_address, creator_address_chain, creator_address_l1_chain, created_at, last_updated, deleted from entries
 )
-on conflict (community_id, creator_type, creator_user_id, creator_address, creator_address_l1_chain) where not deleted
-    do update set last_updated = now()
+on conflict do nothing
 returning id, version, creator_type, community_id, creator_user_id, creator_address, creator_address_l1_chain, creator_address_chain, created_at, last_updated, deleted
 `
 
