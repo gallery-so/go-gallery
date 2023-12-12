@@ -1434,7 +1434,7 @@ type Query {
   postComposerDraftDetails(
     input: PostComposerDraftDetailsInput!
   ): PostComposerDraftDetailsPayloadOrError
-  oboardingUserRecommendations(
+  onboardingUserRecommendations(
     before: String
     after: String
     first: Int

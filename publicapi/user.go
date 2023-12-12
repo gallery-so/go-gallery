@@ -230,7 +230,7 @@ func (api UserAPI) GetOnboardingUserRecommendations(ctx context.Context, before,
 	var err error
 
 	cache := newDBIDCache(api.cache, "onboarding_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
-		users, err = api.queries.GetOnboardingUserRecommendations(ctx, 100)
+		users, err = api.queries.GetOnboardingUserRecommendations(ctx, db.GetOnboardingUserRecommendationsParams{Limit: 100})
 		userIDs := util.MapWithoutError(users, func(u db.User) persist.DBID { return u.ID })
 		return userIDs, err
 	})
@@ -1345,12 +1345,13 @@ func (api UserAPI) GetExploreRecommendedUsers(ctx context.Context, before, after
 		return nil, PageInfo{}, err
 	}
 
-	curUserID, err := getAuthenticatedUserID(ctx)
+	viewerID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
 
 	cursor := cursors.NewPositionCursor()
+	var paginator positionPaginator[db.User]
 
 	// If we have a cursor, we can page through the original set of recommended users
 	if before != nil {
@@ -1363,22 +1364,41 @@ func (api UserAPI) GetExploreRecommendedUsers(ctx context.Context, before, after
 		}
 	} else {
 		// Otherwise make a new recommendation
-		follows, err := api.queries.GetFollowEdgesByUserID(ctx, curUserID)
+		follows, err := api.queries.GetFollowEdgesByUserID(ctx, viewerID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		ids, err := recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
+		userIDs, err := recommend.For(ctx).RecommendFromFollowing(ctx, viewerID, follows)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
+		users, err := api.queries.GetOnboardingUserRecommendations(ctx, db.GetOnboardingUserRecommendationsParams{
+			PersonalizedUserIds: util.MapWithoutError(userIDs, func(i persist.DBID) string { return i.String() }),
+			Limit:               100,
+		})
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		userIDs = make([]persist.DBID, len(users))
+		positions := make(map[persist.DBID]int64, len(users))
+
+		for i, e := range users {
+			userIDs[i] = e.ID
+			positions[e.ID] = int64(i)
+		}
+
+		cursor := cursors.NewPositionCursor()
 		cursor.CurrentPosition = 0
-		cursor.IDs = ids
-		cursor.Positions = util.SliceToMapIndex(ids)
+		cursor.IDs = userIDs
+		cursor.Positions = positions
+
+		paginator = api.paginatorFromResults(ctx, cursor, users)
 	}
 
-	paginator := api.paginatorFromCursor(ctx, cursor, api.queries)
+	paginator = api.paginatorFromCursor(ctx, cursor, api.queries)
 	return paginator.paginate(before, after, first, last)
 }
 

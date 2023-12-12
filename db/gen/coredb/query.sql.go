@@ -3050,12 +3050,18 @@ with sources as (
     select id from users where (traits->>'top_activity')::bool
     union all select recommended_user_id from top_recommended_users
     union all select user_id from user_internal_recommendations
+    union all select unnest($2::varchar[])
 ), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join top_recs using(id) where not users.deleted and not users.universal limit $1
 `
 
-func (q *Queries) GetOnboardingUserRecommendations(ctx context.Context, limit int32) ([]User, error) {
-	rows, err := q.db.Query(ctx, getOnboardingUserRecommendations, limit)
+type GetOnboardingUserRecommendationsParams struct {
+	Limit               int32    `db:"limit" json:"limit"`
+	PersonalizedUserIds []string `db:"personalized_user_ids" json:"personalized_user_ids"`
+}
+
+func (q *Queries) GetOnboardingUserRecommendations(ctx context.Context, arg GetOnboardingUserRecommendationsParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getOnboardingUserRecommendations, arg.Limit, arg.PersonalizedUserIds)
 	if err != nil {
 		return nil, err
 	}

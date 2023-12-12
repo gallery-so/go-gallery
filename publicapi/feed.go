@@ -843,19 +843,21 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		posts := make([]db.Post, len(interleaved))
 		postIDs := make([]persist.DBID, len(interleaved))
 		postTypes := make([]persist.FeedEntityType, len(interleaved))
+		positions := make(map[persist.DBID]int64, len(interleaved))
 
 		for i, e := range interleaved {
 			idx := len(interleaved) - i - 1
 			postIDs[idx] = e.ID
 			posts[idx] = postScores[e.ID].Post
 			postTypes[idx] = persist.FeedEntityType(e.FeedEntityType)
+			positions[e.ID] = int64(idx)
 		}
 
 		cursor := cursors.NewFeedPositionCursor()
 		cursor.CurrentPosition = 0
 		cursor.EntityTypes = postTypes
 		cursor.EntityIDs = postIDs
-		cursor.Positions = util.SliceToMapIndex(postIDs)
+		cursor.Positions = positions
 
 		paginator = api.paginatorFromResults(ctx, cursor, posts)
 	}
@@ -1115,7 +1117,6 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 			return nil, PageInfo{}, err
 		}
 		args.CursorBeforePos = int32(beforeCur.CurrentPosition)
-		args.IDs = beforeCur.EntityIDs
 	}
 
 	if after != nil {
@@ -1123,7 +1124,6 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 			return nil, PageInfo{}, err
 		}
 		args.CursorAfterPos = int32(afterCur.CurrentPosition)
-		args.IDs = afterCur.EntityIDs
 	}
 
 	results, err := p.QueryFunc(args)

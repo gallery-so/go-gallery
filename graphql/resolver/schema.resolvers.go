@@ -2675,8 +2675,8 @@ func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input mode
 	}, err
 }
 
-// OboardingUserRecommendations is the resolver for the oboardingUserRecommendations field.
-func (r *queryResolver) OboardingUserRecommendations(ctx context.Context, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+// OnboardingUserRecommendations is the resolver for the onboardingUserRecommendations field.
+func (r *queryResolver) OnboardingUserRecommendations(ctx context.Context, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
 	users, pageInfo, err := publicapi.For(ctx).User.GetOnboardingUserRecommendations(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err

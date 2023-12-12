@@ -551,7 +551,6 @@ type positionPaginator[T any] struct {
 type positionPagingParams struct {
 	CursorBeforePos int32
 	CursorAfterPos  int32
-	IDs             []persist.DBID
 }
 
 func (p *positionPaginator[T]) paginate(before *string, after *string, first *int, last *int) ([]T, PageInfo, error) {
@@ -568,7 +567,6 @@ func (p *positionPaginator[T]) paginate(before *string, after *string, first *in
 			return nil, PageInfo{}, err
 		}
 		args.CursorBeforePos = int32(beforeCur.CurrentPosition)
-		args.IDs = beforeCur.IDs
 	}
 
 	if after != nil {
@@ -576,7 +574,6 @@ func (p *positionPaginator[T]) paginate(before *string, after *string, first *in
 			return nil, PageInfo{}, err
 		}
 		args.CursorAfterPos = int32(afterCur.CurrentPosition)
-		args.IDs = afterCur.IDs
 	}
 
 	results, err := p.QueryFunc(args)
