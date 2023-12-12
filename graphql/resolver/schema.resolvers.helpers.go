@@ -2623,7 +2623,7 @@ func resolveCommunityCreatorsByCommunityID(ctx context.Context, communityID pers
 		return nil, err
 	}
 
-	models := make([]model.GalleryUserOrAddress, len(creators))
+	models := make([]model.GalleryUserOrAddress, 0, len(creators))
 	for _, creator := range creators {
 		if creator.CreatorUserID != "" {
 			user, err := resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
