@@ -160,6 +160,7 @@ type communityInfo interface {
 	GetDescription() string
 	GetProfileImageURL() string
 	GetCreatorAddresses() []persist.ChainAddress
+	GetWebsiteURL() string
 }
 
 // Configurer maintains provider settings

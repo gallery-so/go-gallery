@@ -1158,7 +1158,7 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 }
 
 const getCommunitiesByTokenDefinitionID = `-- name: GetCommunitiesByTokenDefinitionID :batchmany
-select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted from communities
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url from communities
     join token_definitions on token_definitions.contract_id = communities.contract_id
     where community_type = 0
         and token_definitions.id = $1
@@ -1167,7 +1167,7 @@ select communities.id, communities.version, communities.community_type, communit
 
 union all
 
-select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted from communities
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url from communities
     join token_community_memberships on token_community_memberships.community_id = communities.id
     where community_type != 0
         and token_community_memberships.token_definition_id = $1
@@ -1231,6 +1231,8 @@ func (b *GetCommunitiesByTokenDefinitionIDBatchResults) Query(f func(int, []Comm
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.Deleted,
+					&i.WebsiteUrl,
+					&i.OverrideWebsiteUrl,
 				); err != nil {
 					return err
 				}
@@ -1250,7 +1252,7 @@ func (b *GetCommunitiesByTokenDefinitionIDBatchResults) Close() error {
 }
 
 const getCommunityByID = `-- name: GetCommunityByID :batchone
-select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted from communities
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url from communities
     where id = $1
         and not deleted
 `
@@ -1304,6 +1306,8 @@ func (b *GetCommunityByIDBatchResults) QueryRow(f func(int, Community, error)) {
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.WebsiteUrl,
+			&i.OverrideWebsiteUrl,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -1317,7 +1321,7 @@ func (b *GetCommunityByIDBatchResults) Close() error {
 }
 
 const getCommunityByKey = `-- name: GetCommunityByKey :batchone
-select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted from communities
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url from communities
     where $1 = community_type
         and $2 = key1
         and $3 = key2
@@ -1387,6 +1391,8 @@ func (b *GetCommunityByKeyBatchResults) QueryRow(f func(int, Community, error)) 
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.WebsiteUrl,
+			&i.OverrideWebsiteUrl,
 		)
 		if f != nil {
 			f(t, i, err)

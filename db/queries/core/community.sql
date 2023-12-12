@@ -1,5 +1,5 @@
 -- name: UpsertCommunities :many
-insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, badge_url, contract_id, created_at, last_updated, deleted) (
+insert into communities(id, version, name, description, community_type, key1, key2, key3, key4, profile_image_url, badge_url, website_url, contract_id, created_at, last_updated, deleted) (
     select unnest(@ids::varchar[])
          , unnest(@version::int[])
          , unnest(@name::varchar[])
@@ -11,6 +11,7 @@ insert into communities(id, version, name, description, community_type, key1, ke
          , unnest(@key4::varchar[])
          , nullif(unnest(@profile_image_url::varchar[]), '')
          , nullif(unnest(@badge_url::varchar[]), '')
+         , nullif(unnest(@website_url::varchar[]), '')
          , nullif(unnest(@contract_id::varchar[]), '')
          , now()
          , now()
@@ -22,6 +23,7 @@ on conflict (community_type, key1, key2, key3, key4) where not deleted
                 , description = coalesce(nullif(excluded.description, ''), nullif(communities.description, ''), '')
                 , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(communities.profile_image_url, ''))
                 , badge_url = coalesce(nullif(excluded.badge_url, ''), nullif(communities.badge_url, ''))
+                , website_url = coalesce(nullif(excluded.website_url, ''), nullif(communities.website_url, ''))
                 , contract_id = coalesce(nullif(excluded.contract_id, ''), nullif(communities.contract_id, ''))
                 , last_updated = now()
                 , deleted = excluded.deleted
