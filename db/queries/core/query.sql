@@ -159,10 +159,11 @@ join token_definitions td on t.token_definition_id = td.id
 where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select sqlc.embed(t), sqlc.embed(td)
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(tm)
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
-where t.id = $1 and t.deleted = false and td.deleted = false;
+join token_medias tm on td.token_media_id = tm.id
+where t.id = $1 and t.deleted = false and td.deleted = false and tm.deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
 -- Fetch the definition and contract to cache since downstream queries will likely use them
@@ -178,6 +179,21 @@ where t.token_definition_id = td.id
     and not t.deleted
     and not td.deleted
     and not c.deleted;
+
+-- name: GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch :batchone
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c), sqlc.embed(tm)
+from tokens t, token_definitions td, contracts c, token_medias tm
+where t.token_definition_id = td.id
+    and td.contract_id = c.id
+    and t.owner_user_id = @owner_id
+    and td.token_id = @token_id
+    and td.chain = @chain
+    and td.contract_address = @contract_address
+    and td.token_media_id = tm.id
+    and not t.deleted
+    and not td.deleted
+    and not c.deleted
+    and not tm.deleted;
 
 -- name: GetTokenByUserTokenIdentifiers :one
 select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
@@ -1593,7 +1609,7 @@ with remove_image as (
 )
 update users set profile_image_id = null where users.id = $1 and not users.deleted;
 
--- name: GetProfileImageByID :batchone
+-- name: GetProfileImageByIdBatch :batchone
 select * from profile_images pfp
 where pfp.id = @id
 	and not deleted

@@ -1577,7 +1577,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 				}
 
 				// Manually prime the PFP loader
-				api.loaders.GetProfileImageByID.Prime(db.GetProfileImageByIDParams{
+				api.loaders.GetProfileImageByIdBatch.Prime(db.GetProfileImageByIdBatchParams{
 					ID:              pfp.ProfileImage.ID,
 					EnsSourceType:   persist.ProfileImageSourceENS,
 					TokenSourceType: persist.ProfileImageSourceToken,
@@ -1609,10 +1609,10 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 	if user.ProfileImageID == "" {
 		return db.ProfileImage{}, nil
 	}
-	return api.loaders.GetProfileImageByID.Load(db.GetProfileImageByIDParams{
+	return api.loaders.GetProfileImageByIdBatch.Load(db.GetProfileImageByIdBatchParams{
 		ID:              user.ProfileImageID,
-		EnsSourceType:   persist.ProfileImageSourceENS,
 		TokenSourceType: persist.ProfileImageSourceToken,
+		EnsSourceType:   persist.ProfileImageSourceENS,
 	})
 }
 

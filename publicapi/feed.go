@@ -47,10 +47,9 @@ var feedOpts = struct {
 	GalleryPostHalfLife float64 // controls the decay rate of Gallery posts
 	GalleryDecayPeriod  float64 // time it takes for a Gallery post to reach GalleryPostHalfLife from PostHalfLife
 }{
-	FreshnessFactor: 2.0,
-	FirstPostFactor: 2.0,
-	// LookbackWindow:      time.Duration(4 * 24 * time.Hour).Minutes(),
-	LookbackWindow:      time.Duration(30 * 24 * time.Hour).Minutes(),
+	FreshnessFactor:     2.0,
+	FirstPostFactor:     2.0,
+	LookbackWindow:      time.Duration(4 * 24 * time.Hour).Minutes(),
 	FreshnessWindow:     time.Duration(6 * time.Hour).Minutes(),
 	PostHalfLife:        time.Duration(6 * time.Hour).Minutes(),
 	GalleryPostHalfLife: time.Duration(10 * time.Hour).Minutes(),

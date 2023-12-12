@@ -2306,18 +2306,17 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 	if pfp.ID == "" {
 		return nil, nil
 	}
-	switch pfp.SourceType {
-	case persist.ProfileImageSourceToken:
+	if pfp.SourceType == persist.ProfileImageSourceToken {
 		token, err := publicapi.For(ctx).Token.GetTokenByIdIgnoreDisplayable(ctx, pfp.TokenID)
 		if err != nil {
 			return nil, err
 		}
 		return &model.TokenProfileImage{Token: tokenToModel(ctx, *token, nil)}, nil
-	case persist.ProfileImageSourceENS:
-		return ensProfileImageToModel(ctx, pfp.UserID, pfp.WalletID, pfp.EnsAvatarUri.String, pfp.EnsDomain.String)
-	default:
-		return nil, publicapi.ErrProfileImageUnknownSource
 	}
+	if pfp.SourceType == persist.ProfileImageSourceENS {
+		return ensProfileImageToModel(ctx, pfp.UserID, pfp.WalletID, pfp.EnsAvatarUri.String, pfp.EnsDomain.String)
+	}
+	return nil, publicapi.ErrProfileImageUnknownSource
 }
 
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {

@@ -14,82 +14,83 @@ import (
 )
 
 type Loaders struct {
-	CountAdmiresByCommentIDBatch             *CountAdmiresByCommentIDBatch
-	CountAdmiresByFeedEventIDBatch           *CountAdmiresByFeedEventIDBatch
-	CountAdmiresByPostIDBatch                *CountAdmiresByPostIDBatch
-	CountAdmiresByTokenIDBatch               *CountAdmiresByTokenIDBatch
-	CountCommentsByFeedEventIDBatch          *CountCommentsByFeedEventIDBatch
-	CountCommentsByPostIDBatch               *CountCommentsByPostIDBatch
-	CountInteractionsByFeedEventIDBatch      *CountInteractionsByFeedEventIDBatch
-	CountInteractionsByPostIDBatch           *CountInteractionsByPostIDBatch
-	CountRepliesByCommentIDBatch             *CountRepliesByCommentIDBatch
-	GetAdmireByActorIDAndCommentID           *GetAdmireByActorIDAndCommentID
-	GetAdmireByActorIDAndFeedEventID         *GetAdmireByActorIDAndFeedEventID
-	GetAdmireByActorIDAndPostID              *GetAdmireByActorIDAndPostID
-	GetAdmireByActorIDAndTokenID             *GetAdmireByActorIDAndTokenID
-	GetAdmireByAdmireIDBatch                 *GetAdmireByAdmireIDBatch
-	GetAdmiresByActorIDBatch                 *GetAdmiresByActorIDBatch
-	GetChildContractsByParentIDBatchPaginate *GetChildContractsByParentIDBatchPaginate
-	GetCollectionByIdBatch                   *GetCollectionByIdBatch
-	GetCollectionsByGalleryIdBatch           *GetCollectionsByGalleryIdBatch
-	GetCommentByCommentIDBatch               *GetCommentByCommentIDBatch
-	GetCommunitiesByTokenDefinitionID        *GetCommunitiesByTokenDefinitionID
-	GetCommunityByID                         *GetCommunityByID
-	GetCommunityByKey                        *GetCommunityByKey
-	GetContractByChainAddressBatch           *GetContractByChainAddressBatch
-	GetContractsDisplayedByUserIDBatch       *GetContractsDisplayedByUserIDBatch
-	GetCreatedContractsBatchPaginate         *GetCreatedContractsBatchPaginate
-	GetCreatorsByCommunityID                 *GetCreatorsByCommunityID
-	GetEventByIdBatch                        *GetEventByIdBatch
-	GetFollowersByUserIdBatch                *GetFollowersByUserIdBatch
-	GetFollowingByUserIdBatch                *GetFollowingByUserIdBatch
-	GetGalleriesByUserIdBatch                *GetGalleriesByUserIdBatch
-	GetGalleryByCollectionIdBatch            *GetGalleryByCollectionIdBatch
-	GetGalleryByIdBatch                      *GetGalleryByIdBatch
-	GetGalleryTokenMediasByGalleryIDBatch    *GetGalleryTokenMediasByGalleryIDBatch
-	GetMediaByMediaIdIgnoringStatusBatch     *GetMediaByMediaIdIgnoringStatusBatch
-	GetMembershipByMembershipIdBatch         *GetMembershipByMembershipIdBatch
-	GetMentionsByCommentID                   *GetMentionsByCommentID
-	GetMentionsByPostID                      *GetMentionsByPostID
-	GetNewTokensByFeedEventIdBatch           *GetNewTokensByFeedEventIdBatch
-	GetNotificationByIDBatch                 *GetNotificationByIDBatch
-	GetOwnersByContractIdBatchPaginate       *GetOwnersByContractIdBatchPaginate
-	GetPostByIdBatch                         *GetPostByIdBatch
-	GetPostsByIdsPaginateBatch               *GetPostsByIdsPaginateBatch
-	GetProfileImageByID                      *GetProfileImageByID
-	GetSharedContractsBatchPaginate          *GetSharedContractsBatchPaginate
-	GetSharedFollowersBatchPaginate          *GetSharedFollowersBatchPaginate
-	GetTokenByIdBatch                        *GetTokenByIdBatch
-	GetTokenByIdIgnoreDisplayableBatch       *GetTokenByIdIgnoreDisplayableBatch
-	GetTokenByUserTokenIdentifiersBatch      *GetTokenByUserTokenIdentifiersBatch
-	GetTokenDefinitionByIdBatch              *GetTokenDefinitionByIdBatch
-	GetTokensByCollectionIdBatch             *GetTokensByCollectionIdBatch
-	GetTokensByUserIdBatch                   *GetTokensByUserIdBatch
-	GetTokensByWalletIdsBatch                *GetTokensByWalletIdsBatch
-	GetUserByAddressAndL1Batch               *GetUserByAddressAndL1Batch
-	GetUserByIdBatch                         *GetUserByIdBatch
-	GetUserByUsernameBatch                   *GetUserByUsernameBatch
-	GetUserNotificationsBatch                *GetUserNotificationsBatch
-	GetUsersByPositionPaginateBatch          *GetUsersByPositionPaginateBatch
-	GetUsersWithTraitBatch                   *GetUsersWithTraitBatch
-	GetVisibleCollectionsByIDsPaginateBatch  *GetVisibleCollectionsByIDsPaginateBatch
-	GetWalletByIDBatch                       *GetWalletByIDBatch
-	GetWalletsByUserIDBatch                  *GetWalletsByUserIDBatch
-	PaginateAdmiresByCommentIDBatch          *PaginateAdmiresByCommentIDBatch
-	PaginateAdmiresByFeedEventIDBatch        *PaginateAdmiresByFeedEventIDBatch
-	PaginateAdmiresByPostIDBatch             *PaginateAdmiresByPostIDBatch
-	PaginateAdmiresByTokenIDBatch            *PaginateAdmiresByTokenIDBatch
-	PaginateCommentsByFeedEventIDBatch       *PaginateCommentsByFeedEventIDBatch
-	PaginateCommentsByPostIDBatch            *PaginateCommentsByPostIDBatch
-	PaginateHoldersByCommunityID             *PaginateHoldersByCommunityID
-	PaginateInteractionsByFeedEventIDBatch   *PaginateInteractionsByFeedEventIDBatch
-	PaginateInteractionsByPostIDBatch        *PaginateInteractionsByPostIDBatch
-	PaginatePostsByCommunityID               *PaginatePostsByCommunityID
-	PaginatePostsByContractID                *PaginatePostsByContractID
-	PaginateRepliesByCommentIDBatch          *PaginateRepliesByCommentIDBatch
-	PaginateTokensByCommunityID              *PaginateTokensByCommunityID
-	GetContractCreatorsByIds                 *GetContractCreatorsByIds
-	GetContractsByIDs                        *GetContractsByIDs
+	CountAdmiresByCommentIDBatch                         *CountAdmiresByCommentIDBatch
+	CountAdmiresByFeedEventIDBatch                       *CountAdmiresByFeedEventIDBatch
+	CountAdmiresByPostIDBatch                            *CountAdmiresByPostIDBatch
+	CountAdmiresByTokenIDBatch                           *CountAdmiresByTokenIDBatch
+	CountCommentsByFeedEventIDBatch                      *CountCommentsByFeedEventIDBatch
+	CountCommentsByPostIDBatch                           *CountCommentsByPostIDBatch
+	CountInteractionsByFeedEventIDBatch                  *CountInteractionsByFeedEventIDBatch
+	CountInteractionsByPostIDBatch                       *CountInteractionsByPostIDBatch
+	CountRepliesByCommentIDBatch                         *CountRepliesByCommentIDBatch
+	GetAdmireByActorIDAndCommentID                       *GetAdmireByActorIDAndCommentID
+	GetAdmireByActorIDAndFeedEventID                     *GetAdmireByActorIDAndFeedEventID
+	GetAdmireByActorIDAndPostID                          *GetAdmireByActorIDAndPostID
+	GetAdmireByActorIDAndTokenID                         *GetAdmireByActorIDAndTokenID
+	GetAdmireByAdmireIDBatch                             *GetAdmireByAdmireIDBatch
+	GetAdmiresByActorIDBatch                             *GetAdmiresByActorIDBatch
+	GetChildContractsByParentIDBatchPaginate             *GetChildContractsByParentIDBatchPaginate
+	GetCollectionByIdBatch                               *GetCollectionByIdBatch
+	GetCollectionsByGalleryIdBatch                       *GetCollectionsByGalleryIdBatch
+	GetCommentByCommentIDBatch                           *GetCommentByCommentIDBatch
+	GetCommunitiesByTokenDefinitionID                    *GetCommunitiesByTokenDefinitionID
+	GetCommunityByID                                     *GetCommunityByID
+	GetCommunityByKey                                    *GetCommunityByKey
+	GetContractByChainAddressBatch                       *GetContractByChainAddressBatch
+	GetContractsDisplayedByUserIDBatch                   *GetContractsDisplayedByUserIDBatch
+	GetCreatedContractsBatchPaginate                     *GetCreatedContractsBatchPaginate
+	GetCreatorsByCommunityID                             *GetCreatorsByCommunityID
+	GetEventByIdBatch                                    *GetEventByIdBatch
+	GetFollowersByUserIdBatch                            *GetFollowersByUserIdBatch
+	GetFollowingByUserIdBatch                            *GetFollowingByUserIdBatch
+	GetGalleriesByUserIdBatch                            *GetGalleriesByUserIdBatch
+	GetGalleryByCollectionIdBatch                        *GetGalleryByCollectionIdBatch
+	GetGalleryByIdBatch                                  *GetGalleryByIdBatch
+	GetGalleryTokenMediasByGalleryIDBatch                *GetGalleryTokenMediasByGalleryIDBatch
+	GetMediaByMediaIdIgnoringStatusBatch                 *GetMediaByMediaIdIgnoringStatusBatch
+	GetMembershipByMembershipIdBatch                     *GetMembershipByMembershipIdBatch
+	GetMentionsByCommentID                               *GetMentionsByCommentID
+	GetMentionsByPostID                                  *GetMentionsByPostID
+	GetNewTokensByFeedEventIdBatch                       *GetNewTokensByFeedEventIdBatch
+	GetNotificationByIDBatch                             *GetNotificationByIDBatch
+	GetOwnersByContractIdBatchPaginate                   *GetOwnersByContractIdBatchPaginate
+	GetPostByIdBatch                                     *GetPostByIdBatch
+	GetPostsByIdsPaginateBatch                           *GetPostsByIdsPaginateBatch
+	GetProfileImageByIdBatch                             *GetProfileImageByIdBatch
+	GetSharedContractsBatchPaginate                      *GetSharedContractsBatchPaginate
+	GetSharedFollowersBatchPaginate                      *GetSharedFollowersBatchPaginate
+	GetTokenByIdBatch                                    *GetTokenByIdBatch
+	GetTokenByIdIgnoreDisplayableBatch                   *GetTokenByIdIgnoreDisplayableBatch
+	GetTokenByUserTokenIdentifiersBatch                  *GetTokenByUserTokenIdentifiersBatch
+	GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch
+	GetTokenDefinitionByIdBatch                          *GetTokenDefinitionByIdBatch
+	GetTokensByCollectionIdBatch                         *GetTokensByCollectionIdBatch
+	GetTokensByUserIdBatch                               *GetTokensByUserIdBatch
+	GetTokensByWalletIdsBatch                            *GetTokensByWalletIdsBatch
+	GetUserByAddressAndL1Batch                           *GetUserByAddressAndL1Batch
+	GetUserByIdBatch                                     *GetUserByIdBatch
+	GetUserByUsernameBatch                               *GetUserByUsernameBatch
+	GetUserNotificationsBatch                            *GetUserNotificationsBatch
+	GetUsersByPositionPaginateBatch                      *GetUsersByPositionPaginateBatch
+	GetUsersWithTraitBatch                               *GetUsersWithTraitBatch
+	GetVisibleCollectionsByIDsPaginateBatch              *GetVisibleCollectionsByIDsPaginateBatch
+	GetWalletByIDBatch                                   *GetWalletByIDBatch
+	GetWalletsByUserIDBatch                              *GetWalletsByUserIDBatch
+	PaginateAdmiresByCommentIDBatch                      *PaginateAdmiresByCommentIDBatch
+	PaginateAdmiresByFeedEventIDBatch                    *PaginateAdmiresByFeedEventIDBatch
+	PaginateAdmiresByPostIDBatch                         *PaginateAdmiresByPostIDBatch
+	PaginateAdmiresByTokenIDBatch                        *PaginateAdmiresByTokenIDBatch
+	PaginateCommentsByFeedEventIDBatch                   *PaginateCommentsByFeedEventIDBatch
+	PaginateCommentsByPostIDBatch                        *PaginateCommentsByPostIDBatch
+	PaginateHoldersByCommunityID                         *PaginateHoldersByCommunityID
+	PaginateInteractionsByFeedEventIDBatch               *PaginateInteractionsByFeedEventIDBatch
+	PaginateInteractionsByPostIDBatch                    *PaginateInteractionsByPostIDBatch
+	PaginatePostsByCommunityID                           *PaginatePostsByCommunityID
+	PaginatePostsByContractID                            *PaginatePostsByContractID
+	PaginateRepliesByCommentIDBatch                      *PaginateRepliesByCommentIDBatch
+	PaginateTokensByCommunityID                          *PaginateTokensByCommunityID
+	GetContractCreatorsByIds                             *GetContractCreatorsByIds
+	GetContractsByIDs                                    *GetContractsByIDs
 }
 
 func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, preFetchHook PreFetchHook, postFetchHook PostFetchHook) *Loaders {
@@ -137,12 +138,13 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetOwnersByContractIdBatchPaginate = newGetOwnersByContractIdBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetOwnersByContractIdBatchPaginate(q), preFetchHook, postFetchHook)
 	loaders.GetPostByIdBatch = newGetPostByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetPostByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetPostsByIdsPaginateBatch = newGetPostsByIdsPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetPostsByIdsPaginateBatch(q), preFetchHook, postFetchHook)
-	loaders.GetProfileImageByID = newGetProfileImageByID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetProfileImageByID(q), preFetchHook, postFetchHook)
+	loaders.GetProfileImageByIdBatch = newGetProfileImageByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetProfileImageByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetSharedContractsBatchPaginate = newGetSharedContractsBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetSharedContractsBatchPaginate(q), preFetchHook, postFetchHook)
 	loaders.GetSharedFollowersBatchPaginate = newGetSharedFollowersBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetSharedFollowersBatchPaginate(q), preFetchHook, postFetchHook)
 	loaders.GetTokenByIdBatch = newGetTokenByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokenByIdIgnoreDisplayableBatch = newGetTokenByIdIgnoreDisplayableBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByIdIgnoreDisplayableBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokenByUserTokenIdentifiersBatch = newGetTokenByUserTokenIdentifiersBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByUserTokenIdentifiersBatch(q), preFetchHook, postFetchHook)
+	loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch = newGetTokenByUserTokenIdentifiersIgnoreDisplayableBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByUserTokenIdentifiersIgnoreDisplayableBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokenDefinitionByIdBatch = newGetTokenDefinitionByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenDefinitionByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokensByCollectionIdBatch = newGetTokensByCollectionIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokensByCollectionIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokensByUserIdBatch = newGetTokensByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokensByUserIdBatch(q), preFetchHook, postFetchHook)
@@ -265,6 +267,9 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
 		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result.Contract), result.Contract)
 	})
+	loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow) {
+		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result.Contract), result.Contract)
+	})
 	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
 		for _, entry := range result {
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
@@ -311,6 +316,12 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetTokenByIdIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.GetTokenByIdIgnoreDisplayableBatchRow) {
+		loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(result.TokenMedia), result.TokenMedia)
+	})
+	loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow) {
+		loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(result.TokenMedia), result.TokenMedia)
+	})
 	loaders.GetUserNotificationsBatch.RegisterResultSubscriber(func(result []coredb.Notification) {
 		for _, entry := range result {
 			loaders.GetNotificationByIDBatch.Prime(loaders.GetNotificationByIDBatch.getKeyForResult(entry), entry)
@@ -338,6 +349,9 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
 	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
+	})
+	loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow) {
 		loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
 	})
 	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
@@ -461,6 +475,9 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		}
 	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
+		loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(result.Contract), result.Contract)
+	})
+	loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow) {
 		loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(result.Contract), result.Contract)
 	})
 	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
@@ -1221,12 +1238,12 @@ func loadGetPostsByIdsPaginateBatch(q *coredb.Queries) func(context.Context, *Ge
 	}
 }
 
-func loadGetProfileImageByID(q *coredb.Queries) func(context.Context, *GetProfileImageByID, []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
-	return func(ctx context.Context, d *GetProfileImageByID, params []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
+func loadGetProfileImageByIdBatch(q *coredb.Queries) func(context.Context, *GetProfileImageByIdBatch, []coredb.GetProfileImageByIdBatchParams) ([]coredb.ProfileImage, []error) {
+	return func(ctx context.Context, d *GetProfileImageByIdBatch, params []coredb.GetProfileImageByIdBatchParams) ([]coredb.ProfileImage, []error) {
 		results := make([]coredb.ProfileImage, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetProfileImageByID(ctx, params)
+		b := q.GetProfileImageByIdBatch(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, r coredb.ProfileImage, err error) {
@@ -1319,6 +1336,25 @@ func loadGetTokenByUserTokenIdentifiersBatch(q *coredb.Queries) func(context.Con
 		defer b.Close()
 
 		b.QueryRow(func(i int, r coredb.GetTokenByUserTokenIdentifiersBatchRow, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetTokenByUserTokenIdentifiersIgnoreDisplayableBatch(q *coredb.Queries) func(context.Context, *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch, []coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow, []error) {
+	return func(ctx context.Context, d *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch, params []coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow, []error) {
+		results := make([]coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow, err error) {
 			results[i], errors[i] = r, err
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = d.getNotFoundError(params[i])
