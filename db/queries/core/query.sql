@@ -1821,7 +1821,6 @@ with sources as (
     select id from users where (traits->>'top_activity')::bool
     union all select recommended_user_id from top_recommended_users
     union all select user_id from user_internal_recommendations
-    union all select unnest(@personalized_user_ids::varchar[])
 ), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
 select users.* from users join top_recs using(id) where not users.deleted and not users.universal limit $1;
 
