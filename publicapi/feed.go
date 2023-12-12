@@ -1,12 +1,12 @@
 package publicapi
 
 import (
-	"container/heap"
+	heappkg "container/heap"
 	"context"
 	"database/sql"
 	"fmt"
 	"math"
-	sortpkg "sort"
+	"sort"
 	"sync"
 	"time"
 
@@ -33,7 +33,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
-	"github.com/mikeydub/go-gallery/util/sort"
 )
 
 const trendingFeedCacheKey = "trending:feedEvents:all"
@@ -989,7 +988,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	<-postsDone
 
 	// Sort in descending order
-	sortpkg.Slice(errored, func(i, j int) bool { return errored[i] > errored[j] })
+	sort.Slice(errored, func(i, j int) bool { return errored[i] > errored[j] })
 
 	// Filter out errored entities
 	for _, pos := range errored {
@@ -1007,21 +1006,8 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-type entityScore struct {
-	v db.FeedEntityScore
-	s float64
-}
-
-func (n entityScore) Less(a any) bool {
-	other, ok := a.(entityScore)
-	if !ok {
-		return false
-	}
-	return n.s < other.s
-}
-
 func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) []db.FeedEntityScore {
-	h := make(sort.Heap[entityScore], 0)
+	h := make(heap[entityScore], 0)
 
 	var wg sync.WaitGroup
 
@@ -1043,13 +1029,13 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 	for _, node := range scores {
 		// Add first n items in the heap
 		if h.Len() < n {
-			heap.Push(&h, node)
+			heappkg.Push(&h, node)
 			continue
 		}
 		// If the score is greater than the smallest score in the heap, replace it
 		if node.s > h[0].s {
-			heap.Pop(&h)
-			heap.Push(&h, node)
+			heappkg.Pop(&h)
+			heappkg.Push(&h, node)
 		}
 	}
 
@@ -1059,7 +1045,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 	// such that the highest score is first
 	i := h.Len() - 1
 	for h.Len() > 0 {
-		node := heap.Pop(&h)
+		node := heappkg.Pop(&h)
 		scoredEntities[i] = node.(entityScore).v
 		i--
 	}
@@ -1096,6 +1082,35 @@ func engagementFactor(interactions float64) float64 {
 	// Add 2 because log(0) => undefined and log(1) => 0 and returning 0 will cancel out
 	// the effect of other terms this term may get multiplied with
 	return math.Log2(2 + interactions)
+}
+
+type entityScore struct {
+	v db.FeedEntityScore
+	s float64
+}
+
+func (n entityScore) Less(a any) bool {
+	other, ok := a.(entityScore)
+	if !ok {
+		return false
+	}
+	return n.s < other.s
+}
+
+type lt interface{ Less(j any) bool }
+type heap[T lt] []T
+
+func (h heap[T]) Len() int           { return len(h) }
+func (h heap[T]) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *heap[T]) Push(s any)        { *h = append(*h, s.(T)) }
+func (h heap[T]) Less(i, j int) bool { return h[i].Less(h[j]) }
+
+func (h *heap[T]) Pop() any {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	*h = old[:n-1]
+	return item
 }
 
 type feedPaginator struct {
