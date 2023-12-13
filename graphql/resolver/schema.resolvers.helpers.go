@@ -2205,10 +2205,13 @@ func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRe
 		Chain:               &chain,
 		ProfileImageURL:     util.ToPointer(contract.ProfileImageUrl.String),
 		BadgeURL:            util.ToPointer(contract.BadgeUrl.String),
-		Subtype:             model.ContractCommunity{Contract: contractToModel(ctx, contract)},
-		Owners:              nil, // handled by dedicated resolver
-		Creator:             nil, // handled by dedicated resolver
-		TokensInCommunity:   nil, // handled by dedicated resolver
+		Subtype: model.ContractCommunity{
+			HelperContractCommunityData: model.HelperContractCommunityData{Community: db.Community{ContractID: contract.ID}},
+			Contract:                    contractToModel(ctx, contract),
+		},
+		Owners:            nil, // handled by dedicated resolver
+		Creator:           nil, // handled by dedicated resolver
+		TokensInCommunity: nil, // handled by dedicated resolver
 	}
 }
 
