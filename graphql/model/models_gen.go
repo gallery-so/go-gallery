@@ -811,6 +811,7 @@ type Community struct {
 	Description       *string                 `json:"description"`
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
+	MintURL           *string                 `json:"mintURL"`
 	Subtype           CommunitySubtype        `json:"subtype"`
 	Creators          []GalleryUserOrAddress  `json:"creators"`
 	Holders           *TokenHoldersConnection `json:"holders"`

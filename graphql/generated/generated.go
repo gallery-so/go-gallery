@@ -357,6 +357,7 @@ type ComplexityRoot struct {
 		Holders           func(childComplexity int, before *string, after *string, first *int, last *int) int
 		ID                func(childComplexity int) int
 		LastUpdated       func(childComplexity int) int
+		MintURL           func(childComplexity int) int
 		Name              func(childComplexity int) int
 		Owners            func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 		Posts             func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -1817,6 +1818,8 @@ type CommentOnPostPayloadResolver interface {
 	ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error)
 }
 type CommunityResolver interface {
+	MintURL(ctx context.Context, obj *model.Community) (*string, error)
+
 	Creators(ctx context.Context, obj *model.Community) ([]model.GalleryUserOrAddress, error)
 	Holders(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error)
 	Tokens(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error)
@@ -3136,6 +3139,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.LastUpdated(childComplexity), true
+
+	case "Community.mintURL":
+		if e.complexity.Community.MintURL == nil {
+			break
+		}
+
+		return e.complexity.Community.MintURL(childComplexity), true
 
 	case "Community.name":
 		if e.complexity.Community.Name == nil {
@@ -9889,6 +9899,7 @@ type Community implements Node @goEmbedHelper {
   description: String
   profileImageURL: String
   badgeURL: String
+  mintURL: String @goField(forceResolver: true)
 
   subtype: CommunitySubtype
   creators: [GalleryUserOrAddress] @goField(forceResolver: true)
@@ -22578,6 +22589,47 @@ func (ec *executionContext) fieldContext_Community_badgeURL(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_mintURL(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_mintURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().MintURL(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_mintURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Community_subtype(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Community_subtype(ctx, field)
 	if err != nil {
@@ -23243,6 +23295,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -23365,6 +23419,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -43106,6 +43162,8 @@ func (ec *executionContext) fieldContext_PostComposerDraftDetailsPayload_communi
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -51889,6 +51947,8 @@ func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotificati
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -52252,6 +52312,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_commu
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -55472,6 +55534,8 @@ func (ec *executionContext) fieldContext_Token_community(ctx context.Context, fi
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -56632,6 +56696,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_community(ctx context.C
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -56713,6 +56779,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_communities(ctx context
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -73847,6 +73915,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._Community_badgeURL(ctx, field, obj)
 
+		case "mintURL":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_mintURL(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "subtype":
 
 			out.Values[i] = ec._Community_subtype(ctx, field, obj)
