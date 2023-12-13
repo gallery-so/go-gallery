@@ -1438,6 +1438,15 @@ func (r *mutationResolver) FollowAllSocialConnections(ctx context.Context, accou
 	return output, nil
 }
 
+// FollowAllOnboardingRecommendations is the resolver for the followAllOnboardingRecommendations field.
+func (r *mutationResolver) FollowAllOnboardingRecommendations(ctx context.Context, cursor *string) (model.FollowAllOnboardingRecommendationsPayloadOrError, error) {
+	err := publicapi.For(ctx).User.FollowAllOnboardingRecommendations(ctx, cursor)
+	if err != nil {
+		return nil, err
+	}
+	return &model.FollowAllOnboardingRecommendationsPayload{Viewer: resolveViewer(ctx)}, nil
+}
+
 // UnfollowUser is the resolver for the unfollowUser field.
 func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error) {
 	err := publicapi.For(ctx).User.UnfollowUser(ctx, userID)

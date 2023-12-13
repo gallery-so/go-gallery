@@ -136,6 +136,10 @@ type FeedEventOrError interface {
 	IsFeedEventOrError()
 }
 
+type FollowAllOnboardingRecommendationsPayloadOrError interface {
+	IsFollowAllOnboardingRecommendationsPayloadOrError()
+}
+
 type FollowAllSocialConnectionsPayloadOrError interface {
 	IsFollowAllSocialConnectionsPayloadOrError()
 }
@@ -1178,6 +1182,7 @@ func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()           
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()                         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()                         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()                      {}
+func (ErrInvalidInput) IsFollowAllOnboardingRecommendationsPayloadOrError()              {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                                      {}
 func (ErrInvalidInput) IsReferralPostTokenPayloadOrError()                               {}
@@ -1276,6 +1281,7 @@ func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError()          
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()                         {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()                         {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()                      {}
+func (ErrNotAuthorized) IsFollowAllOnboardingRecommendationsPayloadOrError()              {}
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()                        {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()                                 {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                                      {}
@@ -1454,6 +1460,13 @@ type FeedEventCommentEdge struct {
 type FeedEventCommentsConnection struct {
 	Edges    []*FeedEventCommentEdge `json:"edges"`
 	PageInfo *PageInfo               `json:"pageInfo"`
+}
+
+type FollowAllOnboardingRecommendationsPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (FollowAllOnboardingRecommendationsPayload) IsFollowAllOnboardingRecommendationsPayloadOrError() {
 }
 
 type FollowAllSocialConnectionsPayload struct {

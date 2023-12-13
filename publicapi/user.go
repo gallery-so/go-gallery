@@ -1075,6 +1075,51 @@ func (api UserAPI) FollowAllSocialConnections(ctx context.Context, socialType pe
 	})
 }
 
+func (api UserAPI) FollowAllOnboardingRecommendations(ctx context.Context, curStr *string) error {
+	curUserID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	var usersToFollow []persist.DBID
+
+	if curStr != nil {
+		cursor := cursors.NewPositionCursor()
+		if err := cursor.Unpack(*curStr); err != nil {
+			// Just log the error and continue
+			sentryutil.ReportError(ctx, err)
+		} else {
+			usersToFollow = cursor.IDs
+		}
+	}
+
+	// cursor wasn't provided or is invalid
+	if len(usersToFollow) == 0 {
+		// fetch from the cache and possibly re-calculate the recommendations
+		cache := newDBIDCache(api.cache, "onboarding_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
+			users, err := api.queries.GetOnboardingUserRecommendations(ctx, 100)
+			return util.MapWithoutError(users, func(u db.User) persist.DBID { return u.ID }), err
+		})
+		usersToFollow, err = cache.Load(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	ids := make([]string, len(usersToFollow))
+	userIDs := make([]string, len(usersToFollow))
+	for i, id := range usersToFollow {
+		ids[i] = persist.GenerateID().String()
+		userIDs[i] = id.String()
+	}
+
+	return api.queries.AddManyFollows(ctx, db.AddManyFollowsParams{
+		Ids:       ids,
+		Follower:  curUserID,
+		Followees: userIDs,
+	})
+}
+
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
