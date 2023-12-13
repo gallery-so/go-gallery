@@ -3140,6 +3140,11 @@ func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDef
 	return resolveTokenMedia(ctx, obj.HelperTokenDefinitionData.Definition, media, false), nil
 }
 
+// Contract is the resolver for the contract field.
+func (r *tokenDefinitionResolver) Contract(ctx context.Context, obj *model.TokenDefinition) (*model.Contract, error) {
+	return resolveContractByContractID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
+}
+
 // TokenMetadata is the resolver for the tokenMetadata field.
 func (r *tokenDefinitionResolver) TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error) {
 	b, err := obj.HelperTokenDefinitionData.Definition.Metadata.MarshalJSON()

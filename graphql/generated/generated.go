@@ -1462,6 +1462,7 @@ type ComplexityRoot struct {
 		Chain         func(childComplexity int) int
 		Communities   func(childComplexity int) int
 		Community     func(childComplexity int) int
+		Contract      func(childComplexity int) int
 		CreationTime  func(childComplexity int) int
 		Dbid          func(childComplexity int) int
 		Description   func(childComplexity int) int
@@ -2137,6 +2138,8 @@ type TokenResolver interface {
 }
 type TokenDefinitionResolver interface {
 	Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error)
+
+	Contract(ctx context.Context, obj *model.TokenDefinition) (*model.Contract, error)
 
 	TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error)
 	Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error)
@@ -8231,6 +8234,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenDefinition.Community(childComplexity), true
 
+	case "TokenDefinition.contract":
+		if e.complexity.TokenDefinition.Contract == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Contract(childComplexity), true
+
 	case "TokenDefinition.creationTime":
 		if e.complexity.TokenDefinition.CreationTime == nil {
 			break
@@ -9688,13 +9698,13 @@ type TokenDefinition implements Node @goEmbedHelper {
   lastUpdated: Time
   media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
+  contract: Contract @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
-    @deprecated(reason: "Use TokenDefinition.communities instead")
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
 }
@@ -9883,28 +9893,31 @@ type Community implements Node @goEmbedHelper {
   subtype: CommunitySubtype
   creators: [GalleryUserOrAddress] @goField(forceResolver: true)
 
-  holders(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): TokenHoldersConnection @goField(forceResolver: true)
+  holders(before: String, after: String, first: Int, last: Int): TokenHoldersConnection
+    @goField(forceResolver: true)
 
-  tokens(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): TokensConnection @goField(forceResolver: true)
+  tokens(before: String, after: String, first: Int, last: Int): TokensConnection
+    @goField(forceResolver: true)
 
-  posts(before: String, after: String, first: Int, last: Int): PostsConnection @goField(forceResolver: true)
+  posts(before: String, after: String, first: Int, last: Int): PostsConnection
+    @goField(forceResolver: true)
 
   # Deprecated fields
-  contract: Contract @goField(forceResolver: true) @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
-  contractAddress: ChainAddress  @goField(forceResolver: true) @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
-  chain: Chain  @goField(forceResolver: true) @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
-  creatorAddress: ChainAddress  @goField(forceResolver: true) @deprecated(reason: "Use Community.creators to get an address")
-  creator: GalleryUserOrAddress @goField(forceResolver: true) @deprecated(reason: "Use Community.creators")
+  contract: Contract
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  contractAddress: ChainAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  chain: Chain
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  creatorAddress: ChainAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.creators to get an address")
+  creator: GalleryUserOrAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.creators")
 
   tokensInCommunity(
     before: String
@@ -9912,8 +9925,7 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
     onlyGalleryUsers: Boolean
-  ): TokensConnection @goField(forceResolver: true)
-  @deprecated(reason: "Use Community.tokens")
+  ): TokensConnection @goField(forceResolver: true) @deprecated(reason: "Use Community.tokens")
 
   owners(
     before: String
@@ -9921,10 +9933,10 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
     onlyGalleryUsers: Boolean
-  ): TokenHoldersConnection @goField(forceResolver: true)
-  @deprecated(reason: "Use Community.holders")
+  ): TokenHoldersConnection
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.holders")
 }
-
 
 type Contract implements Node {
   id: ID!
@@ -54877,6 +54889,8 @@ func (ec *executionContext) fieldContext_Token_definition(ctx context.Context, f
 				return ec.fieldContext_TokenDefinition_media(ctx, field)
 			case "tokenType":
 				return ec.fieldContext_TokenDefinition_tokenType(ctx, field)
+			case "contract":
+				return ec.fieldContext_TokenDefinition_contract(ctx, field)
 			case "chain":
 				return ec.fieldContext_TokenDefinition_chain(ctx, field)
 			case "name":
@@ -56291,6 +56305,73 @@ func (ec *executionContext) fieldContext_TokenDefinition_tokenType(ctx context.C
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type TokenType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_contract(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDefinition().Contract(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Contract)
+	fc.Result = res
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Contract_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Contract_dbid(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Contract_lastUpdated(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Contract_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Contract_creatorAddress(ctx, field)
+			case "chain":
+				return ec.fieldContext_Contract_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Contract_name(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Contract_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Contract_mintURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
 	}
 	return fc, nil
@@ -82270,6 +82351,23 @@ func (ec *executionContext) _TokenDefinition(ctx context.Context, sel ast.Select
 
 			out.Values[i] = ec._TokenDefinition_tokenType(ctx, field, obj)
 
+		case "contract":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDefinition_contract(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "chain":
 
 			out.Values[i] = ec._TokenDefinition_chain(ctx, field, obj)
