@@ -431,6 +431,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   lastUpdated: Time
   media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
+  contract: Contract @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
