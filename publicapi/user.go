@@ -1415,14 +1415,21 @@ func (api UserAPI) GetExploreRecommendedUsers(ctx context.Context, before, after
 			return nil, PageInfo{}, err
 		}
 
-		userIDs, err := recommend.For(ctx).RecommendFromFollowing(ctx, viewerID, follows)
+		personalizedIDs, err := recommend.For(ctx).RecommendFromFollowing(ctx, viewerID, follows)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
+		// when there's no cache:
+		// 1) get personalized ids
+		// 2) join with other recommendation sources to get list of ids and users
+		// 3) output should be users, with users that are already followed
+		// 4) cache the list of ids for that user
+		// 5) encode cursor for recommendations
+
 		cursor.CurrentPosition = 0
-		cursor.IDs = userIDs
-		cursor.Positions = sliceToMapIndex(userIDs)
+		cursor.IDs = personalizedIDs
+		cursor.Positions = sliceToMapIndex(personalizedIDs)
 	}
 
 	paginator = api.paginatorFromCursor(ctx, cursor)
