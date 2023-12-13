@@ -597,8 +597,7 @@ func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Communit
 	return communityToModel(ctx, *community), nil
 }
 
-// Deprecated: use resolveCommunitiesByTokenDefinitionID instead. This helper is only used by deprecated
-// resolvers that expect a single community per token.
+// resolveCommunityByTokenDefinitionID returns the first community that a token belongs to
 func resolveCommunityByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*model.Community, error) {
 	communities, err := resolveCommunitiesByTokenDefinitionID(ctx, tokenDefinitionID)
 	if err != nil {

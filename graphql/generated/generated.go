@@ -9694,7 +9694,6 @@ type TokenDefinition implements Node @goEmbedHelper {
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
-    @deprecated(reason: "Use TokenDefinition.communities instead")
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
 }
@@ -9883,28 +9882,31 @@ type Community implements Node @goEmbedHelper {
   subtype: CommunitySubtype
   creators: [GalleryUserOrAddress] @goField(forceResolver: true)
 
-  holders(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): TokenHoldersConnection @goField(forceResolver: true)
+  holders(before: String, after: String, first: Int, last: Int): TokenHoldersConnection
+    @goField(forceResolver: true)
 
-  tokens(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): TokensConnection @goField(forceResolver: true)
+  tokens(before: String, after: String, first: Int, last: Int): TokensConnection
+    @goField(forceResolver: true)
 
-  posts(before: String, after: String, first: Int, last: Int): PostsConnection @goField(forceResolver: true)
+  posts(before: String, after: String, first: Int, last: Int): PostsConnection
+    @goField(forceResolver: true)
 
   # Deprecated fields
-  contract: Contract @goField(forceResolver: true) @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
-  contractAddress: ChainAddress  @goField(forceResolver: true) @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
-  chain: Chain  @goField(forceResolver: true) @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
-  creatorAddress: ChainAddress  @goField(forceResolver: true) @deprecated(reason: "Use Community.creators to get an address")
-  creator: GalleryUserOrAddress @goField(forceResolver: true) @deprecated(reason: "Use Community.creators")
+  contract: Contract
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  contractAddress: ChainAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  chain: Chain
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  creatorAddress: ChainAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.creators to get an address")
+  creator: GalleryUserOrAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.creators")
 
   tokensInCommunity(
     before: String
@@ -9912,8 +9914,7 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
     onlyGalleryUsers: Boolean
-  ): TokensConnection @goField(forceResolver: true)
-  @deprecated(reason: "Use Community.tokens")
+  ): TokensConnection @goField(forceResolver: true) @deprecated(reason: "Use Community.tokens")
 
   owners(
     before: String
@@ -9921,10 +9922,10 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
     onlyGalleryUsers: Boolean
-  ): TokenHoldersConnection @goField(forceResolver: true)
-  @deprecated(reason: "Use Community.holders")
+  ): TokenHoldersConnection
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.holders")
 }
-
 
 type Contract implements Node {
   id: ID!

@@ -436,9 +436,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   description: String
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
-  community: Community
-    @goField(forceResolver: true)
-    @deprecated(reason: "Use TokenDefinition.communities instead")
+  community: Community @goField(forceResolver: true)
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
 }
