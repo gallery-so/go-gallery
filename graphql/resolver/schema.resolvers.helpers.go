@@ -2102,14 +2102,16 @@ func collectionTokenToModel(ctx context.Context, token *model.Token, collectionI
 
 func getContractCommunity(ctx context.Context, community db.Community) *model.ContractCommunity {
 	return &model.ContractCommunity{
-		Contract: nil, // handled by dedicated resolver
+		HelperContractCommunityData: model.HelperContractCommunityData{Community: community},
+		Contract:                    nil, // handled by dedicated resolver
 	}
 }
 
 func getArtBlocksCommunity(ctx context.Context, community db.Community) *model.ArtBlocksCommunity {
 	return &model.ArtBlocksCommunity{
-		Contract:  nil, // handled by dedicated resolver
-		ProjectID: util.ToPointer(community.Key3),
+		HelperArtBlocksCommunityData: model.HelperArtBlocksCommunityData{Community: community},
+		Contract:                     nil, // handled by dedicated resolver
+		ProjectID:                    util.ToPointer(community.Key3),
 	}
 }
 
