@@ -313,6 +313,35 @@ func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *
 	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
+// MintURL is the resolver for the mintURL field.
+func (r *communityResolver) MintURL(ctx context.Context, obj *model.Community) (*string, error) {
+	// TODO: Check community.mint_url and community.override_mint_url once we add them.
+	if obj.Community.ContractID == "" {
+		return nil, nil
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.Community.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	var mintURL string
+
+	if contract.Address != "" && !contract.IsProviderMarkedSpam {
+		if contract.Chain == persist.ChainZora {
+			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", contract.Address)
+		} else if contract.Chain == persist.ChainBase {
+			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+		} else if contract.Chain == persist.ChainOptimism {
+			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+		} else if contract.Chain == persist.ChainETH {
+			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+		}
+	}
+
+	return &mintURL, nil
+}
+
 // Creators is the resolver for the creators field.
 func (r *communityResolver) Creators(ctx context.Context, obj *model.Community) ([]model.GalleryUserOrAddress, error) {
 	return resolveCommunityCreatorsByCommunityID(ctx, obj.Dbid)

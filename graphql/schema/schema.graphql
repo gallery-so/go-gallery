@@ -622,6 +622,7 @@ type Community implements Node @goEmbedHelper {
   description: String
   profileImageURL: String
   badgeURL: String
+  mintURL: String @goField(forceResolver: true)
 
   subtype: CommunitySubtype
   creators: [GalleryUserOrAddress] @goField(forceResolver: true)
