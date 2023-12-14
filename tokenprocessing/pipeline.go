@@ -345,12 +345,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromOpenSeaAssetURLs(ctx context.Contex
 		LiveRenderGCP:                &tpj.pipelineMetadata.AlternateAnimationLiveRenderGCP,
 	}
 	for _, asset := range assets {
-		// Double check how OS gets their animation media from
-		// XXX animURL := media.AnimationURL(util.FirstNonEmptyString(
-		// XXX 	asset.AnimationURL,
-		// XXX 	asset.AnimationOriginalURL,
-		// XXX ))
-		imgResult, _, animResult = tpj.cacheMediaSources(ctx, media.ImageURL(asset.ImageURL), "", "", imgRunMetadata, nil, animRunMetadata)
+		imgResult, _, animResult = tpj.cacheMediaSources(ctx, media.ImageURL(asset.ImageURL), "", media.AnimationURL(asset.AnimationURL), imgRunMetadata, nil, animRunMetadata)
 		if animResult.IsSuccess() || imgResult.IsSuccess() {
 			return imgResult, animResult
 		}

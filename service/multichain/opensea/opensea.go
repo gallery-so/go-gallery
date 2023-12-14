@@ -38,6 +38,7 @@ type Asset struct {
 	Name          string         `json:"name"`
 	Description   string         `json:"description"`
 	ImageURL      string         `json:"image_url"`
+	AnimationURL  string         `json:"animation_url"`
 	MetadataURL   string         `json:"metadata_url"`
 	Owners        []Owner        `json:"owners"`
 }
@@ -617,9 +618,10 @@ func assetToToken(asset Asset, collection Collection, tokenType persist.TokenTyp
 
 func metadataFromAsset(asset Asset) persist.TokenMetadata {
 	m := persist.TokenMetadata{
-		"name":        asset.Name,
-		"description": asset.Description,
-		"image_url":   asset.ImageURL,
+		"name":          asset.Name,
+		"description":   asset.Description,
+		"image_url":     asset.ImageURL,
+		"animation_url": asset.AnimationURL,
 	}
 	// ENS
 	if persist.Address(asset.Contract) == eth.EnsAddress {
