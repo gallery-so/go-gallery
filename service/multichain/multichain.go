@@ -203,15 +203,6 @@ type ContractsOwnerFetcher interface {
 	GetContractsByOwnerAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
 }
 
-type ChildContractFetcher interface {
-	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ParentToChildEdge, error)
-}
-
-type OpenSeaChildContractFetcher interface {
-	ChildContractFetcher
-	IsOpenSea()
-}
-
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
 	ContractsFetcher
@@ -875,86 +866,6 @@ func (c combinedProviderChildContractResults) ParentContracts() []db.Contract {
 	return chainContractsToUpsertableContracts(combined, nil)
 }
 
-// SyncTokensCreatedOnSharedContracts queries each provider to identify contracts created by the given user.
-func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
-	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-
-	if len(chains) == 0 {
-		for chain := range p.Chains {
-			chains = append(chains, chain)
-		}
-	}
-
-	fetchers := matchingProvidersByChains[ChildContractFetcher](p.Chains, chains...)
-	searchAddresses := p.matchingWallets(user.Wallets, chains)
-	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx)
-
-	// Fetch all tokens created by the user
-	for chain, addresses := range searchAddresses {
-		for priority, fetcher := range fetchers[chain] {
-			for _, address := range addresses {
-				c := chain
-				p := priority
-				f := fetcher
-				a := address
-				providerPool.Go(func(ctx context.Context) (ProviderChildContractResult, error) {
-					contractEdges, err := f.GetChildContractsCreatedOnSharedContract(ctx, a)
-					if err != nil {
-						return ProviderChildContractResult{}, err
-					}
-					return ProviderChildContractResult{
-						Priority: p,
-						Chain:    c,
-						Edges:    contractEdges,
-					}, nil
-				})
-			}
-		}
-	}
-
-	pResult, err := providerPool.Wait()
-	if err != nil {
-		return err
-	}
-
-	combinedResult := combinedProviderChildContractResults(pResult)
-
-	parentContracts, err := p.Repos.ContractRepository.BulkUpsert(ctx, combinedResult.ParentContracts(), true)
-	if err != nil {
-		return err
-	}
-
-	contractToDBID := make(map[persist.ContractIdentifiers]persist.DBID)
-	for _, c := range parentContracts {
-		cID := persist.NewContractIdentifiers(c.Address, c.Chain)
-		contractToDBID[cID] = c.ID
-	}
-
-	params := db.UpsertChildContractsParams{}
-
-	for _, result := range combinedResult {
-		for _, edge := range result.Edges {
-			for _, child := range edge.Children {
-				params.ID = append(params.ID, persist.GenerateID().String())
-				params.Name = append(params.Name, child.Name)
-				params.Address = append(params.Address, child.ChildID)
-				params.CreatorAddress = append(params.CreatorAddress, child.CreatorAddress.String())
-				params.OwnerAddress = append(params.OwnerAddress, child.OwnerAddress.String())
-				params.Chain = append(params.Chain, int32(result.Chain))
-				params.L1Chain = append(params.L1Chain, int32(result.Chain.L1Chain()))
-				params.Description = append(params.Description, child.Description)
-				params.ParentIds = append(params.ParentIds, contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)].String())
-			}
-		}
-	}
-
-	_, err = p.Queries.UpsertChildContracts(ctx, params)
-	return err
-}
-
 func (p *Provider) processTokenCommunities(ctx context.Context, contracts []db.Contract, tokens []op.TokenFullDetails) error {
 	knownProviders, err := p.Queries.GetCommunityContractProviders(ctx, util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID }))
 	if err != nil {
@@ -1614,8 +1525,6 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	}
 
 	return nil
-	//return p.SyncTokensCreatedOnSharedContracts(ctx, userID, chains)
-
 }
 
 type tokenForUser struct {
