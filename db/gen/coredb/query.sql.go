@@ -2737,7 +2737,7 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 }
 
 const getMentionByID = `-- name: GetMentionByID :one
-select id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted from mentions where id = $1 and not deleted
+select id, post_id, comment_id, user_id, start, length, created_at, deleted, community_id from mentions where id = $1 and not deleted
 `
 
 func (q *Queries) GetMentionByID(ctx context.Context, id persist.DBID) (Mention, error) {
@@ -2748,11 +2748,11 @@ func (q *Queries) GetMentionByID(ctx context.Context, id persist.DBID) (Mention,
 		&i.PostID,
 		&i.CommentID,
 		&i.UserID,
-		&i.ContractID,
 		&i.Start,
 		&i.Length,
 		&i.CreatedAt,
 		&i.Deleted,
+		&i.CommunityID,
 	)
 	return i, err
 }
@@ -5736,13 +5736,13 @@ func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (p
 }
 
 const insertCommentMention = `-- name: InsertCommentMention :one
-insert into mentions (id, user_id, contract_id, comment_id, start, length) values ($1, $2, $3, $4, $5, $6) returning id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted
+insert into mentions (id, user_id, community_id, comment_id, start, length) values ($1, $2, $3, $4, $5, $6) returning id, post_id, comment_id, user_id, start, length, created_at, deleted, community_id
 `
 
 type InsertCommentMentionParams struct {
 	ID        persist.DBID   `db:"id" json:"id"`
 	User      sql.NullString `db:"user" json:"user"`
-	Contract  sql.NullString `db:"contract" json:"contract"`
+	Community sql.NullString `db:"community" json:"community"`
 	CommentID persist.DBID   `db:"comment_id" json:"comment_id"`
 	Start     sql.NullInt32  `db:"start" json:"start"`
 	Length    sql.NullInt32  `db:"length" json:"length"`
@@ -5752,7 +5752,7 @@ func (q *Queries) InsertCommentMention(ctx context.Context, arg InsertCommentMen
 	row := q.db.QueryRow(ctx, insertCommentMention,
 		arg.ID,
 		arg.User,
-		arg.Contract,
+		arg.Community,
 		arg.CommentID,
 		arg.Start,
 		arg.Length,
@@ -5763,11 +5763,11 @@ func (q *Queries) InsertCommentMention(ctx context.Context, arg InsertCommentMen
 		&i.PostID,
 		&i.CommentID,
 		&i.UserID,
-		&i.ContractID,
 		&i.Start,
 		&i.Length,
 		&i.CreatedAt,
 		&i.Deleted,
+		&i.CommunityID,
 	)
 	return i, err
 }
@@ -5822,7 +5822,7 @@ func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, ar
 }
 
 const insertMention = `-- name: InsertMention :one
-INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, $5, $6, $3, $4) RETURNING ID
+insert into mentions (id, comment_id, user_id, community_id, start, length) values ($1, $2, $5, $6, $3, $4) returning id
 `
 
 type InsertMentionParams struct {
@@ -5831,7 +5831,7 @@ type InsertMentionParams struct {
 	Start     sql.NullInt32  `db:"start" json:"start"`
 	Length    sql.NullInt32  `db:"length" json:"length"`
 	User      sql.NullString `db:"user" json:"user"`
-	Contract  sql.NullString `db:"contract" json:"contract"`
+	Community sql.NullString `db:"community" json:"community"`
 }
 
 func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) (persist.DBID, error) {
@@ -5841,7 +5841,7 @@ func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) (p
 		arg.Start,
 		arg.Length,
 		arg.User,
-		arg.Contract,
+		arg.Community,
 	)
 	var id persist.DBID
 	err := row.Scan(&id)
@@ -5879,23 +5879,23 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist
 }
 
 const insertPostMention = `-- name: InsertPostMention :one
-insert into mentions (id, user_id, contract_id, post_id, start, length) values ($1, $2, $3, $4, $5, $6) returning id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted
+insert into mentions (id, user_id, community_id, post_id, start, length) values ($1, $2, $3, $4, $5, $6) returning id, post_id, comment_id, user_id, start, length, created_at, deleted, community_id
 `
 
 type InsertPostMentionParams struct {
-	ID       persist.DBID   `db:"id" json:"id"`
-	User     sql.NullString `db:"user" json:"user"`
-	Contract sql.NullString `db:"contract" json:"contract"`
-	PostID   persist.DBID   `db:"post_id" json:"post_id"`
-	Start    sql.NullInt32  `db:"start" json:"start"`
-	Length   sql.NullInt32  `db:"length" json:"length"`
+	ID        persist.DBID   `db:"id" json:"id"`
+	User      sql.NullString `db:"user" json:"user"`
+	Community sql.NullString `db:"community" json:"community"`
+	PostID    persist.DBID   `db:"post_id" json:"post_id"`
+	Start     sql.NullInt32  `db:"start" json:"start"`
+	Length    sql.NullInt32  `db:"length" json:"length"`
 }
 
 func (q *Queries) InsertPostMention(ctx context.Context, arg InsertPostMentionParams) (Mention, error) {
 	row := q.db.QueryRow(ctx, insertPostMention,
 		arg.ID,
 		arg.User,
-		arg.Contract,
+		arg.Community,
 		arg.PostID,
 		arg.Start,
 		arg.Length,
@@ -5906,11 +5906,11 @@ func (q *Queries) InsertPostMention(ctx context.Context, arg InsertPostMentionPa
 		&i.PostID,
 		&i.CommentID,
 		&i.UserID,
-		&i.ContractID,
 		&i.Start,
 		&i.Length,
 		&i.CreatedAt,
 		&i.Deleted,
+		&i.CommunityID,
 	)
 	return i, err
 }

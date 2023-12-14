@@ -1251,31 +1251,31 @@ func (b *GetCommunitiesByTokenDefinitionIDBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getCommunityByID = `-- name: GetCommunityByID :batchone
+const getCommunityByIDBatch = `-- name: GetCommunityByIDBatch :batchone
 select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url from communities
     where id = $1
         and not deleted
 `
 
-type GetCommunityByIDBatchResults struct {
+type GetCommunityByIDBatchBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-func (q *Queries) GetCommunityByID(ctx context.Context, id []persist.DBID) *GetCommunityByIDBatchResults {
+func (q *Queries) GetCommunityByIDBatch(ctx context.Context, id []persist.DBID) *GetCommunityByIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range id {
 		vals := []interface{}{
 			a,
 		}
-		batch.Queue(getCommunityByID, vals...)
+		batch.Queue(getCommunityByIDBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetCommunityByIDBatchResults{br, len(id), false}
+	return &GetCommunityByIDBatchBatchResults{br, len(id), false}
 }
 
-func (b *GetCommunityByIDBatchResults) QueryRow(f func(int, Community, error)) {
+func (b *GetCommunityByIDBatchBatchResults) QueryRow(f func(int, Community, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var i Community
@@ -1315,7 +1315,7 @@ func (b *GetCommunityByIDBatchResults) QueryRow(f func(int, Community, error)) {
 	}
 }
 
-func (b *GetCommunityByIDBatchResults) Close() error {
+func (b *GetCommunityByIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -2364,7 +2364,7 @@ func (b *GetMembershipByMembershipIdBatchBatchResults) Close() error {
 }
 
 const getMentionsByCommentID = `-- name: GetMentionsByCommentID :batchmany
-select id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted from mentions where comment_id = $1 and not deleted
+select id, post_id, comment_id, user_id, start, length, created_at, deleted, community_id from mentions where comment_id = $1 and not deleted
 `
 
 type GetMentionsByCommentIDBatchResults struct {
@@ -2408,11 +2408,11 @@ func (b *GetMentionsByCommentIDBatchResults) Query(f func(int, []Mention, error)
 					&i.PostID,
 					&i.CommentID,
 					&i.UserID,
-					&i.ContractID,
 					&i.Start,
 					&i.Length,
 					&i.CreatedAt,
 					&i.Deleted,
+					&i.CommunityID,
 				); err != nil {
 					return err
 				}
@@ -2432,7 +2432,7 @@ func (b *GetMentionsByCommentIDBatchResults) Close() error {
 }
 
 const getMentionsByPostID = `-- name: GetMentionsByPostID :batchmany
-select id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted from mentions where post_id = $1 and not deleted
+select id, post_id, comment_id, user_id, start, length, created_at, deleted, community_id from mentions where post_id = $1 and not deleted
 `
 
 type GetMentionsByPostIDBatchResults struct {
@@ -2476,11 +2476,11 @@ func (b *GetMentionsByPostIDBatchResults) Query(f func(int, []Mention, error)) {
 					&i.PostID,
 					&i.CommentID,
 					&i.UserID,
-					&i.ContractID,
 					&i.Start,
 					&i.Length,
 					&i.CreatedAt,
 					&i.Deleted,
+					&i.CommunityID,
 				); err != nil {
 					return err
 				}

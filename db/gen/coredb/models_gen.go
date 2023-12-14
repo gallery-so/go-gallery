@@ -319,15 +319,15 @@ type Membership struct {
 }
 
 type Mention struct {
-	ID         persist.DBID  `db:"id" json:"id"`
-	PostID     persist.DBID  `db:"post_id" json:"post_id"`
-	CommentID  persist.DBID  `db:"comment_id" json:"comment_id"`
-	UserID     persist.DBID  `db:"user_id" json:"user_id"`
-	ContractID persist.DBID  `db:"contract_id" json:"contract_id"`
-	Start      sql.NullInt32 `db:"start" json:"start"`
-	Length     sql.NullInt32 `db:"length" json:"length"`
-	CreatedAt  time.Time     `db:"created_at" json:"created_at"`
-	Deleted    bool          `db:"deleted" json:"deleted"`
+	ID          persist.DBID  `db:"id" json:"id"`
+	PostID      persist.DBID  `db:"post_id" json:"post_id"`
+	CommentID   persist.DBID  `db:"comment_id" json:"comment_id"`
+	UserID      persist.DBID  `db:"user_id" json:"user_id"`
+	Start       sql.NullInt32 `db:"start" json:"start"`
+	Length      sql.NullInt32 `db:"length" json:"length"`
+	CreatedAt   time.Time     `db:"created_at" json:"created_at"`
+	Deleted     bool          `db:"deleted" json:"deleted"`
+	CommunityID persist.DBID  `db:"community_id" json:"community_id"`
 }
 
 type Merch struct {

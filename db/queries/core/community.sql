@@ -73,7 +73,12 @@ on conflict (community_id, token_definition_id) where not deleted
     do nothing
 returning *;
 
--- name: GetCommunityByID :batchone
+-- name: GetCommunityByID :one
+select * from communities
+    where id = @id
+        and not deleted;
+
+-- name: GetCommunityByIDBatch :batchone
 select * from communities
     where id = @id
         and not deleted;

@@ -192,13 +192,13 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 				if err != nil {
 					return "", err
 				}
-			case mention.ContractID != "":
+			case mention.CommunityID != "":
 				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actorID),
 					ResourceTypeID: persist.ResourceTypeContract,
-					SubjectID:      mention.ContractID,
+					SubjectID:      mention.CommunityID,
 					PostID:         postID,
-					ContractID:     mention.ContractID,
+					ContractID:     mention.CommunityID, // TODO: do we need this to be set? Do we use SubjectID or ContractID?
 					Action:         persist.ActionMentionCommunity,
 					MentionID:      mention.ID,
 				})
@@ -442,25 +442,25 @@ func insertMentionsForPost(ctx context.Context, mentions []*model.MentionInput, 
 	result := make([]db.Mention, len(dbMentions))
 
 	for i, m := range dbMentions {
-		var user, contract sql.NullString
+		var user, community sql.NullString
 		if m.UserID != "" {
 			user = sql.NullString{
 				String: m.UserID.String(),
 				Valid:  true,
 			}
-		} else if m.ContractID != "" {
-			contract = sql.NullString{
-				String: m.ContractID.String(),
+		} else if m.CommunityID != "" {
+			community = sql.NullString{
+				String: m.CommunityID.String(),
 				Valid:  true,
 			}
 		}
 		mid, err := q.InsertPostMention(ctx, db.InsertPostMentionParams{
-			ID:       persist.GenerateID(),
-			User:     user,
-			Contract: contract,
-			PostID:   postID,
-			Start:    m.Start,
-			Length:   m.Length,
+			ID:        persist.GenerateID(),
+			User:      user,
+			Community: community,
+			PostID:    postID,
+			Start:     m.Start,
+			Length:    m.Length,
 		})
 		if err != nil {
 			return nil, err

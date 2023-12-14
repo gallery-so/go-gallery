@@ -2612,8 +2612,8 @@ func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
 	switch {
 	case mention.UserID != "":
 		m.HelperMentionData.UserID = &mention.UserID
-	case mention.ContractID != "":
-		m.HelperMentionData.CommunityID = &mention.ContractID
+	case mention.CommunityID != "":
+		m.HelperMentionData.CommunityID = &mention.CommunityID
 	default:
 		panic(fmt.Sprintf("unknown mention type: %+v", mention))
 	}

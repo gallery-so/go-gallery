@@ -1734,10 +1734,10 @@ returning *;
 select * from pii.user_view u where u.pii_socials->sqlc.arg('social_account_type')::varchar->>'id' = any(@social_ids::varchar[]) and not u.deleted and not u.universal;
 
 -- name: InsertCommentMention :one
-insert into mentions (id, user_id, contract_id, comment_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @comment_id, @start, @length) returning *;
+insert into mentions (id, user_id, community_id, comment_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('community'), @comment_id, @start, @length) returning *;
 
 -- name: InsertPostMention :one
-insert into mentions (id, user_id, contract_id, post_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @post_id, @start, @length) returning *;
+insert into mentions (id, user_id, community_id, post_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('community'), @post_id, @start, @length) returning *;
 
 -- name: GetMentionsByCommentID :batchmany
 select * from mentions where comment_id = @comment_id and not deleted;
@@ -1813,7 +1813,7 @@ SET traits = CASE
 WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 
 -- name: InsertMention :one
-INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
+insert into mentions (id, comment_id, user_id, community_id, start, length) values ($1, $2, sqlc.narg('user'), sqlc.narg('community'), $3, $4) returning id;
 
 -- name: InsertComment :one
 INSERT INTO comments 
