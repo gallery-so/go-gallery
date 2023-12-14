@@ -498,10 +498,6 @@ func tokensToConnection(ctx context.Context, tokens []db.Token, pageInfo publica
 	}
 }
 
-func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
-	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
-}
-
 func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 
@@ -597,8 +593,7 @@ func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Communit
 	return communityToModel(ctx, *community), nil
 }
 
-// Deprecated: use resolveCommunitiesByTokenDefinitionID instead. This helper is only used by deprecated
-// resolvers that expect a single community per token.
+// resolveCommunityByTokenDefinitionID returns the first community that a token belongs to
 func resolveCommunityByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*model.Community, error) {
 	communities, err := resolveCommunitiesByTokenDefinitionID(ctx, tokenDefinitionID)
 	if err != nil {
@@ -2103,14 +2098,16 @@ func collectionTokenToModel(ctx context.Context, token *model.Token, collectionI
 
 func getContractCommunity(ctx context.Context, community db.Community) *model.ContractCommunity {
 	return &model.ContractCommunity{
-		Contract: nil, // handled by dedicated resolver
+		HelperContractCommunityData: model.HelperContractCommunityData{Community: community},
+		Contract:                    nil, // handled by dedicated resolver
 	}
 }
 
 func getArtBlocksCommunity(ctx context.Context, community db.Community) *model.ArtBlocksCommunity {
 	return &model.ArtBlocksCommunity{
-		Contract:  nil, // handled by dedicated resolver
-		ProjectID: util.ToPointer(community.Key3),
+		HelperArtBlocksCommunityData: model.HelperArtBlocksCommunityData{Community: community},
+		Contract:                     nil, // handled by dedicated resolver
+		ProjectID:                    util.ToPointer(community.Key3),
 	}
 }
 
@@ -2205,10 +2202,13 @@ func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRe
 		Chain:               &chain,
 		ProfileImageURL:     util.ToPointer(contract.ProfileImageUrl.String),
 		BadgeURL:            util.ToPointer(contract.BadgeUrl.String),
-		Subtype:             model.ContractCommunity{Contract: contractToModel(ctx, contract)},
-		Owners:              nil, // handled by dedicated resolver
-		Creator:             nil, // handled by dedicated resolver
-		TokensInCommunity:   nil, // handled by dedicated resolver
+		Subtype: model.ContractCommunity{
+			HelperContractCommunityData: model.HelperContractCommunityData{Community: db.Community{ContractID: contract.ID}},
+			Contract:                    contractToModel(ctx, contract),
+		},
+		Owners:            nil, // handled by dedicated resolver
+		Creator:           nil, // handled by dedicated resolver
+		TokensInCommunity: nil, // handled by dedicated resolver
 	}
 }
 
@@ -2623,7 +2623,7 @@ func resolveCommunityCreatorsByCommunityID(ctx context.Context, communityID pers
 		return nil, err
 	}
 
-	models := make([]model.GalleryUserOrAddress, len(creators))
+	models := make([]model.GalleryUserOrAddress, 0, len(creators))
 	for _, creator := range creators {
 		if creator.CreatorUserID != "" {
 			user, err := resolveGalleryUserByUserID(ctx, creator.CreatorUserID)

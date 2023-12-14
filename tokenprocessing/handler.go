@@ -41,7 +41,6 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, retryManager))
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, retryManager, mc, repos.UserRepository))
 	ownersGroup := router.Group("/owners")
-	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, throttler))
 	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))

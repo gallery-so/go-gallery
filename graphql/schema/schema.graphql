@@ -431,14 +431,13 @@ type TokenDefinition implements Node @goEmbedHelper {
   lastUpdated: Time
   media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
+  contract: Contract @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
-  community: Community
-    @goField(forceResolver: true)
-    @deprecated(reason: "Use TokenDefinition.communities instead")
+  community: Community @goField(forceResolver: true)
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
 }
@@ -623,6 +622,7 @@ type Community implements Node @goEmbedHelper {
   description: String
   profileImageURL: String
   badgeURL: String
+  mintURL: String @goField(forceResolver: true)
 
   subtype: CommunitySubtype
   creators: [GalleryUserOrAddress] @goField(forceResolver: true)

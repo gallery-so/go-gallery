@@ -815,6 +815,7 @@ type Community struct {
 	Description       *string                 `json:"description"`
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
+	MintURL           *string                 `json:"mintURL"`
 	Subtype           CommunitySubtype        `json:"subtype"`
 	Creators          []GalleryUserOrAddress  `json:"creators"`
 	Holders           *TokenHoldersConnection `json:"holders"`
@@ -2496,6 +2497,7 @@ type TokenDefinition struct {
 	LastUpdated   *time.Time     `json:"lastUpdated"`
 	Media         MediaSubtype   `json:"media"`
 	TokenType     *TokenType     `json:"tokenType"`
+	Contract      *Contract      `json:"contract"`
 	Chain         *persist.Chain `json:"chain"`
 	Name          *string        `json:"name"`
 	Description   *string        `json:"description"`

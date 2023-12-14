@@ -357,6 +357,7 @@ type ComplexityRoot struct {
 		Holders           func(childComplexity int, before *string, after *string, first *int, last *int) int
 		ID                func(childComplexity int) int
 		LastUpdated       func(childComplexity int) int
+		MintURL           func(childComplexity int) int
 		Name              func(childComplexity int) int
 		Owners            func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 		Posts             func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -1468,6 +1469,7 @@ type ComplexityRoot struct {
 		Chain         func(childComplexity int) int
 		Communities   func(childComplexity int) int
 		Community     func(childComplexity int) int
+		Contract      func(childComplexity int) int
 		CreationTime  func(childComplexity int) int
 		Dbid          func(childComplexity int) int
 		Description   func(childComplexity int) int
@@ -1822,6 +1824,8 @@ type CommentOnPostPayloadResolver interface {
 	ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error)
 }
 type CommunityResolver interface {
+	MintURL(ctx context.Context, obj *model.Community) (*string, error)
+
 	Creators(ctx context.Context, obj *model.Community) ([]model.GalleryUserOrAddress, error)
 	Holders(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error)
 	Tokens(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error)
@@ -2145,6 +2149,8 @@ type TokenResolver interface {
 }
 type TokenDefinitionResolver interface {
 	Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error)
+
+	Contract(ctx context.Context, obj *model.TokenDefinition) (*model.Contract, error)
 
 	TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error)
 	Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error)
@@ -3141,6 +3147,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.LastUpdated(childComplexity), true
+
+	case "Community.mintURL":
+		if e.complexity.Community.MintURL == nil {
+			break
+		}
+
+		return e.complexity.Community.MintURL(childComplexity), true
 
 	case "Community.name":
 		if e.complexity.Community.Name == nil {
@@ -8270,6 +8283,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenDefinition.Community(childComplexity), true
 
+	case "TokenDefinition.contract":
+		if e.complexity.TokenDefinition.Contract == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.Contract(childComplexity), true
+
 	case "TokenDefinition.creationTime":
 		if e.complexity.TokenDefinition.CreationTime == nil {
 			break
@@ -9727,14 +9747,13 @@ type TokenDefinition implements Node @goEmbedHelper {
   lastUpdated: Time
   media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
+  contract: Contract @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
-  community: Community
-    @goField(forceResolver: true)
-    @deprecated(reason: "Use TokenDefinition.communities instead")
+  community: Community @goField(forceResolver: true)
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
 }
@@ -9919,6 +9938,7 @@ type Community implements Node @goEmbedHelper {
   description: String
   profileImageURL: String
   badgeURL: String
+  mintURL: String @goField(forceResolver: true)
 
   subtype: CommunitySubtype
   creators: [GalleryUserOrAddress] @goField(forceResolver: true)
@@ -22686,6 +22706,47 @@ func (ec *executionContext) fieldContext_Community_badgeURL(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_mintURL(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_mintURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().MintURL(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_mintURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Community_subtype(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Community_subtype(ctx, field)
 	if err != nil {
@@ -23351,6 +23412,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -23473,6 +23536,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -43349,6 +43414,8 @@ func (ec *executionContext) fieldContext_PostComposerDraftDetailsPayload_communi
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -52190,6 +52257,8 @@ func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotificati
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -52553,6 +52622,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_commu
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -55190,6 +55261,8 @@ func (ec *executionContext) fieldContext_Token_definition(ctx context.Context, f
 				return ec.fieldContext_TokenDefinition_media(ctx, field)
 			case "tokenType":
 				return ec.fieldContext_TokenDefinition_tokenType(ctx, field)
+			case "contract":
+				return ec.fieldContext_TokenDefinition_contract(ctx, field)
 			case "chain":
 				return ec.fieldContext_TokenDefinition_chain(ctx, field)
 			case "name":
@@ -55771,6 +55844,8 @@ func (ec *executionContext) fieldContext_Token_community(ctx context.Context, fi
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -56609,6 +56684,73 @@ func (ec *executionContext) fieldContext_TokenDefinition_tokenType(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _TokenDefinition_contract(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDefinition().Contract(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Contract)
+	fc.Result = res
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Contract_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Contract_dbid(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Contract_lastUpdated(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Contract_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Contract_creatorAddress(ctx, field)
+			case "chain":
+				return ec.fieldContext_Contract_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Contract_name(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Contract_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Contract_mintURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TokenDefinition_chain(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_TokenDefinition_chain(ctx, field)
 	if err != nil {
@@ -56864,6 +57006,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_community(ctx context.C
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -56945,6 +57089,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_communities(ctx context
 				return ec.fieldContext_Community_profileImageURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "mintURL":
+				return ec.fieldContext_Community_mintURL(ctx, field)
 			case "subtype":
 				return ec.fieldContext_Community_subtype(ctx, field)
 			case "creators":
@@ -74109,6 +74255,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._Community_badgeURL(ctx, field, obj)
 
+		case "mintURL":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_mintURL(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "subtype":
 
 			out.Values[i] = ec._Community_subtype(ctx, field, obj)
@@ -82664,6 +82827,23 @@ func (ec *executionContext) _TokenDefinition(ctx context.Context, sel ast.Select
 
 			out.Values[i] = ec._TokenDefinition_tokenType(ctx, field, obj)
 
+		case "contract":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDefinition_contract(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "chain":
 
 			out.Values[i] = ec._TokenDefinition_chain(ctx, field, obj)
