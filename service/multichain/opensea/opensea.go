@@ -217,6 +217,7 @@ func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Addr
 
 	go func() {
 		defer close(tokensChan)
+		defer close(contractsChan)
 		for a := range outCh {
 			assetsReceived := a
 			if assetsReceived.Err != nil {
@@ -236,19 +237,27 @@ func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Addr
 		}
 	}()
 
+	var tokenOpen, contractOpen bool
+	var token multichain.ChainAgnosticToken
+	var contract multichain.ChainAgnosticContract
+
 	for {
 		select {
-		case token, ok := <-tokensChan:
-			if !ok {
+		case token, tokenOpen = <-tokensChan:
+			if tokenOpen {
+				resultTokens = append(resultTokens, token)
+				continue
+			}
+			if !contractOpen {
 				return resultTokens, resultContracts, nil
 			}
-			resultTokens = append(resultTokens, token)
-		case contract, ok := <-contractsChan:
-			if !ok {
-				return resultTokens, resultContracts, nil
-			}
-			if contract.Address.String() != "" {
+		case contract, contractOpen = <-contractsChan:
+			if contractOpen {
 				resultContracts = append(resultContracts, contract)
+				continue
+			}
+			if !tokenOpen {
+				return resultTokens, resultContracts, nil
 			}
 		case <-ctx.Done():
 			return nil, nil, ctx.Err()
@@ -292,19 +301,29 @@ func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persis
 			}
 		}()
 
+		var tokenOpen, contractOpen bool
+		var token multichain.ChainAgnosticToken
+		var contract multichain.ChainAgnosticContract
+
 	outer:
 		for {
 			select {
-			case token, ok := <-innerTokenReceived:
-				if !ok {
+			case token, tokenOpen = <-innerTokenReceived:
+				if tokenOpen {
+					innerTokens = append(innerTokens, token)
+					continue
+				}
+				if !contractOpen {
 					break outer
 				}
-				innerTokens = append(innerTokens, token)
-			case contract, ok := <-innerContractReceived:
-				if !ok {
+			case contract, contractOpen = <-innerContractReceived:
+				if contractOpen {
+					innerContracts = append(innerContracts, contract)
+					continue
+				}
+				if !tokenOpen {
 					break outer
 				}
-				innerContracts = append(innerContracts, contract)
 			case <-ctx.Done():
 				errChan <- ctx.Err()
 				return
@@ -329,34 +348,41 @@ type contractCollection struct {
 }
 
 func (p *Provider) streamTokenAndContract(ctx context.Context, ownerAddress persist.Address, asset Asset, tokenCh chan<- multichain.ChainAgnosticToken, contractCh chan<- multichain.ChainAgnosticContract, seenContracts *sync.Map, contractLocks map[string]*sync.Mutex, mu *sync.RWMutex) error {
-	cc, ok := seenContracts.Load(asset.Contract)
 	// Haven't seen this contract before, so we need to process it
-	if !ok {
+	if _, ok := seenContracts.Load(asset.Contract); !ok {
+		// If we don't have a lock yet, create one
+		mu.Lock()
+		if _, hasJobLock := contractLocks[asset.Contract]; !hasJobLock {
+			contractLocks[asset.Contract] = &sync.Mutex{}
+		}
+		mu.Unlock()
+
 		// Acquire a lock for the job
 		mu.RLock()
-		jobMu, hasLock := contractLocks[asset.Contract]
+		jobMu := contractLocks[asset.Contract]
 		mu.RUnlock()
-		// If we don't have a lock yet, create one
-		if !hasLock {
-			mu.Lock()
-			jobMu = &sync.Mutex{}
-			contractLocks[asset.Contract] = jobMu
-			mu.Unlock()
-		}
+
 		// Process the contract
 		var err error
 		func() {
 			jobMu.Lock()
 			defer jobMu.Unlock()
-			cc, err = fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, persist.Address(asset.Contract))
-			contractCh <- contractToChainAgnosticContract(cc.(contractCollection).Contract, cc.(contractCollection).Collection)
-			seenContracts.Store(asset.Contract, cc)
+			// Check again if we've seen the contract, since another job may have processed it while we were waiting for the lock
+			if _, ok := seenContracts.Load(asset.Contract); !ok {
+				c, err := fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, persist.Address(asset.Contract))
+				if err == nil {
+					contractCh <- contractToChainAgnosticContract(c.Contract, c.Collection)
+					seenContracts.Store(asset.Contract, c)
+				}
+			}
 		}()
+
 		if err != nil {
 			return err
 		}
 	}
 
+	cc, _ := seenContracts.Load(asset.Contract)
 	collection := cc.(contractCollection).Collection
 
 	typ, err := tokenTypeFromAsset(asset)
@@ -364,23 +390,27 @@ func (p *Provider) streamTokenAndContract(ctx context.Context, ownerAddress pers
 		return err
 	}
 
+	var tokens []multichain.ChainAgnosticToken
+
+	if ownerAddress != "" {
+		tokenCh <- assetToToken(asset, collection, typ, ownerAddress, 1)
+		return nil
+	}
+
 	// There are some types of syncs like syncing tokens by contract address or syncing tokens by token identifiers
 	// where we can't confirm the owner via the API. If there isn't an input ownerAddress, we expand the token to all owners of the token.
-	var tokens []multichain.ChainAgnosticToken
-	if ownerAddress == "" {
-		switch typ {
-		case persist.TokenTypeERC721:
-			if numOwners := len(asset.Owners); numOwners != 1 {
-				return fmt.Errorf("unexpected number of owners for ERC721 token %s:%s: expected 1, got %d", asset.Contract, asset.Identifier, numOwners)
-			}
-			tokens = []multichain.ChainAgnosticToken{assetToToken(asset, collection, typ, persist.Address(asset.Owners[0].Address), 1)}
-		case persist.TokenTypeERC1155:
-			tokens = util.MapWithoutError(asset.Owners, func(o Owner) multichain.ChainAgnosticToken {
-				return assetToToken(asset, collection, typ, persist.Address(o.Address), o.Quantity)
-			})
-		default:
-			return fmt.Errorf("don't know how to handle owners for token type %s", typ)
+	switch typ {
+	case persist.TokenTypeERC721:
+		if numOwners := len(asset.Owners); numOwners != 1 {
+			return fmt.Errorf("unexpected number of owners for ERC721 token %s:%s: expected 1, got %d", asset.Contract, asset.Identifier, numOwners)
 		}
+		tokens = []multichain.ChainAgnosticToken{assetToToken(asset, collection, typ, persist.Address(asset.Owners[0].Address), 1)}
+	case persist.TokenTypeERC1155:
+		tokens = util.MapWithoutError(asset.Owners, func(o Owner) multichain.ChainAgnosticToken {
+			return assetToToken(asset, collection, typ, persist.Address(o.Address), o.Quantity)
+		})
+	default:
+		return fmt.Errorf("don't know how to handle owners for token type %s", typ)
 	}
 
 	for _, token := range tokens {
@@ -559,10 +589,10 @@ func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, client *http.C
 		outCh <- assetsReceived{Err: err}
 		return
 	}
-	// OS doesn't let you filter for a specific token ID, so we have to filter it ourselves
 	setCollection(endpoint, contract.Collection)
 	setPagingParams(endpoint)
 	paginateAssetsFilter(ctx, client, authRequest(ctx, endpoint), outCh, func(a Asset) bool {
+		// OS doesn't let you filter for a specific token ID, so we have exclude everything that isn't the token we want
 		return a.Contract != contractAddress.String() && mustTokenID(a.Identifier) != tokenID
 	})
 }
