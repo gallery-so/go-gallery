@@ -198,7 +198,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 					ResourceTypeID: persist.ResourceTypeContract,
 					SubjectID:      mention.CommunityID,
 					PostID:         postID,
-					ContractID:     mention.CommunityID, // TODO: do we need this to be set? Do we use SubjectID or ContractID?
+					CommunityID:    mention.CommunityID,
 					Action:         persist.ActionMentionCommunity,
 					MentionID:      mention.ID,
 				})
@@ -216,6 +216,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return "", err
 	}
 
+	// TODO: Update to use community creators
 	creators, _ := api.loaders.GetContractCreatorsByIds.LoadAll(util.StringersToStrings(contractIDs))
 	for _, creator := range creators {
 		if creator.CreatorUserID == "" {
@@ -228,7 +229,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 			UserID:         creator.CreatorUserID,
 			SubjectID:      creator.ContractID,
 			PostID:         postID,
-			ContractID:     creator.ContractID,
+			CommunityID:    creator.ContractID,
 		})
 		if err != nil {
 			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
@@ -314,6 +315,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			return postID, err
 		}
 
+		// TODO: Update to use community creators
 		creator, _ := api.loaders.GetContractCreatorsByIds.Load(r.Contract.ID.String())
 		if creator.CreatorUserID != "" {
 			err = event.Dispatch(ctx, db.Event{
@@ -323,7 +325,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 				UserID:         creator.CreatorUserID,
 				SubjectID:      creator.ContractID,
 				PostID:         postID,
-				ContractID:     creator.ContractID,
+				CommunityID:    creator.ContractID,
 			})
 			if err != nil {
 				sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
@@ -370,6 +372,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		return postID, err
 	}
 
+	// TODO: Update to use community creators
 	creator, _ := api.loaders.GetContractCreatorsByIds.Load(synced.Contract.ID.String())
 	if creator.CreatorUserID != "" {
 		err = event.Dispatch(ctx, db.Event{
@@ -379,7 +382,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			UserID:         creator.CreatorUserID,
 			SubjectID:      creator.ContractID,
 			PostID:         postID,
-			ContractID:     creator.ContractID,
+			CommunityID:    creator.ContractID,
 		})
 		if err != nil {
 			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))

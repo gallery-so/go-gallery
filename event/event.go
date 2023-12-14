@@ -479,7 +479,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
-		CommunityID: persistedEvent.ContractID,
+		CommunityID: persistedEvent.CommunityID,
 		MentionID:   persistedEvent.MentionID,
 	})
 }
@@ -544,8 +544,8 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
 	case persist.ResourceTypeContract:
-
-		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.ContractID.String())
+		// TODO: Update to use community creators
+		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.CommunityID.String())
 		if err != nil || u.CreatorUserID == "" {
 			logger.For(ctx).Warnf("error loading user by address: %s", err)
 			return "", nil
@@ -613,7 +613,7 @@ func (h followerNotificationHandler) handleDelayed(ctx context.Context, persiste
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
-		CommunityID: persistedEvent.ContractID,
+		CommunityID: persistedEvent.CommunityID,
 		MentionID:   persistedEvent.MentionID,
 	})
 }

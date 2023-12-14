@@ -189,7 +189,7 @@ type Event struct {
 	Caption        sql.NullString       `db:"caption" json:"caption"`
 	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
 	PostID         persist.DBID         `db:"post_id" json:"post_id"`
-	ContractID     persist.DBID         `db:"contract_id" json:"contract_id"`
+	CommunityID    persist.DBID         `db:"community_id" json:"community_id"`
 	MentionID      persist.DBID         `db:"mention_id" json:"mention_id"`
 }
 

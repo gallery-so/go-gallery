@@ -1200,7 +1200,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 					SubjectID:      mention.CommunityID,
 					PostID:         postID,
 					FeedEventID:    feedEventID,
-					ContractID:     mention.CommunityID, // TODO: do we use this? should we add a CommunityID column?
+					CommunityID:    mention.CommunityID,
 					CommentID:      commentID,
 					MentionID:      mention.ID,
 					Action:         persist.ActionMentionCommunity,
