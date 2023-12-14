@@ -113,6 +113,11 @@ type CommunityCreator struct {
 	Deleted               bool                         `db:"deleted" json:"deleted"`
 }
 
+type CommunityRelevance struct {
+	ID    persist.DBID `db:"id" json:"id"`
+	Score int32        `db:"score" json:"score"`
+}
+
 type Contract struct {
 	ID                    persist.DBID    `db:"id" json:"id"`
 	Deleted               bool            `db:"deleted" json:"deleted"`
@@ -150,11 +155,6 @@ type ContractCreator struct {
 	CreatorUserID  persist.DBID    `db:"creator_user_id" json:"creator_user_id"`
 	Chain          persist.Chain   `db:"chain" json:"chain"`
 	CreatorAddress persist.Address `db:"creator_address" json:"creator_address"`
-}
-
-type ContractRelevance struct {
-	ID    persist.DBID `db:"id" json:"id"`
-	Score int32        `db:"score" json:"score"`
 }
 
 type DevMetadataUser struct {

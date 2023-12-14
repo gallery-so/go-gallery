@@ -1432,10 +1432,12 @@ type Query {
   ): SearchGalleriesPayloadOrError
   """
   Search for communities with optional weighting. Weights are floats in the [0.0. 1.0] range
-  that help determine how matches will be ranked. nameWeight defaults to 0.4, descriptionWeight
-  defaults to 0.2, and poapAddressWeight defaults to 0.1, meaning that a search result matching
-  a community name is considered twice as relevant as a search result matching a community
-  description, and four times as relevant as a search result matching a POAP address string.
+  that help determine how matches will be ranked. nameWeight defaults to 0.4, providerNameWeight
+  defaults to 0.3, descriptionWeight defaults to 0.2, and poapAddressWeight defaults to 0.1,
+  meaning that a search result matching a community name is considered twice as relevant as a
+  search result matching a community description, and four times as relevant as a search result
+  matching a POAP address string. providerNameWeight is used to return communities provided by
+  a provider (e.g. Art Blocks) when searching for that provider's name (e.g. "art blocks").
   """
   searchCommunities(
     query: String!
@@ -1443,6 +1445,7 @@ type Query {
     nameWeight: Float
     descriptionWeight: Float
     poapAddressWeight: Float
+    providerNameWeight: Float
   ): SearchCommunitiesPayloadOrError
 
   # Retool Specific

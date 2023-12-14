@@ -1092,7 +1092,7 @@ type ComplexityRoot struct {
 		Node                       func(childComplexity int, id model.GqlID) int
 		PostByID                   func(childComplexity int, id persist.DBID) int
 		PostComposerDraftDetails   func(childComplexity int, input model.PostComposerDraftDetailsInput) int
-		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
+		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64, providerNameWeight *float64) int
 		SearchGalleries            func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
 		SearchUsers                func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
 		SocialConnections          func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
@@ -2036,7 +2036,7 @@ type QueryResolver interface {
 	TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error)
 	SearchUsers(ctx context.Context, query string, limit *int, usernameWeight *float64, bioWeight *float64) (model.SearchUsersPayloadOrError, error)
 	SearchGalleries(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64) (model.SearchGalleriesPayloadOrError, error)
-	SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) (model.SearchCommunitiesPayloadOrError, error)
+	SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64, providerNameWeight *float64) (model.SearchCommunitiesPayloadOrError, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
@@ -6608,7 +6608,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.SearchCommunities(childComplexity, args["query"].(string), args["limit"].(*int), args["nameWeight"].(*float64), args["descriptionWeight"].(*float64), args["poapAddressWeight"].(*float64)), true
+		return e.complexity.Query.SearchCommunities(childComplexity, args["query"].(string), args["limit"].(*int), args["nameWeight"].(*float64), args["descriptionWeight"].(*float64), args["poapAddressWeight"].(*float64), args["providerNameWeight"].(*float64)), true
 
 	case "Query.searchGalleries":
 		if e.complexity.Query.SearchGalleries == nil {
@@ -10709,10 +10709,12 @@ type Query {
   ): SearchGalleriesPayloadOrError
   """
   Search for communities with optional weighting. Weights are floats in the [0.0. 1.0] range
-  that help determine how matches will be ranked. nameWeight defaults to 0.4, descriptionWeight
-  defaults to 0.2, and poapAddressWeight defaults to 0.1, meaning that a search result matching
-  a community name is considered twice as relevant as a search result matching a community
-  description, and four times as relevant as a search result matching a POAP address string.
+  that help determine how matches will be ranked. nameWeight defaults to 0.4, providerNameWeight
+  defaults to 0.3, descriptionWeight defaults to 0.2, and poapAddressWeight defaults to 0.1,
+  meaning that a search result matching a community name is considered twice as relevant as a
+  search result matching a community description, and four times as relevant as a search result
+  matching a POAP address string. providerNameWeight is used to return communities provided by
+  a provider (e.g. Art Blocks) when searching for that provider's name (e.g. "art blocks").
   """
   searchCommunities(
     query: String!
@@ -10720,6 +10722,7 @@ type Query {
     nameWeight: Float
     descriptionWeight: Float
     poapAddressWeight: Float
+    providerNameWeight: Float
   ): SearchCommunitiesPayloadOrError
 
   # Retool Specific
@@ -14938,6 +14941,15 @@ func (ec *executionContext) field_Query_searchCommunities_args(ctx context.Conte
 		}
 	}
 	args["poapAddressWeight"] = arg4
+	var arg5 *float64
+	if tmp, ok := rawArgs["providerNameWeight"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("providerNameWeight"))
+		arg5, err = ec.unmarshalOFloat2ᚖfloat64(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["providerNameWeight"] = arg5
 	return args, nil
 }
 
@@ -45470,7 +45482,7 @@ func (ec *executionContext) _Query_searchCommunities(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().SearchCommunities(rctx, fc.Args["query"].(string), fc.Args["limit"].(*int), fc.Args["nameWeight"].(*float64), fc.Args["descriptionWeight"].(*float64), fc.Args["poapAddressWeight"].(*float64))
+		return ec.resolvers.Query().SearchCommunities(rctx, fc.Args["query"].(string), fc.Args["limit"].(*int), fc.Args["nameWeight"].(*float64), fc.Args["descriptionWeight"].(*float64), fc.Args["poapAddressWeight"].(*float64), fc.Args["providerNameWeight"].(*float64))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
