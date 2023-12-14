@@ -631,69 +631,6 @@ query account($usernameOrAddress: String ) {
 
 */
 
-type fxhashGenerativeToken struct {
-	GentkContractAddress string `json:"gentkContractAddress"`
-	Name                 string `json:"name"`
-	Slug                 string `json:"slug"`
-	ThumbnailUri         string `json:"thumbnailUri"`
-}
-
-type fxhashAccount struct {
-	Username         string
-	GenerativeTokens []fxhashGenerativeToken
-}
-
-type accountWithCollectionsQuery struct {
-	Account fxhashAccount `graphql:"account(usernameOrAddress: $usernameOrAddress)"`
-}
-
-// TODO will be removed along with the ChildContract and Parent types, but this is how you would do it
-func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
-	// fxhash and objkt are two known omnibus contracts, let objkt provider handle objkt
-	var query accountWithCollectionsQuery
-
-	if err := retry.RetryQuery(ctx, p.fxGQL, &query, inputArgs{
-		"usernameOrAddress": sgql.String(creatorAddress),
-	}); err != nil {
-		return nil, err
-	}
-
-	// No matching query results
-	if len(query.Account.GenerativeTokens) < 1 {
-		return nil, fmt.Errorf("no child contracts found for creator")
-	}
-
-	groups := util.GroupBy(query.Account.GenerativeTokens, func(gt fxhashGenerativeToken) string {
-		return gt.GentkContractAddress
-	})
-
-	edges := make([]multichain.ParentToChildEdge, 0, len(query.Account.GenerativeTokens))
-	for gtca, ts := range groups {
-
-		// get the contract
-		contract, err := p.GetContractByAddress(ctx, persist.Address(gtca))
-		if err != nil {
-			return nil, err
-		}
-
-		children := make([]multichain.ChildContract, 0, len(ts))
-		for _, t := range ts {
-			children = append(children, multichain.ChildContract{
-				ChildID:        fmt.Sprintf("%s:%s", contract.Address, t.Slug),
-				Name:           t.Name,
-				CreatorAddress: creatorAddress,
-				Tokens:         nil, // expensive to fetch, we can sort tokens from an owner into these collections
-			})
-		}
-		edges = append(edges, multichain.ParentToChildEdge{
-			Parent:   contract,
-			Children: children,
-		})
-	}
-
-	return edges, nil
-}
-
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))

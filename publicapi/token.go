@@ -433,21 +433,6 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	return nil
 }
 
-func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractIdentifiers": validate.WithTag(ci, "required"),
-	}); err != nil {
-		return err
-	}
-
-	err := api.multichainProvider.RefreshTokensForContract(ctx, ci)
-	if err != nil {
-		return ErrTokenRefreshFailed{Message: err.Error()}
-	}
-
-	return nil
-}
-
 func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persist.DBID) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": validate.WithTag(collectionDBID, "required"),
@@ -651,6 +636,16 @@ func (api TokenAPI) GetTokenDefinitionByID(ctx context.Context, id persist.DBID)
 	return api.loaders.GetTokenDefinitionByIdBatch.Load(id)
 }
 
+func (api TokenAPI) GetCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) ([]db.Community, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDefinitionID": validate.WithTag(tokenDefinitionID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+	return api.loaders.GetCommunitiesByTokenDefinitionID.Load(tokenDefinitionID)
+}
+
 // syncableChains returns a list of chains that the user is allowed to sync, and a callback to release the locks for those chains.
 func syncableChains(ctx context.Context, userID persist.DBID, chains []persist.Chain, throttler *throttle.Locker) ([]persist.Chain, func(), error) {
 	chainsToSync := make([]persist.Chain, 0, len(chains))
@@ -659,7 +654,7 @@ func syncableChains(ctx context.Context, userID persist.DBID, chains []persist.C
 	for _, chain := range chains {
 		k := fmt.Sprintf("sync:owned:%d:%s", chain, userID)
 		err := throttler.Lock(ctx, k)
-		if err != nil && util.ErrorAs[throttle.ErrThrottleLocked](err) {
+		if err != nil && util.ErrorIs[throttle.ErrThrottleLocked](err) {
 			continue
 		}
 		if err != nil {

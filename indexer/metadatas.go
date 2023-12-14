@@ -413,19 +413,16 @@ func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddres
 
 	result := domain.LabelName + ".eth"
 
-	assets, err := opensea.FetchAssetsForTokenIdentifiers(ctx, addr, opensea.TokenID(tid.Base10String()))
+	assets, err := opensea.FetchAssetsForTokenIdentifiers(ctx, persist.ChainETH, persist.Address(addr), tid)
 	if err != nil {
 		return persist.TokenURI(result), nil, err
 	}
-	withImage, ok := util.FindFirst(assets, func(asset opensea.Asset) bool {
-		return asset.ImageURL != "" || asset.ImagePreviewURL != "" || asset.ImageOriginalURL != "" || asset.ImageThumbnailURL != ""
-	})
-
+	withImage, ok := util.FindFirst(assets, func(asset opensea.Asset) bool { return asset.ImageURL != "" })
 	if ok {
 		return persist.TokenURI(withImage.ImageURL), persist.TokenMetadata{
 			"name":          fmt.Sprintf("ENS: %s", result),
 			"description":   "ENS names are used to resolve domain names to Ethereum addresses.",
-			"image":         util.FirstNonEmptyString(withImage.ImageURL, withImage.ImagePreviewURL, withImage.ImageOriginalURL, withImage.ImageThumbnailURL),
+			"image":         withImage.ImageURL,
 			"profile_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
 		}, nil
 	}

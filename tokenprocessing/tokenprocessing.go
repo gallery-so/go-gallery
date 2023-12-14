@@ -212,7 +212,7 @@ func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 
 // isBadTokenErr returns true if the error is a bad token error.
 func isBadTokenErr(err error) bool {
-	return util.ErrorAs[ErrBadToken](err)
+	return util.ErrorIs[ErrBadToken](err)
 }
 
 // excludeTokenSpamEvents excludes events for tokens marked as spam.

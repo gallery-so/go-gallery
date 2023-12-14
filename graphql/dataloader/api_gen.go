@@ -33,9 +33,13 @@ type Loaders struct {
 	GetCollectionByIdBatch                   *GetCollectionByIdBatch
 	GetCollectionsByGalleryIdBatch           *GetCollectionsByGalleryIdBatch
 	GetCommentByCommentIDBatch               *GetCommentByCommentIDBatch
+	GetCommunitiesByTokenDefinitionID        *GetCommunitiesByTokenDefinitionID
+	GetCommunityByID                         *GetCommunityByID
+	GetCommunityByKey                        *GetCommunityByKey
 	GetContractByChainAddressBatch           *GetContractByChainAddressBatch
 	GetContractsDisplayedByUserIDBatch       *GetContractsDisplayedByUserIDBatch
 	GetCreatedContractsBatchPaginate         *GetCreatedContractsBatchPaginate
+	GetCreatorsByCommunityID                 *GetCreatorsByCommunityID
 	GetEventByIdBatch                        *GetEventByIdBatch
 	GetFollowersByUserIdBatch                *GetFollowersByUserIdBatch
 	GetFollowingByUserIdBatch                *GetFollowingByUserIdBatch
@@ -75,10 +79,13 @@ type Loaders struct {
 	PaginateAdmiresByTokenIDBatch            *PaginateAdmiresByTokenIDBatch
 	PaginateCommentsByFeedEventIDBatch       *PaginateCommentsByFeedEventIDBatch
 	PaginateCommentsByPostIDBatch            *PaginateCommentsByPostIDBatch
+	PaginateHoldersByCommunityID             *PaginateHoldersByCommunityID
 	PaginateInteractionsByFeedEventIDBatch   *PaginateInteractionsByFeedEventIDBatch
 	PaginateInteractionsByPostIDBatch        *PaginateInteractionsByPostIDBatch
+	PaginatePostsByCommunityID               *PaginatePostsByCommunityID
 	PaginatePostsByContractID                *PaginatePostsByContractID
 	PaginateRepliesByCommentIDBatch          *PaginateRepliesByCommentIDBatch
+	PaginateTokensByCommunityID              *PaginateTokensByCommunityID
 	GetContractCreatorsByIds                 *GetContractCreatorsByIds
 	GetContractsByIDs                        *GetContractsByIDs
 }
@@ -105,9 +112,13 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCollectionByIdBatch = newGetCollectionByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCollectionByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetCollectionsByGalleryIdBatch = newGetCollectionsByGalleryIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCollectionsByGalleryIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetCommentByCommentIDBatch = newGetCommentByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommentByCommentIDBatch(q), preFetchHook, postFetchHook)
+	loaders.GetCommunitiesByTokenDefinitionID = newGetCommunitiesByTokenDefinitionID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommunitiesByTokenDefinitionID(q), preFetchHook, postFetchHook)
+	loaders.GetCommunityByID = newGetCommunityByID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommunityByID(q), preFetchHook, postFetchHook)
+	loaders.GetCommunityByKey = newGetCommunityByKey(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCommunityByKey(q), preFetchHook, postFetchHook)
 	loaders.GetContractByChainAddressBatch = newGetContractByChainAddressBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractByChainAddressBatch(q), preFetchHook, postFetchHook)
 	loaders.GetContractsDisplayedByUserIDBatch = newGetContractsDisplayedByUserIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractsDisplayedByUserIDBatch(q), preFetchHook, postFetchHook)
 	loaders.GetCreatedContractsBatchPaginate = newGetCreatedContractsBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCreatedContractsBatchPaginate(q), preFetchHook, postFetchHook)
+	loaders.GetCreatorsByCommunityID = newGetCreatorsByCommunityID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetCreatorsByCommunityID(q), preFetchHook, postFetchHook)
 	loaders.GetEventByIdBatch = newGetEventByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetEventByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetFollowersByUserIdBatch = newGetFollowersByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetFollowersByUserIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetFollowingByUserIdBatch = newGetFollowingByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetFollowingByUserIdBatch(q), preFetchHook, postFetchHook)
@@ -147,10 +158,13 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.PaginateAdmiresByTokenIDBatch = newPaginateAdmiresByTokenIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateAdmiresByTokenIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateCommentsByFeedEventIDBatch = newPaginateCommentsByFeedEventIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateCommentsByFeedEventIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateCommentsByPostIDBatch = newPaginateCommentsByPostIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateCommentsByPostIDBatch(q), preFetchHook, postFetchHook)
+	loaders.PaginateHoldersByCommunityID = newPaginateHoldersByCommunityID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateHoldersByCommunityID(q), preFetchHook, postFetchHook)
 	loaders.PaginateInteractionsByFeedEventIDBatch = newPaginateInteractionsByFeedEventIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateInteractionsByFeedEventIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateInteractionsByPostIDBatch = newPaginateInteractionsByPostIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateInteractionsByPostIDBatch(q), preFetchHook, postFetchHook)
+	loaders.PaginatePostsByCommunityID = newPaginatePostsByCommunityID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginatePostsByCommunityID(q), preFetchHook, postFetchHook)
 	loaders.PaginatePostsByContractID = newPaginatePostsByContractID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginatePostsByContractID(q), preFetchHook, postFetchHook)
 	loaders.PaginateRepliesByCommentIDBatch = newPaginateRepliesByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateRepliesByCommentIDBatch(q), preFetchHook, postFetchHook)
+	loaders.PaginateTokensByCommunityID = newPaginateTokensByCommunityID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateTokensByCommunityID(q), preFetchHook, postFetchHook)
 	loaders.GetContractCreatorsByIds = newGetContractCreatorsByIds(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractCreatorsByIds(q), preFetchHook, postFetchHook)
 	loaders.GetContractsByIDs = newGetContractsByIDs(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractsByIDs(q), preFetchHook, postFetchHook)
 
@@ -211,6 +225,14 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetCommentByCommentIDBatch.Prime(loaders.GetCommentByCommentIDBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetCommunitiesByTokenDefinitionID.RegisterResultSubscriber(func(result []coredb.Community) {
+		for _, entry := range result {
+			loaders.GetCommunityByID.Prime(loaders.GetCommunityByID.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetCommunityByKey.RegisterResultSubscriber(func(result coredb.Community) {
+		loaders.GetCommunityByID.Prime(loaders.GetCommunityByID.getKeyForResult(result), result)
+	})
 	loaders.GetChildContractsByParentIDBatchPaginate.RegisterResultSubscriber(func(result []coredb.Contract) {
 		for _, entry := range result {
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry), entry)
@@ -230,6 +252,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result.Contract), result.Contract)
 	})
 	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
+		}
+	})
+	loaders.PaginateTokensByCommunityID.RegisterResultSubscriber(func(result []coredb.PaginateTokensByCommunityIDRow) {
 		for _, entry := range result {
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
 		}
@@ -275,6 +302,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetNotificationByIDBatch.Prime(loaders.GetNotificationByIDBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.PaginatePostsByCommunityID.RegisterResultSubscriber(func(result []coredb.Post) {
+		for _, entry := range result {
+			loaders.GetPostByIdBatch.Prime(loaders.GetPostByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
 	loaders.PaginatePostsByContractID.RegisterResultSubscriber(func(result []coredb.Post) {
 		for _, entry := range result {
 			loaders.GetPostByIdBatch.Prime(loaders.GetPostByIdBatch.getKeyForResult(entry), entry)
@@ -290,6 +322,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(result.TokenDefinition), result.TokenDefinition)
 	})
 	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
+		}
+	})
+	loaders.PaginateTokensByCommunityID.RegisterResultSubscriber(func(result []coredb.PaginateTokensByCommunityIDRow) {
 		for _, entry := range result {
 			loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
 		}
@@ -323,6 +360,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.PaginateHoldersByCommunityID.RegisterResultSubscriber(func(result []coredb.User) {
+		for _, entry := range result {
+			loaders.GetTokenOwnerByIDBatch.Prime(loaders.GetTokenOwnerByIDBatch.getKeyForResult(entry), entry)
+		}
+	})
 	loaders.GetFollowersByUserIdBatch.RegisterResultSubscriber(func(result []coredb.User) {
 		for _, entry := range result {
 			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
@@ -348,6 +390,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(result), result)
 	})
 	loaders.GetUsersWithTraitBatch.RegisterResultSubscriber(func(result []coredb.User) {
+		for _, entry := range result {
+			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.PaginateHoldersByCommunityID.RegisterResultSubscriber(func(result []coredb.User) {
 		for _, entry := range result {
 			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
 		}
@@ -381,6 +428,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.PaginateHoldersByCommunityID.RegisterResultSubscriber(func(result []coredb.User) {
+		for _, entry := range result {
+			loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(entry), entry)
+		}
+	})
 	loaders.GetWalletsByUserIDBatch.RegisterResultSubscriber(func(result []coredb.Wallet) {
 		for _, entry := range result {
 			loaders.GetWalletByIDBatch.Prime(loaders.GetWalletByIDBatch.getKeyForResult(entry), entry)
@@ -408,6 +460,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(result.Contract), result.Contract)
 	})
 	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry.Contract), entry.Contract)
+		}
+	})
+	loaders.PaginateTokensByCommunityID.RegisterResultSubscriber(func(result []coredb.PaginateTokensByCommunityIDRow) {
 		for _, entry := range result {
 			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry.Contract), entry.Contract)
 		}
@@ -762,6 +819,60 @@ func loadGetCommentByCommentIDBatch(q *coredb.Queries) func(context.Context, *Ge
 	}
 }
 
+func loadGetCommunitiesByTokenDefinitionID(q *coredb.Queries) func(context.Context, *GetCommunitiesByTokenDefinitionID, []persist.DBID) ([][]coredb.Community, []error) {
+	return func(ctx context.Context, d *GetCommunitiesByTokenDefinitionID, params []persist.DBID) ([][]coredb.Community, []error) {
+		results := make([][]coredb.Community, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCommunitiesByTokenDefinitionID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Community, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCommunityByID(q *coredb.Queries) func(context.Context, *GetCommunityByID, []persist.DBID) ([]coredb.Community, []error) {
+	return func(ctx context.Context, d *GetCommunityByID, params []persist.DBID) ([]coredb.Community, []error) {
+		results := make([]coredb.Community, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCommunityByID(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Community, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCommunityByKey(q *coredb.Queries) func(context.Context, *GetCommunityByKey, []coredb.GetCommunityByKeyParams) ([]coredb.Community, []error) {
+	return func(ctx context.Context, d *GetCommunityByKey, params []coredb.GetCommunityByKeyParams) ([]coredb.Community, []error) {
+		results := make([]coredb.Community, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCommunityByKey(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r coredb.Community, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
 func loadGetContractByChainAddressBatch(q *coredb.Queries) func(context.Context, *GetContractByChainAddressBatch, []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error) {
 	return func(ctx context.Context, d *GetContractByChainAddressBatch, params []coredb.GetContractByChainAddressBatchParams) ([]coredb.Contract, []error) {
 		results := make([]coredb.Contract, len(params))
@@ -806,6 +917,22 @@ func loadGetCreatedContractsBatchPaginate(q *coredb.Queries) func(context.Contex
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.Contract, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetCreatorsByCommunityID(q *coredb.Queries) func(context.Context, *GetCreatorsByCommunityID, []persist.DBID) ([][]coredb.GetCreatorsByCommunityIDRow, []error) {
+	return func(ctx context.Context, d *GetCreatorsByCommunityID, params []persist.DBID) ([][]coredb.GetCreatorsByCommunityIDRow, []error) {
+		results := make([][]coredb.GetCreatorsByCommunityIDRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCreatorsByCommunityID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.GetCreatorsByCommunityIDRow, err error) {
 			results[i], errors[i] = r, err
 		})
 
@@ -1488,6 +1615,22 @@ func loadPaginateCommentsByPostIDBatch(q *coredb.Queries) func(context.Context, 
 	}
 }
 
+func loadPaginateHoldersByCommunityID(q *coredb.Queries) func(context.Context, *PaginateHoldersByCommunityID, []coredb.PaginateHoldersByCommunityIDParams) ([][]coredb.User, []error) {
+	return func(ctx context.Context, d *PaginateHoldersByCommunityID, params []coredb.PaginateHoldersByCommunityIDParams) ([][]coredb.User, []error) {
+		results := make([][]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateHoldersByCommunityID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
 func loadPaginateInteractionsByFeedEventIDBatch(q *coredb.Queries) func(context.Context, *PaginateInteractionsByFeedEventIDBatch, []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error) {
 	return func(ctx context.Context, d *PaginateInteractionsByFeedEventIDBatch, params []coredb.PaginateInteractionsByFeedEventIDBatchParams) ([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, []error) {
 		results := make([][]coredb.PaginateInteractionsByFeedEventIDBatchRow, len(params))
@@ -1520,6 +1663,22 @@ func loadPaginateInteractionsByPostIDBatch(q *coredb.Queries) func(context.Conte
 	}
 }
 
+func loadPaginatePostsByCommunityID(q *coredb.Queries) func(context.Context, *PaginatePostsByCommunityID, []coredb.PaginatePostsByCommunityIDParams) ([][]coredb.Post, []error) {
+	return func(ctx context.Context, d *PaginatePostsByCommunityID, params []coredb.PaginatePostsByCommunityIDParams) ([][]coredb.Post, []error) {
+		results := make([][]coredb.Post, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginatePostsByCommunityID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Post, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
 func loadPaginatePostsByContractID(q *coredb.Queries) func(context.Context, *PaginatePostsByContractID, []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error) {
 	return func(ctx context.Context, d *PaginatePostsByContractID, params []coredb.PaginatePostsByContractIDParams) ([][]coredb.Post, []error) {
 		results := make([][]coredb.Post, len(params))
@@ -1545,6 +1704,22 @@ func loadPaginateRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.Comment, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateTokensByCommunityID(q *coredb.Queries) func(context.Context, *PaginateTokensByCommunityID, []coredb.PaginateTokensByCommunityIDParams) ([][]coredb.PaginateTokensByCommunityIDRow, []error) {
+	return func(ctx context.Context, d *PaginateTokensByCommunityID, params []coredb.PaginateTokensByCommunityIDParams) ([][]coredb.PaginateTokensByCommunityIDRow, []error) {
+		results := make([][]coredb.PaginateTokensByCommunityIDRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateTokensByCommunityID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.PaginateTokensByCommunityIDRow, err error) {
 			results[i], errors[i] = r, err
 		})
 

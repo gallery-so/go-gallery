@@ -27,7 +27,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -115,7 +114,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 		_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(contract))
 
 		if err != nil {
-			if util.ErrorAs[ErrBadToken](err) {
+			if util.ErrorIs[ErrBadToken](err) {
 				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
 				return
 			}
@@ -163,42 +162,6 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm
 		runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-	}
-}
-
-func processOwnersForContractTokens(mc *multichain.Provider, throttler *throttle.Locker) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var input task.TokenProcessingContractTokensMessage
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
-
-		contract, err := mc.Queries.GetContractByID(c, input.ContractID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		lockID := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
-
-		if !input.ForceRefresh {
-			if err := throttler.Lock(c, lockID); err != nil {
-				util.ErrResponse(c, http.StatusOK, err)
-				return
-			}
-		}
-
-		// do not unlock, let expiry handle the unlock
-		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", lockID)
-		cID := persist.NewContractIdentifiers(contract.Address, contract.Chain)
-		if err := mc.RefreshTokensForContract(c, cID); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", lockID)
-
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

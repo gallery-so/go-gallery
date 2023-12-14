@@ -293,7 +293,7 @@ func (l LazyCache) Load(ctx context.Context) ([]byte, error) {
 	if err == nil {
 		return b, nil
 	}
-	if !util.ErrorAs[ErrKeyNotFound](err) {
+	if !util.ErrorIs[ErrKeyNotFound](err) {
 		return nil, err
 	}
 	b, err = l.CalcFunc(ctx)

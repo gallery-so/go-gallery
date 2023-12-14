@@ -213,7 +213,7 @@ func pathURL(host, uri string) string {
 // Most gateways will redirect the former to the latter, but some gateways don't. https://docs.ipfs.tech/concepts/ipfs-gateway/#path
 func standardizeQueryParams(uri string) string {
 	paramIdx := strings.Index(uri, "?")
-	isClean := strings.Index(uri, "/?") != -1
+	isClean := strings.Contains(uri, "/?")
 	if paramIdx != -1 && !isClean {
 		uri = uri[:paramIdx] + "/?" + uri[paramIdx+1:]
 	}

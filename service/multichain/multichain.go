@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"math/big"
 	"net/http"
 	"sort"
@@ -14,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gammazero/workerpool"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
@@ -33,10 +33,6 @@ import (
 func init() {
 	env.RegisterValidation("TOKEN_PROCESSING_URL", "required")
 }
-
-const staleCommunityTime = time.Minute * 30
-
-const maxCommunitySize = 10_000
 
 var contractNameBlacklist = map[string]bool{
 	"unidentified contract": true,
@@ -153,6 +149,15 @@ type errWithPriority struct {
 	priority int
 }
 
+type communityInfo interface {
+	GetKey() persist.CommunityKey
+	GetName() string
+	GetDescription() string
+	GetProfileImageURL() string
+	GetCreatorAddresses() []persist.ChainAddress
+	GetWebsiteURL() string
+}
+
 // Configurer maintains provider settings
 type Configurer interface {
 	GetBlockchainInfo() BlockchainInfo
@@ -191,15 +196,6 @@ type ContractsFetcher interface {
 
 type ContractsOwnerFetcher interface {
 	GetContractsByOwnerAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
-}
-
-type ChildContractFetcher interface {
-	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ParentToChildEdge, error)
-}
-
-type OpenSeaChildContractFetcher interface {
-	ChildContractFetcher
-	IsOpenSea()
 }
 
 // ContractRefresher supports refreshes of a contract
@@ -542,7 +538,7 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 			return nil
 		}
 		// Unexpected error
-		if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+		if err != nil && !util.ErrorIs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
 			return err
 		}
 		// Try to sync the token from each wallet. This treats SyncTokensByUserIDAndTokenIdentifiers as a black box: it runs each
@@ -826,123 +822,14 @@ outer:
 	return err
 }
 
-type ProviderChildContractResult struct {
-	Priority int
-	Chain    persist.Chain
-	Edges    []ParentToChildEdge
-}
-
-type ParentToChildEdge struct {
-	Parent   ChainAgnosticContract // Providers may optionally provide the parent if its convenient to do so
-	Children []ChildContract
-}
-
-type ChildContract struct {
-	ChildID        string // Uniquely identifies a child contract within a parent contract
-	Name           string
-	Description    string
-	OwnerAddress   persist.Address
-	CreatorAddress persist.Address
-	Tokens         []ChainAgnosticToken
-}
-
-// combinedProviderChildContractResults is a helper for combining results from multiple providers
-type combinedProviderChildContractResults []ProviderChildContractResult
-
-func (c combinedProviderChildContractResults) ParentContracts() []db.Contract {
-	combined := make([]chainContracts, 0)
-	for _, result := range c {
-		contracts := make([]ChainAgnosticContract, 0)
-		for _, edge := range result.Edges {
-			contracts = append(contracts, edge.Parent)
-		}
-		combined = append(combined, chainContracts{
-			priority:  result.Priority,
-			chain:     result.Chain,
-			contracts: contracts,
-		})
-	}
-	return chainContractsToUpsertableContracts(combined, nil)
-}
-
-// SyncTokensCreatedOnSharedContracts queries each provider to identify contracts created by the given user.
-func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
-	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+func (p *Provider) processTokenCommunities(ctx context.Context, contracts []db.Contract, tokens []op.TokenFullDetails) error {
+	knownProviders, err := p.Queries.GetCommunityContractProviders(ctx, util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID }))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve contract community types: %w", err)
 	}
 
-	if len(chains) == 0 {
-		for chain := range p.Chains {
-			chains = append(chains, chain)
-		}
-	}
-
-	fetchers := matchingProvidersByChains[ChildContractFetcher](p.Chains, chains...)
-	searchAddresses := p.matchingWallets(user.Wallets, chains)
-	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx)
-
-	// Fetch all tokens created by the user
-	for chain, addresses := range searchAddresses {
-		for priority, fetcher := range fetchers[chain] {
-			for _, address := range addresses {
-				c := chain
-				p := priority
-				f := fetcher
-				a := address
-				providerPool.Go(func(ctx context.Context) (ProviderChildContractResult, error) {
-					contractEdges, err := f.GetChildContractsCreatedOnSharedContract(ctx, a)
-					if err != nil {
-						return ProviderChildContractResult{}, err
-					}
-					return ProviderChildContractResult{
-						Priority: p,
-						Chain:    c,
-						Edges:    contractEdges,
-					}, nil
-				})
-			}
-		}
-	}
-
-	pResult, err := providerPool.Wait()
-	if err != nil {
-		return err
-	}
-
-	combinedResult := combinedProviderChildContractResults(pResult)
-
-	parentContracts, err := p.Repos.ContractRepository.BulkUpsert(ctx, combinedResult.ParentContracts(), true)
-	if err != nil {
-		return err
-	}
-
-	contractToDBID := make(map[persist.ContractIdentifiers]persist.DBID)
-	for _, c := range parentContracts {
-		cID := persist.NewContractIdentifiers(c.Address, c.Chain)
-		contractToDBID[cID] = c.ID
-	}
-
-	params := db.UpsertChildContractsParams{}
-
-	for _, result := range combinedResult {
-		for _, edge := range result.Edges {
-			for _, child := range edge.Children {
-				params.ID = append(params.ID, persist.GenerateID().String())
-				params.Name = append(params.Name, child.Name)
-				params.Address = append(params.Address, child.ChildID)
-				params.CreatorAddress = append(params.CreatorAddress, child.CreatorAddress.String())
-				params.OwnerAddress = append(params.OwnerAddress, child.OwnerAddress.String())
-				params.Chain = append(params.Chain, int32(result.Chain))
-				params.L1Chain = append(params.L1Chain, int32(result.Chain.L1Chain()))
-				params.Description = append(params.Description, child.Description)
-				params.ParentIds = append(params.ParentIds, contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)].String())
-			}
-		}
-	}
-
-	_, err = p.Queries.UpsertChildContracts(ctx, params)
-	return err
+	// TODO: Make this more flexible, allow other providers, etc (possibly via wire)
+	return p.processArtBlocksTokenCommunities(ctx, knownProviders, tokens)
 }
 
 func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens,
@@ -974,18 +861,30 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		return nil, nil, err
 	}
 
+	// Create a lookup for userID to persisted token IDs
+	currentUserTokens = make(map[persist.DBID][]op.TokenFullDetails)
+	for _, token := range upsertedTokens {
+		currentUserTokens[token.Instance.OwnerUserID] = append(currentUserTokens[token.Instance.OwnerUserID], token)
+	}
+
+	// TODO: Consider tracking (token_definition_id, community_type) in a table so we'd know whether we've already
+	// evaluated a token for a given community type and can avoid checking it again.
+	communityTokens := upsertedTokens
+	err = p.processTokenCommunities(ctx, contracts, communityTokens)
+	if err != nil {
+		// Report errors, but don't return. We can retry token community memberships at some point, but the whole
+		// sync shouldn't fail because a community provider's API was unavailable.
+		err = fmt.Errorf("failed to process token communities: %w", err)
+		logger.For(ctx).WithError(err).Error(err)
+		sentryutil.ReportError(ctx, err)
+	}
+
 	if upsertParams.OptionalDelete != nil {
 		numAffectedRows, err := p.Queries.DeleteTokensBeforeTimestamp(ctx, upsertParams.OptionalDelete.ToParams(upsertTime))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to delete tokens: %w", err)
 		}
 		logger.For(ctx).Infof("deleted %d tokens", numAffectedRows)
-	}
-
-	// Create a lookup for userID to persisted token IDs
-	currentUserTokens = make(map[persist.DBID][]op.TokenFullDetails)
-	for _, token := range upsertedTokens {
-		currentUserTokens[token.Instance.OwnerUserID] = append(currentUserTokens[token.Instance.OwnerUserID], token)
 	}
 
 	newUserTokens = make(map[persist.DBID][]op.TokenFullDetails, len(users))
@@ -1081,21 +980,6 @@ func (p *Provider) processTokensForUser(ctx context.Context, user persist.User, 
 	return currentUserTokens[user.ID], newUserTokens[user.ID], nil
 }
 
-func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contract db.Contract, users map[persist.DBID]persist.User,
-	chainTokensForUsers map[persist.DBID][]chainTokens, upsertParams op.TokenUpsertParams) (map[persist.DBID][]op.TokenFullDetails, map[persist.DBID][]op.TokenFullDetails, error) {
-	existingTokens, err := op.TokensFullDetailsByContractID(ctx, p.Queries, contract.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	existingTokensForUsers := make(map[persist.DBID][]op.TokenFullDetails)
-	for _, t := range existingTokens {
-		existingTokensForUsers[t.Instance.OwnerUserID] = append(existingTokensForUsers[t.Instance.OwnerUserID], t)
-	}
-
-	return p.processTokensForUsers(ctx, users, chainTokensForUsers, existingTokensForUsers, []db.Contract{contract}, upsertParams)
-}
-
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain) error {
 	input := map[string]any{
 		"token_id":         tokenID,
@@ -1124,42 +1008,6 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	}
 
 	return nil
-}
-
-func (p *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, forceRefresh bool, limit, offset int) ([]TokenHolder, error) {
-
-	cacheKey := fmt.Sprintf("%s-%d-%d", communityIdentifiers.String(), limit, offset)
-	if !forceRefresh {
-		bs, err := p.Cache.Get(ctx, cacheKey)
-		if err == nil && len(bs) > 0 {
-			var owners []TokenHolder
-			err = json.Unmarshal(bs, &owners)
-			if err != nil {
-				return nil, err
-			}
-			return owners, nil
-		}
-	}
-
-	dbHolders, err := p.Repos.ContractRepository.GetOwnersByAddress(ctx, communityIdentifiers.Address(), communityIdentifiers.Chain(), limit, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	holders, err := tokenHoldersToTokenHolders(ctx, dbHolders, p.Repos.UserRepository)
-	if err != nil {
-		return nil, err
-	}
-
-	bs, err := json.Marshal(holders)
-	if err != nil {
-		return nil, err
-	}
-	err = p.Cache.Set(ctx, cacheKey, bs, staleCommunityTime)
-	if err != nil {
-		return nil, err
-	}
-	return holders, nil
 }
 
 func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.ChainAddress, wallet persist.L1ChainAddress, limit, offset int) ([]op.TokenFullDetails, error) {
@@ -1480,81 +1328,6 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return err
 }
 
-// RefreshTokensForContract refreshes all tokens in a given contract
-func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.ContractIdentifiers) error {
-	contractRefreshers := matchingProvidersForChain[TokensContractFetcher](p.Chains, ci.Chain)
-
-	tokensFromProviders := []chainTokens{}
-	contractsFromProviders := []chainContracts{}
-	tokensReceive := make(chan chainTokens)
-	contractsReceive := make(chan chainContracts)
-	errChan := make(chan errWithPriority)
-	done := make(chan struct{})
-	wg := &sync.WaitGroup{}
-	for i, fetcher := range contractRefreshers {
-		wg.Add(1)
-		go func(priority int, p TokensContractFetcher) {
-			defer wg.Done()
-			tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress, maxCommunitySize, 0)
-			if err != nil {
-				errChan <- errWithPriority{priority: priority, err: err}
-				return
-			}
-			tokensReceive <- chainTokens{chain: ci.Chain, tokens: tokens, priority: priority}
-			contractsReceive <- chainContracts{chain: ci.Chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
-		}(i, fetcher)
-	}
-	go func() {
-		defer close(done)
-		wg.Wait()
-	}()
-
-outer:
-	for {
-		select {
-		case err := <-errChan:
-			logger.For(ctx).Errorf("error fetching tokens for contract %s-%d: %s", ci.ContractAddress, ci.Chain, err)
-			if err.priority == 0 {
-				return err
-			}
-		case tokens := <-tokensReceive:
-			tokensFromProviders = append(tokensFromProviders, tokens)
-		case contract := <-contractsReceive:
-			contractsFromProviders = append(contractsFromProviders, contract)
-		case <-done:
-			logger.For(ctx).Debug("done refreshing tokens for collection")
-			break outer
-		}
-	}
-
-	logger.For(ctx).Debug("creating users")
-
-	chainTokensForUsers, users, err := p.createUsersForTokens(ctx, tokensFromProviders, ci.Chain)
-	if err != nil {
-		return err
-	}
-
-	logger.For(ctx).Debug("creating contracts")
-
-	_, persistedContracts, err := p.processContracts(ctx, contractsFromProviders, nil, false)
-	if err != nil {
-		return err
-	}
-
-	// We should receive exactly one contract from processContracts
-	if len(persistedContracts) != 1 {
-		return fmt.Errorf("expected one contract to be returned from processContracts, got %d", len(persistedContracts))
-	}
-
-	_, _, err = p.processTokensForOwnersOfContract(ctx, persistedContracts[0], users, chainTokensForUsers, op.TokenUpsertParams{
-		SetCreatorFields: false,
-		SetHolderFields:  true,
-		OptionalDelete:   nil,
-	})
-
-	return err
-}
-
 type ContractOwnerResult struct {
 	Priority  int
 	Contracts []ChainAgnosticContract
@@ -1618,214 +1391,6 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	}
 
 	return nil
-	//return p.SyncTokensCreatedOnSharedContracts(ctx, userID, chains)
-
-}
-
-type tokenForUser struct {
-	userID   persist.DBID
-	token    ChainAgnosticToken
-	chain    persist.Chain
-	priority int
-}
-
-// this function returns a map of user IDs to their new tokens as well as a map of user IDs to the users themselves
-func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainTokens, chain persist.Chain) (map[persist.DBID][]chainTokens, map[persist.DBID]persist.User, error) {
-	users := map[persist.DBID]persist.User{}
-	userTokens := map[persist.DBID]map[int]chainTokens{}
-	seenTokens := map[persist.TokenUniqueIdentifiers]bool{}
-
-	userChan := make(chan persist.User)
-	tokensForUserChan := make(chan tokenForUser)
-	errChan := make(chan error)
-	done := make(chan struct{})
-	wp := workerpool.New(100)
-
-	mu := &sync.Mutex{}
-
-	ownerAddresses := make([]string, 0, len(tokens))
-
-	for _, chainToken := range tokens {
-		for _, token := range chainToken.tokens {
-			ownerAddresses = append(ownerAddresses, token.OwnerAddress.String())
-		}
-	}
-
-	// get all current users
-
-	allCurrentUsers, err := p.Queries.GetUsersByChainAddresses(ctx, db.GetUsersByChainAddressesParams{
-		Addresses: ownerAddresses,
-		L1Chain:   chain.L1Chain(),
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// figure out which users are not in the database
-
-	addressesToUsers := map[string]persist.User{}
-
-	for _, user := range allCurrentUsers {
-		traits := persist.Traits{}
-		err = user.Traits.AssignTo(&traits)
-		if err != nil {
-			return nil, nil, err
-		}
-		addressesToUsers[string(user.Address)] = persist.User{
-			Version:            persist.NullInt32(user.Version.Int32),
-			ID:                 user.ID,
-			CreationTime:       user.CreatedAt,
-			Deleted:            persist.NullBool(user.Deleted),
-			LastUpdated:        user.LastUpdated,
-			Username:           persist.NullString(user.Username.String),
-			UsernameIdempotent: persist.NullString(user.UsernameIdempotent.String),
-			Wallets:            user.Wallets,
-			Bio:                persist.NullString(user.Bio.String),
-			Traits:             traits,
-			Universal:          persist.NullBool(user.Universal),
-		}
-	}
-
-	logger.For(ctx).Debugf("found %d users", len(addressesToUsers))
-
-	// create users for those that are not in the database
-
-	for _, chainToken := range tokens {
-		resolvers := matchingProvidersForChain[NameResolver](p.Chains, chainToken.chain)
-
-		for _, agnosticToken := range chainToken.tokens {
-			if agnosticToken.OwnerAddress == "" {
-				continue
-			}
-			tid := persist.TokenUniqueIdentifiers{Chain: chainToken.chain, ContractAddress: agnosticToken.ContractAddress, TokenID: agnosticToken.TokenID, OwnerAddress: agnosticToken.OwnerAddress}
-			if seenTokens[tid] {
-				continue
-			}
-			seenTokens[tid] = true
-			ct := chainToken
-			t := agnosticToken
-			wp.Submit(func() {
-				user, ok := addressesToUsers[string(t.OwnerAddress)]
-				if !ok {
-					username := t.OwnerAddress.String()
-					for _, resolver := range resolvers {
-						doBreak := func() bool {
-							displayCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-							defer cancel()
-							display := resolver.GetDisplayNameByAddress(displayCtx, t.OwnerAddress)
-
-							// if display is an empty address, this will return empty
-							displayCopy := strings.TrimLeft(display, "0x")
-							displayCopy = strings.TrimRight(displayCopy, "0")
-							if displayCopy != "" {
-								username = display
-								return true
-							}
-							return false
-						}()
-						if doBreak {
-							break
-						}
-					}
-					func() {
-						mu.Lock()
-						defer mu.Unlock()
-						userID, err := p.Repos.UserRepository.Create(ctx, persist.CreateUserInput{
-							Username:     username,
-							ChainAddress: persist.NewChainAddress(t.OwnerAddress, ct.chain),
-							Universal:    true,
-						}, nil)
-						if err != nil {
-							if _, ok := err.(persist.ErrUsernameNotAvailable); ok {
-								logger.For(ctx).Infof("username %s not available", username)
-								user, err = p.Repos.UserRepository.GetByUsername(ctx, username)
-								if err != nil {
-									errChan <- err
-									return
-								}
-							} else if _, ok := err.(persist.ErrAddressOwnedByUser); ok {
-								logger.For(ctx).Infof("address %s already owned by user", t.OwnerAddress)
-								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewL1ChainAddress(t.OwnerAddress, ct.chain))
-								if err != nil {
-									errChan <- err
-									return
-								}
-							} else if _, ok := err.(persist.ErrWalletCreateFailed); ok {
-								logger.For(ctx).Infof("wallet creation failed for address %s", t.OwnerAddress)
-								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewL1ChainAddress(t.OwnerAddress, ct.chain))
-								if err != nil {
-									errChan <- err
-									return
-								}
-							} else {
-								errChan <- err
-								return
-							}
-						} else {
-							user, err = p.Repos.UserRepository.GetByID(ctx, userID)
-							if err != nil {
-								errChan <- err
-								return
-							}
-						}
-					}()
-				}
-
-				err = p.Repos.UserRepository.FillWalletDataForUser(ctx, &user)
-				if err != nil {
-					errChan <- err
-					return
-				}
-				userChan <- user
-				tokensForUserChan <- tokenForUser{
-					userID:   user.ID,
-					token:    t,
-					chain:    ct.chain,
-					priority: ct.priority,
-				}
-			})
-		}
-	}
-
-	go func() {
-		defer close(done)
-		wp.StopWait()
-	}()
-
-outer:
-	for {
-		select {
-		case user := <-userChan:
-			logger.For(ctx).Debugf("got user %s", user.Username)
-			users[user.ID] = user
-			if userTokens[user.ID] == nil {
-				userTokens[user.ID] = map[int]chainTokens{}
-			}
-		case token := <-tokensForUserChan:
-			chainTokensForUser := userTokens[token.userID]
-			tokensInChainTokens, ok := chainTokensForUser[token.priority]
-			if !ok {
-				tokensInChainTokens = chainTokens{chain: token.chain, tokens: []ChainAgnosticToken{}, priority: token.priority}
-			}
-			tokensInChainTokens.tokens = append(tokensInChainTokens.tokens, token.token)
-			chainTokensForUser[token.priority] = tokensInChainTokens
-			userTokens[token.userID] = chainTokensForUser
-		case err := <-errChan:
-			return nil, nil, err
-		case <-done:
-			break outer
-		}
-	}
-
-	chainTokensForUser := map[persist.DBID][]chainTokens{}
-	for userID, chainTokens := range userTokens {
-		for _, chainToken := range chainTokens {
-			chainTokensForUser[userID] = append(chainTokensForUser[userID], chainToken)
-		}
-	}
-
-	logger.For(ctx).Infof("created %d users for tokens", len(users))
-	return chainTokensForUser, users, nil
 }
 
 // matchingWallets returns wallet addresses that belong to any of the passed chains
@@ -1851,17 +1416,124 @@ func (p *Provider) matchingWalletsChain(wallets []persist.Wallet, chain persist.
 	return p.matchingWallets(wallets, []persist.Chain{chain})[chain]
 }
 
+// processContractCommunities ensures that every contract has a corresponding "contract community" in the database.
+// This is the most basic community type, and every token belongs to a contract community (because every token belongs
+// to a contract, and every contract belongs to a contract community).
+func (d *Provider) processContractCommunities(ctx context.Context, contracts []db.Contract) ([]db.Community, error) {
+	communities := make([]db.Community, 0, len(contracts))
+	for _, contract := range contracts {
+		// No need to fill in createdAt, lastUpdated, or deleted. They'll be handled by the upsert.
+		communities = append(communities, db.Community{
+			ID:              persist.GenerateID(),
+			Version:         0,
+			Name:            contract.Name.String,
+			Description:     contract.Description.String,
+			CommunityType:   persist.CommunityTypeContract,
+			Key1:            fmt.Sprintf("%d", contract.Chain),
+			Key2:            contract.Address.String(),
+			ContractID:      contract.ID,
+			ProfileImageUrl: contract.ProfileImageUrl,
+		})
+	}
+
+	communities, err := d.Repos.CommunityRepository.UpsertCommunities(ctx, communities)
+	if err != nil {
+		return nil, err
+	}
+
+	communityByContractID := make(map[persist.DBID]db.Community)
+	communityByKey := make(map[persist.CommunityKey]db.Community)
+
+	for _, community := range communities {
+		communityByContractID[community.ContractID] = community
+		communityByKey[persist.CommunityKey{
+			Type: community.CommunityType,
+			Key1: community.Key1,
+			Key2: community.Key2,
+		}] = community
+	}
+
+	upsertCreatorsParams := db.UpsertCommunityCreatorsParams{}
+	for _, contract := range contracts {
+		creatorAddress, ok := util.FindFirst([]persist.Address{contract.OwnerAddress, contract.CreatorAddress}, func(a persist.Address) bool {
+			return a != ""
+		})
+
+		if !ok {
+			continue
+		}
+
+		if community, ok := communityByContractID[contract.ID]; ok {
+			upsertCreatorsParams.Ids = append(upsertCreatorsParams.Ids, persist.GenerateID().String())
+			upsertCreatorsParams.CreatorType = append(upsertCreatorsParams.CreatorType, int32(persist.CommunityCreatorTypeProvider))
+			upsertCreatorsParams.CommunityID = append(upsertCreatorsParams.CommunityID, community.ID.String())
+			upsertCreatorsParams.CreatorAddress = append(upsertCreatorsParams.CreatorAddress, creatorAddress.String())
+			upsertCreatorsParams.CreatorAddressChain = append(upsertCreatorsParams.CreatorAddressChain, int32(contract.Chain))
+			upsertCreatorsParams.CreatorAddressL1Chain = append(upsertCreatorsParams.CreatorAddressL1Chain, int32(contract.Chain.L1Chain()))
+		}
+	}
+
+	if len(upsertCreatorsParams.Ids) > 0 {
+		_, err = d.Queries.UpsertCommunityCreators(ctx, upsertCreatorsParams)
+		if err != nil {
+			err := fmt.Errorf("failed to upsert contract community creators: %w", err)
+			logger.For(ctx).WithError(err).Error(err)
+			sentryutil.ReportError(ctx, err)
+		}
+	}
+
+	params := db.UpsertContractCommunityMembershipsParams{}
+
+	for _, contract := range contracts {
+		key := persist.CommunityKey{
+			Type: persist.CommunityTypeContract,
+			Key1: fmt.Sprintf("%d", contract.Chain),
+			Key2: contract.Address.String(),
+		}
+
+		community, ok := communityByKey[key]
+		if !ok {
+			// This shouldn't happen. By this point, we've successfully upserted communities,
+			// so we should be able to find one matching every contract we have.
+			err = fmt.Errorf("couldn't find community with type: %d, key: %s for contract ID: %s", key.Type, key, contract.ID)
+			sentryutil.ReportError(ctx, err)
+			return nil, err
+		}
+
+		params.Ids = append(params.Ids, persist.GenerateID().String())
+		params.ContractID = append(params.ContractID, contract.ID.String())
+		params.CommunityID = append(params.CommunityID, community.ID.String())
+	}
+
+	_, err = d.Queries.UpsertContractCommunityMemberships(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return communities, nil
+}
+
 // processContracts deduplicates contracts and upserts them into the database. If canOverwriteOwnerAddress is true, then
 // the owner address of an existing contract will be overwritten if the new contract provides a non-empty owner address.
 // An empty owner address will never overwrite an existing address, even if canOverwriteOwnerAddress is true.
-func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, existingContracts []db.Contract, canOverwriteOwnerAddress bool) (currentContractState []db.Contract, newContracts []db.Contract, err error) {
+func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, existingContracts []db.Contract, canOverwriteOwnerAddress bool) (dbContracts []db.Contract, newContracts []db.Contract, err error) {
 	contractsToUpsert := chainContractsToUpsertableContracts(contractsFromProviders, existingContracts)
 	newUpsertedContracts, err := d.Repos.ContractRepository.BulkUpsert(ctx, contractsToUpsert, canOverwriteOwnerAddress)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c db.Contract) persist.DBID { return c.ID }), newUpsertedContracts, nil
+	dbContracts = util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c db.Contract) persist.DBID { return c.ID })
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, err = d.processContractCommunities(ctx, dbContracts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return dbContracts, newUpsertedContracts, nil
 }
 
 // chainTokensToUpsertableTokenDefinitions returns a slice of token definitions that are ready to be upserted into the database from a slice of chainTokens.
@@ -2164,38 +1836,6 @@ func mergeContractMetadata(lower contractMetadata, higher contractMetadata) cont
 	}
 
 	return lower
-}
-
-func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolder, userRepo *postgres.UserRepository) ([]TokenHolder, error) {
-	seenUsers := make(map[persist.DBID]persist.TokenHolder)
-	allUserIDs := make([]persist.DBID, 0, len(owners))
-	for _, owner := range owners {
-		if _, ok := seenUsers[owner.UserID]; !ok {
-			allUserIDs = append(allUserIDs, owner.UserID)
-			seenUsers[owner.UserID] = owner
-		}
-	}
-	allUsers, err := userRepo.GetByIDs(ctx, allUserIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get users for token holders: %s", err)
-	}
-	res := make([]TokenHolder, 0, len(seenUsers))
-	for _, user := range allUsers {
-		owner := seenUsers[user.ID]
-		username := user.Username.String()
-		previews := make([]string, 0, len(owner.PreviewTokens))
-		for _, p := range owner.PreviewTokens {
-			previews = append(previews, p.String())
-		}
-		res = append(res, TokenHolder{
-			UserID:        owner.UserID,
-			DisplayName:   username,
-			WalletIDs:     owner.WalletIDs,
-			PreviewTokens: previews,
-		})
-	}
-
-	return res, nil
 }
 
 func (t ChainAgnosticIdentifiers) String() string {

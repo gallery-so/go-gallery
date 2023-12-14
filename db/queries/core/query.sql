@@ -745,41 +745,41 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null 
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
 
--- name: PaginateRepliesByCommentIDBatch :batchmany
-SELECT * FROM comments WHERE 
-    (
-        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
-        AND top_level_comment_id = sqlc.arg('comment_id') 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
-        AND reply_to = sqlc.arg('comment_id') 
-    ) AND deleted = false
-    AND (comments.created_at, comments.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (comments.created_at, comments.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
-    LIMIT sqlc.arg('limit');
-
 -- name: CountCommentsByPostIDBatch :batchone
 SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
 
 -- name: CountCommentsAndRepliesByPostID :one
 SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false;
 
+-- name: PaginateRepliesByCommentIDBatch :batchmany
+SELECT * FROM comments c 
+WHERE 
+    CASE 
+        WHEN (SELECT reply_to FROM comments cc WHERE cc.id = sqlc.arg('comment_id')) IS NULL 
+        THEN c.top_level_comment_id = sqlc.arg('comment_id') 
+        ELSE c.reply_to = sqlc.arg('comment_id') 
+    END
+    AND c.deleted = false
+    AND (c.created_at, c.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (c.created_at, c.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+ORDER BY 
+    CASE 
+        WHEN sqlc.arg('paging_forward')::bool THEN (c.created_at, c.id) 
+    END ASC,
+    CASE 
+        WHEN NOT sqlc.arg('paging_forward')::bool THEN (c.created_at, c.id) 
+    END DESC
+LIMIT sqlc.arg('limit');
 
 -- name: CountRepliesByCommentIDBatch :batchone
-SELECT count(*) FROM comments WHERE 
-    (
-        (SELECT reply_to FROM comments WHERE comments.id = sqlc.arg('comment_id')) IS NULL 
-        AND top_level_comment_id = sqlc.arg('comment_id') 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE id = sqlc.arg('comment_id')) IS NOT NULL 
-        AND reply_to = sqlc.arg('comment_id') 
-    ) AND deleted = false;
+SELECT count(*) FROM comments c 
+WHERE 
+    CASE 
+        WHEN (SELECT reply_to FROM comments cc WHERE cc.id = sqlc.arg('comment_id')) IS NULL 
+        THEN c.top_level_comment_id = sqlc.arg('comment_id') 
+        ELSE c.reply_to = sqlc.arg('comment_id') 
+    END
+    AND c.deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
@@ -1722,18 +1722,6 @@ update tokens
       and is_creator_token = true
       and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract_id)
       and not deleted;
-      
--- name: IsMemberOfCommunity :one
-with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = @contract_id)
-select exists(
-    select 1
-    from tokens, contract_tokens
-    where tokens.owner_user_id = @user_id
-        and not tokens.deleted
-        and tokens.displayable
-        and tokens.token_definition_id = contract_tokens.id
-    limit 1
-);
 
 -- name: InsertExternalSocialConnectionsForUser :many
 insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
@@ -1857,3 +1845,20 @@ on conflict(user_id, blocked_user_id) where not deleted do update set active = t
 
 -- name: UnblockUser :exec
 update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;
+
+-- name: GetCommunitiesByTokenDefinitionID :batchmany
+select communities.* from communities
+    join token_definitions on token_definitions.contract_id = communities.contract_id
+    where community_type = 0
+        and token_definitions.id = @token_definition_id
+        and not communities.deleted
+        and not token_definitions.deleted
+
+union all
+
+select communities.* from communities
+    join token_community_memberships on token_community_memberships.community_id = communities.id
+    where community_type != 0
+        and token_community_memberships.token_definition_id = @token_definition_id
+        and not communities.deleted
+        and not token_community_memberships.deleted;

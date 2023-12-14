@@ -171,22 +171,6 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 	}
 
 	return nil
-
-}
-
-func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": validate.WithTag(contractID, "required"),
-	}); err != nil {
-		return err
-	}
-
-	in := task.TokenProcessingContractTokensMessage{
-		ContractID:   contractID,
-		ForceRefresh: forceRefresh,
-	}
-	return api.taskClient.CreateTaskForContractOwnerProcessing(ctx, in)
 }
 
 func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.User, PageInfo, error) {
@@ -277,7 +261,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractAddress": validate.WithTag(contractID, "required"),
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
