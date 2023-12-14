@@ -437,16 +437,14 @@ func (b *CountInteractionsByPostIDBatchBatchResults) Close() error {
 }
 
 const countRepliesByCommentIDBatch = `-- name: CountRepliesByCommentIDBatch :batchone
-SELECT count(*) FROM comments WHERE 
-    (
-        (SELECT reply_to FROM comments WHERE comments.id = $1) IS NULL 
-        AND top_level_comment_id = $1 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE id = $1) IS NOT NULL 
-        AND reply_to = $1 
-    ) AND deleted = false
+SELECT count(*) FROM comments c 
+WHERE 
+    CASE 
+        WHEN (SELECT reply_to FROM comments cc WHERE cc.id = $1) IS NULL 
+        THEN c.top_level_comment_id = $1 
+        ELSE c.reply_to = $1 
+    END
+    AND c.deleted = false
 `
 
 type CountRepliesByCommentIDBatchBatchResults struct {
@@ -4948,21 +4946,24 @@ func (b *PaginatePostsByContractIDBatchResults) Close() error {
 }
 
 const paginateRepliesByCommentIDBatch = `-- name: PaginateRepliesByCommentIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id FROM comments WHERE 
-    (
-        (SELECT reply_to FROM comments WHERE comments.id = $1) IS NULL 
-        AND top_level_comment_id = $1 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE id = $1) IS NOT NULL 
-        AND reply_to = $1 
-    ) AND deleted = false
-    AND (comments.created_at, comments.id) < ($2, $3)
-    AND (comments.created_at, comments.id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
-    LIMIT $7
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id FROM comments c 
+WHERE 
+    CASE 
+        WHEN (SELECT reply_to FROM comments cc WHERE cc.id = $1) IS NULL 
+        THEN c.top_level_comment_id = $1 
+        ELSE c.reply_to = $1 
+    END
+    AND c.deleted = false
+    AND (c.created_at, c.id) < ($2, $3)
+    AND (c.created_at, c.id) > ($4, $5)
+ORDER BY 
+    CASE 
+        WHEN $6::bool THEN (c.created_at, c.id) 
+    END ASC,
+    CASE 
+        WHEN NOT $6::bool THEN (c.created_at, c.id) 
+    END DESC
+LIMIT $7
 `
 
 type PaginateRepliesByCommentIDBatchBatchResults struct {
