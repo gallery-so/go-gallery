@@ -498,10 +498,6 @@ func tokensToConnection(ctx context.Context, tokens []db.Token, pageInfo publica
 	}
 }
 
-func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
-	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
-}
-
 func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 

@@ -64,6 +64,25 @@ type Contract struct {
 	Name            string          `json:"name"`
 }
 
+func FetchAssetsForTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) ([]Asset, error) {
+	outCh := make(chan assetsReceived)
+
+	go func() {
+		defer close(outCh)
+		streamAssetsForToken(ctx, http.DefaultClient, chain, contractAddress, tokenID, outCh)
+	}()
+
+	assets := make([]Asset, 0)
+	for a := range outCh {
+		if a.Err != nil {
+			return nil, a.Err
+		}
+		assets = append(assets, a.Assets...)
+	}
+
+	return assets, nil
+}
+
 type Provider struct {
 	Chain      persist.Chain
 	httpClient *http.Client
@@ -420,25 +439,6 @@ func (p *Provider) streamTokenAndContract(ctx context.Context, ownerAddress pers
 	return nil
 }
 
-func FetchAssetsForTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) ([]Asset, error) {
-	outCh := make(chan assetsReceived)
-
-	go func() {
-		defer close(outCh)
-		streamAssetsForToken(ctx, http.DefaultClient, chain, contractAddress, tokenID, outCh)
-	}()
-
-	assets := make([]Asset, 0)
-	for a := range outCh {
-		if a.Err != nil {
-			return nil, a.Err
-		}
-		assets = append(assets, a.Assets...)
-	}
-
-	return assets, nil
-}
-
 func fetchContractCollectionByAddress(ctx context.Context, client *http.Client, chain persist.Chain, contractAddress persist.Address) (contractCollection, error) {
 	contract, err := fetchContractByAddress(ctx, client, chain, contractAddress)
 	if err != nil {
@@ -711,8 +711,6 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 			outCh <- assetsReceived{Err: err}
 			return
 		}
-
-		logger.For(ctx).Infof("received %d assets from opensea query %s", len(page.NFTs), req.URL.RawQuery)
 
 		if keepAssetFilter == nil {
 			outCh <- assetsReceived{Assets: page.NFTs}

@@ -433,21 +433,6 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	return nil
 }
 
-func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractIdentifiers": validate.WithTag(ci, "required"),
-	}); err != nil {
-		return err
-	}
-
-	err := api.multichainProvider.RefreshTokensForContract(ctx, ci)
-	if err != nil {
-		return ErrTokenRefreshFailed{Message: err.Error()}
-	}
-
-	return nil
-}
-
 func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persist.DBID) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": validate.WithTag(collectionDBID, "required"),
