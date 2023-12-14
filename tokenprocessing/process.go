@@ -612,6 +612,18 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 		}
 		tokenID := persist.TokenID(bigTokenID.Text(16))
 
+		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(c, coredb.GetTokenByUserTokenIdentifiersParams{
+			OwnerID:         user.ID,
+			TokenID:         tokenID,
+			Chain:           persist.ChainZora,
+			ContractAddress: contractAddress,
+		})
+
+		beforeBalance := persist.HexString("0")
+		if beforeToken.Token.ID != "" {
+			beforeBalance = beforeToken.Token.Quantity
+		}
+
 		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": tokenID, "contract_address": contractAddress, "user_address": userAddress})
 		l.Infof("Processing: %s - Processing Goldsky Zora User Tokens Refresh", user.ID)
 		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, user.ID, []persist.TokenUniqueIdentifiers{{
@@ -630,18 +642,16 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 			for _, token := range newTokens {
 
-				dbUniqueTokenIDs, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
+				dbToken, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
 				if err != nil {
 					l.Errorf("error getting unique token identifiers: %s", err)
 					continue
 				}
 
-				if dbUniqueTokenIDs.Quantity.BigInt().Cmp(token.Instance.Quantity.BigInt()) != 0 {
-					l.Errorf("error: total quantity of tokens in db is not equal to total quantity of tokens on chain")
-					continue
-				}
-				if dbUniqueTokenIDs.Quantity.BigInt().Cmp(big.NewInt(0)) == 0 {
-					l.Infof("token quantity is 0, skipping")
+				newBalance := big.NewInt(0).Sub(dbToken.Quantity.BigInt(), beforeBalance.BigInt())
+
+				if newBalance.Cmp(big.NewInt(0)) == 0 || newBalance.Cmp(big.NewInt(0)) < 0 {
+					l.Infof("token quantity is 0 or less, skipping")
 					continue
 				}
 
@@ -656,7 +666,7 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 					Action:         persist.ActionNewTokensReceived,
 					Data: persist.EventData{
 						NewTokenID:       token.Instance.ID,
-						NewTokenQuantity: token.Instance.Quantity,
+						NewTokenQuantity: persist.HexString(newBalance.Text(16)),
 					},
 				})
 				if err != nil {
