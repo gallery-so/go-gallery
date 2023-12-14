@@ -154,14 +154,14 @@ type HelperSomeoneMentionedYouNotificationData struct {
 	CommentID *persist.DBID
 }
 type HelperSomeoneMentionedYourCommunityNotificationData struct {
-	ContractID persist.DBID
-	PostID     *persist.DBID
-	CommentID  *persist.DBID
+	CommunityID persist.DBID
+	PostID      *persist.DBID
+	CommentID   *persist.DBID
 }
 
 type HelperSomeonePostedYourWorkNotificationData struct {
-	ContractID persist.DBID
-	PostID     persist.DBID
+	CommunityID persist.DBID
+	PostID      persist.DBID
 }
 
 type HelperSomeoneYouFollowPostedTheirFirstPostNotificationData struct {

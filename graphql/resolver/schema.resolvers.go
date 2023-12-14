@@ -2926,7 +2926,7 @@ func (r *someoneMentionedYourCommunityNotificationResolver) MentionSource(ctx co
 
 // Community is the resolver for the community field.
 func (r *someoneMentionedYourCommunityNotificationResolver) Community(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.ContractID)
+	return resolveCommunityByID(ctx, obj.CommunityID)
 }
 
 // Post is the resolver for the post field.
@@ -2936,7 +2936,7 @@ func (r *someonePostedYourWorkNotificationResolver) Post(ctx context.Context, ob
 
 // Community is the resolver for the community field.
 func (r *someonePostedYourWorkNotificationResolver) Community(ctx context.Context, obj *model.SomeonePostedYourWorkNotification) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.ContractID)
+	return resolveCommunityByID(ctx, obj.CommunityID)
 }
 
 // Comment is the resolver for the comment field.

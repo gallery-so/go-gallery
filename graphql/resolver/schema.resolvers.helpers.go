@@ -1042,9 +1042,9 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeoneMentionedYourCommunityNotification{
 			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
 
-				ContractID: notif.ContractID,
-				PostID:     postID,
-				CommentID:  commentID,
+				CommunityID: notif.CommunityID,
+				PostID:      postID,
+				CommentID:   commentID,
 			},
 			Dbid:          notif.ID,
 			Seen:          &notif.Seen,
@@ -1057,8 +1057,8 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeonePostedYourWorkNotification{
 			HelperSomeonePostedYourWorkNotificationData: model.HelperSomeonePostedYourWorkNotificationData{
 
-				ContractID: notif.ContractID,
-				PostID:     notif.PostID,
+				CommunityID: notif.CommunityID,
+				PostID:      notif.PostID,
 			},
 			Dbid:         notif.ID,
 			Seen:         &notif.Seen,

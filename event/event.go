@@ -479,7 +479,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
-		ContractID:  persistedEvent.ContractID,
+		CommunityID: persistedEvent.ContractID,
 		MentionID:   persistedEvent.MentionID,
 	})
 }
@@ -613,7 +613,7 @@ func (h followerNotificationHandler) handleDelayed(ctx context.Context, persiste
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
-		ContractID:  persistedEvent.ContractID,
+		CommunityID: persistedEvent.ContractID,
 		MentionID:   persistedEvent.MentionID,
 	})
 }

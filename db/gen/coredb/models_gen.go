@@ -391,7 +391,7 @@ type Notification struct {
 	Amount      int32                    `db:"amount" json:"amount"`
 	PostID      persist.DBID             `db:"post_id" json:"post_id"`
 	TokenID     persist.DBID             `db:"token_id" json:"token_id"`
-	ContractID  persist.DBID             `db:"contract_id" json:"contract_id"`
+	CommunityID persist.DBID             `db:"community_id" json:"community_id"`
 	MentionID   persist.DBID             `db:"mention_id" json:"mention_id"`
 }
 
