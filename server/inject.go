@@ -125,7 +125,6 @@ func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(indexerProvider)),
-		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		ethRequirements,
 	)
 	return nil
@@ -143,9 +142,8 @@ func ethRequirements(
 	tmf multichain.TokenMetadataFetcher,
 	tcof multichain.ContractsOwnerFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
-	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, tiof, cf, cr, tmf, tcof, tdf, osccf}
+	return ethProviderList{nr, v, tof, toc, tiof, cf, cr, tmf, tcof, tdf}
 }
 
 // tezosProviderSet is a wire injector that creates the set of Tezos providers
@@ -185,7 +183,6 @@ func tezosRequirements(
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
 func optimismProviderSet(*http.Client, *tokenMetadataCache) optimismProviderList {
 	wire.Build(
-		rpc.NewEthClient,
 		optimismProvidersConfig,
 		wire.Value(persist.ChainOptimism),
 		// Add providers for Optimism here
@@ -202,7 +199,6 @@ func optimismProvidersConfig(alchemyProvider *alchemy.Provider, openseaProvider 
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		optimismRequirements,
 	)
 	return nil
@@ -214,15 +210,13 @@ func optimismRequirements(
 	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
-	opensea multichain.OpenSeaChildContractFetcher,
 ) optimismProviderList {
-	return optimismProviderList{tof, toc, tiof, tmf, opensea}
+	return optimismProviderList{tof, toc, tiof, tmf}
 }
 
 // arbitrumProviderSet is a wire injector that creates the set of Arbitrum providers
 func arbitrumProviderSet(*http.Client, *tokenMetadataCache) arbitrumProviderList {
 	wire.Build(
-		rpc.NewEthClient,
 		arbitrumProvidersConfig,
 		wire.Value(persist.ChainArbitrum),
 		// Add providers for Optimism here
@@ -239,7 +233,6 @@ func arbitrumProvidersConfig(alchemyProvider *alchemy.Provider, openseaProvider 
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
 		arbitrumRequirements,
 	)
@@ -252,10 +245,9 @@ func arbitrumRequirements(
 	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
-	opensea multichain.OpenSeaChildContractFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, tiof, tmf, opensea, tdf}
+	return arbitrumProviderList{tof, toc, tiof, tmf, tdf}
 }
 
 // poapProviderSet is a wire injector that creates the set of POAP providers
