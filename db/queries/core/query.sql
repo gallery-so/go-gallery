@@ -1013,9 +1013,10 @@ order by t.pos asc;
 select u.*
 from users u
 join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
-left join follows on follows.follower = u.id and follows.followee = @viewer_id and not follows.deleted
-where not u.deleted and not u.universal
-order by follows.created_at asc, t.pos asc;
+left join follows follow_back on follow_back.follower = u.id and follow_back.followee = @viewer_id and not follow_back.deleted
+left join follows following on following.follower = @viewer_id and following.followee = u.id
+where not u.deleted and not u.universal and following.id is null
+order by follow_back.created_at asc, t.pos asc;
 
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
