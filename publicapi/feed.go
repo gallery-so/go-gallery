@@ -195,7 +195,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 			case mention.CommunityID != "":
 				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actorID),
-					ResourceTypeID: persist.ResourceTypeContract,
+					ResourceTypeID: persist.ResourceTypeCommunity,
 					SubjectID:      mention.CommunityID,
 					PostID:         postID,
 					CommunityID:    mention.CommunityID,
@@ -225,7 +225,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(actorID),
 			Action:         persist.ActionUserPostedYourWork,
-			ResourceTypeID: persist.ResourceTypeContract,
+			ResourceTypeID: persist.ResourceTypeCommunity,
 			UserID:         creator.CreatorUserID,
 			SubjectID:      creator.ContractID,
 			PostID:         postID,
@@ -321,7 +321,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 			err = event.Dispatch(ctx, db.Event{
 				ActorID:        persist.DBIDToNullStr(userID),
 				Action:         persist.ActionUserPostedYourWork,
-				ResourceTypeID: persist.ResourceTypeContract,
+				ResourceTypeID: persist.ResourceTypeCommunity,
 				UserID:         creator.CreatorUserID,
 				SubjectID:      creator.ContractID,
 				PostID:         postID,
@@ -378,7 +378,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(userID),
 			Action:         persist.ActionUserPostedYourWork,
-			ResourceTypeID: persist.ResourceTypeContract,
+			ResourceTypeID: persist.ResourceTypeCommunity,
 			UserID:         creator.CreatorUserID,
 			SubjectID:      creator.ContractID,
 			PostID:         postID,

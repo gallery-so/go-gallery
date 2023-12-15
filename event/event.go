@@ -543,9 +543,10 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 		return event.SubjectID, nil
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
-	case persist.ResourceTypeContract:
-		// TODO: Update to use community creators
-		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.CommunityID.String())
+	case persist.ResourceTypeCommunity:
+		// TODO: Update to use community creators.
+		// There can be multiple creators for a community; for the time being, should we just use the first one?
+		u, err := h.dataloaders.GetCreatorsByCommunityID.Load(event.CommunityID)
 		if err != nil || u.CreatorUserID == "" {
 			logger.For(ctx).Warnf("error loading user by address: %s", err)
 			return "", nil

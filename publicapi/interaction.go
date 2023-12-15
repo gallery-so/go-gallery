@@ -1196,7 +1196,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 			case mention.CommunityID != "":
 				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actor),
-					ResourceTypeID: persist.ResourceTypeContract,
+					ResourceTypeID: persist.ResourceTypeCommunity,
 					SubjectID:      mention.CommunityID,
 					PostID:         postID,
 					FeedEventID:    feedEventID,

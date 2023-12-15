@@ -31,8 +31,8 @@ func (r *EventRepository) Add(ctx context.Context, event db.Event) (*db.Event, e
 		return r.AddCommentEvent(ctx, event)
 	case persist.ResourceTypeGallery:
 		return r.AddGalleryEvent(ctx, event)
-	case persist.ResourceTypeContract:
-		return r.AddContractEvent(ctx, event)
+	case persist.ResourceTypeCommunity:
+		return r.AddCommunityEvent(ctx, event)
 	case persist.ResourceTypePost:
 		return r.AddPostEvent(ctx, event)
 	default:
@@ -145,7 +145,7 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 	return &event, err
 }
 
-func (r *EventRepository) AddContractEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+func (r *EventRepository) AddCommunityEvent(ctx context.Context, event db.Event) (*db.Event, error) {
 	event, err := r.Queries.CreateCommunityEvent(ctx, db.CreateCommunityEventParams{
 		Post:           util.ToNullString(event.PostID.String(), true),
 		Comment:        util.ToNullString(event.CommentID.String(), true),
