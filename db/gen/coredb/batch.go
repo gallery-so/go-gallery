@@ -2888,24 +2888,24 @@ func (b *GetProfileImageByIDBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getSharedContractsBatchPaginate = `-- name: GetSharedContractsBatchPaginate :batchmany
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
-from owned_contracts a, owned_contracts b, contracts
-left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+const getSharedCommunitiesBatchPaginate = `-- name: GetSharedCommunitiesBatchPaginate :batchmany
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+from owned_communities a, owned_communities b, communities
+left join contracts on communities.contract_id = contracts.id
+left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
 where a.user_id = $1
   and b.user_id = $2
-  and a.contract_id = b.contract_id
-  and a.contract_id = contracts.id
+  and a.community_id = b.community_id
+  and a.community_id = communities.id
   and marketplace_contracts.contract_id is null
-  and contracts.name is not null
-  and contracts.name != ''
-  and contracts.name != 'Unidentified contract'
-  and not contracts.is_provider_marked_spam
+  and communities.name != ''
+  and communities.name != 'Unidentified contract'
+  and (contracts.is_provider_marked_spam is null or contracts.is_provider_marked_spam = false)
   and (
     a.displayed,
     b.displayed,
     a.owned_count,
-    contracts.id
+    communities.id
   ) > (
     $3,
     $4,
@@ -2916,25 +2916,25 @@ where a.user_id = $1
     a.displayed,
     b.displayed,
     a.owned_count,
-    contracts.id
+    communities.id
   ) < (
     $7,
     $8,
     $9::int,
     $10
   )
-order by case when $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc,
-        case when not $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
+order by case when $11::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end desc,
+        case when not $11::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end asc
 limit $12
 `
 
-type GetSharedContractsBatchPaginateBatchResults struct {
+type GetSharedCommunitiesBatchPaginateBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-type GetSharedContractsBatchPaginateParams struct {
+type GetSharedCommunitiesBatchPaginateParams struct {
 	UserAID                   persist.DBID `db:"user_a_id" json:"user_a_id"`
 	UserBID                   persist.DBID `db:"user_b_id" json:"user_b_id"`
 	CurBeforeDisplayedByUserA bool         `db:"cur_before_displayed_by_user_a" json:"cur_before_displayed_by_user_a"`
@@ -2949,32 +2949,34 @@ type GetSharedContractsBatchPaginateParams struct {
 	Limit                     int32        `db:"limit" json:"limit"`
 }
 
-type GetSharedContractsBatchPaginateRow struct {
-	ID                    persist.DBID    `db:"id" json:"id"`
-	Deleted               bool            `db:"deleted" json:"deleted"`
-	Version               sql.NullInt32   `db:"version" json:"version"`
-	CreatedAt             time.Time       `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time       `db:"last_updated" json:"last_updated"`
-	Name                  sql.NullString  `db:"name" json:"name"`
-	Symbol                sql.NullString  `db:"symbol" json:"symbol"`
-	Address               persist.Address `db:"address" json:"address"`
-	CreatorAddress        persist.Address `db:"creator_address" json:"creator_address"`
-	Chain                 persist.Chain   `db:"chain" json:"chain"`
-	ProfileBannerUrl      sql.NullString  `db:"profile_banner_url" json:"profile_banner_url"`
-	ProfileImageUrl       sql.NullString  `db:"profile_image_url" json:"profile_image_url"`
-	BadgeUrl              sql.NullString  `db:"badge_url" json:"badge_url"`
-	Description           sql.NullString  `db:"description" json:"description"`
-	OwnerAddress          persist.Address `db:"owner_address" json:"owner_address"`
-	IsProviderMarkedSpam  bool            `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
-	ParentID              persist.DBID    `db:"parent_id" json:"parent_id"`
-	OverrideCreatorUserID persist.DBID    `db:"override_creator_user_id" json:"override_creator_user_id"`
-	L1Chain               persist.L1Chain `db:"l1_chain" json:"l1_chain"`
-	DisplayedByUserA      bool            `db:"displayed_by_user_a" json:"displayed_by_user_a"`
-	DisplayedByUserB      bool            `db:"displayed_by_user_b" json:"displayed_by_user_b"`
-	OwnedCount            int64           `db:"owned_count" json:"owned_count"`
+type GetSharedCommunitiesBatchPaginateRow struct {
+	ID                      persist.DBID          `db:"id" json:"id"`
+	Version                 int32                 `db:"version" json:"version"`
+	CommunityType           persist.CommunityType `db:"community_type" json:"community_type"`
+	Key1                    string                `db:"key1" json:"key1"`
+	Key2                    string                `db:"key2" json:"key2"`
+	Key3                    string                `db:"key3" json:"key3"`
+	Key4                    string                `db:"key4" json:"key4"`
+	Name                    string                `db:"name" json:"name"`
+	OverrideName            sql.NullString        `db:"override_name" json:"override_name"`
+	Description             string                `db:"description" json:"description"`
+	OverrideDescription     sql.NullString        `db:"override_description" json:"override_description"`
+	ProfileImageUrl         sql.NullString        `db:"profile_image_url" json:"profile_image_url"`
+	OverrideProfileImageUrl sql.NullString        `db:"override_profile_image_url" json:"override_profile_image_url"`
+	BadgeUrl                sql.NullString        `db:"badge_url" json:"badge_url"`
+	OverrideBadgeUrl        sql.NullString        `db:"override_badge_url" json:"override_badge_url"`
+	ContractID              persist.DBID          `db:"contract_id" json:"contract_id"`
+	CreatedAt               time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated             time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted                 bool                  `db:"deleted" json:"deleted"`
+	WebsiteUrl              sql.NullString        `db:"website_url" json:"website_url"`
+	OverrideWebsiteUrl      sql.NullString        `db:"override_website_url" json:"override_website_url"`
+	DisplayedByUserA        bool                  `db:"displayed_by_user_a" json:"displayed_by_user_a"`
+	DisplayedByUserB        bool                  `db:"displayed_by_user_b" json:"displayed_by_user_b"`
+	OwnedCount              int64                 `db:"owned_count" json:"owned_count"`
 }
 
-func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
+func (q *Queries) GetSharedCommunitiesBatchPaginate(ctx context.Context, arg []GetSharedCommunitiesBatchPaginateParams) *GetSharedCommunitiesBatchPaginateBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
@@ -2991,16 +2993,16 @@ func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []Get
 			a.PagingForward,
 			a.Limit,
 		}
-		batch.Queue(getSharedContractsBatchPaginate, vals...)
+		batch.Queue(getSharedCommunitiesBatchPaginate, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetSharedContractsBatchPaginateBatchResults{br, len(arg), false}
+	return &GetSharedCommunitiesBatchPaginateBatchResults{br, len(arg), false}
 }
 
-func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSharedContractsBatchPaginateRow, error)) {
+func (b *GetSharedCommunitiesBatchPaginateBatchResults) Query(f func(int, []GetSharedCommunitiesBatchPaginateRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []GetSharedContractsBatchPaginateRow
+		var items []GetSharedCommunitiesBatchPaginateRow
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -3014,27 +3016,29 @@ func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSha
 				return err
 			}
 			for rows.Next() {
-				var i GetSharedContractsBatchPaginateRow
+				var i GetSharedCommunitiesBatchPaginateRow
 				if err := rows.Scan(
 					&i.ID,
-					&i.Deleted,
 					&i.Version,
+					&i.CommunityType,
+					&i.Key1,
+					&i.Key2,
+					&i.Key3,
+					&i.Key4,
+					&i.Name,
+					&i.OverrideName,
+					&i.Description,
+					&i.OverrideDescription,
+					&i.ProfileImageUrl,
+					&i.OverrideProfileImageUrl,
+					&i.BadgeUrl,
+					&i.OverrideBadgeUrl,
+					&i.ContractID,
 					&i.CreatedAt,
 					&i.LastUpdated,
-					&i.Name,
-					&i.Symbol,
-					&i.Address,
-					&i.CreatorAddress,
-					&i.Chain,
-					&i.ProfileBannerUrl,
-					&i.ProfileImageUrl,
-					&i.BadgeUrl,
-					&i.Description,
-					&i.OwnerAddress,
-					&i.IsProviderMarkedSpam,
-					&i.ParentID,
-					&i.OverrideCreatorUserID,
-					&i.L1Chain,
+					&i.Deleted,
+					&i.WebsiteUrl,
+					&i.OverrideWebsiteUrl,
 					&i.DisplayedByUserA,
 					&i.DisplayedByUserB,
 					&i.OwnedCount,
@@ -3051,7 +3055,7 @@ func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSha
 	}
 }
 
-func (b *GetSharedContractsBatchPaginateBatchResults) Close() error {
+func (b *GetSharedCommunitiesBatchPaginateBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
