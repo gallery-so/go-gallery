@@ -1009,6 +1009,14 @@ join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
 where not u.deleted and not u.universal and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
 order by t.pos asc;
 
+-- name: GetUsersByPositionPersonalizedBatch :batchmany
+select u.*
+from users u
+join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
+left join follows on follows.follower = u.id and follows.followee = @viewer_id and not follows.deleted
+where not u.deleted and not u.universal
+order by follows.created_at asc, t.pos asc;
+
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
 

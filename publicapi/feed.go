@@ -885,7 +885,7 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 		}
 	}
 
-	l := newDBIDCache(api.cache, "trending:users:"+report.Name, ttl, calcFunc)
+	l := newDBIDCache(redis.FeedCache, "trending:users:"+report.Name, ttl, calcFunc)
 
 	ids, err := l.Load(ctx)
 	if err != nil {

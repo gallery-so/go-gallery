@@ -42,7 +42,7 @@ func For(ctx context.Context) *Recommender {
 	return gc.Value(contextKey).(*Recommender)
 }
 
-func NewRecommender(queries *db.Queries) *Recommender {
+func NewRecommender(queries *db.Queries, bootstrapF func(context.Context) ([]persist.DBID, error)) *Recommender {
 	r := &Recommender{saveCh: make(chan saveMsg)}
 
 	r.LoadFunc = func(ctx context.Context) {
@@ -68,14 +68,7 @@ func NewRecommender(queries *db.Queries) *Recommender {
 		return queries.UpdatedRecommendationResults(ctx, params)
 	}
 
-	r.BootstrapFunc = func(ctx context.Context) ([]persist.DBID, error) {
-		recommendedIDs, err := queries.GetTopRecommendedUserIDs(ctx)
-		if err != nil {
-			return nil, err
-		}
-		Shuffle(recommendedIDs, 24)
-		return recommendedIDs, nil
-	}
+	r.BootstrapFunc = bootstrapF
 
 	r.RecommendFunc = func(ctx context.Context, userID persist.DBID, follows []db.Follow) ([]persist.DBID, error) {
 		var latestFollow time.Time
@@ -130,7 +123,10 @@ func (r *Recommender) RecommendFromFollowingShuffled(ctx context.Context, userID
 // UsersFromFollowing suggest users based on a given user's follows sorted in descending order.
 func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist.DBID, follows []db.Follow) ([]persist.DBID, error) {
 	if len(follows) == 0 {
-		return r.BootstrapFunc(ctx)
+		if r.BootstrapFunc != nil {
+			return r.BootstrapFunc(ctx)
+		}
+		return []persist.DBID{}, nil
 	}
 
 	recommendedIDs, err := r.RecommendFunc(ctx, userID, follows)

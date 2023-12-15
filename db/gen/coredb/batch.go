@@ -4453,6 +4453,94 @@ func (b *GetUsersByPositionPaginateBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getUsersByPositionPersonalizedBatch = `-- name: GetUsersByPositionPersonalizedBatch :batchmany
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
+from users u
+join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
+left join follows on follows.follower = u.id and follows.followee = $2 and not follows.deleted
+where not u.deleted and not u.universal
+order by follows.created_at asc, t.pos asc
+`
+
+type GetUsersByPositionPersonalizedBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetUsersByPositionPersonalizedBatchParams struct {
+	UserIds  []string     `db:"user_ids" json:"user_ids"`
+	ViewerID persist.DBID `db:"viewer_id" json:"viewer_id"`
+}
+
+func (q *Queries) GetUsersByPositionPersonalizedBatch(ctx context.Context, arg []GetUsersByPositionPersonalizedBatchParams) *GetUsersByPositionPersonalizedBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.UserIds,
+			a.ViewerID,
+		}
+		batch.Queue(getUsersByPositionPersonalizedBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUsersByPositionPersonalizedBatchBatchResults{br, len(arg), false}
+}
+
+func (b *GetUsersByPositionPersonalizedBatchBatchResults) Query(f func(int, []User, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []User
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i User
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.LastUpdated,
+					&i.CreatedAt,
+					&i.Username,
+					&i.UsernameIdempotent,
+					&i.Wallets,
+					&i.Bio,
+					&i.Traits,
+					&i.Universal,
+					&i.NotificationSettings,
+					&i.EmailVerified,
+					&i.EmailUnsubscriptions,
+					&i.FeaturedGallery,
+					&i.PrimaryWalletID,
+					&i.UserExperiences,
+					&i.ProfileImageID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetUsersByPositionPersonalizedBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `

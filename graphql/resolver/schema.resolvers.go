@@ -2739,24 +2739,6 @@ func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input mode
 	}, err
 }
 
-// OnboardingUserRecommendations is the resolver for the onboardingUserRecommendations field.
-func (r *queryResolver) OnboardingUserRecommendations(ctx context.Context, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
-	users, pageInfo, err := publicapi.For(ctx).User.GetOnboardingUserRecommendations(ctx, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
-	edges := util.MapWithoutError(users, func(u coredb.User) *model.UserEdge {
-		return &model.UserEdge{
-			Node:   userToModel(ctx, u),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	})
-	return &model.UsersConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-}
-
 // ContractCommunityByKey is the resolver for the contractCommunityByKey field.
 func (r *queryResolver) ContractCommunityByKey(ctx context.Context, key model.ContractCommunityKeyInput) (model.CommunityByKeyOrError, error) {
 	communityKey := persist.CommunityKey{
@@ -3359,7 +3341,7 @@ func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer)
 
 // SuggestedUsers is the resolver for the suggestedUsers field.
 func (r *viewerResolver) SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
-	users, pageInfo, err := publicapi.For(ctx).User.GetExploreRecommendedUsers(ctx, before, after, first, last)
+	users, pageInfo, err := publicapi.For(ctx).User.GetSuggestedUsers(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}

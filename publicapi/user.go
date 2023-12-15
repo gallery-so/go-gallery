@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -199,60 +200,6 @@ func (api UserAPI) paginatorWithQuery(c *positionCursor, queryF func(positionPag
 	paginator.QueryFunc = queryF
 	paginator.CursorFunc = func(u db.User) (int64, []persist.DBID, error) { return c.Positions[u.ID], c.IDs, nil }
 	return paginator
-}
-
-func (api UserAPI) GetOnboardingUserRecommendations(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
-	// Validate
-	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	cursor := cursors.NewPositionCursor()
-	paginator := positionPaginator[db.User]{}
-
-	if before != nil {
-		paginator, err := api.paginatorFromCursorStr(ctx, *before)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-		return paginator.paginate(before, after, first, last)
-	}
-
-	if after != nil {
-		paginator, err := api.paginatorFromCursorStr(ctx, *after)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-		return paginator.paginate(before, after, first, last)
-	}
-
-	// Not currently paging, so we need to check the cache and possibly re-calculate the recommendations
-	var users []db.User
-	var err error
-
-	cache := newDBIDCache(api.cache, "onboarding_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
-		users, err = api.queries.GetOnboardingUserRecommendations(ctx, 100)
-		userIDs := util.MapWithoutError(users, func(u db.User) persist.DBID { return u.ID })
-		return userIDs, err
-	})
-
-	userIDs, err := cache.Load(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	cursor.CurrentPosition = 0
-	cursor.IDs = userIDs
-	cursor.Positions = sliceToMapIndex(userIDs)
-
-	// We already did the work to fetch the users when re-calculating the recommendations, so we can just return them here
-	if users != nil {
-		paginator = api.paginatorFromResults(ctx, cursor, users)
-	} else {
-		paginator = api.paginatorFromCursor(ctx, cursor)
-	}
-
-	return paginator.paginate(before, after, first, last)
 }
 
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
@@ -1095,12 +1042,7 @@ func (api UserAPI) FollowAllOnboardingRecommendations(ctx context.Context, curSt
 
 	// cursor wasn't provided or is invalid
 	if len(usersToFollow) == 0 {
-		// fetch from the cache and possibly re-calculate the recommendations
-		cache := newDBIDCache(api.cache, "onboarding_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
-			users, err := api.queries.GetOnboardingUserRecommendations(ctx, 100)
-			return util.MapWithoutError(users, func(u db.User) persist.DBID { return u.ID }), err
-		})
-		usersToFollow, err = cache.Load(ctx)
+		usersToFollow, err = GetOnboardingUserRecommendationsBootstrap(api.queries)(ctx)
 		if err != nil {
 			return err
 		}
@@ -1385,7 +1327,17 @@ func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType mode
 	})
 }
 
-func (api UserAPI) GetExploreRecommendedUsers(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+// GetOnboardingUserRecommendationsBootstrap returns a function that when called returns a list of recommended users.
+func GetOnboardingUserRecommendationsBootstrap(q *db.Queries) func(ctx context.Context) ([]persist.DBID, error) {
+	return func(ctx context.Context) ([]persist.DBID, error) {
+		return newDBIDCache(redis.SocialCache, "onboarding_user_recommendations", 24*time.Hour, func(ctx context.Context) ([]persist.DBID, error) {
+			users, err := q.GetOnboardingUserRecommendations(ctx, 100)
+			return util.MapWithoutError(users, func(u db.User) persist.DBID { return u.ID }), err
+		}).Load(ctx)
+	}
+}
+
+func (api UserAPI) GetSuggestedUsers(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -1396,43 +1348,71 @@ func (api UserAPI) GetExploreRecommendedUsers(ctx context.Context, before, after
 		return nil, PageInfo{}, err
 	}
 
-	cursor := cursors.NewPositionCursor()
 	var paginator positionPaginator[db.User]
 
 	// If we have a cursor, we can page through the original set of recommended users
 	if before != nil {
-		if err = cursor.Unpack(*before); err != nil {
+		paginator, err = api.paginatorFromCursorStr(ctx, *before)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		if err = cursor.Unpack(*after); err != nil {
+		paginator, err = api.paginatorFromCursorStr(ctx, *after)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else {
 		// Otherwise make a new recommendation
+		userIDs, err := GetOnboardingUserRecommendationsBootstrap(api.queries)(ctx)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
 		follows, err := api.queries.GetFollowEdgesByUserID(ctx, viewerID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		personalizedIDs, err := recommend.For(ctx).RecommendFromFollowing(ctx, viewerID, follows)
+		// Make personalized recommendations
+		if len(follows) > 0 {
+			personalizedIDs, err := recommend.For(ctx).RecommendFromFollowing(ctx, viewerID, follows)
+			if err != nil {
+				return nil, PageInfo{}, err
+			}
+			freq := make(map[persist.DBID]int)
+			for _, id := range personalizedIDs {
+				freq[id] += 2
+			}
+			for _, id := range userIDs {
+				freq[id] += 1
+			}
+			userIDs = append(userIDs, personalizedIDs...)
+			userIDs = util.Dedupe(userIDs, true)
+			sort.Slice(userIDs, func(i, j int) bool { return freq[userIDs[i]] > freq[userIDs[j]] })
+			userIDs = userIDs[:100]
+		}
+
+		users, err := api.loaders.GetUsersByPositionPersonalizedBatch.Load(db.GetUsersByPositionPersonalizedBatchParams{
+			ViewerID: viewerID,
+			UserIds:  util.MapWithoutError(userIDs, func(id persist.DBID) string { return id.String() }),
+		})
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		// when there's no cache:
-		// 1) get personalized ids
-		// 2) join with other recommendation sources to get list of ids and users
-		// 3) output should be users, with users that are already followed
-		// 4) cache the list of ids for that user
-		// 5) encode cursor for recommendations
+		curPos := make(map[persist.DBID]int64, len(users))
+		curIDs := make([]persist.DBID, len(users))
+		for i, u := range users {
+			curPos[u.ID] = int64(i)
+			curIDs[i] = u.ID
+		}
 
-		cursor.CurrentPosition = 0
-		cursor.IDs = personalizedIDs
-		cursor.Positions = sliceToMapIndex(personalizedIDs)
+		cursor := cursors.NewPositionCursor()
+		cursor.IDs = curIDs
+		cursor.Positions = curPos
+		paginator = api.paginatorFromResults(ctx, cursor, users)
 	}
 
-	paginator = api.paginatorFromCursor(ctx, cursor)
 	return paginator.paginate(before, after, first, last)
 }
 

@@ -139,28 +139,22 @@ func publishEventGroup(ctx context.Context, groupID string, action persist.Actio
 // dbidCache is a lazy cache that stores DBIDs from expensive queries
 type dbidCache struct {
 	*redis.LazyCache
-	CalcFunc func(context.Context) ([]persist.DBID, error)
 }
 
-func newDBIDCache(cache *redis.Cache, key string, ttl time.Duration, f func(context.Context) ([]persist.DBID, error)) dbidCache {
-	return dbidCache{
-		LazyCache: &redis.LazyCache{
-			Cache: cache,
-			Key:   key,
-			TTL:   ttl,
-			CalcFunc: func(ctx context.Context) ([]byte, error) {
-				ids, err := f(ctx)
-				if err != nil {
-					return nil, err
-				}
-				cur := cursors.NewPositionCursor()
-				cur.CurrentPosition = 0
-				cur.IDs = ids
-				b, err := cur.Pack()
-				return []byte(b), err
-			},
-		},
+func newDBIDCache(cfg redis.CacheConfig, key string, ttl time.Duration, f func(context.Context) ([]persist.DBID, error)) dbidCache {
+	lc := &redis.LazyCache{Cache: redis.NewCache(cfg), Key: key, TTL: ttl}
+	lc.CalcFunc = func(ctx context.Context) ([]byte, error) {
+		ids, err := f(ctx)
+		if err != nil {
+			return nil, err
+		}
+		cur := cursors.NewPositionCursor()
+		cur.CurrentPosition = 0
+		cur.IDs = ids
+		b, err := cur.Pack()
+		return []byte(b), err
 	}
+	return dbidCache{lc}
 }
 
 func (d dbidCache) Load(ctx context.Context) ([]persist.DBID, error) {

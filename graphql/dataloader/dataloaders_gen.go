@@ -2226,6 +2226,43 @@ func newGetUsersByPositionPaginateBatch(
 	return d
 }
 
+// GetUsersByPositionPersonalizedBatch batches and caches requests
+type GetUsersByPositionPersonalizedBatch struct {
+	generator.Dataloader[coredb.GetUsersByPositionPersonalizedBatchParams, []coredb.User]
+}
+
+// newGetUsersByPositionPersonalizedBatch creates a new GetUsersByPositionPersonalizedBatch with the given settings, functions, and options
+func newGetUsersByPositionPersonalizedBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetUsersByPositionPersonalizedBatch, []coredb.GetUsersByPositionPersonalizedBatchParams) ([][]coredb.User, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetUsersByPositionPersonalizedBatch {
+	d := &GetUsersByPositionPersonalizedBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetUsersByPositionPersonalizedBatchParams) ([][]coredb.User, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetUsersByPositionPersonalizedBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetUsersByPositionPersonalizedBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetUsersWithTraitBatch batches and caches requests
 type GetUsersWithTraitBatch struct {
 	generator.Dataloader[string, []coredb.User]

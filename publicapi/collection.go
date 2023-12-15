@@ -131,7 +131,7 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 	} else {
 		// No cursor provided, need to access the cache
 		key := fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address())
-		l := newDBIDCache(redis.NewCache(redis.SearchCache), key, time.Hour*2, func(ctx context.Context) ([]persist.DBID, error) {
+		l := newDBIDCache(redis.SearchCache, key, time.Hour*2, func(ctx context.Context) ([]persist.DBID, error) {
 			return api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
 				Chain:   chainAddress.Chain(),
 				Address: chainAddress.Address(),

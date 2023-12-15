@@ -1469,12 +1469,6 @@ type Query {
   postComposerDraftDetails(
     input: PostComposerDraftDetailsInput!
   ): PostComposerDraftDetailsPayloadOrError
-  onboardingUserRecommendations(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): UsersConnection
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError

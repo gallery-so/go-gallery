@@ -1080,42 +1080,41 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		ArtBlocksCommunityByKey       func(childComplexity int, key model.ArtBlocksCommunityKeyInput) int
-		CollectionByID                func(childComplexity int, id persist.DBID) int
-		CollectionTokenByID           func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
-		CollectionsByIds              func(childComplexity int, ids []persist.DBID) int
-		CommunityByAddress            func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
-		ContractCommunityByKey        func(childComplexity int, key model.ContractCommunityKeyInput) int
-		CuratedFeed                   func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
-		FeedEventByID                 func(childComplexity int, id persist.DBID) int
-		GalleryByID                   func(childComplexity int, id persist.DBID) int
-		GalleryOfTheWeekWinners       func(childComplexity int) int
-		GeneralAllowlist              func(childComplexity int) int
-		GetMerchTokens                func(childComplexity int, wallet persist.Address) int
-		GlobalFeed                    func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
-		MembershipTiers               func(childComplexity int, forceRefresh *bool) int
-		Node                          func(childComplexity int, id model.GqlID) int
-		OnboardingUserRecommendations func(childComplexity int, before *string, after *string, first *int, last *int) int
-		PostByID                      func(childComplexity int, id persist.DBID) int
-		PostComposerDraftDetails      func(childComplexity int, input model.PostComposerDraftDetailsInput) int
-		SearchCommunities             func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
-		SearchGalleries               func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
-		SearchUsers                   func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
-		SocialConnections             func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
-		SocialQueries                 func(childComplexity int) int
-		TokenByID                     func(childComplexity int, id persist.DBID) int
-		TopCollectionsForCommunity    func(childComplexity int, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) int
-		TrendingFeed                  func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
-		TrendingUsers                 func(childComplexity int, input model.TrendingUsersInput) int
-		UserByAddress                 func(childComplexity int, chainAddress persist.ChainAddress) int
-		UserByID                      func(childComplexity int, id persist.DBID) int
-		UserByUsername                func(childComplexity int, username string) int
-		UsersByRole                   func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
-		UsersWithTrait                func(childComplexity int, trait string) int
-		Viewer                        func(childComplexity int) int
-		ViewerGalleryByID             func(childComplexity int, id persist.DBID) int
-		__resolve__service            func(childComplexity int) int
-		__resolve_entities            func(childComplexity int, representations []map[string]interface{}) int
+		ArtBlocksCommunityByKey    func(childComplexity int, key model.ArtBlocksCommunityKeyInput) int
+		CollectionByID             func(childComplexity int, id persist.DBID) int
+		CollectionTokenByID        func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
+		CollectionsByIds           func(childComplexity int, ids []persist.DBID) int
+		CommunityByAddress         func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		ContractCommunityByKey     func(childComplexity int, key model.ContractCommunityKeyInput) int
+		CuratedFeed                func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		FeedEventByID              func(childComplexity int, id persist.DBID) int
+		GalleryByID                func(childComplexity int, id persist.DBID) int
+		GalleryOfTheWeekWinners    func(childComplexity int) int
+		GeneralAllowlist           func(childComplexity int) int
+		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
+		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
+		Node                       func(childComplexity int, id model.GqlID) int
+		PostByID                   func(childComplexity int, id persist.DBID) int
+		PostComposerDraftDetails   func(childComplexity int, input model.PostComposerDraftDetailsInput) int
+		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
+		SearchGalleries            func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
+		SearchUsers                func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
+		SocialConnections          func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
+		SocialQueries              func(childComplexity int) int
+		TokenByID                  func(childComplexity int, id persist.DBID) int
+		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) int
+		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		TrendingUsers              func(childComplexity int, input model.TrendingUsersInput) int
+		UserByAddress              func(childComplexity int, chainAddress persist.ChainAddress) int
+		UserByID                   func(childComplexity int, id persist.DBID) int
+		UserByUsername             func(childComplexity int, username string) int
+		UsersByRole                func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
+		UsersWithTrait             func(childComplexity int, trait string) int
+		Viewer                     func(childComplexity int) int
+		ViewerGalleryByID          func(childComplexity int, id persist.DBID) int
+		__resolve__service         func(childComplexity int) int
+		__resolve_entities         func(childComplexity int, representations []map[string]interface{}) int
 	}
 
 	RedeemMerchPayload struct {
@@ -2049,7 +2048,6 @@ type QueryResolver interface {
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
 	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) (*model.CollectionsConnection, error)
 	PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error)
-	OnboardingUserRecommendations(ctx context.Context, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	ContractCommunityByKey(ctx context.Context, key model.ContractCommunityKeyInput) (model.CommunityByKeyOrError, error)
 	ArtBlocksCommunityByKey(ctx context.Context, key model.ArtBlocksCommunityKeyInput) (model.CommunityByKeyOrError, error)
 }
@@ -6601,18 +6599,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Node(childComplexity, args["id"].(model.GqlID)), true
 
-	case "Query.onboardingUserRecommendations":
-		if e.complexity.Query.OnboardingUserRecommendations == nil {
-			break
-		}
-
-		args, err := ec.field_Query_onboardingUserRecommendations_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.OnboardingUserRecommendations(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
-
 	case "Query.postById":
 		if e.complexity.Query.PostByID == nil {
 			break
@@ -10785,12 +10771,6 @@ type Query {
   postComposerDraftDetails(
     input: PostComposerDraftDetailsInput!
   ): PostComposerDraftDetailsPayloadOrError
-  onboardingUserRecommendations(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): UsersConnection
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
@@ -14932,48 +14912,6 @@ func (ec *executionContext) field_Query_node_args(ctx context.Context, rawArgs m
 		}
 	}
 	args["id"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_onboardingUserRecommendations_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *string
-	if tmp, ok := rawArgs["before"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["before"] = arg0
-	var arg1 *string
-	if tmp, ok := rawArgs["after"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
-		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["after"] = arg1
-	var arg2 *int
-	if tmp, ok := rawArgs["first"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
-		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["first"] = arg2
-	var arg3 *int
-	if tmp, ok := rawArgs["last"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
-		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["last"] = arg3
 	return args, nil
 }
 
@@ -46081,64 +46019,6 @@ func (ec *executionContext) fieldContext_Query_postComposerDraftDetails(ctx cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_postComposerDraftDetails_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_onboardingUserRecommendations(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_onboardingUserRecommendations(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().OnboardingUserRecommendations(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.UsersConnection)
-	fc.Result = res
-	return ec.marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_onboardingUserRecommendations(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "edges":
-				return ec.fieldContext_UsersConnection_edges(ctx, field)
-			case "pageInfo":
-				return ec.fieldContext_UsersConnection_pageInfo(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type UsersConnection", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_onboardingUserRecommendations_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -80058,26 +79938,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_postComposerDraftDetails(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
-		case "onboardingUserRecommendations":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_onboardingUserRecommendations(ctx, field)
 				return res
 			}
 

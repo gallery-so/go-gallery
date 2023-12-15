@@ -72,6 +72,7 @@ type Loaders struct {
 	GetUserByUsernameBatch                               *GetUserByUsernameBatch
 	GetUserNotificationsBatch                            *GetUserNotificationsBatch
 	GetUsersByPositionPaginateBatch                      *GetUsersByPositionPaginateBatch
+	GetUsersByPositionPersonalizedBatch                  *GetUsersByPositionPersonalizedBatch
 	GetUsersWithTraitBatch                               *GetUsersWithTraitBatch
 	GetVisibleCollectionsByIDsPaginateBatch              *GetVisibleCollectionsByIDsPaginateBatch
 	GetWalletByIDBatch                                   *GetWalletByIDBatch
@@ -154,6 +155,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetUserByUsernameBatch = newGetUserByUsernameBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUserByUsernameBatch(q), preFetchHook, postFetchHook)
 	loaders.GetUserNotificationsBatch = newGetUserNotificationsBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUserNotificationsBatch(q), preFetchHook, postFetchHook)
 	loaders.GetUsersByPositionPaginateBatch = newGetUsersByPositionPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUsersByPositionPaginateBatch(q), preFetchHook, postFetchHook)
+	loaders.GetUsersByPositionPersonalizedBatch = newGetUsersByPositionPersonalizedBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUsersByPositionPersonalizedBatch(q), preFetchHook, postFetchHook)
 	loaders.GetUsersWithTraitBatch = newGetUsersWithTraitBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetUsersWithTraitBatch(q), preFetchHook, postFetchHook)
 	loaders.GetVisibleCollectionsByIDsPaginateBatch = newGetVisibleCollectionsByIDsPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetVisibleCollectionsByIDsPaginateBatch(q), preFetchHook, postFetchHook)
 	loaders.GetWalletByIDBatch = newGetWalletByIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetWalletByIDBatch(q), preFetchHook, postFetchHook)
@@ -395,6 +397,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetUsersByPositionPersonalizedBatch.RegisterResultSubscriber(func(result []coredb.User) {
+		for _, entry := range result {
+			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
 	loaders.GetUsersWithTraitBatch.RegisterResultSubscriber(func(result []coredb.User) {
 		for _, entry := range result {
 			loaders.GetUserByIdBatch.Prime(loaders.GetUserByIdBatch.getKeyForResult(entry), entry)
@@ -432,6 +439,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(result), result)
 	})
 	loaders.GetUsersByPositionPaginateBatch.RegisterResultSubscriber(func(result []coredb.User) {
+		for _, entry := range result {
+			loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetUsersByPositionPersonalizedBatch.RegisterResultSubscriber(func(result []coredb.User) {
 		for _, entry := range result {
 			loaders.GetUserByUsernameBatch.Prime(loaders.GetUserByUsernameBatch.getKeyForResult(entry), entry)
 		}
@@ -1511,6 +1523,22 @@ func loadGetUsersByPositionPaginateBatch(q *coredb.Queries) func(context.Context
 		errors := make([]error, len(params))
 
 		b := q.GetUsersByPositionPaginateBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetUsersByPositionPersonalizedBatch(q *coredb.Queries) func(context.Context, *GetUsersByPositionPersonalizedBatch, []coredb.GetUsersByPositionPersonalizedBatchParams) ([][]coredb.User, []error) {
+	return func(ctx context.Context, d *GetUsersByPositionPersonalizedBatch, params []coredb.GetUsersByPositionPersonalizedBatchParams) ([][]coredb.User, []error) {
+		results := make([][]coredb.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUsersByPositionPersonalizedBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.User, err error) {
