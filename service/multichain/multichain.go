@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"math/big"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
@@ -470,6 +471,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 							innerErrChan <- err
 							return
 						}
+						logger.For(ctx).Infof("got token %s for user %s", token.TokenID, user.Username)
 						incomingAgnosticTokens <- token
 						incomingAgnosticContracts <- contract
 					})
@@ -587,6 +589,7 @@ outer:
 		case incomingTokens := <-incomingTokens:
 			discrepencyLog[incomingTokens.priority] = len(incomingTokens.tokens)
 			tokensFromProviders = append(tokensFromProviders, incomingTokens)
+			logger.For(ctx).Infof("received %d incoming agnostic tokens for user %s", len(incomingTokens.tokens), user.ID)
 		case incomingContracts, ok := <-incomingContracts:
 			if !ok {
 				break outer

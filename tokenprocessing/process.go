@@ -601,40 +601,41 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 			return
 		}
 
-		if len(newTokens) > 0 {
+		if len(newTokens) == 0 {
+			l.Info("no new tokens found")
+		}
 
-			for _, token := range newTokens {
+		for _, token := range newTokens {
 
-				dbToken, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
-				if err != nil {
-					l.Errorf("error getting unique token identifiers: %s", err)
-					continue
-				}
+			dbToken, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
+			if err != nil {
+				l.Errorf("error getting unique token identifiers: %s", err)
+				continue
+			}
 
-				newBalance := big.NewInt(0).Sub(dbToken.Quantity.BigInt(), beforeBalance.BigInt())
+			newBalance := big.NewInt(0).Sub(dbToken.Quantity.BigInt(), beforeBalance.BigInt())
 
-				if newBalance.Cmp(big.NewInt(0)) == 0 || newBalance.Cmp(big.NewInt(0)) < 0 {
-					l.Infof("token quantity is 0 or less, skipping")
-					continue
-				}
+			if newBalance.Cmp(big.NewInt(0)) == 0 || newBalance.Cmp(big.NewInt(0)) < 0 {
+				l.Infof("token quantity is 0 or less, skipping")
+				continue
+			}
 
-				// one event per token identifier (grouping ERC-1155s)
-				err = event.Dispatch(c, coredb.Event{
-					ID:             persist.GenerateID(),
-					ActorID:        persist.DBIDToNullStr(user.ID),
-					ResourceTypeID: persist.ResourceTypeToken,
-					SubjectID:      token.Instance.ID,
-					UserID:         user.ID,
-					TokenID:        token.Instance.ID,
-					Action:         persist.ActionNewTokensReceived,
-					Data: persist.EventData{
-						NewTokenID:       token.Instance.ID,
-						NewTokenQuantity: persist.HexString(newBalance.Text(16)),
-					},
-				})
-				if err != nil {
-					l.Errorf("error dispatching event: %s", err)
-				}
+			// one event per token identifier (grouping ERC-1155s)
+			err = event.Dispatch(c, coredb.Event{
+				ID:             persist.GenerateID(),
+				ActorID:        persist.DBIDToNullStr(user.ID),
+				ResourceTypeID: persist.ResourceTypeToken,
+				SubjectID:      token.Instance.ID,
+				UserID:         user.ID,
+				TokenID:        token.Instance.ID,
+				Action:         persist.ActionNewTokensReceived,
+				Data: persist.EventData{
+					NewTokenID:       token.Instance.ID,
+					NewTokenQuantity: persist.HexString(newBalance.Text(16)),
+				},
+			})
+			if err != nil {
+				l.Errorf("error dispatching event: %s", err)
 			}
 		}
 
