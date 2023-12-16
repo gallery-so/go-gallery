@@ -1389,7 +1389,6 @@ func (api UserAPI) GetSuggestedUsers(ctx context.Context, before, after *string,
 			userIDs = append(userIDs, personalizedIDs...)
 			userIDs = util.Dedupe(userIDs, true)
 			sort.Slice(userIDs, func(i, j int) bool { return freq[userIDs[i]] > freq[userIDs[j]] })
-			userIDs = userIDs[:100]
 		}
 
 		users, err := api.loaders.GetUsersByPositionPersonalizedBatch.Load(db.GetUsersByPositionPersonalizedBatchParams{
@@ -1399,6 +1398,8 @@ func (api UserAPI) GetSuggestedUsers(ctx context.Context, before, after *string,
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
+
+		recommend.Shuffle(users, 8)
 
 		curPos := make(map[persist.DBID]int64, len(users))
 		curIDs := make([]persist.DBID, len(users))

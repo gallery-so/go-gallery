@@ -4457,10 +4457,10 @@ const getUsersByPositionPersonalizedBatch = `-- name: GetUsersByPositionPersonal
 select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
 from users u
 join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
-left join follows follow_back on follow_back.follower = u.id and follow_back.followee = $2 and not follow_back.deleted
-left join follows following on following.follower = $2 and following.followee = u.id
-where not u.deleted and not u.universal and following.id is null
-order by follow_back.created_at asc, t.pos asc
+left join follows on follows.follower = $2 and follows.followee = u.id
+where not u.deleted and not u.universal and follows.id is null
+order by t.pos
+limit 100
 `
 
 type GetUsersByPositionPersonalizedBatchBatchResults struct {

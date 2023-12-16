@@ -1013,10 +1013,10 @@ order by t.pos asc;
 select u.*
 from users u
 join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
-left join follows follow_back on follow_back.follower = u.id and follow_back.followee = @viewer_id and not follow_back.deleted
-left join follows following on following.follower = @viewer_id and following.followee = u.id
-where not u.deleted and not u.universal and following.id is null
-order by follow_back.created_at asc, t.pos asc;
+left join follows on follows.follower = @viewer_id and follows.followee = u.id
+where not u.deleted and not u.universal and follows.id is null
+order by t.pos
+limit 100;
 
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
@@ -1827,9 +1827,9 @@ WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 
 -- name: GetOnboardingUserRecommendations :many
 with sources as (
-    select id from users where (traits->>'top_activity')::bool
-    union all select recommended_user_id from top_recommended_users
-    union all select user_id from user_internal_recommendations
+    select id from users where (traits->>'top_activity')::bool -- activity badges
+    union all select recommended_user_id from top_recommended_users -- most freq rec from last 30 days
+    union all select user_id from user_internal_recommendations -- hand picked
 ), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
 select users.* from users join top_recs using(id) where not users.deleted and not users.universal limit $1;
 
