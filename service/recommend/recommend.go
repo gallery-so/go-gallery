@@ -135,7 +135,10 @@ func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist
 	}
 
 	if len(recommendedIDs) == 0 {
-		return r.BootstrapFunc(ctx)
+		if r.BootstrapFunc != nil {
+			return r.BootstrapFunc(ctx)
+		}
+		return []persist.DBID{}, nil
 	}
 
 	if len(recommendedIDs) > 100 {
