@@ -2511,6 +2511,7 @@ type TokenDefinition struct {
 	Community     *Community     `json:"community"`
 	Communities   []*Community   `json:"communities"`
 	ExternalURL   *string        `json:"externalUrl"`
+	MintURL       *string        `json:"mintUrl"`
 }
 
 func (TokenDefinition) IsNode() {}

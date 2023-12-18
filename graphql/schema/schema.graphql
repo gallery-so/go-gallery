@@ -440,6 +440,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   community: Community @goField(forceResolver: true)
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
+  mintUrl: String @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
