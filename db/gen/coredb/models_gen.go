@@ -395,6 +395,16 @@ type Notification struct {
 	MentionID   persist.DBID             `db:"mention_id" json:"mention_id"`
 }
 
+type OwnedCommunity struct {
+	UserID         persist.DBID `db:"user_id" json:"user_id"`
+	UserCreatedAt  time.Time    `db:"user_created_at" json:"user_created_at"`
+	CommunityID    persist.DBID `db:"community_id" json:"community_id"`
+	OwnedCount     int64        `db:"owned_count" json:"owned_count"`
+	DisplayedCount int64        `db:"displayed_count" json:"displayed_count"`
+	Displayed      bool         `db:"displayed" json:"displayed"`
+	LastUpdated    time.Time    `db:"last_updated" json:"last_updated"`
+}
+
 type OwnedContract struct {
 	UserID         persist.DBID `db:"user_id" json:"user_id"`
 	UserCreatedAt  time.Time    `db:"user_created_at" json:"user_created_at"`

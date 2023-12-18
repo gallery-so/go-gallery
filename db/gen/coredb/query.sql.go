@@ -264,28 +264,28 @@ func (q *Queries) CountPostsByUserID(ctx context.Context, actorID persist.DBID) 
 	return count, err
 }
 
-const countSharedContracts = `-- name: CountSharedContracts :one
+const countSharedCommunities = `-- name: CountSharedCommunities :one
 select count(*)
-from owned_contracts a, owned_contracts b, contracts
-left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+from owned_communities a, owned_communities b, communities
+left join contracts on communities.contract_id = contracts.id
+left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
 where a.user_id = $1
   and b.user_id = $2
-  and a.contract_id = b.contract_id
-  and a.contract_id = contracts.id
+  and a.community_id = b.community_id
+  and a.community_id = communities.id
   and marketplace_contracts.contract_id is null
-  and contracts.name is not null
-  and contracts.name != ''
-  and contracts.name != 'Unidentified contract'
-  and not contracts.is_provider_marked_spam
+  and communities.name != ''
+  and communities.name != 'Unidentified contract'
+  and (contracts.is_provider_marked_spam is null or contracts.is_provider_marked_spam = false)
 `
 
-type CountSharedContractsParams struct {
+type CountSharedCommunitiesParams struct {
 	UserAID persist.DBID `db:"user_a_id" json:"user_a_id"`
 	UserBID persist.DBID `db:"user_b_id" json:"user_b_id"`
 }
 
-func (q *Queries) CountSharedContracts(ctx context.Context, arg CountSharedContractsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSharedContracts, arg.UserAID, arg.UserBID)
+func (q *Queries) CountSharedCommunities(ctx context.Context, arg CountSharedCommunitiesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSharedCommunities, arg.UserAID, arg.UserBID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err

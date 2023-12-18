@@ -323,28 +323,28 @@ func (p *sharedFollowersPaginator[Node]) paginate(before *string, after *string,
 	return paginator.paginate(before, after, first, last)
 }
 
-type sharedContractsPaginatorParams struct {
+type sharedCommunitiesPaginatorParams struct {
 	Limit                        int32
 	CursorBeforeDisplayedByUserA bool
 	CursorBeforeDisplayedByUserB bool
 	CursorBeforeOwnedCount       int
-	CursorBeforeContractID       persist.DBID
+	CursorBeforeCommunityID      persist.DBID
 	CursorAfterDisplayedByUserA  bool
 	CursorAfterDisplayedByUserB  bool
 	CursorAfterOwnedCount        int
-	CursorAfterContractID        persist.DBID
+	CursorAfterCommunityID       persist.DBID
 	PagingForward                bool
 }
 
-type sharedContractsPaginator[Node any] struct {
+type sharedCommunitiesPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params sharedContractsPaginatorParams) ([]Node, error)
+	QueryFunc func(params sharedCommunitiesPaginatorParams) ([]Node, error)
 
 	// CursorFunc returns:
-	//  * A bool indicating that userA displays the contract on their gallery
-	//  * A bool indicating that userB displays the contract on their gallery
-	//  * An int indicating how many tokens userA owns for a contract
-	//  * A DBID indicating the ID of the contract
+	//  * A bool indicating that userA displays the community on their gallery
+	//  * A bool indicating that userB displays the community on their gallery
+	//  * An int indicating how many tokens userA owns for a community
+	//  * A DBID indicating the ID of the community
 	CursorFunc func(node Node) (bool, bool, int64, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
@@ -352,7 +352,7 @@ type sharedContractsPaginator[Node any] struct {
 	CountFunc func() (count int, err error)
 }
 
-func (p *sharedContractsPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+func (p *sharedCommunitiesPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewBoolBoolIntIDCursor()
 		beforeCur.Bool1 = false
@@ -377,16 +377,16 @@ func (p *sharedContractsPaginator[Node]) paginate(before *string, after *string,
 			}
 		}
 
-		queryParams := sharedContractsPaginatorParams{
+		queryParams := sharedCommunitiesPaginatorParams{
 			Limit:                        limit,
 			CursorBeforeDisplayedByUserA: beforeCur.Bool1,
 			CursorBeforeDisplayedByUserB: beforeCur.Bool2,
 			CursorBeforeOwnedCount:       int(beforeCur.Int),
-			CursorBeforeContractID:       beforeCur.ID,
+			CursorBeforeCommunityID:      beforeCur.ID,
 			CursorAfterDisplayedByUserA:  afterCur.Bool1,
 			CursorAfterDisplayedByUserB:  afterCur.Bool2,
 			CursorAfterOwnedCount:        int(afterCur.Int),
-			CursorAfterContractID:        afterCur.ID,
+			CursorAfterCommunityID:       afterCur.ID,
 			PagingForward:                pagingForward,
 		}
 

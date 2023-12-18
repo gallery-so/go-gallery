@@ -57,7 +57,7 @@ type Loaders struct {
 	GetPostByIdBatch                                     *GetPostByIdBatch
 	GetPostsByIdsPaginateBatch                           *GetPostsByIdsPaginateBatch
 	GetProfileImageByIdBatch                             *GetProfileImageByIdBatch
-	GetSharedContractsBatchPaginate                      *GetSharedContractsBatchPaginate
+	GetSharedCommunitiesBatchPaginate                    *GetSharedCommunitiesBatchPaginate
 	GetSharedFollowersBatchPaginate                      *GetSharedFollowersBatchPaginate
 	GetTokenByIdBatch                                    *GetTokenByIdBatch
 	GetTokenByIdIgnoreDisplayableBatch                   *GetTokenByIdIgnoreDisplayableBatch
@@ -140,7 +140,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetPostByIdBatch = newGetPostByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetPostByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetPostsByIdsPaginateBatch = newGetPostsByIdsPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetPostsByIdsPaginateBatch(q), preFetchHook, postFetchHook)
 	loaders.GetProfileImageByIdBatch = newGetProfileImageByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetProfileImageByIdBatch(q), preFetchHook, postFetchHook)
-	loaders.GetSharedContractsBatchPaginate = newGetSharedContractsBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetSharedContractsBatchPaginate(q), preFetchHook, postFetchHook)
+	loaders.GetSharedCommunitiesBatchPaginate = newGetSharedCommunitiesBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetSharedCommunitiesBatchPaginate(q), preFetchHook, postFetchHook)
 	loaders.GetSharedFollowersBatchPaginate = newGetSharedFollowersBatchPaginate(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetSharedFollowersBatchPaginate(q), preFetchHook, postFetchHook)
 	loaders.GetTokenByIdBatch = newGetTokenByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetTokenByIdIgnoreDisplayableBatch = newGetTokenByIdIgnoreDisplayableBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetTokenByIdIgnoreDisplayableBatch(q), preFetchHook, postFetchHook)
@@ -259,11 +259,6 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCreatedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.Contract) {
 		for _, entry := range result {
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry), entry)
-		}
-	})
-	loaders.GetSharedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.GetSharedContractsBatchPaginateRow) {
-		for _, entry := range result {
-			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
 		}
 	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
@@ -479,11 +474,6 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCreatedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.Contract) {
 		for _, entry := range result {
 			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry), entry)
-		}
-	})
-	loaders.GetSharedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.GetSharedContractsBatchPaginateRow) {
-		for _, entry := range result {
-			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry.Contract), entry.Contract)
 		}
 	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
@@ -1269,15 +1259,15 @@ func loadGetProfileImageByIdBatch(q *coredb.Queries) func(context.Context, *GetP
 	}
 }
 
-func loadGetSharedContractsBatchPaginate(q *coredb.Queries) func(context.Context, *GetSharedContractsBatchPaginate, []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
-	return func(ctx context.Context, d *GetSharedContractsBatchPaginate, params []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
-		results := make([][]coredb.GetSharedContractsBatchPaginateRow, len(params))
+func loadGetSharedCommunitiesBatchPaginate(q *coredb.Queries) func(context.Context, *GetSharedCommunitiesBatchPaginate, []coredb.GetSharedCommunitiesBatchPaginateParams) ([][]coredb.GetSharedCommunitiesBatchPaginateRow, []error) {
+	return func(ctx context.Context, d *GetSharedCommunitiesBatchPaginate, params []coredb.GetSharedCommunitiesBatchPaginateParams) ([][]coredb.GetSharedCommunitiesBatchPaginateRow, []error) {
+		results := make([][]coredb.GetSharedCommunitiesBatchPaginateRow, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetSharedContractsBatchPaginate(ctx, params)
+		b := q.GetSharedCommunitiesBatchPaginate(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, r []coredb.GetSharedContractsBatchPaginateRow, err error) {
+		b.Query(func(i int, r []coredb.GetSharedCommunitiesBatchPaginateRow, err error) {
 			results[i], errors[i] = r, err
 		})
 
