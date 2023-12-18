@@ -1279,24 +1279,24 @@ where a.follower = @follower
 	and b.deleted = false
 	and users.deleted = false;
 
--- name: GetSharedContractsBatchPaginate :batchmany
-select contracts.*, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
-from owned_contracts a, owned_contracts b, contracts
-left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+-- name: GetSharedCommunitiesBatchPaginate :batchmany
+select communities.*, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+from owned_communities a, owned_communities b, communities
+left join contracts on communities.contract_id = contracts.id
+left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
 where a.user_id = @user_a_id
   and b.user_id = @user_b_id
-  and a.contract_id = b.contract_id
-  and a.contract_id = contracts.id
+  and a.community_id = b.community_id
+  and a.community_id = communities.id
   and marketplace_contracts.contract_id is null
-  and contracts.name is not null
-  and contracts.name != ''
-  and contracts.name != 'Unidentified contract'
-  and not contracts.is_provider_marked_spam
+  and communities.name != ''
+  and communities.name != 'Unidentified contract'
+  and (contracts.is_provider_marked_spam is null or contracts.is_provider_marked_spam = false)
   and (
     a.displayed,
     b.displayed,
     a.owned_count,
-    contracts.id
+    communities.id
   ) > (
     sqlc.arg('cur_before_displayed_by_user_a'),
     sqlc.arg('cur_before_displayed_by_user_b'),
@@ -1307,15 +1307,15 @@ where a.user_id = @user_a_id
     a.displayed,
     b.displayed,
     a.owned_count,
-    contracts.id
+    communities.id
   ) < (
     sqlc.arg('cur_after_displayed_by_user_a'),
     sqlc.arg('cur_after_displayed_by_user_b'),
     sqlc.arg('cur_after_owned_count')::int,
     sqlc.arg('cur_after_contract_id')
   )
-order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc,
-        case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
+order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end desc,
+        case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end asc
 limit sqlc.arg('limit');
 
 -- name: GetCreatedContractsBatchPaginate :batchmany
@@ -1329,19 +1329,19 @@ order by case when sqlc.arg('paging_forward')::bool then (contracts.created_at, 
         case when not sqlc.arg('paging_forward')::bool then (contracts.created_at, contracts.id) end desc
 limit sqlc.arg('limit');
 
--- name: CountSharedContracts :one
+-- name: CountSharedCommunities :one
 select count(*)
-from owned_contracts a, owned_contracts b, contracts
-left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+from owned_communities a, owned_communities b, communities
+left join contracts on communities.contract_id = contracts.id
+left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
 where a.user_id = @user_a_id
   and b.user_id = @user_b_id
-  and a.contract_id = b.contract_id
-  and a.contract_id = contracts.id
+  and a.community_id = b.community_id
+  and a.community_id = communities.id
   and marketplace_contracts.contract_id is null
-  and contracts.name is not null
-  and contracts.name != ''
-  and contracts.name != 'Unidentified contract'
-  and not contracts.is_provider_marked_spam;
+  and communities.name != ''
+  and communities.name != 'Unidentified contract'
+  and (contracts.is_provider_marked_spam is null or contracts.is_provider_marked_spam = false);
 
 -- name: AddPiiAccountCreationInfo :exec
 insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())
