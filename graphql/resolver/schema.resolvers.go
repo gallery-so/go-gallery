@@ -3189,6 +3189,30 @@ func (r *tokenDefinitionResolver) Communities(ctx context.Context, obj *model.To
 	return resolveCommunitiesByTokenDefinitionID(ctx, obj.Dbid)
 }
 
+// MintURL is the resolver for the mintUrl field.
+func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenDefinition) (*string, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	var mintURL string
+
+	if contract.Address != "" && !contract.IsProviderMarkedSpam {
+		if contract.Chain == persist.ChainZora {
+			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s/%s", contract.Address, obj.HelperTokenDefinitionData.Definition.TokenID.Base10String())
+		} else if contract.Chain == persist.ChainBase {
+			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+		} else if contract.Chain == persist.ChainOptimism {
+			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+		} else if contract.Chain == persist.ChainETH {
+			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+		}
+	}
+
+	return &mintURL, nil
+}
+
 // Wallets is the resolver for the wallets field.
 func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
 	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))
