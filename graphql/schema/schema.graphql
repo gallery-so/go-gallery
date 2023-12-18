@@ -2258,6 +2258,29 @@ type YouReceivedTopActivityBadgeNotification implements Notification & Node {
   threshold: Int!
 }
 
+enum Platform {
+  Web
+  Mobile
+  All
+}
+
+type GalleryAnnouncementNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  platform: Platform!
+  internalId: String!
+  imageUrl: String
+  title: String
+  description: String
+  ctaText: String
+  ctaLink: String
+  pushNotificationText: String
+}
+
 type ClearAllNotificationsPayload {
   notifications: [Notification]
 }

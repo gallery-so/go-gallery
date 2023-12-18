@@ -9,10 +9,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"sort"
 	"strings"
 	"time"
+
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 
 	"golang.org/x/net/html"
 
@@ -81,6 +82,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeonePostedYourWorkNotification:                fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
 	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
+	OnGalleryAnnouncementNotification:                  fetchNotificationByID[model.GalleryAnnouncementNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
