@@ -32,7 +32,7 @@ const (
 type EmailUnsubscriptions struct {
 	All           NullBool `json:"all"`
 	Notifications NullBool `json:"notifications"`
-	Digest        NullBool `json:"digest"`
+	// Digest        NullBool `json:"digest"` TODO -DIGEST add back in when digest is implemented
 }
 
 func (e EmailUnsubscriptions) Value() (driver.Value, error) {

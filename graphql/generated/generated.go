@@ -10225,13 +10225,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean!
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean!
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -24990,14 +24990,11 @@ func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromDigest(ct
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(bool)
+	res := resTmp.(*bool)
 	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -68006,7 +68003,7 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unsubscribedFromDigest"))
-			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -75408,9 +75405,6 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 
 			out.Values[i] = ec._EmailNotificationSettings_unsubscribedFromDigest(ctx, field, obj)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
