@@ -333,12 +333,8 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	return result, nil
 }
 
-<<<<<<< HEAD
-// TODO max limit
-=======
 const maxLimit = 1000
 
->>>>>>> main
 func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := 50

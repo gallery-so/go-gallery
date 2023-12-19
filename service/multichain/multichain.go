@@ -41,6 +41,8 @@ var contractNameBlacklist = map[string]bool{
 	"unknown":               true,
 }
 
+const maxCommunitySize = 1000
+
 // SubmitTokens is called to process a batch of tokens
 type SubmitTokensF func(ctx context.Context, tDefIDs []persist.DBID) error
 
