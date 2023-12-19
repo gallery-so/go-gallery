@@ -267,6 +267,14 @@ func Contains[T comparable](s []T, str T) bool {
 	return false
 }
 
+func FillSliceWithValue[T any](s []T, fillWith T) []T {
+	for i, l := 0, len(s); i < l; i++ {
+		s[i] = fillWith
+	}
+
+	return s
+}
+
 // Difference will take in 2 arrays and return the elements that exist in the second array but are not in the first
 func Difference[T comparable](old []T, new []T) []T {
 	var added []T
@@ -799,8 +807,16 @@ func (lr *LoggingReader) WriteTo(w io.Writer) (n int64, err error) {
 	return 0, fmt.Errorf("no WriterTo provided")
 }
 
-// ErrorAs returns true if the given error is of type T
-func ErrorAs[T error](e error) bool {
+// ErrorIs returns true if the given error is of type T
+func ErrorIs[T error](e error) bool {
 	var t T
 	return errors.As(e, &t)
+}
+
+// ErrorAs unwraps errors until it finds an error of type T. The second return value
+// will be true if an error was found and returned, and false otherwise.
+func ErrorAs[T error](e error) (T, bool) {
+	var t T
+	ok := errors.As(e, &t)
+	return t, ok
 }

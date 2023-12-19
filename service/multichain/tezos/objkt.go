@@ -130,18 +130,6 @@ tokens by creator
   }
 */
 
-type objktTokenCreator struct {
-	Token token
-}
-
-type tokensByCreatorQuery struct {
-	TokenCreator []objktTokenCreator `graphql:"token_creator(where: {creator_address: {_eq: $creatorAddress}, token: {fa_contract: {_nin: $contracts}}}, order_by: {token_pk: desc_nulls_last}, limit: $limit, offset: $offset)"`
-}
-
-type faByCreatorQuery struct {
-	Fa []contract `graphql:"fa(where: {creator: {address: {_eq: $creatorAddress}}})"`
-}
-
 // Objkt's API has pretty strict usage limits (120 requests/minute, and 500 results per page)
 // so its best used as a fallback.
 type TezosObjktProvider struct {

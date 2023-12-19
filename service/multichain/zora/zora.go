@@ -180,8 +180,31 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
-	return d.getToken(ctx, owner, url)
+	tokens, contracts, err := d.GetTokensByWalletAddress(ctx, owner)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	var resultToken multichain.ChainAgnosticToken
+	var resultContract multichain.ChainAgnosticContract
+	for _, token := range tokens {
+		if strings.EqualFold(token.ContractAddress.String(), ti.ContractAddress.String()) && strings.EqualFold(token.TokenID.String(), ti.TokenID.String()) {
+			resultToken = token
+			break
+		}
+	}
+	for _, contract := range contracts {
+		if strings.EqualFold(contract.Address.String(), ti.ContractAddress.String()) {
+			resultContract = contract
+			break
+		}
+	}
+
+	if resultToken.TokenID == "" || resultContract.Address == "" {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for identifiers %+v", ti)
+	}
+
+	return resultToken, resultContract, nil
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
@@ -219,6 +242,21 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	}
 	return tokens, contracts[0], nil
 
+}
+
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	url := fmt.Sprintf("%s/tokens/ZORA-MAINNET/%s?&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, addr.String())
+	go func() {
+		defer close(rec)
+		_, _, err := d.getTokens(ctx, url, rec, false)
+		if err != nil {
+			errChan <- err
+			return
+		}
+	}()
+	return rec, errChan
 }
 
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
@@ -275,8 +313,10 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	}
 
 	if len(resp.ZoraCreateContracts) == 0 {
-		return nil, fmt.Errorf("no zora contract found for address %s", addr.String())
+		return nil, nil
 	}
+
+	logger.For(ctx).Infof("zora contracts retrieved: %d (%+v)", len(resp.ZoraCreateContracts), resp.ZoraCreateContracts)
 
 	result := make([]multichain.ChainAgnosticContract, len(resp.ZoraCreateContracts))
 	for i, contract := range resp.ZoraCreateContracts {
@@ -284,7 +324,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 			Descriptors: multichain.ChainAgnosticContractDescriptors{
 				Symbol:       contract.Symbol,
 				Name:         contract.Name,
-				OwnerAddress: persist.Address(strings.ToLower(contract.Creator)),
+				OwnerAddress: addr,
 			},
 			Address: persist.Address(strings.ToLower(contract.Address)),
 		}
@@ -292,6 +332,8 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 
 	return result, nil
 }
+
+const maxLimit = 1000
 
 func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
@@ -345,6 +387,11 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 
 		allTokens = append(allTokens, tokens...)
 		allContracts = append(allContracts, contracts...)
+
+		if len(allTokens) > maxLimit {
+			willBreak = true
+			allTokens = allTokens[:maxLimit]
+		}
 
 		if rec != nil {
 			rec <- multichain.ChainAgnosticTokensAndContracts{
@@ -416,11 +463,7 @@ func (d *Provider) balanceTokensToChainAgnostic(ctx context.Context, tokens []zo
 
 		result = append(result, converted)
 
-		if _, ok := contracts[token.Token.CollectionAddress]; ok {
-			continue
-		}
-
-		contracts[token.Token.CollectionAddress] = d.contractToChainAgnostic(ctx, token.Token)
+		contracts[token.Token.CollectionAddress] = d.contractToChainAgnostic(ctx, token.Token, contracts[token.Token.CollectionAddress])
 
 	}
 
@@ -443,11 +486,7 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraToken
 		}
 		result = append(result, converted)
 
-		if _, ok := contracts[token.CollectionAddress]; ok {
-			continue
-		}
-
-		contracts[token.CollectionAddress] = d.contractToChainAgnostic(ctx, token)
+		contracts[token.CollectionAddress] = d.contractToChainAgnostic(ctx, token, contracts[token.CollectionAddress])
 
 	}
 
@@ -525,23 +564,22 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 		Quantity:        persist.HexString("1"),
 		OwnerAddress:    persist.Address(strings.ToLower(token.Owner)),
 		ContractAddress: persist.Address(strings.ToLower(token.CollectionAddress)),
-
 		FallbackMedia: persist.FallbackMedia{
 			ImageURL: persist.NullString(token.Media.ImagePreview.EncodedPreview),
 		},
 	}, nil
 }
 
-func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken) multichain.ChainAgnosticContract {
-	creator := util.FirstNonEmptyString(token.CreatorAddress, token.Mintable.CreatorAddress)
+func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken, mergeContract multichain.ChainAgnosticContract) multichain.ChainAgnosticContract {
+	creator := util.FirstNonEmptyString(token.CreatorAddress, token.Mintable.CreatorAddress, mergeContract.Descriptors.OwnerAddress.String())
 	return multichain.ChainAgnosticContract{
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:          token.Collection.Symbol,
-			Name:            token.Collection.Name,
-			Description:     token.Collection.Description,
+			Symbol:          util.FirstNonEmptyString(token.Collection.Symbol, token.Mintable.Collection.Symbol, mergeContract.Descriptors.Symbol),
+			Name:            util.FirstNonEmptyString(token.Collection.Name, token.Mintable.Collection.Name, mergeContract.Descriptors.Name),
+			Description:     util.FirstNonEmptyString(token.Collection.Description, token.Mintable.Collection.Description, mergeContract.Descriptors.Description),
 			OwnerAddress:    persist.Address(strings.ToLower(creator)),
 			ProfileImageURL: token.Collection.Image,
 		},
-		Address: persist.Address(strings.ToLower(token.CollectionAddress)),
+		Address: persist.Address(strings.ToLower(util.FirstNonEmptyString(token.CollectionAddress, token.Mintable.Collection.Address, string(mergeContract.Address)))),
 	}
 }

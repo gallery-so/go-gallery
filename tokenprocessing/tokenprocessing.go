@@ -110,6 +110,7 @@ func setDefaults() {
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ARBITRUM", "")
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ETH", "")
+	viper.SetDefault("GOLDSKY_WEBHOOK_SECRET", "")
 
 	viper.AutomaticEnv()
 
@@ -211,7 +212,7 @@ func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 
 // isBadTokenErr returns true if the error is a bad token error.
 func isBadTokenErr(err error) bool {
-	return util.ErrorAs[ErrBadToken](err)
+	return util.ErrorIs[ErrBadToken](err)
 }
 
 // excludeTokenSpamEvents excludes events for tokens marked as spam.
