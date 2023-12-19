@@ -743,6 +743,121 @@ func (*GetCommentByCommentIDBatch) getKeyForResult(result coredb.Comment) persis
 	return result.ID
 }
 
+// GetCommunitiesByTokenDefinitionID batches and caches requests
+type GetCommunitiesByTokenDefinitionID struct {
+	generator.Dataloader[persist.DBID, []coredb.Community]
+}
+
+// newGetCommunitiesByTokenDefinitionID creates a new GetCommunitiesByTokenDefinitionID with the given settings, functions, and options
+func newGetCommunitiesByTokenDefinitionID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetCommunitiesByTokenDefinitionID, []persist.DBID) ([][]coredb.Community, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetCommunitiesByTokenDefinitionID {
+	d := &GetCommunitiesByTokenDefinitionID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.Community, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetCommunitiesByTokenDefinitionID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetCommunitiesByTokenDefinitionID")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetCommunityByID batches and caches requests
+type GetCommunityByID struct {
+	generator.Dataloader[persist.DBID, coredb.Community]
+}
+
+// newGetCommunityByID creates a new GetCommunityByID with the given settings, functions, and options
+func newGetCommunityByID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetCommunityByID, []persist.DBID) ([]coredb.Community, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetCommunityByID {
+	d := &GetCommunityByID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Community, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetCommunityByID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetCommunityByID")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+func (*GetCommunityByID) getKeyForResult(result coredb.Community) persist.DBID {
+	return result.ID
+}
+
+// GetCommunityByKey batches and caches requests
+type GetCommunityByKey struct {
+	generator.Dataloader[coredb.GetCommunityByKeyParams, coredb.Community]
+}
+
+// newGetCommunityByKey creates a new GetCommunityByKey with the given settings, functions, and options
+func newGetCommunityByKey(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetCommunityByKey, []coredb.GetCommunityByKeyParams) ([]coredb.Community, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetCommunityByKey {
+	d := &GetCommunityByKey{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetCommunityByKeyParams) ([]coredb.Community, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetCommunityByKey")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetCommunityByKey")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetContractByChainAddressBatch batches and caches requests
 type GetContractByChainAddressBatch struct {
 	generator.Dataloader[coredb.GetContractByChainAddressBatchParams, coredb.Contract]
@@ -845,6 +960,43 @@ func newGetCreatedContractsBatchPaginate(
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetCreatedContractsBatchPaginate")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetCreatorsByCommunityID batches and caches requests
+type GetCreatorsByCommunityID struct {
+	generator.Dataloader[persist.DBID, []coredb.GetCreatorsByCommunityIDRow]
+}
+
+// newGetCreatorsByCommunityID creates a new GetCreatorsByCommunityID with the given settings, functions, and options
+func newGetCreatorsByCommunityID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetCreatorsByCommunityID, []persist.DBID) ([][]coredb.GetCreatorsByCommunityIDRow, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetCreatorsByCommunityID {
+	d := &GetCreatorsByCommunityID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([][]coredb.GetCreatorsByCommunityIDRow, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetCreatorsByCommunityID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetCreatorsByCommunityID")
 		}
 
 		return results, errors
@@ -1474,34 +1626,34 @@ func newGetProfileImageByID(
 	return d
 }
 
-// GetSharedContractsBatchPaginate batches and caches requests
-type GetSharedContractsBatchPaginate struct {
-	generator.Dataloader[coredb.GetSharedContractsBatchPaginateParams, []coredb.GetSharedContractsBatchPaginateRow]
+// GetSharedCommunitiesBatchPaginate batches and caches requests
+type GetSharedCommunitiesBatchPaginate struct {
+	generator.Dataloader[coredb.GetSharedCommunitiesBatchPaginateParams, []coredb.GetSharedCommunitiesBatchPaginateRow]
 }
 
-// newGetSharedContractsBatchPaginate creates a new GetSharedContractsBatchPaginate with the given settings, functions, and options
-func newGetSharedContractsBatchPaginate(
+// newGetSharedCommunitiesBatchPaginate creates a new GetSharedCommunitiesBatchPaginate with the given settings, functions, and options
+func newGetSharedCommunitiesBatchPaginate(
 	ctx context.Context,
 	maxBatchSize int,
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetSharedContractsBatchPaginate, []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error),
+	fetch func(context.Context, *GetSharedCommunitiesBatchPaginate, []coredb.GetSharedCommunitiesBatchPaginateParams) ([][]coredb.GetSharedCommunitiesBatchPaginateRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
-) *GetSharedContractsBatchPaginate {
-	d := &GetSharedContractsBatchPaginate{}
+) *GetSharedCommunitiesBatchPaginate {
+	d := &GetSharedCommunitiesBatchPaginate{}
 
-	fetchWithHooks := func(ctx context.Context, keys []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetSharedCommunitiesBatchPaginateParams) ([][]coredb.GetSharedCommunitiesBatchPaginateRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetSharedContractsBatchPaginate")
+			ctx = preFetchHook(ctx, "GetSharedCommunitiesBatchPaginate")
 		}
 
 		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
-			postFetchHook(ctx, "GetSharedContractsBatchPaginate")
+			postFetchHook(ctx, "GetSharedCommunitiesBatchPaginate")
 		}
 
 		return results, errors
@@ -2341,6 +2493,43 @@ func newPaginateCommentsByPostIDBatch(
 	return d
 }
 
+// PaginateHoldersByCommunityID batches and caches requests
+type PaginateHoldersByCommunityID struct {
+	generator.Dataloader[coredb.PaginateHoldersByCommunityIDParams, []coredb.User]
+}
+
+// newPaginateHoldersByCommunityID creates a new PaginateHoldersByCommunityID with the given settings, functions, and options
+func newPaginateHoldersByCommunityID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *PaginateHoldersByCommunityID, []coredb.PaginateHoldersByCommunityIDParams) ([][]coredb.User, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *PaginateHoldersByCommunityID {
+	d := &PaginateHoldersByCommunityID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateHoldersByCommunityIDParams) ([][]coredb.User, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "PaginateHoldersByCommunityID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "PaginateHoldersByCommunityID")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // PaginateInteractionsByFeedEventIDBatch batches and caches requests
 type PaginateInteractionsByFeedEventIDBatch struct {
 	generator.Dataloader[coredb.PaginateInteractionsByFeedEventIDBatchParams, []coredb.PaginateInteractionsByFeedEventIDBatchRow]
@@ -2415,6 +2604,43 @@ func newPaginateInteractionsByPostIDBatch(
 	return d
 }
 
+// PaginatePostsByCommunityID batches and caches requests
+type PaginatePostsByCommunityID struct {
+	generator.Dataloader[coredb.PaginatePostsByCommunityIDParams, []coredb.Post]
+}
+
+// newPaginatePostsByCommunityID creates a new PaginatePostsByCommunityID with the given settings, functions, and options
+func newPaginatePostsByCommunityID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *PaginatePostsByCommunityID, []coredb.PaginatePostsByCommunityIDParams) ([][]coredb.Post, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *PaginatePostsByCommunityID {
+	d := &PaginatePostsByCommunityID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginatePostsByCommunityIDParams) ([][]coredb.Post, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "PaginatePostsByCommunityID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "PaginatePostsByCommunityID")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // PaginatePostsByContractID batches and caches requests
 type PaginatePostsByContractID struct {
 	generator.Dataloader[coredb.PaginatePostsByContractIDParams, []coredb.Post]
@@ -2480,6 +2706,43 @@ func newPaginateRepliesByCommentIDBatch(
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "PaginateRepliesByCommentIDBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// PaginateTokensByCommunityID batches and caches requests
+type PaginateTokensByCommunityID struct {
+	generator.Dataloader[coredb.PaginateTokensByCommunityIDParams, []coredb.PaginateTokensByCommunityIDRow]
+}
+
+// newPaginateTokensByCommunityID creates a new PaginateTokensByCommunityID with the given settings, functions, and options
+func newPaginateTokensByCommunityID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *PaginateTokensByCommunityID, []coredb.PaginateTokensByCommunityIDParams) ([][]coredb.PaginateTokensByCommunityIDRow, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *PaginateTokensByCommunityID {
+	d := &PaginateTokensByCommunityID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateTokensByCommunityIDParams) ([][]coredb.PaginateTokensByCommunityIDRow, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "PaginateTokensByCommunityID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "PaginateTokensByCommunityID")
 		}
 
 		return results, errors

@@ -583,6 +583,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		data.OriginalCommentID = event.SubjectID
 	case persist.ActionTopActivityBadgeReceived:
 		data.ActivityBadgeThreshold = event.Data.ActivityBadgeThreshold
+		data.NewTopActiveUser = event.Data.NewTopActiveUser
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}

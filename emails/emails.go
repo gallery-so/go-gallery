@@ -72,9 +72,7 @@ func coreInitServer() *gin.Engine {
 		}
 	}
 
-	lock := redis.NewLockClient(redis.NewCache(redis.EmailThrottleCache))
-
-	go autoSendNotificationEmails(queries, sendgridClient, pub, lock)
+	go autoSendNotificationEmails(queries, sendgridClient, pub, redis.NewCache(redis.EmailThrottleCache))
 
 	return handlersInitServer(router, loaders, queries, sendgridClient)
 }

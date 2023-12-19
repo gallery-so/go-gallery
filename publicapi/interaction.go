@@ -549,6 +549,38 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 	return comments, pageInfo, err
 }
 
+func (api InteractionAPI) GetTotalCommentsByPostID(ctx context.Context, postID persist.DBID) (*int, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	count, err := api.queries.CountCommentsAndRepliesByPostID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(int(count)), nil
+}
+
+func (api InteractionAPI) GetTotalCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) (*int, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"feedEventID": validate.WithTag(feedEventID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	count, err := api.queries.CountCommentsAndRepliesByFeedEventID(ctx, feedEventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(int(count)), nil
+}
+
 func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]db.Admire, PageInfo, error) {
 	// Validate
@@ -1081,25 +1113,23 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		return "", err
 	}
 	var action persist.Action
+	var feedEntityOwner persist.DBID
 	if feedEventID != "" {
 		action = persist.ActionCommentedOnFeedEvent
+		f, err := api.queries.GetFeedEventByID(ctx, feedEventID)
+		if err != nil {
+			return "", err
+		}
+		feedEntityOwner = f.OwnerID
 	} else if postID != "" {
 		action = persist.ActionCommentedOnPost
+		p, err := api.queries.GetPostByID(ctx, postID)
+		if err != nil {
+			return "", err
+		}
+		feedEntityOwner = p.ActorID
 	} else {
 		panic("commenting on neither feed event nor post")
-	}
-
-	err = event.Dispatch(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(actor),
-		ResourceTypeID: persist.ResourceTypeComment,
-		SubjectID:      persist.DBID(util.FirstNonEmptyString(postID.String(), feedEventID.String())),
-		PostID:         postID,
-		FeedEventID:    feedEventID,
-		CommentID:      commentID,
-		Action:         action,
-	})
-	if err != nil {
-		return "", err
 	}
 
 	var replyToUser *persist.DBID
@@ -1123,6 +1153,21 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		}
 
 		replyToUser = &replyToComment.ActorID
+	}
+
+	if replyToUser == nil || *replyToUser != feedEntityOwner {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(actor),
+			ResourceTypeID: persist.ResourceTypeComment,
+			SubjectID:      persist.DBID(util.FirstNonEmptyString(postID.String(), feedEventID.String())),
+			PostID:         postID,
+			FeedEventID:    feedEventID,
+			CommentID:      commentID,
+			Action:         action,
+		})
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if len(mentions) > 0 {

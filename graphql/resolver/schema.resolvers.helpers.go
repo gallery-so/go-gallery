@@ -9,8 +9,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
+
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 
 	"golang.org/x/net/html"
 
@@ -26,6 +29,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
@@ -35,7 +39,7 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-const top100ActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
+const topActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
@@ -56,14 +60,12 @@ var nodeFetcher = model.NodeFetcher{
 	OnSocialConnection: resolveSocialConnectionByIdentifiers,
 	OnPost:             resolvePostByPostID,
 	OnTokenDefinition:  resolveTokenDefinitionByID,
+	OnCommunity:        resolveCommunityByID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
 
-	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
-		return resolveCommunityByID(ctx, dbid)
-	},
 	OnSomeoneAdmiredYourFeedEventNotification:          fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
 	OnSomeoneCommentedOnYourFeedEventNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
 	OnSomeoneAdmiredYourPostNotification:               fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
@@ -80,6 +82,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeonePostedYourWorkNotification:                fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
 	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
+	OnGalleryAnnouncementNotification:                  fetchNotificationByID[model.GalleryAnnouncementNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -109,44 +112,46 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
 
 	switch {
-	case util.ErrorAs[auth.ErrAuthenticationFailed](err) || errors.Is(err, publicapi.ErrOnlyRemoveOwnAdmire) || errors.Is(err, publicapi.ErrOnlyRemoveOwnComment):
+	case util.ErrorIs[auth.ErrAuthenticationFailed](err) || errors.Is(err, publicapi.ErrOnlyRemoveOwnAdmire) || errors.Is(err, publicapi.ErrOnlyRemoveOwnComment):
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
-	case util.ErrorAs[auth.ErrDoesNotOwnRequiredNFT](err):
+	case util.ErrorIs[auth.ErrDoesNotOwnRequiredNFT](err):
 		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
-	case util.ErrorAs[persist.ErrUserNotFound](err):
+	case util.ErrorIs[persist.ErrUserNotFound](err):
 		mappedErr = model.ErrUserNotFound{Message: message}
-	case util.ErrorAs[persist.ErrUserAlreadyExists](err):
+	case util.ErrorIs[persist.ErrUserAlreadyExists](err):
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
-	case util.ErrorAs[persist.ErrUsernameNotAvailable](err):
+	case util.ErrorIs[persist.ErrUsernameNotAvailable](err):
 		mappedErr = model.ErrUsernameNotAvailable{Message: message}
-	case util.ErrorAs[persist.ErrCollectionNotFoundByID](err):
+	case util.ErrorIs[persist.ErrCollectionNotFoundByID](err):
 		mappedErr = model.ErrCollectionNotFound{Message: message}
-	case util.ErrorAs[persist.ErrTokenNotFound](err) || util.ErrorAs[persist.ErrTokenDefinitionNotFound](err):
+	case util.ErrorIs[persist.ErrTokenNotFound](err) || util.ErrorIs[persist.ErrTokenDefinitionNotFound](err):
 		mappedErr = model.ErrTokenNotFound{Message: message}
-	case util.ErrorAs[persist.ErrContractNotFound](err):
+	case util.ErrorIs[persist.ErrContractNotFound](err):
 		mappedErr = model.ErrCommunityNotFound{Message: message}
-	case util.ErrorAs[persist.ErrAddressOwnedByUser](err):
+	case util.ErrorIs[persist.ErrCommunityNotFound](err):
+		mappedErr = model.ErrCommunityNotFound{Message: message}
+	case util.ErrorIs[persist.ErrAddressOwnedByUser](err):
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case util.ErrorAs[persist.ErrAdmireNotFound](err):
+	case util.ErrorIs[persist.ErrAdmireNotFound](err):
 		mappedErr = model.ErrAdmireNotFound{Message: message}
-	case util.ErrorAs[persist.ErrCommentNotFound](err):
+	case util.ErrorIs[persist.ErrCommentNotFound](err):
 		mappedErr = model.ErrCommentNotFound{Message: message}
-	case util.ErrorAs[persist.ErrPostNotFound](err):
+	case util.ErrorIs[persist.ErrPostNotFound](err):
 		mappedErr = model.ErrPostNotFound{Message: message}
-	case util.ErrorAs[publicapi.ErrTokenRefreshFailed](err):
+	case util.ErrorIs[publicapi.ErrTokenRefreshFailed](err):
 		mappedErr = model.ErrSyncFailed{Message: message}
-	case util.ErrorAs[validate.ErrInvalidInput](err):
+	case util.ErrorIs[validate.ErrInvalidInput](err):
 		errTyp := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: errTyp.Parameters, Reasons: errTyp.Reasons}
-	case util.ErrorAs[persist.ErrFeedEventNotFound](err):
+	case util.ErrorIs[persist.ErrFeedEventNotFound](err):
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
-	case util.ErrorAs[persist.ErrUnknownAction](err):
+	case util.ErrorIs[persist.ErrUnknownAction](err):
 		mappedErr = model.ErrUnknownAction{Message: message}
-	case util.ErrorAs[persist.ErrGalleryNotFound](err):
+	case util.ErrorIs[persist.ErrGalleryNotFound](err):
 		mappedErr = model.ErrGalleryNotFound{Message: message}
-	case util.ErrorAs[twitter.ErrInvalidRefreshToken](err):
+	case util.ErrorIs[twitter.ErrInvalidRefreshToken](err):
 		mappedErr = model.ErrNeedsToReconnectSocial{SocialAccountType: persist.SocialProviderTwitter, Message: message}
-	case util.ErrorAs[persist.ErrPushTokenBelongsToAnotherUser](err):
+	case util.ErrorIs[persist.ErrPushTokenBelongsToAnotherUser](err):
 		mappedErr = model.ErrPushTokenBelongsToAnotherUser{Message: message}
 	case errors.Is(err, publicapi.ErrProfileImageTooManySources) || errors.Is(err, publicapi.ErrProfileImageUnknownSource):
 		mappedErr = model.ErrInvalidInput{Message: message}
@@ -276,11 +281,11 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID, traits pers
 		result = append(result, contractToBadgeModel(ctx, contract))
 	}
 
-	if _, ok := traits[persist.TraitTypeTop100ActiveUser]; ok {
+	if _, ok := traits[persist.TraitTypeTopActiveUser]; ok {
 
 		result = append(result, &model.Badge{
 			Name:     util.ToPointer("Top Member"),
-			ImageURL: top100ActivityImageURL,
+			ImageURL: topActivityImageURL,
 		})
 	}
 
@@ -472,8 +477,8 @@ func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*mod
 	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokensConnection, error) {
-	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers)
+func resolveCommunityTokensByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) (*model.TokensConnection, error) {
+	tokens, pageInfo, err := publicapi.For(ctx).Community.PaginateTokensByCommunityID(ctx, communityID, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -493,10 +498,6 @@ func tokensToConnection(ctx context.Context, tokens []db.Token, pageInfo publica
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}
-}
-
-func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
-	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
 }
 
 func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
@@ -587,46 +588,86 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 }
 
 func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Community, error) {
-	community, err := publicapi.For(ctx).Contract.GetContractByID(ctx, id)
+	community, err := publicapi.For(ctx).Community.GetCommunityByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return communityToModel(ctx, *community, nil), nil
+	return communityToModel(ctx, *community), nil
+}
+
+// resolveCommunityByTokenDefinitionID returns the first community that a token belongs to
+func resolveCommunityByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*model.Community, error) {
+	communities, err := resolveCommunitiesByTokenDefinitionID(ctx, tokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(communities) > 0 {
+		return communities[0], nil
+	}
+
+	return nil, nil
+}
+
+func resolveCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) ([]*model.Community, error) {
+	communities, err := publicapi.For(ctx).Token.GetCommunitiesByTokenDefinitionID(ctx, tokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.Community, len(communities))
+	for i, c := range communities {
+		result[i] = communityToModel(ctx, c)
+	}
+
+	// Sort by descending CommunityType (with Dbid as a tiebreaker so ordering is stable).
+	// We'll probably want to update this as we add more community providers, but for the time being, a simple and
+	// useful ordering is to put contract communities last. If a token is part of multiple communities, it's probably
+	// the ArtBlocksCommunity or similar that is most interesting and should be the canonical "primary" community.
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].HelperCommunityData.Community.CommunityType == result[j].HelperCommunityData.Community.CommunityType {
+			return result[i].Dbid < result[j].Dbid
+		}
+		return result[i].HelperCommunityData.Community.CommunityType > result[j].HelperCommunityData.Community.CommunityType
+	})
+
+	return result, nil
 }
 
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {
-	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
+	communityKey := persist.CommunityKey{
+		Type: persist.CommunityTypeContract,
+		Key1: fmt.Sprintf("%d", contractAddress.Chain()),
+		Key2: contractAddress.Address().String(),
+	}
 
+	community, err := publicapi.For(ctx).Community.GetCommunityByKey(ctx, communityKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return communityToModel(ctx, *community, forceRefresh), nil
+	return communityToModel(ctx, *community), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokenHoldersConnection, error) {
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+func resolveCommunityHoldersByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) (*model.TokenHoldersConnection, error) {
+	holders, pageInfo, err := publicapi.For(ctx).Community.PaginateHoldersByCommunityID(ctx, communityID, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
-	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers)
-	if err != nil {
-		return nil, err
-	}
-	connection := ownersToConnection(ctx, owners, contractID, pageInfo)
+	connection := holdersToConnection(ctx, holders, communityID, pageInfo)
 	return &connection, nil
 }
 
-func resolveCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.PostsConnection, error) {
-	posts, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityPostsByContractID(ctx, contractID, before, after, first, last)
+func resolveCommunityPostsByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) (*model.PostsConnection, error) {
+	posts, pageInfo, err := publicapi.For(ctx).Community.PaginatePostsByCommunityID(ctx, communityID, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
-	connection := postsToConnection(ctx, posts, contractID, pageInfo)
+	connection := postsToConnection(ctx, posts, communityID, pageInfo)
 	return &connection, nil
 }
 
-func ownersToConnection(ctx context.Context, owners []db.User, contractID persist.DBID, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
+func holdersToConnection(ctx context.Context, owners []db.User, contractID persist.DBID, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
 	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
 		walletIDs := make([]persist.DBID, len(owner.Wallets))
@@ -640,7 +681,7 @@ func ownersToConnection(ctx context.Context, owners []db.User, contractID persis
 					WalletIds:  walletIDs,
 					ContractId: contractID,
 				},
-				DisplayName:   &owner.Username.String,
+				DisplayName:   util.ToPointer(owner.Username.String),
 				Wallets:       nil, // handled by a dedicated resolver
 				User:          nil, // handled by a dedicated resolver
 				PreviewTokens: nil, // handled by dedicated resolver
@@ -1695,15 +1736,16 @@ func postToModel(post *db.Post) *model.Post {
 			TokenIDs: post.TokenIds,
 			AuthorID: post.ActorID,
 		},
-		Dbid:         post.ID,
-		Tokens:       nil, // handled by dedicated resolver
-		CreationTime: &post.CreatedAt,
-		Caption:      captionVal,
-		Admires:      nil, // handled by dedicated resolver
-		Comments:     nil, // handled by dedicated resolver
-		Interactions: nil, // handled by dedicated resolver
-		ViewerAdmire: nil, // handled by dedicated resolver
-		IsFirstPost:  post.IsFirstPost,
+		Dbid:             post.ID,
+		Tokens:           nil, // handled by dedicated resolver
+		CreationTime:     &post.CreatedAt,
+		Caption:          captionVal,
+		Admires:          nil, // handled by dedicated resolver
+		Comments:         nil, // handled by dedicated resolver
+		Interactions:     nil, // handled by dedicated resolver
+		ViewerAdmire:     nil, // handled by dedicated resolver
+		IsFirstPost:      post.IsFirstPost,
+		UserAddedMintURL: &post.UserMintUrl.String,
 	}
 }
 
@@ -2056,40 +2098,118 @@ func collectionTokenToModel(ctx context.Context, token *model.Token, collectionI
 	}
 }
 
-func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
-	lastUpdated := community.LastUpdated
-	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
-	chain := community.Chain
+func getContractCommunity(ctx context.Context, community db.Community) *model.ContractCommunity {
+	return &model.ContractCommunity{
+		HelperContractCommunityData: model.HelperContractCommunityData{Community: community},
+		Contract:                    nil, // handled by dedicated resolver
+	}
+}
+
+func getArtBlocksCommunity(ctx context.Context, community db.Community) *model.ArtBlocksCommunity {
+	return &model.ArtBlocksCommunity{
+		HelperArtBlocksCommunityData: model.HelperArtBlocksCommunityData{Community: community},
+		Contract:                     nil, // handled by dedicated resolver
+		ProjectID:                    util.ToPointer(community.Key3),
+	}
+}
+
+func communityToModel(ctx context.Context, community db.Community) *model.Community {
+	getStringWithOverride := func(original string, override sql.NullString) *string {
+		if override.Valid {
+			return util.ToPointer(override.String)
+		}
+		return util.ToPointer(original)
+	}
+
+	getNullStringWithOverride := func(original sql.NullString, override sql.NullString) *string {
+		if override.Valid {
+			return util.ToPointer(override.String)
+		}
+
+		if original.Valid {
+			return util.ToPointer(original.String)
+		}
+
+		return nil
+	}
+
+	return &model.Community{
+		HelperCommunityData: model.HelperCommunityData{Community: community},
+
+		Dbid:            community.ID,
+		LastUpdated:     util.ToPointer(community.LastUpdated),
+		Name:            getStringWithOverride(community.Name, community.OverrideName),
+		Description:     getStringWithOverride(community.Description, community.OverrideDescription),
+		ProfileImageURL: getNullStringWithOverride(community.ProfileImageUrl, community.OverrideProfileImageUrl),
+		BadgeURL:        getNullStringWithOverride(community.BadgeUrl, community.OverrideBadgeUrl),
+		Subtype:         communityToSubtypeModel(ctx, community),
+
+		Creators: nil, // handled by dedicated resolver
+		Holders:  nil, // handled by dedicated resolver
+		Tokens:   nil, // handled by dedicated resolver
+		Posts:    nil, // handled by dedicated resolver
+
+		// Deprecated
+		Contract:          nil, // handled by dedicated resolver
+		ContractAddress:   nil, // handled by dedicated resolver
+		CreatorAddress:    nil, // handled by dedicated resolver
+		Chain:             nil, // handled by dedicated resolver
+		Creator:           nil, // handled by dedicated resolver
+		TokensInCommunity: nil, // handled by dedicated resolver
+		Owners:            nil, // handled by dedicated resolver
+	}
+}
+
+func communityToSubtypeModel(ctx context.Context, community db.Community) model.CommunitySubtype {
+	switch community.CommunityType {
+	case persist.CommunityTypeContract:
+		return getContractCommunity(ctx, community)
+	case persist.CommunityTypeArtBlocks:
+		return getArtBlocksCommunity(ctx, community)
+	default:
+		err := fmt.Errorf("failed to create community subtype from unknown community type: %d", community.CommunityType)
+		logger.For(ctx).WithError(err).Error(err)
+		sentryutil.ReportError(ctx, err, nil, nil)
+		return nil
+	}
+}
+
+func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRefresh *bool) *model.Community {
+	lastUpdated := contract.LastUpdated
+	contractAddress := persist.NewChainAddress(contract.Address, contract.Chain)
+	chain := contract.Chain
 
 	var creatorAddress *persist.ChainAddress
-	if community.OwnerAddress != "" {
-		creator, _ := util.FindFirst([]persist.Address{community.OwnerAddress, community.CreatorAddress}, func(a persist.Address) bool {
+	if contract.OwnerAddress != "" {
+		creator, _ := util.FindFirst([]persist.Address{contract.OwnerAddress, contract.CreatorAddress}, func(a persist.Address) bool {
 			return a != ""
 		})
 		chainAddress := persist.NewChainAddress(creator, chain)
 		creatorAddress = &chainAddress
 	}
 
+	// This is extremely hacky and brittle (HelperCommunityData should have a real db.Community reference, Dbid should be
+	// the community's ID, not the contract's ID), but this function is only used for search results, and search results
+	// don't use any of the incorrect fields. Once we update search to use communities directly, we can remove this
+	// whole function.
 	return &model.Community{
-		HelperCommunityData: model.HelperCommunityData{
-			ForceRefresh: forceRefresh,
+		HelperCommunityData: model.HelperCommunityData{Community: db.Community{ContractID: contract.ID}},
+		Dbid:                contract.ID,
+		LastUpdated:         &lastUpdated,
+		Contract:            contractToModel(ctx, contract),
+		ContractAddress:     &contractAddress,
+		CreatorAddress:      creatorAddress,
+		Name:                util.ToPointer(html.UnescapeString(contract.Name.String)),
+		Description:         util.ToPointer(html.UnescapeString(contract.Description.String)),
+		Chain:               &chain,
+		ProfileImageURL:     util.ToPointer(contract.ProfileImageUrl.String),
+		BadgeURL:            util.ToPointer(contract.BadgeUrl.String),
+		Subtype: model.ContractCommunity{
+			HelperContractCommunityData: model.HelperContractCommunityData{Community: db.Community{ContractID: contract.ID}},
+			Contract:                    contractToModel(ctx, contract),
 		},
-		Dbid:            community.ID,
-		LastUpdated:     &lastUpdated,
-		Contract:        contractToModel(ctx, community),
-		ContractAddress: &contractAddress,
-		CreatorAddress:  creatorAddress,
-		Name:            util.ToPointer(html.UnescapeString(community.Name.String)),
-		Description:     util.ToPointer(html.UnescapeString(community.Description.String)),
-		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
-		Chain:             &chain,
-		ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
-		ProfileBannerURL:  util.ToPointer(community.ProfileBannerUrl.String),
-		BadgeURL:          util.ToPointer(community.BadgeUrl.String),
 		Owners:            nil, // handled by dedicated resolver
 		Creator:           nil, // handled by dedicated resolver
-		ParentCommunity:   nil, // handled by dedicated resolver
-		SubCommunities:    nil, // handled by dedicated resolver
 		TokensInCommunity: nil, // handled by dedicated resolver
 	}
 }
@@ -2106,16 +2226,11 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 }
 
 func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
-	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := td.FallbackMedia.ImageURL.String(); strings.HasPrefix(fallback, "ipfs://") {
-		td.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
-	} else if strings.HasPrefix(fallback, "ar://") {
-		td.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
-	}
+	isFxHash := tezos.IsFxHash(td.ContractAddress)
 
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2129,7 +2244,7 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
@@ -2139,10 +2254,24 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef)
+	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
 }
 
-func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
+func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool, isFxHash bool) model.MediaSubtype {
+	// Rewrite fallback IPFS and Arweave URLs to HTTP
+
+	if fallbackURL := fallback.ImageURL.String(); strings.HasPrefix(fallbackURL, "ipfs://") || strings.HasPrefix(fallbackURL, "https://gallery.infura-ipfs.io") {
+		fallback.ImageURL = persist.NullString(ipfs.BestGatewayNodeFrom(fallbackURL, isFxHash))
+	} else if strings.HasPrefix(fallbackURL, "ar://") {
+		fallback.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
+	}
+
+	if mediaURL := tokenMedia.Media.MediaURL.String(); strings.HasPrefix(mediaURL, "ipfs://") || strings.HasPrefix(mediaURL, "https://gallery.infura-ipfs.io") {
+		tokenMedia.Media.MediaURL = persist.NullString(ipfs.BestGatewayNodeFrom(mediaURL, isFxHash))
+	} else if strings.HasPrefix(mediaURL, "ar://") {
+		tokenMedia.Media.MediaURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(mediaURL, false)))
+	}
+
 	fallbackMedia := getFallbackMedia(ctx, fallback)
 
 	switch media := tokenMedia.Media; media.MediaType {
@@ -2488,4 +2617,27 @@ func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
 	}
 
 	return m
+}
+
+func resolveCommunityCreatorsByCommunityID(ctx context.Context, communityID persist.DBID) ([]model.GalleryUserOrAddress, error) {
+	creators, err := publicapi.For(ctx).Community.GetCreatorsByCommunityID(ctx, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]model.GalleryUserOrAddress, 0, len(creators))
+	for _, creator := range creators {
+		if creator.CreatorUserID != "" {
+			user, err := resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
+			if err != nil {
+				return nil, err
+			}
+			models = append(models, user)
+		} else if creator.CreatorAddress != "" {
+			address := util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.CreatorAddressChain))
+			models = append(models, address)
+		}
+	}
+
+	return models, nil
 }

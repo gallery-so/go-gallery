@@ -168,15 +168,6 @@ func (c *Client) CreateTaskForTokenProcessing(ctx context.Context, message Token
 	return c.submitTask(ctx, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))
 }
 
-func (c *Client) CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProcessingContractTokensMessage) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForContractOwnerProcessing")
-	defer tracing.FinishSpan(span)
-	tracing.AddEventDataToSpan(span, map[string]any{"Contract ID": message.ContractID})
-	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-	url := fmt.Sprintf("%s/owners/process/contract", env.GetString("TOKEN_PROCESSING_URL"))
-	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
-}
-
 func (c *Client) CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessingUserTokensMessage) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForUserTokenProcessing")
 	defer tracing.FinishSpan(span)

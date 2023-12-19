@@ -95,7 +95,7 @@ with refreshed as (
 )
 select
   feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated,
-  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post,
+  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url,
   coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
 from feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
@@ -106,7 +106,7 @@ where feed_entity_scores.created_at > $1::timestamptz
 union
 select
   feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated,
-  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post,
+  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url,
   coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
 from feed_entity_score_view feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
@@ -155,6 +155,7 @@ func (q *Queries) GetFeedEntityScores(ctx context.Context, arg GetFeedEntityScor
 			&i.Post.LastUpdated,
 			&i.Post.Deleted,
 			&i.Post.IsFirstPost,
+			&i.Post.UserMintUrl,
 			&i.IsGalleryPost,
 		); err != nil {
 			return nil, err

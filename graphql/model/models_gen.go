@@ -79,6 +79,14 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
+type CommunityByKeyOrError interface {
+	IsCommunityByKeyOrError()
+}
+
+type CommunitySubtype interface {
+	IsCommunitySubtype()
+}
+
 type ConnectSocialAccountPayloadOrError interface {
 	IsConnectSocialAccountPayloadOrError()
 }
@@ -549,6 +557,19 @@ type AdmireTokenPayload struct {
 
 func (AdmireTokenPayload) IsAdmireTokenPayloadOrError() {}
 
+type ArtBlocksCommunity struct {
+	HelperArtBlocksCommunityData
+	Contract  *Contract `json:"contract"`
+	ProjectID *string   `json:"projectID"`
+}
+
+func (ArtBlocksCommunity) IsCommunitySubtype() {}
+
+type ArtBlocksCommunityKeyInput struct {
+	Contract  *persist.ChainAddress `json:"contract"`
+	ProjectID string                `json:"projectID"`
+}
+
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -784,38 +805,35 @@ type CommunitiesConnection struct {
 
 type Community struct {
 	HelperCommunityData
-	Dbid                  persist.DBID            `json:"dbid"`
-	LastUpdated           *time.Time              `json:"lastUpdated"`
-	Contract              *Contract               `json:"contract"`
-	ContractAddress       *persist.ChainAddress   `json:"contractAddress"`
-	CreatorAddress        *persist.ChainAddress   `json:"creatorAddress"`
-	Creator               GalleryUserOrAddress    `json:"creator"`
-	Chain                 *persist.Chain          `json:"chain"`
-	Name                  *string                 `json:"name"`
-	Description           *string                 `json:"description"`
-	PreviewImage          *string                 `json:"previewImage"`
-	ProfileImageURL       *string                 `json:"profileImageURL"`
-	ProfileBannerURL      *string                 `json:"profileBannerURL"`
-	BadgeURL              *string                 `json:"badgeURL"`
-	ParentCommunity       *CommunityLink          `json:"parentCommunity"`
-	SubCommunities        *CommunitiesConnection  `json:"subCommunities"`
-	TokensInCommunity     *TokensConnection       `json:"tokensInCommunity"`
-	Owners                *TokenHoldersConnection `json:"owners"`
-	Posts                 *PostsConnection        `json:"posts"`
-	TmpPostsWithProjectID *PostsConnection        `json:"tmpPostsWithProjectID"`
+	Dbid              persist.DBID            `json:"dbid"`
+	LastUpdated       *time.Time              `json:"lastUpdated"`
+	Name              *string                 `json:"name"`
+	Description       *string                 `json:"description"`
+	ProfileImageURL   *string                 `json:"profileImageURL"`
+	BadgeURL          *string                 `json:"badgeURL"`
+	MintURL           *string                 `json:"mintURL"`
+	Subtype           CommunitySubtype        `json:"subtype"`
+	Creators          []GalleryUserOrAddress  `json:"creators"`
+	Holders           *TokenHoldersConnection `json:"holders"`
+	Tokens            *TokensConnection       `json:"tokens"`
+	Posts             *PostsConnection        `json:"posts"`
+	Contract          *Contract               `json:"contract"`
+	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
+	Chain             *persist.Chain          `json:"chain"`
+	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Creator           GalleryUserOrAddress    `json:"creator"`
+	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
+	Owners            *TokenHoldersConnection `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
+func (Community) IsCommunityByKeyOrError()     {}
 func (Community) IsMentionEntity()             {}
 
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
-}
-
-type CommunityLink struct {
-	Node *Community `json:"node"`
 }
 
 type CommunitySearchResult struct {
@@ -843,6 +861,17 @@ type Contract struct {
 }
 
 func (Contract) IsNode() {}
+
+type ContractCommunity struct {
+	HelperContractCommunityData
+	Contract *Contract `json:"contract"`
+}
+
+func (ContractCommunity) IsCommunitySubtype() {}
+
+type ContractCommunityKeyInput struct {
+	Contract *persist.ChainAddress `json:"contract"`
+}
 
 type CreateCollectionInGalleryInput struct {
 	Name           string                          `json:"name"`
@@ -1032,6 +1061,7 @@ type ErrCommunityNotFound struct {
 }
 
 func (ErrCommunityNotFound) IsCommunityByAddressOrError()                                     {}
+func (ErrCommunityNotFound) IsCommunityByKeyOrError()                                         {}
 func (ErrCommunityNotFound) IsPostComposerDraftDetailsPayloadOrError()                        {}
 func (ErrCommunityNotFound) IsError()                                                         {}
 func (ErrCommunityNotFound) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {}
@@ -1091,6 +1121,7 @@ func (ErrInvalidInput) IsUserByIDOrError()                                      
 func (ErrInvalidInput) IsUserByAddressOrError()                                          {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                                     {}
+func (ErrInvalidInput) IsCommunityByKeyOrError()                                         {}
 func (ErrInvalidInput) IsPostOrError()                                                   {}
 func (ErrInvalidInput) IsSocialConnectionsOrError()                                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                                     {}
@@ -1392,6 +1423,7 @@ type FeedEvent struct {
 	EventData             FeedEventData                `json:"eventData"`
 	Admires               *FeedEventAdmiresConnection  `json:"admires"`
 	Comments              *FeedEventCommentsConnection `json:"comments"`
+	TotalComments         *int                         `json:"totalComments"`
 	Caption               *string                      `json:"caption"`
 	Interactions          *InteractionsConnection      `json:"interactions"`
 	ViewerAdmire          *Admire                      `json:"viewerAdmire"`
@@ -1469,6 +1501,24 @@ type Gallery struct {
 
 func (Gallery) IsNode()                      {}
 func (Gallery) IsGalleryByIDPayloadOrError() {}
+
+type GalleryAnnouncementNotification struct {
+	Dbid                 persist.DBID `json:"dbid"`
+	Seen                 *bool        `json:"seen"`
+	CreationTime         *time.Time   `json:"creationTime"`
+	UpdatedTime          *time.Time   `json:"updatedTime"`
+	Platform             Platform     `json:"platform"`
+	InternalID           string       `json:"internalId"`
+	ImageURL             *string      `json:"imageUrl"`
+	Title                *string      `json:"title"`
+	Description          *string      `json:"description"`
+	CtaText              *string      `json:"ctaText"`
+	CtaLink              *string      `json:"ctaLink"`
+	PushNotificationText *string      `json:"pushNotificationText"`
+}
+
+func (GalleryAnnouncementNotification) IsNotification() {}
+func (GalleryAnnouncementNotification) IsNode()         {}
 
 type GalleryInfoUpdatedFeedEventData struct {
 	EventTime      *time.Time      `json:"eventTime"`
@@ -1832,17 +1882,19 @@ func (PDFMedia) IsMedia()        {}
 
 type Post struct {
 	HelperPostData
-	Dbid         persist.DBID            `json:"dbid"`
-	Author       *GalleryUser            `json:"author"`
-	CreationTime *time.Time              `json:"creationTime"`
-	Tokens       []*Token                `json:"tokens"`
-	Caption      *string                 `json:"caption"`
-	Mentions     []*Mention              `json:"mentions"`
-	Admires      *PostAdmiresConnection  `json:"admires"`
-	Comments     *PostCommentsConnection `json:"comments"`
-	Interactions *InteractionsConnection `json:"interactions"`
-	ViewerAdmire *Admire                 `json:"viewerAdmire"`
-	IsFirstPost  bool                    `json:"isFirstPost"`
+	Dbid             persist.DBID            `json:"dbid"`
+	Author           *GalleryUser            `json:"author"`
+	CreationTime     *time.Time              `json:"creationTime"`
+	Tokens           []*Token                `json:"tokens"`
+	Caption          *string                 `json:"caption"`
+	Mentions         []*Mention              `json:"mentions"`
+	Admires          *PostAdmiresConnection  `json:"admires"`
+	Comments         *PostCommentsConnection `json:"comments"`
+	TotalComments    *int                    `json:"totalComments"`
+	Interactions     *InteractionsConnection `json:"interactions"`
+	ViewerAdmire     *Admire                 `json:"viewerAdmire"`
+	IsFirstPost      bool                    `json:"isFirstPost"`
+	UserAddedMintURL *string                 `json:"userAddedMintURL"`
 }
 
 func (Post) IsAdmireSource()     {}
@@ -1896,6 +1948,7 @@ type PostTokensInput struct {
 	TokenIds []persist.DBID  `json:"tokenIds"`
 	Caption  *string         `json:"caption"`
 	Mentions []*MentionInput `json:"mentions"`
+	MintURL  *string         `json:"mintURL"`
 }
 
 type PostTokensPayload struct {
@@ -1969,6 +2022,7 @@ func (ReferralPostPreflightPayload) IsReferralPostPreflightPayloadOrError() {}
 type ReferralPostTokenInput struct {
 	Token   *ChainAddressTokenInput `json:"token"`
 	Caption *string                 `json:"caption"`
+	MintURL *string                 `json:"mintURL"`
 }
 
 type ReferralPostTokenPayload struct {
@@ -2449,13 +2503,16 @@ type TokenDefinition struct {
 	LastUpdated   *time.Time     `json:"lastUpdated"`
 	Media         MediaSubtype   `json:"media"`
 	TokenType     *TokenType     `json:"tokenType"`
+	Contract      *Contract      `json:"contract"`
 	Chain         *persist.Chain `json:"chain"`
 	Name          *string        `json:"name"`
 	Description   *string        `json:"description"`
 	TokenID       *string        `json:"tokenId"`
 	TokenMetadata *string        `json:"tokenMetadata"`
 	Community     *Community     `json:"community"`
+	Communities   []*Community   `json:"communities"`
 	ExternalURL   *string        `json:"externalUrl"`
+	MintURL       *string        `json:"mintUrl"`
 }
 
 func (TokenDefinition) IsNode() {}
@@ -3002,6 +3059,49 @@ func (e *MerchType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e MerchType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type Platform string
+
+const (
+	PlatformWeb    Platform = "Web"
+	PlatformMobile Platform = "Mobile"
+	PlatformAll    Platform = "All"
+)
+
+var AllPlatform = []Platform{
+	PlatformWeb,
+	PlatformMobile,
+	PlatformAll,
+}
+
+func (e Platform) IsValid() bool {
+	switch e {
+	case PlatformWeb, PlatformMobile, PlatformAll:
+		return true
+	}
+	return false
+}
+
+func (e Platform) String() string {
+	return string(e)
+}
+
+func (e *Platform) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Platform(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Platform", str)
+	}
+	return nil
+}
+
+func (e Platform) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

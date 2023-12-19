@@ -55,7 +55,8 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 	tc := task.NewClient(ctx)
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger(), useEventHandler(queries, pub, tc, lock))
-	router.POST("/calculate_activity_badges", cloudSchedulerMiddleware, calculateTopActivityBadges(queries, stg, pgx))
+	router.POST("/calculate_activity_badges", cloudSchedulerMiddleware, autoCalculateTopActivityBadges(queries, stg, pgx))
+	router.POST("/recalculate_activity_badges", retoolMiddleware, recalculateTopActivityBadges(queries, stg, pgx))
 	router.POST("/update_top_conf", retoolMiddleware, updateTopActivityConfiguration(stg))
 	router.GET("/get_top_conf", retoolMiddleware, getTopActivityConfiguration(stg))
 

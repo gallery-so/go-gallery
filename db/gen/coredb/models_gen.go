@@ -64,6 +64,55 @@ type Comment struct {
 	TopLevelCommentID persist.DBID `db:"top_level_comment_id" json:"top_level_comment_id"`
 }
 
+type Community struct {
+	ID                      persist.DBID          `db:"id" json:"id"`
+	Version                 int32                 `db:"version" json:"version"`
+	CommunityType           persist.CommunityType `db:"community_type" json:"community_type"`
+	Key1                    string                `db:"key1" json:"key1"`
+	Key2                    string                `db:"key2" json:"key2"`
+	Key3                    string                `db:"key3" json:"key3"`
+	Key4                    string                `db:"key4" json:"key4"`
+	Name                    string                `db:"name" json:"name"`
+	OverrideName            sql.NullString        `db:"override_name" json:"override_name"`
+	Description             string                `db:"description" json:"description"`
+	OverrideDescription     sql.NullString        `db:"override_description" json:"override_description"`
+	ProfileImageUrl         sql.NullString        `db:"profile_image_url" json:"profile_image_url"`
+	OverrideProfileImageUrl sql.NullString        `db:"override_profile_image_url" json:"override_profile_image_url"`
+	BadgeUrl                sql.NullString        `db:"badge_url" json:"badge_url"`
+	OverrideBadgeUrl        sql.NullString        `db:"override_badge_url" json:"override_badge_url"`
+	ContractID              persist.DBID          `db:"contract_id" json:"contract_id"`
+	CreatedAt               time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated             time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted                 bool                  `db:"deleted" json:"deleted"`
+	WebsiteUrl              sql.NullString        `db:"website_url" json:"website_url"`
+	OverrideWebsiteUrl      sql.NullString        `db:"override_website_url" json:"override_website_url"`
+}
+
+type CommunityContractProvider struct {
+	ID              persist.DBID          `db:"id" json:"id"`
+	Version         int32                 `db:"version" json:"version"`
+	ContractID      persist.DBID          `db:"contract_id" json:"contract_id"`
+	CommunityType   persist.CommunityType `db:"community_type" json:"community_type"`
+	IsValidProvider bool                  `db:"is_valid_provider" json:"is_valid_provider"`
+	CreatedAt       time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated     time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted         bool                  `db:"deleted" json:"deleted"`
+}
+
+type CommunityCreator struct {
+	ID                    persist.DBID                 `db:"id" json:"id"`
+	Version               int32                        `db:"version" json:"version"`
+	CreatorType           persist.CommunityCreatorType `db:"creator_type" json:"creator_type"`
+	CommunityID           persist.DBID                 `db:"community_id" json:"community_id"`
+	CreatorUserID         persist.DBID                 `db:"creator_user_id" json:"creator_user_id"`
+	CreatorAddress        persist.Address              `db:"creator_address" json:"creator_address"`
+	CreatorAddressL1Chain persist.L1Chain              `db:"creator_address_l1_chain" json:"creator_address_l1_chain"`
+	CreatorAddressChain   persist.Chain                `db:"creator_address_chain" json:"creator_address_chain"`
+	CreatedAt             time.Time                    `db:"created_at" json:"created_at"`
+	LastUpdated           time.Time                    `db:"last_updated" json:"last_updated"`
+	Deleted               bool                         `db:"deleted" json:"deleted"`
+}
+
 type Contract struct {
 	ID                    persist.DBID    `db:"id" json:"id"`
 	Deleted               bool            `db:"deleted" json:"deleted"`
@@ -84,6 +133,16 @@ type Contract struct {
 	ParentID              persist.DBID    `db:"parent_id" json:"parent_id"`
 	OverrideCreatorUserID persist.DBID    `db:"override_creator_user_id" json:"override_creator_user_id"`
 	L1Chain               persist.L1Chain `db:"l1_chain" json:"l1_chain"`
+}
+
+type ContractCommunityMembership struct {
+	ID          persist.DBID `db:"id" json:"id"`
+	Version     int32        `db:"version" json:"version"`
+	ContractID  persist.DBID `db:"contract_id" json:"contract_id"`
+	CommunityID persist.DBID `db:"community_id" json:"community_id"`
+	CreatedAt   time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
+	Deleted     bool         `db:"deleted" json:"deleted"`
 }
 
 type ContractCreator struct {
@@ -336,6 +395,16 @@ type Notification struct {
 	MentionID   persist.DBID             `db:"mention_id" json:"mention_id"`
 }
 
+type OwnedCommunity struct {
+	UserID         persist.DBID `db:"user_id" json:"user_id"`
+	UserCreatedAt  time.Time    `db:"user_created_at" json:"user_created_at"`
+	CommunityID    persist.DBID `db:"community_id" json:"community_id"`
+	OwnedCount     int64        `db:"owned_count" json:"owned_count"`
+	DisplayedCount int64        `db:"displayed_count" json:"displayed_count"`
+	Displayed      bool         `db:"displayed" json:"displayed"`
+	LastUpdated    time.Time    `db:"last_updated" json:"last_updated"`
+}
+
 type OwnedContract struct {
 	UserID         persist.DBID `db:"user_id" json:"user_id"`
 	UserCreatedAt  time.Time    `db:"user_created_at" json:"user_created_at"`
@@ -404,6 +473,7 @@ type Post struct {
 	LastUpdated time.Time        `db:"last_updated" json:"last_updated"`
 	Deleted     bool             `db:"deleted" json:"deleted"`
 	IsFirstPost bool             `db:"is_first_post" json:"is_first_post"`
+	UserMintUrl sql.NullString   `db:"user_mint_url" json:"user_mint_url"`
 }
 
 type ProfileImage struct {
@@ -523,6 +593,16 @@ type Token struct {
 	TokenDefinitionID persist.DBID      `db:"token_definition_id" json:"token_definition_id"`
 	IsHolderToken     bool              `db:"is_holder_token" json:"is_holder_token"`
 	Displayable       bool              `db:"displayable" json:"displayable"`
+}
+
+type TokenCommunityMembership struct {
+	ID                persist.DBID `db:"id" json:"id"`
+	Version           int32        `db:"version" json:"version"`
+	TokenDefinitionID persist.DBID `db:"token_definition_id" json:"token_definition_id"`
+	CommunityID       persist.DBID `db:"community_id" json:"community_id"`
+	CreatedAt         time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time    `db:"last_updated" json:"last_updated"`
+	Deleted           bool         `db:"deleted" json:"deleted"`
 }
 
 type TokenDefinition struct {

@@ -163,6 +163,15 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
+input ContractCommunityKeyInput {
+  contract: ChainAddressInput!
+}
+
+input ArtBlocksCommunityKeyInput {
+  contract: ChainAddressInput!
+  projectID: String!
+}
+
 input CreatedCommunitiesInput {
   # When includeChains is empty, returns all communities from all chains.
   includeChains: [Chain!]
@@ -423,13 +432,16 @@ type TokenDefinition implements Node @goEmbedHelper {
   lastUpdated: Time
   media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
+  contract: Contract @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
+  communities: [Community] @goField(forceResolver: true)
   externalUrl: String
+  mintUrl: String @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
@@ -591,9 +603,16 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type CommunityLink {
-  node: Community
+type ContractCommunity @goEmbedHelper {
+  contract: Contract @goField(forceResolver: true)
 }
+
+type ArtBlocksCommunity @goEmbedHelper {
+  contract: Contract @goField(forceResolver: true)
+  projectID: String
+}
+
+union CommunitySubtype = ContractCommunity | ArtBlocksCommunity
 
 type Community implements Node @goEmbedHelper {
   dbid: DBID!
@@ -601,20 +620,40 @@ type Community implements Node @goEmbedHelper {
 
   lastUpdated: Time
 
-  contract: Contract
-  contractAddress: ChainAddress
-  creatorAddress: ChainAddress
-  creator: GalleryUserOrAddress @goField(forceResolver: true)
-  chain: Chain
   name: String
   description: String
-  previewImage: String
   profileImageURL: String
-  profileBannerURL: String
   badgeURL: String
-  parentCommunity: CommunityLink @goField(forceResolver: true)
-  subCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
+  mintURL: String @goField(forceResolver: true)
+
+  subtype: CommunitySubtype
+  creators: [GalleryUserOrAddress] @goField(forceResolver: true)
+
+  holders(before: String, after: String, first: Int, last: Int): TokenHoldersConnection
     @goField(forceResolver: true)
+
+  tokens(before: String, after: String, first: Int, last: Int): TokensConnection
+    @goField(forceResolver: true)
+
+  posts(before: String, after: String, first: Int, last: Int): PostsConnection
+    @goField(forceResolver: true)
+
+  # Deprecated fields
+  contract: Contract
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  contractAddress: ChainAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  chain: Chain
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.subtype. Not all communities have contracts.")
+  creatorAddress: ChainAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.creators to get an address")
+  creator: GalleryUserOrAddress
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.creators")
 
   tokensInCommunity(
     before: String
@@ -622,7 +661,7 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
     onlyGalleryUsers: Boolean
-  ): TokensConnection @goField(forceResolver: true)
+  ): TokensConnection @goField(forceResolver: true) @deprecated(reason: "Use Community.tokens")
 
   owners(
     before: String
@@ -630,18 +669,9 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
     onlyGalleryUsers: Boolean
-  ): TokenHoldersConnection @goField(forceResolver: true)
-
-  posts(before: String, after: String, first: Int, last: Int): PostsConnection
+  ): TokenHoldersConnection
     @goField(forceResolver: true)
-
-  tmpPostsWithProjectID(
-    projectID: Int!
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): PostsConnection @goField(forceResolver: true)
+    @deprecated(reason: "Use Community.holders")
 }
 
 type Contract implements Node {
@@ -850,6 +880,7 @@ union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInp
 union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | ErrTokenNotFound
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
+union CommunityByKeyOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
 union AdmireSource = Post | FeedEvent | Comment
 
@@ -1021,6 +1052,9 @@ type FeedEvent implements Node @key(fields: "dbid") {
     @goField(forceResolver: true)
   comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection
     @goField(forceResolver: true)
+
+  totalComments: Int @goField(forceResolver: true)
+
   caption: String
 
   interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
@@ -1050,11 +1084,14 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
     @goField(forceResolver: true)
 
+  totalComments: Int @goField(forceResolver: true)
+
   interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
   isFirstPost: Boolean!
+  userAddedMintURL: String
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -1434,6 +1471,10 @@ type Query {
   postComposerDraftDetails(
     input: PostComposerDraftDetailsInput!
   ): PostComposerDraftDetailsPayloadOrError
+
+  # Community lookups
+  contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
+  artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
 }
 
 type SocialQueries {
@@ -2220,6 +2261,29 @@ type YouReceivedTopActivityBadgeNotification implements Notification & Node {
   threshold: Int!
 }
 
+enum Platform {
+  Web
+  Mobile
+  All
+}
+
+type GalleryAnnouncementNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  platform: Platform!
+  internalId: String!
+  imageUrl: String
+  title: String
+  description: String
+  ctaText: String
+  ctaLink: String
+  pushNotificationText: String
+}
+
 type ClearAllNotificationsPayload {
   notifications: [Notification]
 }
@@ -2686,6 +2750,7 @@ input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
   mentions: [MentionInput!]
+  mintURL: String
 }
 
 type PostTokensPayload {
@@ -2697,6 +2762,7 @@ union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAut
 input ReferralPostTokenInput {
   token: ChainAddressTokenInput!
   caption: String
+  mintURL: String
 }
 
 type ReferralPostTokenPayload {

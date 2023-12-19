@@ -180,8 +180,31 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
-	return d.getToken(ctx, owner, url)
+	tokens, contracts, err := d.GetTokensByWalletAddress(ctx, owner)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	var resultToken multichain.ChainAgnosticToken
+	var resultContract multichain.ChainAgnosticContract
+	for _, token := range tokens {
+		if strings.EqualFold(token.ContractAddress.String(), ti.ContractAddress.String()) && strings.EqualFold(token.TokenID.String(), ti.TokenID.String()) {
+			resultToken = token
+			break
+		}
+	}
+	for _, contract := range contracts {
+		if strings.EqualFold(contract.Address.String(), ti.ContractAddress.String()) {
+			resultContract = contract
+			break
+		}
+	}
+
+	if resultToken.TokenID == "" || resultContract.Address == "" {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for identifiers %+v", ti)
+	}
+
+	return resultToken, resultContract, nil
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
@@ -290,8 +313,10 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	}
 
 	if len(resp.ZoraCreateContracts) == 0 {
-		return nil, fmt.Errorf("no zora contract found for address %s", addr.String())
+		return nil, nil
 	}
+
+	logger.For(ctx).Infof("zora contracts retrieved: %d (%+v)", len(resp.ZoraCreateContracts), resp.ZoraCreateContracts)
 
 	result := make([]multichain.ChainAgnosticContract, len(resp.ZoraCreateContracts))
 	for i, contract := range resp.ZoraCreateContracts {
@@ -308,7 +333,12 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	return result, nil
 }
 
+<<<<<<< HEAD
 // TODO max limit
+=======
+const maxLimit = 1000
+
+>>>>>>> main
 func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := 50
@@ -361,6 +391,11 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 
 		allTokens = append(allTokens, tokens...)
 		allContracts = append(allContracts, contracts...)
+
+		if len(allTokens) > maxLimit {
+			willBreak = true
+			allTokens = allTokens[:maxLimit]
+		}
 
 		if rec != nil {
 			rec <- multichain.ChainAgnosticTokensAndContracts{

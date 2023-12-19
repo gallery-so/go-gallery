@@ -64,6 +64,7 @@ type EventData struct {
 	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`
 	GalleryNewTokenCollectorsNotes      map[DBID]string   `json:"gallery_new_token_collectors_notes"`
 	ActivityBadgeThreshold              int               `json:"activity_badge_threshold"`
+	NewTopActiveUser                    bool              `json:"new_top_active_user"`
 }
 
 type FeedEventData struct {

@@ -198,6 +198,10 @@ sql:
           - column: 'token_definitions.metadata'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenMetadata'
 
+          # Communities
+          - column: 'community_creators.creator_type'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.CommunityCreatorType'
+
           # Reported Posts
           - column: 'reported_posts.reason'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.ReportReason'
@@ -221,10 +225,14 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Address'
           - column: '*.*.*_address'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Address'
-          - column: '*.*.chain'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
           - column: '*.*.l1_chain'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.L1Chain'
+          - column: '*.*.*_l1_chain'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.L1Chain'
+          - column: '*.*.chain'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
+          - column: '*.*.*_chain'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
           - column: '*.*.action'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Action'
           - column: '*.*.thumbnail_url'
@@ -253,3 +261,5 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Socials'
           - column: '*.*.mentions'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Mentions'
+          - column: '*.*.community_type'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.CommunityType'

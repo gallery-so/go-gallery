@@ -90,33 +90,34 @@ func NewShell() *shell.Shell {
 	return sh
 }
 
-// Node that uses Infura
-var nodeInfura = func(h *http.Client, s *shell.Shell) HTTPReader {
-	return HTTPReader{Host: env.GetString("IPFS_URL"), Client: h}
-}
-
-// Node that uses a self-hosted gateway
-var nodeGallery = func(h *http.Client, s *shell.Shell) HTTPReader {
-	return HTTPReader{Host: env.GetString("FALLBACK_IPFS_URL"), Client: h}
-}
-
-// Node that uses ipfs:// protocol
-var nodeIPFS = func(h *http.Client, s *shell.Shell) IPFSReader {
-	return IPFSReader{Client: s}
-}
-
-// Node that uses a public gateway
-var nodePublic = func(h *http.Client, s *shell.Shell) HTTPReader {
-	return HTTPReader{Host: "https://ipfs.io", Client: h}
-}
+var (
+	nodeGallery = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: env.GetString("FALLBACK_IPFS_URL"), Client: h}
+	}
+	nodeIPFS = func(h *http.Client, s *shell.Shell) IPFSReader {
+		return IPFSReader{Client: s}
+	}
+	nodeIpfsIO = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://ipfs.io", Client: h}
+	}
+	nodePinata = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://gateway.pinata.cloud", Client: h}
+	}
+	nodeNftStorage = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://nftstorage.link", Client: h}
+	}
+	nodeCloudFlare = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://cloudflare-ipfs.com", Client: h}
+	}
+	nodeFxHash = func(h *http.Client, s *shell.Shell) HTTPReader {
+		return HTTPReader{Host: "https://gateway.fxhash.xyz", Client: h}
+	}
+)
 
 func GetResponse(ctx context.Context, path string) (io.ReadCloser, error) {
 	httpClient := defaultHTTPClient()
 	ipfsClient := NewShell()
 	return util.FirstNonErrorWithValue(ctx, false, nil,
-		func(ctx context.Context) (io.ReadCloser, error) {
-			return nodeInfura(httpClient, ipfsClient).Do(ctx, path)
-		},
 		func(ctx context.Context) (io.ReadCloser, error) {
 			return nodeGallery(httpClient, ipfsClient).Do(ctx, path)
 		},
@@ -124,7 +125,16 @@ func GetResponse(ctx context.Context, path string) (io.ReadCloser, error) {
 			return nodeIPFS(httpClient, ipfsClient).Do(ctx, path)
 		},
 		func(ctx context.Context) (io.ReadCloser, error) {
-			return nodePublic(httpClient, ipfsClient).Do(ctx, path)
+			return nodeIpfsIO(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodePinata(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodeNftStorage(httpClient, ipfsClient).Do(ctx, path)
+		},
+		func(ctx context.Context) (io.ReadCloser, error) {
+			return nodeCloudFlare(httpClient, ipfsClient).Do(ctx, path)
 		},
 	)
 }
@@ -134,13 +144,19 @@ func GetHeader(ctx context.Context, path string) (http.Header, error) {
 	ipfsClient := NewShell()
 	return util.FirstNonErrorWithValue(ctx, true, nil,
 		func(ctx context.Context) (http.Header, error) {
-			return nodeInfura(httpClient, ipfsClient).Head(ctx, path)
-		},
-		func(ctx context.Context) (http.Header, error) {
 			return nodeGallery(httpClient, ipfsClient).Head(ctx, path)
 		},
 		func(ctx context.Context) (http.Header, error) {
-			return nodePublic(httpClient, ipfsClient).Head(ctx, path)
+			return nodeIpfsIO(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodePinata(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodeNftStorage(httpClient, ipfsClient).Head(ctx, path)
+		},
+		func(ctx context.Context) (http.Header, error) {
+			return nodeCloudFlare(httpClient, ipfsClient).Head(ctx, path)
 		},
 	)
 }
@@ -157,20 +173,22 @@ func defaultHTTPClient() *http.Client {
 	}
 }
 
+// BestGatewayNodeFrom rewrites an IPFS URL to a gateway URL using the appropriate gateway
+func BestGatewayNodeFrom(ipfsURL string, isFxHash bool) string {
+	if isFxHash {
+		return PathGatewayFrom(nodeFxHash(nil, nil).Host, ipfsURL)
+	}
+	return DefaultGatewayFrom(ipfsURL)
+}
+
 // DefaultGatewayFrom rewrites an IPFS URL to a gateway URL using the default gateway
 func DefaultGatewayFrom(ipfsURL string) string {
-	return PathGatewayFrom(env.GetString("IPFS_URL"), ipfsURL, true)
+	return PathGatewayFrom(nodeIpfsIO(nil, nil).Host, ipfsURL)
 }
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
-// If includeQueryParams is true, the query parameters will be included in the gateway URL
-func PathGatewayFrom(gatewayHost, ipfsURL string, includeQueryParams bool) string {
-	return PathGatewayFor(gatewayHost, util.GetURIPath(ipfsURL, includeQueryParams))
-}
-
-// PathGatewayFor returns the path gateway URL for a CID
-func PathGatewayFor(gatewayHost, cid string) string {
-	return pathURL(gatewayHost, cid)
+func PathGatewayFrom(gatewayHost, ipfsURL string) string {
+	return pathURL(gatewayHost, util.GetURIPath(ipfsURL, false))
 }
 
 // authTransport decorates each request with a basic auth header.
@@ -186,8 +204,20 @@ func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // pathURL returns the gateway URL in path resolution sytle
-func pathURL(host, path string) string {
-	return fmt.Sprintf("%s/ipfs/%s", host, path)
+func pathURL(host, uri string) string {
+	uri = standardizeQueryParams(uri)
+	return fmt.Sprintf("%s/ipfs/%s", host, uri)
+}
+
+// standardizeQueryParams converts a URI with optional params from the format <cid>?key=val&key=val to the format <cid>/?key=val&key=val
+// Most gateways will redirect the former to the latter, but some gateways don't. https://docs.ipfs.tech/concepts/ipfs-gateway/#path
+func standardizeQueryParams(uri string) string {
+	paramIdx := strings.Index(uri, "?")
+	isClean := strings.Contains(uri, "/?")
+	if paramIdx != -1 && !isClean {
+		uri = uri[:paramIdx] + "/?" + uri[paramIdx+1:]
+	}
+	return uri
 }
 
 func isInfura(gateway string) bool {

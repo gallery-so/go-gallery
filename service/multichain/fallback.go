@@ -24,6 +24,7 @@ type SyncWithContractEvalPrimary interface {
 	TokensContractFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
+	ContractsOwnerFetcher
 }
 
 type SyncWithContractEvalSecondary interface {
@@ -92,6 +93,10 @@ func (f SyncWithContractEvalFallbackProvider) GetTokenByTokenIdentifiersAndOwner
 		token.TokenMetadata = f.callFallbackIdentifiers(ctx, token).TokenMetadata
 	}
 	return token, contract, nil
+}
+
+func (f SyncWithContractEvalFallbackProvider) GetContractsByOwnerAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticContract, error) {
+	return f.Primary.GetContractsByOwnerAddress(ctx, address)
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contractAddress persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {

@@ -184,6 +184,28 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countCommentsAndRepliesByFeedEventID = `-- name: CountCommentsAndRepliesByFeedEventID :one
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountCommentsAndRepliesByFeedEventID(ctx context.Context, feedEventID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsAndRepliesByFeedEventID, feedEventID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countCommentsAndRepliesByPostID = `-- name: CountCommentsAndRepliesByPostID :one
+SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountCommentsAndRepliesByPostID(ctx context.Context, postID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsAndRepliesByPostID, postID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countFollowersByUserID = `-- name: CountFollowersByUserID :one
 SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false
 `
@@ -242,28 +264,28 @@ func (q *Queries) CountPostsByUserID(ctx context.Context, actorID persist.DBID) 
 	return count, err
 }
 
-const countSharedContracts = `-- name: CountSharedContracts :one
+const countSharedCommunities = `-- name: CountSharedCommunities :one
 select count(*)
-from owned_contracts a, owned_contracts b, contracts
-left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+from owned_communities a, owned_communities b, communities
+left join contracts on communities.contract_id = contracts.id
+left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
 where a.user_id = $1
   and b.user_id = $2
-  and a.contract_id = b.contract_id
-  and a.contract_id = contracts.id
+  and a.community_id = b.community_id
+  and a.community_id = communities.id
   and marketplace_contracts.contract_id is null
-  and contracts.name is not null
-  and contracts.name != ''
-  and contracts.name != 'Unidentified contract'
-  and not contracts.is_provider_marked_spam
+  and communities.name != ''
+  and communities.name != 'Unidentified contract'
+  and (contracts.is_provider_marked_spam is null or contracts.is_provider_marked_spam = false)
 `
 
-type CountSharedContractsParams struct {
+type CountSharedCommunitiesParams struct {
 	UserAID persist.DBID `db:"user_a_id" json:"user_a_id"`
 	UserBID persist.DBID `db:"user_b_id" json:"user_b_id"`
 }
 
-func (q *Queries) CountSharedContracts(ctx context.Context, arg CountSharedContractsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSharedContracts, arg.UserAID, arg.UserBID)
+func (q *Queries) CountSharedCommunities(ctx context.Context, arg CountSharedCommunitiesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSharedCommunities, arg.UserAID, arg.UserBID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -2789,7 +2811,7 @@ scores AS (
     FULL OUTER JOIN cm using(actor_id)
     FULL OUTER JOIN cr using(actor_id)
 )
-SELECT score, actor_id, admires_given, admires_received, comments_made, comments_received, id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id
+SELECT scores.score, scores.actor_id, scores.admires_given, scores.admires_received, scores.comments_made, scores.comments_received, users.traits
 FROM scores
 join users on scores.actor_id = users.id
 WHERE users.deleted = false AND users.universal = false
@@ -2807,30 +2829,13 @@ type GetMostActiveUsersParams struct {
 }
 
 type GetMostActiveUsersRow struct {
-	Score                int32                            `db:"score" json:"score"`
-	ActorID              persist.DBID                     `db:"actor_id" json:"actor_id"`
-	AdmiresGiven         int64                            `db:"admires_given" json:"admires_given"`
-	AdmiresReceived      int64                            `db:"admires_received" json:"admires_received"`
-	CommentsMade         int64                            `db:"comments_made" json:"comments_made"`
-	CommentsReceived     int64                            `db:"comments_received" json:"comments_received"`
-	ID                   persist.DBID                     `db:"id" json:"id"`
-	Deleted              bool                             `db:"deleted" json:"deleted"`
-	Version              sql.NullInt32                    `db:"version" json:"version"`
-	LastUpdated          time.Time                        `db:"last_updated" json:"last_updated"`
-	CreatedAt            time.Time                        `db:"created_at" json:"created_at"`
-	Username             sql.NullString                   `db:"username" json:"username"`
-	UsernameIdempotent   sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
-	Wallets              persist.WalletList               `db:"wallets" json:"wallets"`
-	Bio                  sql.NullString                   `db:"bio" json:"bio"`
-	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
-	Universal            bool                             `db:"universal" json:"universal"`
-	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
-	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
-	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
-	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
-	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
-	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
-	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+	Score            int32        `db:"score" json:"score"`
+	ActorID          persist.DBID `db:"actor_id" json:"actor_id"`
+	AdmiresGiven     int64        `db:"admires_given" json:"admires_given"`
+	AdmiresReceived  int64        `db:"admires_received" json:"admires_received"`
+	CommentsMade     int64        `db:"comments_made" json:"comments_made"`
+	CommentsReceived int64        `db:"comments_received" json:"comments_received"`
+	Traits           pgtype.JSONB `db:"traits" json:"traits"`
 }
 
 func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsersParams) ([]GetMostActiveUsersRow, error) {
@@ -2855,24 +2860,7 @@ func (q *Queries) GetMostActiveUsers(ctx context.Context, arg GetMostActiveUsers
 			&i.AdmiresReceived,
 			&i.CommentsMade,
 			&i.CommentsReceived,
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
 			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.ProfileImageID,
 		); err != nil {
 			return nil, err
 		}
@@ -3080,7 +3068,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostByID = `-- name: GetPostByID :one
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url FROM posts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error) {
@@ -3097,12 +3085,13 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 		&i.LastUpdated,
 		&i.Deleted,
 		&i.IsFirstPost,
+		&i.UserMintUrl,
 	)
 	return i, err
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
 from posts
 join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
 where not posts.deleted
@@ -3129,6 +3118,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, 
 			&i.LastUpdated,
 			&i.Deleted,
 			&i.IsFirstPost,
+			&i.UserMintUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -5859,8 +5849,8 @@ func (q *Queries) InsertMention(ctx context.Context, arg InsertMentionParams) (p
 }
 
 const insertPost = `-- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, is_first_post, created_at)
-values ($1, $2, $3, $4, $5, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
+insert into posts(id, token_ids, contract_ids, actor_id, caption, user_mint_url, is_first_post, created_at)
+values ($1, $2, $3, $4, $5, $6, not exists(select 1 from posts where posts.created_at < now() and posts.actor_id = $4::varchar limit 1), now())
 on conflict (actor_id, is_first_post) where is_first_post do update set is_first_post = false
 returning id
 `
@@ -5871,6 +5861,7 @@ type InsertPostParams struct {
 	ContractIds persist.DBIDList `db:"contract_ids" json:"contract_ids"`
 	ActorID     persist.DBID     `db:"actor_id" json:"actor_id"`
 	Caption     sql.NullString   `db:"caption" json:"caption"`
+	UserMintUrl sql.NullString   `db:"user_mint_url" json:"user_mint_url"`
 }
 
 func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist.DBID, error) {
@@ -5880,6 +5871,7 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist
 		arg.ContractIds,
 		arg.ActorID,
 		arg.Caption,
+		arg.UserMintUrl,
 	)
 	var id persist.DBID
 	err := row.Scan(&id)
@@ -6250,31 +6242,6 @@ func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.Nul
 	return exists, err
 }
 
-const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
-with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = $2)
-select exists(
-    select 1
-    from tokens, contract_tokens
-    where tokens.owner_user_id = $1
-        and not tokens.deleted
-        and tokens.displayable
-        and tokens.token_definition_id = contract_tokens.id
-    limit 1
-)
-`
-
-type IsMemberOfCommunityParams struct {
-	UserID     persist.DBID `db:"user_id" json:"user_id"`
-	ContractID persist.DBID `db:"contract_id" json:"contract_id"`
-}
-
-func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommunityParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isMemberOfCommunity, arg.UserID, arg.ContractID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
 select fe.id, fe.feed_entity_type, fe.created_at, fe.actor_id
 from feed_entities fe
@@ -6401,7 +6368,7 @@ with valid_post_ids as (
     WHERE $7 = ANY(posts.contract_ids)
       AND posts.deleted = false
 )
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post from posts
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url from posts
     join valid_post_ids on posts.id = valid_post_ids.id
 WHERE (posts.created_at, posts.id) < ($1, $2)
   AND (posts.created_at, posts.id) > ($3, $4)
@@ -6451,6 +6418,7 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 			&i.LastUpdated,
 			&i.Deleted,
 			&i.IsFirstPost,
+			&i.UserMintUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -6463,7 +6431,7 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 }
 
 const paginatePostsByUserID = `-- name: PaginatePostsByUserID :many
-select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post
+select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url
 from posts
 where actor_id = $1
         and (created_at, id) < ($2, $3)
@@ -6513,6 +6481,7 @@ func (q *Queries) PaginatePostsByUserID(ctx context.Context, arg PaginatePostsBy
 			&i.LastUpdated,
 			&i.Deleted,
 			&i.IsFirstPost,
+			&i.UserMintUrl,
 		); err != nil {
 			return nil, err
 		}

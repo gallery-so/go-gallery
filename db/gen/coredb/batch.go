@@ -437,16 +437,14 @@ func (b *CountInteractionsByPostIDBatchBatchResults) Close() error {
 }
 
 const countRepliesByCommentIDBatch = `-- name: CountRepliesByCommentIDBatch :batchone
-SELECT count(*) FROM comments WHERE 
-    (
-        (SELECT reply_to FROM comments WHERE comments.id = $1) IS NULL 
-        AND top_level_comment_id = $1 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE id = $1) IS NOT NULL 
-        AND reply_to = $1 
-    ) AND deleted = false
+SELECT count(*) FROM comments c 
+WHERE 
+    CASE 
+        WHEN (SELECT reply_to FROM comments cc WHERE cc.id = $1) IS NULL 
+        THEN c.top_level_comment_id = $1 
+        ELSE c.reply_to = $1 
+    END
+    AND c.deleted = false
 `
 
 type CountRepliesByCommentIDBatchBatchResults struct {
@@ -1157,6 +1155,254 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getCommunitiesByTokenDefinitionID = `-- name: GetCommunitiesByTokenDefinitionID :batchmany
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url from communities
+    join token_definitions on token_definitions.contract_id = communities.contract_id
+    where community_type = 0
+        and token_definitions.id = $1
+        and not communities.deleted
+        and not token_definitions.deleted
+
+union all
+
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url from communities
+    join token_community_memberships on token_community_memberships.community_id = communities.id
+    where community_type != 0
+        and token_community_memberships.token_definition_id = $1
+        and not communities.deleted
+        and not token_community_memberships.deleted
+`
+
+type GetCommunitiesByTokenDefinitionIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetCommunitiesByTokenDefinitionID(ctx context.Context, tokenDefinitionID []persist.DBID) *GetCommunitiesByTokenDefinitionIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range tokenDefinitionID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getCommunitiesByTokenDefinitionID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCommunitiesByTokenDefinitionIDBatchResults{br, len(tokenDefinitionID), false}
+}
+
+func (b *GetCommunitiesByTokenDefinitionIDBatchResults) Query(f func(int, []Community, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Community
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Community
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.CommunityType,
+					&i.Key1,
+					&i.Key2,
+					&i.Key3,
+					&i.Key4,
+					&i.Name,
+					&i.OverrideName,
+					&i.Description,
+					&i.OverrideDescription,
+					&i.ProfileImageUrl,
+					&i.OverrideProfileImageUrl,
+					&i.BadgeUrl,
+					&i.OverrideBadgeUrl,
+					&i.ContractID,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+					&i.WebsiteUrl,
+					&i.OverrideWebsiteUrl,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetCommunitiesByTokenDefinitionIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getCommunityByID = `-- name: GetCommunityByID :batchone
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url from communities
+    where id = $1
+        and not deleted
+`
+
+type GetCommunityByIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetCommunityByID(ctx context.Context, id []persist.DBID) *GetCommunityByIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getCommunityByID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCommunityByIDBatchResults{br, len(id), false}
+}
+
+func (b *GetCommunityByIDBatchResults) QueryRow(f func(int, Community, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Community
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.CommunityType,
+			&i.Key1,
+			&i.Key2,
+			&i.Key3,
+			&i.Key4,
+			&i.Name,
+			&i.OverrideName,
+			&i.Description,
+			&i.OverrideDescription,
+			&i.ProfileImageUrl,
+			&i.OverrideProfileImageUrl,
+			&i.BadgeUrl,
+			&i.OverrideBadgeUrl,
+			&i.ContractID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.WebsiteUrl,
+			&i.OverrideWebsiteUrl,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetCommunityByIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getCommunityByKey = `-- name: GetCommunityByKey :batchone
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url from communities
+    where $1 = community_type
+        and $2 = key1
+        and $3 = key2
+        and $4 = key3
+        and $5 = key4
+        and not deleted
+`
+
+type GetCommunityByKeyBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetCommunityByKeyParams struct {
+	Type int32  `db:"type" json:"type"`
+	Key1 string `db:"key1" json:"key1"`
+	Key2 string `db:"key2" json:"key2"`
+	Key3 string `db:"key3" json:"key3"`
+	Key4 string `db:"key4" json:"key4"`
+}
+
+func (q *Queries) GetCommunityByKey(ctx context.Context, arg []GetCommunityByKeyParams) *GetCommunityByKeyBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Type,
+			a.Key1,
+			a.Key2,
+			a.Key3,
+			a.Key4,
+		}
+		batch.Queue(getCommunityByKey, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCommunityByKeyBatchResults{br, len(arg), false}
+}
+
+func (b *GetCommunityByKeyBatchResults) QueryRow(f func(int, Community, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Community
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.CommunityType,
+			&i.Key1,
+			&i.Key2,
+			&i.Key3,
+			&i.Key4,
+			&i.Name,
+			&i.OverrideName,
+			&i.Description,
+			&i.OverrideDescription,
+			&i.ProfileImageUrl,
+			&i.OverrideProfileImageUrl,
+			&i.BadgeUrl,
+			&i.OverrideBadgeUrl,
+			&i.ContractID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.WebsiteUrl,
+			&i.OverrideWebsiteUrl,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetCommunityByKeyBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
 select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
@@ -1431,6 +1677,88 @@ func (b *GetCreatedContractsBatchPaginateBatchResults) Query(f func(int, []Contr
 }
 
 func (b *GetCreatedContractsBatchPaginateBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getCreatorsByCommunityID = `-- name: GetCreatorsByCommunityID :batchmany
+select u.id as creator_user_id,
+    cc.creator_address as creator_address,
+    cc.creator_address_chain as creator_address_chain
+    from community_creators cc
+        left join wallets w on
+            w.deleted = false and
+            w.l1_chain = cc.creator_address_l1_chain and
+            cc.creator_address = w.address
+        left join users u on
+            u.deleted = false and
+            u.universal = false and
+            (
+                (cc.creator_user_id is not null and cc.creator_user_id = u.id)
+                or
+                (cc.creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
+            )
+    where cc.community_id = $1
+        and cc.deleted = false
+    order by (cc.creator_type, cc.creator_user_id, cc.creator_address)
+`
+
+type GetCreatorsByCommunityIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetCreatorsByCommunityIDRow struct {
+	CreatorUserID       persist.DBID    `db:"creator_user_id" json:"creator_user_id"`
+	CreatorAddress      persist.Address `db:"creator_address" json:"creator_address"`
+	CreatorAddressChain persist.Chain   `db:"creator_address_chain" json:"creator_address_chain"`
+}
+
+func (q *Queries) GetCreatorsByCommunityID(ctx context.Context, communityID []persist.DBID) *GetCreatorsByCommunityIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range communityID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getCreatorsByCommunityID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCreatorsByCommunityIDBatchResults{br, len(communityID), false}
+}
+
+func (b *GetCreatorsByCommunityIDBatchResults) Query(f func(int, []GetCreatorsByCommunityIDRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []GetCreatorsByCommunityIDRow
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetCreatorsByCommunityIDRow
+				if err := rows.Scan(&i.CreatorUserID, &i.CreatorAddress, &i.CreatorAddressChain); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetCreatorsByCommunityIDBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -2430,7 +2758,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, is_first_post, user_mint_url FROM posts WHERE id = $1 AND deleted = false
 `
 
 type GetPostByIdBatchBatchResults struct {
@@ -2473,6 +2801,7 @@ func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
 			&i.LastUpdated,
 			&i.Deleted,
 			&i.IsFirstPost,
+			&i.UserMintUrl,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -2559,24 +2888,24 @@ func (b *GetProfileImageByIDBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getSharedContractsBatchPaginate = `-- name: GetSharedContractsBatchPaginate :batchmany
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
-from owned_contracts a, owned_contracts b, contracts
-left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+const getSharedCommunitiesBatchPaginate = `-- name: GetSharedCommunitiesBatchPaginate :batchmany
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+from owned_communities a, owned_communities b, communities
+left join contracts on communities.contract_id = contracts.id
+left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
 where a.user_id = $1
   and b.user_id = $2
-  and a.contract_id = b.contract_id
-  and a.contract_id = contracts.id
+  and a.community_id = b.community_id
+  and a.community_id = communities.id
   and marketplace_contracts.contract_id is null
-  and contracts.name is not null
-  and contracts.name != ''
-  and contracts.name != 'Unidentified contract'
-  and not contracts.is_provider_marked_spam
+  and communities.name != ''
+  and communities.name != 'Unidentified contract'
+  and (contracts.is_provider_marked_spam is null or contracts.is_provider_marked_spam = false)
   and (
     a.displayed,
     b.displayed,
     a.owned_count,
-    contracts.id
+    communities.id
   ) > (
     $3,
     $4,
@@ -2587,25 +2916,25 @@ where a.user_id = $1
     a.displayed,
     b.displayed,
     a.owned_count,
-    contracts.id
+    communities.id
   ) < (
     $7,
     $8,
     $9::int,
     $10
   )
-order by case when $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc,
-        case when not $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
+order by case when $11::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end desc,
+        case when not $11::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end asc
 limit $12
 `
 
-type GetSharedContractsBatchPaginateBatchResults struct {
+type GetSharedCommunitiesBatchPaginateBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-type GetSharedContractsBatchPaginateParams struct {
+type GetSharedCommunitiesBatchPaginateParams struct {
 	UserAID                   persist.DBID `db:"user_a_id" json:"user_a_id"`
 	UserBID                   persist.DBID `db:"user_b_id" json:"user_b_id"`
 	CurBeforeDisplayedByUserA bool         `db:"cur_before_displayed_by_user_a" json:"cur_before_displayed_by_user_a"`
@@ -2620,32 +2949,34 @@ type GetSharedContractsBatchPaginateParams struct {
 	Limit                     int32        `db:"limit" json:"limit"`
 }
 
-type GetSharedContractsBatchPaginateRow struct {
-	ID                    persist.DBID    `db:"id" json:"id"`
-	Deleted               bool            `db:"deleted" json:"deleted"`
-	Version               sql.NullInt32   `db:"version" json:"version"`
-	CreatedAt             time.Time       `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time       `db:"last_updated" json:"last_updated"`
-	Name                  sql.NullString  `db:"name" json:"name"`
-	Symbol                sql.NullString  `db:"symbol" json:"symbol"`
-	Address               persist.Address `db:"address" json:"address"`
-	CreatorAddress        persist.Address `db:"creator_address" json:"creator_address"`
-	Chain                 persist.Chain   `db:"chain" json:"chain"`
-	ProfileBannerUrl      sql.NullString  `db:"profile_banner_url" json:"profile_banner_url"`
-	ProfileImageUrl       sql.NullString  `db:"profile_image_url" json:"profile_image_url"`
-	BadgeUrl              sql.NullString  `db:"badge_url" json:"badge_url"`
-	Description           sql.NullString  `db:"description" json:"description"`
-	OwnerAddress          persist.Address `db:"owner_address" json:"owner_address"`
-	IsProviderMarkedSpam  bool            `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
-	ParentID              persist.DBID    `db:"parent_id" json:"parent_id"`
-	OverrideCreatorUserID persist.DBID    `db:"override_creator_user_id" json:"override_creator_user_id"`
-	L1Chain               persist.L1Chain `db:"l1_chain" json:"l1_chain"`
-	DisplayedByUserA      bool            `db:"displayed_by_user_a" json:"displayed_by_user_a"`
-	DisplayedByUserB      bool            `db:"displayed_by_user_b" json:"displayed_by_user_b"`
-	OwnedCount            int64           `db:"owned_count" json:"owned_count"`
+type GetSharedCommunitiesBatchPaginateRow struct {
+	ID                      persist.DBID          `db:"id" json:"id"`
+	Version                 int32                 `db:"version" json:"version"`
+	CommunityType           persist.CommunityType `db:"community_type" json:"community_type"`
+	Key1                    string                `db:"key1" json:"key1"`
+	Key2                    string                `db:"key2" json:"key2"`
+	Key3                    string                `db:"key3" json:"key3"`
+	Key4                    string                `db:"key4" json:"key4"`
+	Name                    string                `db:"name" json:"name"`
+	OverrideName            sql.NullString        `db:"override_name" json:"override_name"`
+	Description             string                `db:"description" json:"description"`
+	OverrideDescription     sql.NullString        `db:"override_description" json:"override_description"`
+	ProfileImageUrl         sql.NullString        `db:"profile_image_url" json:"profile_image_url"`
+	OverrideProfileImageUrl sql.NullString        `db:"override_profile_image_url" json:"override_profile_image_url"`
+	BadgeUrl                sql.NullString        `db:"badge_url" json:"badge_url"`
+	OverrideBadgeUrl        sql.NullString        `db:"override_badge_url" json:"override_badge_url"`
+	ContractID              persist.DBID          `db:"contract_id" json:"contract_id"`
+	CreatedAt               time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated             time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted                 bool                  `db:"deleted" json:"deleted"`
+	WebsiteUrl              sql.NullString        `db:"website_url" json:"website_url"`
+	OverrideWebsiteUrl      sql.NullString        `db:"override_website_url" json:"override_website_url"`
+	DisplayedByUserA        bool                  `db:"displayed_by_user_a" json:"displayed_by_user_a"`
+	DisplayedByUserB        bool                  `db:"displayed_by_user_b" json:"displayed_by_user_b"`
+	OwnedCount              int64                 `db:"owned_count" json:"owned_count"`
 }
 
-func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
+func (q *Queries) GetSharedCommunitiesBatchPaginate(ctx context.Context, arg []GetSharedCommunitiesBatchPaginateParams) *GetSharedCommunitiesBatchPaginateBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
@@ -2662,16 +2993,16 @@ func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []Get
 			a.PagingForward,
 			a.Limit,
 		}
-		batch.Queue(getSharedContractsBatchPaginate, vals...)
+		batch.Queue(getSharedCommunitiesBatchPaginate, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetSharedContractsBatchPaginateBatchResults{br, len(arg), false}
+	return &GetSharedCommunitiesBatchPaginateBatchResults{br, len(arg), false}
 }
 
-func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSharedContractsBatchPaginateRow, error)) {
+func (b *GetSharedCommunitiesBatchPaginateBatchResults) Query(f func(int, []GetSharedCommunitiesBatchPaginateRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []GetSharedContractsBatchPaginateRow
+		var items []GetSharedCommunitiesBatchPaginateRow
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -2685,27 +3016,29 @@ func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSha
 				return err
 			}
 			for rows.Next() {
-				var i GetSharedContractsBatchPaginateRow
+				var i GetSharedCommunitiesBatchPaginateRow
 				if err := rows.Scan(
 					&i.ID,
-					&i.Deleted,
 					&i.Version,
+					&i.CommunityType,
+					&i.Key1,
+					&i.Key2,
+					&i.Key3,
+					&i.Key4,
+					&i.Name,
+					&i.OverrideName,
+					&i.Description,
+					&i.OverrideDescription,
+					&i.ProfileImageUrl,
+					&i.OverrideProfileImageUrl,
+					&i.BadgeUrl,
+					&i.OverrideBadgeUrl,
+					&i.ContractID,
 					&i.CreatedAt,
 					&i.LastUpdated,
-					&i.Name,
-					&i.Symbol,
-					&i.Address,
-					&i.CreatorAddress,
-					&i.Chain,
-					&i.ProfileBannerUrl,
-					&i.ProfileImageUrl,
-					&i.BadgeUrl,
-					&i.Description,
-					&i.OwnerAddress,
-					&i.IsProviderMarkedSpam,
-					&i.ParentID,
-					&i.OverrideCreatorUserID,
-					&i.L1Chain,
+					&i.Deleted,
+					&i.WebsiteUrl,
+					&i.OverrideWebsiteUrl,
 					&i.DisplayedByUserA,
 					&i.DisplayedByUserB,
 					&i.OwnedCount,
@@ -2722,7 +3055,7 @@ func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSha
 	}
 }
 
-func (b *GetSharedContractsBatchPaginateBatchResults) Close() error {
+func (b *GetSharedCommunitiesBatchPaginateBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -4655,6 +4988,139 @@ func (b *PaginateCommentsByPostIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const paginateHoldersByCommunityID = `-- name: PaginateHoldersByCommunityID :batchmany
+with community_data as (
+    select community_type, contract_id
+    from communities
+    where communities.id = $7 and not deleted
+),
+
+community_tokens as (
+    select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable
+    from community_data, tokens
+    where community_data.community_type = 0
+        and tokens.contract_id = community_data.contract_id
+        and not tokens.deleted
+
+    union all
+
+    select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable
+    from community_data, tokens
+        join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
+            and token_community_memberships.community_id = $7
+            and not token_community_memberships.deleted
+    where community_data.community_type != 0
+        and not tokens.deleted
+)
+
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from (
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, community_tokens t
+        where t.owner_user_id = u.id
+        and t.displayable
+        and u.universal = false
+        and t.deleted = false and u.deleted = false
+    ) as users
+    where (users.created_at,users.id) < ($1::timestamptz, $2)
+    and (users.created_at,users.id) > ($3::timestamptz, $4)
+    order by case when $5::bool then (users.created_at,users.id) end asc,
+         case when not $5::bool then (users.created_at,users.id) end desc limit $6
+`
+
+type PaginateHoldersByCommunityIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginateHoldersByCommunityIDParams struct {
+	CurBeforeTime time.Time     `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID  `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time     `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID  `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool          `db:"paging_forward" json:"paging_forward"`
+	Limit         sql.NullInt32 `db:"limit" json:"limit"`
+	CommunityID   persist.DBID  `db:"community_id" json:"community_id"`
+}
+
+// Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
+//
+//	return complete rows from the users table. As a workaround, aliasing the subquery to
+//	"users" seems to fix the issue (along with aliasing the users table inside the subquery
+//	to "u" to avoid confusion -- otherwise, sqlc creates a custom row type that includes
+//	all users.* fields twice).
+func (q *Queries) PaginateHoldersByCommunityID(ctx context.Context, arg []PaginateHoldersByCommunityIDParams) *PaginateHoldersByCommunityIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+			a.CommunityID,
+		}
+		batch.Queue(paginateHoldersByCommunityID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateHoldersByCommunityIDBatchResults{br, len(arg), false}
+}
+
+func (b *PaginateHoldersByCommunityIDBatchResults) Query(f func(int, []User, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []User
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i User
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.LastUpdated,
+					&i.CreatedAt,
+					&i.Username,
+					&i.UsernameIdempotent,
+					&i.Wallets,
+					&i.Bio,
+					&i.Traits,
+					&i.Universal,
+					&i.NotificationSettings,
+					&i.EmailVerified,
+					&i.EmailUnsubscriptions,
+					&i.FeaturedGallery,
+					&i.PrimaryWalletID,
+					&i.UserExperiences,
+					&i.ProfileImageID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginateHoldersByCommunityIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const paginateInteractionsByFeedEventIDBatch = `-- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, $1::int as tag FROM admires t WHERE $1 != 0 AND t.feed_event_id = $2 AND t.deleted = false
@@ -4851,8 +5317,131 @@ func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const paginatePostsByCommunityID = `-- name: PaginatePostsByCommunityID :batchmany
+with community_data as (
+    select community_type, contract_id
+    from communities
+    where communities.id = $1 and not deleted
+)
+
+(
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
+    from community_data, posts
+    where community_data.community_type = 0
+        and community_data.contract_id = any(posts.contract_ids)
+        and posts.deleted = false
+        and (posts.created_at, posts.id) < ($2, $3)
+        and (posts.created_at, posts.id) > ($4, $5)
+    order by
+        case when $6::bool then (posts.created_at, posts.id) end asc,
+        case when not $6::bool then (posts.created_at, posts.id) end desc
+    limit $7
+)
+
+union all
+
+(
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
+    from community_data, posts
+        join tokens on tokens.id = any(posts.token_ids) and not tokens.deleted
+        join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
+            and token_community_memberships.community_id = $1
+            and not token_community_memberships.deleted
+    where community_data.community_type = 1
+      and posts.deleted = false
+      and (posts.created_at, posts.id) < ($2, $3)
+      and (posts.created_at, posts.id) > ($4, $5)
+    order by
+        case when $6::bool then (posts.created_at, posts.id) end asc,
+        case when not $6::bool then (posts.created_at, posts.id) end desc
+    limit $7
+)
+`
+
+type PaginatePostsByCommunityIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginatePostsByCommunityIDParams struct {
+	CommunityID   persist.DBID `db:"community_id" json:"community_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
+}
+
+func (q *Queries) PaginatePostsByCommunityID(ctx context.Context, arg []PaginatePostsByCommunityIDParams) *PaginatePostsByCommunityIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CommunityID,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(paginatePostsByCommunityID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginatePostsByCommunityIDBatchResults{br, len(arg), false}
+}
+
+func (b *PaginatePostsByCommunityIDBatchResults) Query(f func(int, []Post, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Post
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Post
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.TokenIds,
+					&i.ContractIds,
+					&i.ActorID,
+					&i.Caption,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+					&i.IsFirstPost,
+					&i.UserMintUrl,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginatePostsByCommunityIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
 FROM posts
 WHERE $1 = ANY(posts.contract_ids)
 AND posts.deleted = false
@@ -4927,6 +5516,7 @@ func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)
 					&i.LastUpdated,
 					&i.Deleted,
 					&i.IsFirstPost,
+					&i.UserMintUrl,
 				); err != nil {
 					return err
 				}
@@ -4946,21 +5536,24 @@ func (b *PaginatePostsByContractIDBatchResults) Close() error {
 }
 
 const paginateRepliesByCommentIDBatch = `-- name: PaginateRepliesByCommentIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id FROM comments WHERE 
-    (
-        (SELECT reply_to FROM comments WHERE comments.id = $1) IS NULL 
-        AND top_level_comment_id = $1 
-    ) 
-    OR 
-    ( 
-        (SELECT reply_to FROM comments WHERE id = $1) IS NOT NULL 
-        AND reply_to = $1 
-    ) AND deleted = false
-    AND (comments.created_at, comments.id) < ($2, $3)
-    AND (comments.created_at, comments.id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
-    LIMIT $7
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, top_level_comment_id FROM comments c 
+WHERE 
+    CASE 
+        WHEN (SELECT reply_to FROM comments cc WHERE cc.id = $1) IS NULL 
+        THEN c.top_level_comment_id = $1 
+        ELSE c.reply_to = $1 
+    END
+    AND c.deleted = false
+    AND (c.created_at, c.id) < ($2, $3)
+    AND (c.created_at, c.id) > ($4, $5)
+ORDER BY 
+    CASE 
+        WHEN $6::bool THEN (c.created_at, c.id) 
+    END ASC,
+    CASE 
+        WHEN NOT $6::bool THEN (c.created_at, c.id) 
+    END DESC
+LIMIT $7
 `
 
 type PaginateRepliesByCommentIDBatchBatchResults struct {
@@ -5042,6 +5635,176 @@ func (b *PaginateRepliesByCommentIDBatchBatchResults) Query(f func(int, []Commen
 }
 
 func (b *PaginateRepliesByCommentIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const paginateTokensByCommunityID = `-- name: PaginateTokensByCommunityID :batchmany
+with community_data as (
+    select community_type, contract_id
+    from communities
+    where communities.id = $7 and not deleted
+),
+
+community_token_ids as (
+    select tokens.id
+    from community_data, tokens
+    where community_data.community_type = 0
+        and tokens.contract_id = community_data.contract_id
+        and not tokens.deleted
+
+    union all
+
+    select tokens.id
+    from community_data, tokens
+        join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
+            and token_community_memberships.community_id = $7
+            and not token_community_memberships.deleted
+    where community_data.community_type != 0
+        and not tokens.deleted
+)
+
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_token_ids ct
+    join tokens t on t.id = ct.id
+    join token_definitions td on t.token_definition_id = td.id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+    where t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.universal = false
+    and (t.created_at,t.id) < ($1::timestamptz, $2)
+    and (t.created_at,t.id) > ($3::timestamptz, $4)
+    order by case when $5::bool then (t.created_at,t.id) end asc,
+             case when not $5::bool then (t.created_at,t.id) end desc
+    limit $6
+`
+
+type PaginateTokensByCommunityIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginateTokensByCommunityIDParams struct {
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
+	CommunityID   persist.DBID `db:"community_id" json:"community_id"`
+}
+
+type PaginateTokensByCommunityIDRow struct {
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
+}
+
+func (q *Queries) PaginateTokensByCommunityID(ctx context.Context, arg []PaginateTokensByCommunityIDParams) *PaginateTokensByCommunityIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+			a.CommunityID,
+		}
+		batch.Queue(paginateTokensByCommunityID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateTokensByCommunityIDBatchResults{br, len(arg), false}
+}
+
+func (b *PaginateTokensByCommunityIDBatchResults) Query(f func(int, []PaginateTokensByCommunityIDRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []PaginateTokensByCommunityIDRow
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i PaginateTokensByCommunityIDRow
+				if err := rows.Scan(
+					&i.Token.ID,
+					&i.Token.Deleted,
+					&i.Token.Version,
+					&i.Token.CreatedAt,
+					&i.Token.LastUpdated,
+					&i.Token.CollectorsNote,
+					&i.Token.Quantity,
+					&i.Token.BlockNumber,
+					&i.Token.OwnerUserID,
+					&i.Token.OwnedByWallets,
+					&i.Token.ContractID,
+					&i.Token.IsUserMarkedSpam,
+					&i.Token.LastSynced,
+					&i.Token.IsCreatorToken,
+					&i.Token.TokenDefinitionID,
+					&i.Token.IsHolderToken,
+					&i.Token.Displayable,
+					&i.TokenDefinition.ID,
+					&i.TokenDefinition.CreatedAt,
+					&i.TokenDefinition.LastUpdated,
+					&i.TokenDefinition.Deleted,
+					&i.TokenDefinition.Name,
+					&i.TokenDefinition.Description,
+					&i.TokenDefinition.TokenType,
+					&i.TokenDefinition.TokenID,
+					&i.TokenDefinition.ExternalUrl,
+					&i.TokenDefinition.Chain,
+					&i.TokenDefinition.Metadata,
+					&i.TokenDefinition.FallbackMedia,
+					&i.TokenDefinition.ContractAddress,
+					&i.TokenDefinition.ContractID,
+					&i.TokenDefinition.TokenMediaID,
+					&i.Contract.ID,
+					&i.Contract.Deleted,
+					&i.Contract.Version,
+					&i.Contract.CreatedAt,
+					&i.Contract.LastUpdated,
+					&i.Contract.Name,
+					&i.Contract.Symbol,
+					&i.Contract.Address,
+					&i.Contract.CreatorAddress,
+					&i.Contract.Chain,
+					&i.Contract.ProfileBannerUrl,
+					&i.Contract.ProfileImageUrl,
+					&i.Contract.BadgeUrl,
+					&i.Contract.Description,
+					&i.Contract.OwnerAddress,
+					&i.Contract.IsProviderMarkedSpam,
+					&i.Contract.ParentID,
+					&i.Contract.OverrideCreatorUserID,
+					&i.Contract.L1Chain,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginateTokensByCommunityIDBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
