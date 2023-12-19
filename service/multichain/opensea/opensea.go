@@ -229,7 +229,10 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 		streamAssetsForWallet(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
 
-	go streamAssetsToTokens(ctx, address, assetsChan, p.ethClient, p.chain, rec, errChan)
+	go func() {
+		defer close(rec)
+		streamAssetsToTokens(ctx, address, assetsChan, p.ethClient, p.chain, rec, errChan)
+	}()
 	return rec, errChan
 }
 
@@ -262,7 +265,10 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 		streamAssetsForContract(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
 
-	go streamAssetsToTokens(ctx, address, assetsChan, p.ethClient, p.chain, rec, errChan)
+	go func() {
+		defer close(rec)
+		streamAssetsToTokens(ctx, address, assetsChan, p.ethClient, p.chain, rec, errChan)
+	}()
 	return rec, errChan
 }
 
@@ -808,7 +814,6 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 }
 
 func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client, chain persist.Chain, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
-	defer close(rec)
 
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {

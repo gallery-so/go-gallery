@@ -330,7 +330,6 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 
 	go func() {
 		defer close(rec)
-	outer:
 		for {
 			select {
 			case err := <-subErrChan:
@@ -341,7 +340,7 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 				return
 			case tokens, ok := <-alchemyRec:
 				if !ok {
-					break outer
+					return
 				}
 				cTokens, cContracts, err := d.alchemyContractTokensToChainAgnosticTokens(ctx, addr, tokens)
 				if err != nil {

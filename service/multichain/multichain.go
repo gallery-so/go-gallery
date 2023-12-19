@@ -410,7 +410,7 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 		walletWg.Wait()
 	}()
 
-	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, false, chains, result, errChan)
+	return p.receiveSyncedCollectedTokensIncrementallyForUser(ctx, user, chains, result, errChan)
 }
 
 // SyncCreatedTokensForNewContractsIncrementally processes a user's created tokens incrementally
@@ -507,7 +507,7 @@ func (p *Provider) SyncCreatedTokensForNewContractsIncrementally(ctx context.Con
 
 	logger.For(ctx).Infof("waiting for results in receiver")
 
-	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, true, chains, result, errChan)
+	return p.receiveSyncedCreatedTokensIncrementallyForUser(ctx, user, chains, result, errChan)
 }
 
 // SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
@@ -736,13 +736,50 @@ outer:
 	return newTokens, nil
 }
 
-func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, user persist.User, isCreator bool, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) error {
-
+func (p *Provider) receiveSyncedCreatedTokensIncrementallyForUser(ctx context.Context, user persist.User, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) error {
 	beginTime := time.Now()
+	_, currentContracts, err := p.receiveSyncedTokensIncrementallyForUser(ctx, p.AddCreatorTokensOfContractsForUser, user, chains, result, errChan)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Queries.DeleteTokensBeforeTimestamp(ctx, db.DeleteTokensBeforeTimestampParams{
+		RemoveHolderStatus:  false,
+		RemoveCreatorStatus: true,
+		OnlyFromUserID:      sql.NullString{String: user.ID.String(), Valid: true},
+		OnlyFromContractIds: util.MapWithoutError(currentContracts, func(c db.Contract) string { return c.ID.String() }),
+		OnlyFromChains:      util.MapWithoutError(chains, func(c persist.Chain) int32 { return int32(c) }),
+		Timestamp:           beginTime,
+	})
+	return err
+}
+
+func (p *Provider) receiveSyncedCollectedTokensIncrementallyForUser(ctx context.Context, user persist.User, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) error {
+	beginTime := time.Now()
+	_, currentContracts, err := p.receiveSyncedTokensIncrementallyForUser(ctx, p.AddHolderTokensToUser, user, chains, result, errChan)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Queries.DeleteTokensBeforeTimestamp(ctx, db.DeleteTokensBeforeTimestampParams{
+		RemoveHolderStatus:  true,
+		RemoveCreatorStatus: false,
+		OnlyFromUserID:      sql.NullString{String: user.ID.String(), Valid: true},
+		OnlyFromContractIds: util.MapWithoutError(currentContracts, func(c db.Contract) string { return c.ID.String() }),
+		OnlyFromChains:      util.MapWithoutError(chains, func(c persist.Chain) int32 { return int32(c) }),
+		Timestamp:           beginTime,
+	})
+	return err
+}
+
+type addTokensFunc func(ctx context.Context, user persist.User, tokensFromProviders []chainTokens, contracts []db.Contract, existingTokens []op.TokenFullDetails) (currentTokenState []op.TokenFullDetails, newTokens []op.TokenFullDetails, err error)
+
+func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, add addTokensFunc, user persist.User, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) ([]op.TokenFullDetails, []db.Contract, error) {
+
 	errs := []error{}
 	currentTokens, err := op.TokensFullDetailsByUserID(ctx, p.Queries, user.ID)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	currentContracts := util.MapWithoutError(currentTokens, func(t op.TokenFullDetails) db.Contract { return t.Contract })
 	currentContracts = util.DedupeWithTranslate(currentContracts, true, func(c db.Contract) persist.DBID { return c.ID })
@@ -756,43 +793,27 @@ outer:
 			}
 			currentContracts, _, err = p.processContracts(ctx, []chainContracts{inc.contracts}, currentContracts, false)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 
 			totalTokensReceived += len(inc.tokens.tokens)
 
-			if isCreator {
-				logger.For(ctx).Infof("incrementally adding %d created tokens for user %s", len(inc.tokens.tokens), user.Username)
-				currentTokens, _, err = p.AddCreatorTokensOfContractsForUser(ctx, user, []chainTokens{inc.tokens}, currentContracts, currentTokens)
-			} else {
-				logger.For(ctx).Infof("incrementally adding %d tokens for user %s", len(inc.tokens.tokens), user.Username)
-				currentTokens, _, err = p.AddHolderTokensToUser(ctx, user, []chainTokens{inc.tokens}, currentContracts, currentTokens)
-			}
+			logger.For(ctx).Infof("incrementally adding %d tokens for user %s", len(inc.tokens.tokens), user.Username)
+			currentTokens, _, err = add(ctx, user, []chainTokens{inc.tokens}, currentContracts, currentTokens)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, nil, ctx.Err()
 		case err := <-errChan:
 			errs = append(errs, err)
 		}
 	}
 	if len(errs) > 0 && totalTokensReceived == 0 {
-		return util.MultiErr(errs)
+		return nil, nil, util.MultiErr(errs)
 	}
 
-	logger.For(ctx).Infof("incrementally synced %d tokens for user %s in %s", totalTokensReceived, user.Username, time.Since(beginTime))
-	// once we have all the tokens, remove any tokens that are no longer owned by the user
-	_, err = p.Queries.DeleteTokensBeforeTimestamp(ctx, db.DeleteTokensBeforeTimestampParams{
-		RemoveHolderStatus:  !isCreator,
-		RemoveCreatorStatus: isCreator,
-		OnlyFromUserID:      sql.NullString{String: user.ID.String(), Valid: true},
-		OnlyFromContractIds: util.MapWithoutError(currentContracts, func(c db.Contract) string { return c.ID.String() }),
-		OnlyFromChains:      util.MapWithoutError(chains, func(c persist.Chain) int32 { return int32(c) }),
-		Timestamp:           beginTime,
-	})
-
-	return err
+	return currentTokens, currentContracts, nil
 }
 
 // SyncCreatedTokensForNewContracts syncs tokens for contracts that the user created but does not
