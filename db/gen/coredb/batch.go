@@ -1684,7 +1684,9 @@ func (b *GetCreatedContractsBatchPaginateBatchResults) Close() error {
 }
 
 const getCreatorsByCommunityID = `-- name: GetCreatorsByCommunityID :batchmany
-select u.id as creator_user_id,
+select
+    cc.community_id as community_id,
+    u.id as creator_user_id,
     cc.creator_address as creator_address,
     cc.creator_address_chain as creator_address_chain
     from community_creators cc
@@ -1712,6 +1714,7 @@ type GetCreatorsByCommunityIDBatchResults struct {
 }
 
 type GetCreatorsByCommunityIDRow struct {
+	CommunityID         persist.DBID    `db:"community_id" json:"community_id"`
 	CreatorUserID       persist.DBID    `db:"creator_user_id" json:"creator_user_id"`
 	CreatorAddress      persist.Address `db:"creator_address" json:"creator_address"`
 	CreatorAddressChain persist.Chain   `db:"creator_address_chain" json:"creator_address_chain"`
@@ -1747,7 +1750,12 @@ func (b *GetCreatorsByCommunityIDBatchResults) Query(f func(int, []GetCreatorsBy
 			}
 			for rows.Next() {
 				var i GetCreatorsByCommunityIDRow
-				if err := rows.Scan(&i.CreatorUserID, &i.CreatorAddress, &i.CreatorAddressChain); err != nil {
+				if err := rows.Scan(
+					&i.CommunityID,
+					&i.CreatorUserID,
+					&i.CreatorAddress,
+					&i.CreatorAddressChain,
+				); err != nil {
 					return err
 				}
 				items = append(items, i)

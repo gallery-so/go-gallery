@@ -208,7 +208,9 @@ community_posts as (
 select count(*) from community_posts;
 
 -- name: GetCreatorsByCommunityID :batchmany
-select u.id as creator_user_id,
+select
+    cc.community_id as community_id,
+    u.id as creator_user_id,
     cc.creator_address as creator_address,
     cc.creator_address_chain as creator_address_chain
     from community_creators cc

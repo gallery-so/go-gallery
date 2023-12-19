@@ -544,15 +544,18 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
 	case persist.ResourceTypeCommunity:
-		// TODO: Update to use community creators.
-		// There can be multiple creators for a community; for the time being, should we just use the first one?
-		u, err := h.dataloaders.GetCreatorsByCommunityID.Load(event.CommunityID)
-		if err != nil || u.CreatorUserID == "" {
-			logger.For(ctx).Warnf("error loading user by address: %s", err)
+		// TODO: a community can technically have multiple creators. For now, just return the first one.
+		creators, err := h.dataloaders.GetCreatorsByCommunityID.Load(event.CommunityID)
+		if err != nil {
+			err = fmt.Errorf("error getting creators for community ID %s: %w", event.CommunityID, err)
+			logger.For(ctx).WithError(err).Warn(err)
+			sentryutil.ReportError(ctx, err)
 			return "", nil
 		}
-		return u.CreatorUserID, nil
-
+		if len(creators) > 0 && creators[0].CreatorUserID != "" {
+			return creators[0].CreatorUserID, nil
+		}
+		return "", nil
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)

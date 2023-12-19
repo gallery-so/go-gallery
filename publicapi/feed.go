@@ -128,6 +128,43 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	return &post, nil
 }
 
+// getCreatorsForTokenDefinitionIDs looks up all creators for the given token definition IDs and all the communities that the token
+// definition IDs belong to, and returns a map of creator ID to community IDs.
+func getCreatorsForTokenDefinitionIDs(ctx context.Context, loaders *dataloader.Loaders, tokenDefinitionIDs []persist.DBID) map[persist.DBID][]persist.DBID {
+	communityIDs := make(map[persist.DBID]bool)
+	communities, errs := loaders.GetCommunitiesByTokenDefinitionID.LoadAll(tokenDefinitionIDs)
+	for i, err := range errs {
+		if err == nil {
+			for _, community := range communities[i] {
+				communityIDs[community.ID] = true
+			}
+		} else {
+			err = fmt.Errorf("error looking up communities by token definition ID: %w", err)
+			sentryutil.ReportError(ctx, err)
+			logger.For(ctx).WithError(err).Error(err)
+		}
+	}
+
+	creators, errs := loaders.GetCreatorsByCommunityID.LoadAll(util.MapKeys(communityIDs))
+	creatorIDToCommunityIDs := make(map[persist.DBID][]persist.DBID)
+
+	for i, err := range errs {
+		if err == nil {
+			for _, creator := range creators[i] {
+				if creator.CreatorUserID != "" {
+					creatorIDToCommunityIDs[creator.CreatorUserID] = append(creatorIDToCommunityIDs[creator.CreatorUserID], creator.CommunityID)
+				}
+			}
+		} else {
+			err = fmt.Errorf("error looking up creators by community ID: %w", err)
+			sentryutil.ReportError(ctx, err)
+			logger.For(ctx).WithError(err).Error(err)
+		}
+	}
+
+	return creatorIDToCommunityIDs
+}
+
 func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, mentions []*model.MentionInput, caption, mintURL *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -151,6 +188,14 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 	contractIDs := util.MapWithoutError(contracts, func(c db.Contract) persist.DBID {
 		return c.ID
 	})
+
+	tokens, errs := api.loaders.GetTokenByIdBatch.LoadAll(tokenIDs)
+	tokenDefinitionIDs := make([]persist.DBID, 0, len(tokens))
+	for i, err := range errs {
+		if err == nil {
+			tokenDefinitionIDs = append(tokenDefinitionIDs, tokens[i].Token.TokenDefinitionID)
+		}
+	}
 
 	tx, err := api.repos.BeginTx(ctx)
 	if err != nil {
@@ -216,20 +261,19 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return "", err
 	}
 
-	// TODO: Update to use community creators
-	creators, _ := api.loaders.GetContractCreatorsByIds.LoadAll(util.StringersToStrings(contractIDs))
-	for _, creator := range creators {
-		if creator.CreatorUserID == "" {
-			continue
-		}
+	creators := getCreatorsForTokenDefinitionIDs(ctx, api.loaders, tokenDefinitionIDs)
+
+	// Only notify creators once per post, even if the post includes tokens from multiple communities owned
+	// by the same creator. At some point we may want to update notifications to allow for multiple communities.
+	for creatorID, communityIDs := range creators {
 		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(actorID),
 			Action:         persist.ActionUserPostedYourWork,
 			ResourceTypeID: persist.ResourceTypeCommunity,
-			UserID:         creator.CreatorUserID,
-			SubjectID:      creator.ContractID,
+			UserID:         creatorID,
+			SubjectID:      communityIDs[0],
 			PostID:         postID,
-			CommunityID:    creator.ContractID,
+			CommunityID:    communityIDs[0],
 		})
 		if err != nil {
 			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
@@ -301,69 +345,38 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		Chain:           t.Chain,
 	})
 
-	// The token is already synced
+	var tokenID persist.DBID
+	var tokenDefinitionID persist.DBID
+	var contractID persist.DBID
+
 	if err == nil {
-		postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
-			ID:          persist.GenerateID(),
-			TokenIds:    []persist.DBID{r.Token.ID},
-			ContractIds: []persist.DBID{r.Contract.ID},
-			ActorID:     user.ID,
-			Caption:     util.ToSQLNullString(caption),
-			UserMintUrl: util.ToSQLNullString(mintURL),
+		// The token is already synced
+		tokenID = r.Token.ID
+		tokenDefinitionID = r.Token.TokenDefinitionID
+		contractID = r.Contract.ID
+	} else if !util.ErrorIs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+		// Unexpected error
+		return "", err
+	} else {
+		// The token is not synced, so we need to find it
+		synced, err := api.multichainProvider.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, t, retry.Retry{
+			Base:  2,
+			Cap:   4,
+			Tries: 4,
 		})
 		if err != nil {
-			return postID, err
+			return "", err
 		}
 
-		// TODO: Update to use community creators
-		creator, _ := api.loaders.GetContractCreatorsByIds.Load(r.Contract.ID.String())
-		if creator.CreatorUserID != "" {
-			err = event.Dispatch(ctx, db.Event{
-				ActorID:        persist.DBIDToNullStr(userID),
-				Action:         persist.ActionUserPostedYourWork,
-				ResourceTypeID: persist.ResourceTypeCommunity,
-				UserID:         creator.CreatorUserID,
-				SubjectID:      creator.ContractID,
-				PostID:         postID,
-				CommunityID:    creator.ContractID,
-			})
-			if err != nil {
-				sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
-				logger.For(ctx).Errorf("error dispatching event: %v", err)
-			}
-		}
-
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(user.ID),
-			Action:         persist.ActionUserPosted,
-			ResourceTypeID: persist.ResourceTypePost,
-			UserID:         user.ID,
-			SubjectID:      postID,
-			PostID:         postID,
-		})
-
-		return postID, err
-	}
-
-	// Unexpected error
-	if err != nil && !util.ErrorIs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
-		return "", err
-	}
-
-	// The token is not synced, so we need to find it
-	synced, err := api.multichainProvider.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, t, retry.Retry{
-		Base:  2,
-		Cap:   4,
-		Tries: 4,
-	})
-	if err != nil {
-		return "", err
+		tokenID = synced.Instance.ID
+		tokenDefinitionID = synced.Instance.TokenDefinitionID
+		contractID = synced.Contract.ID
 	}
 
 	postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
-		TokenIds:    []persist.DBID{synced.Instance.ID},
-		ContractIds: []persist.DBID{synced.Contract.ID},
+		TokenIds:    []persist.DBID{tokenID},
+		ContractIds: []persist.DBID{contractID},
 		ActorID:     user.ID,
 		Caption:     util.ToSQLNullString(caption),
 		UserMintUrl: util.ToSQLNullString(mintURL),
@@ -372,17 +385,16 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		return postID, err
 	}
 
-	// TODO: Update to use community creators
-	creator, _ := api.loaders.GetContractCreatorsByIds.Load(synced.Contract.ID.String())
-	if creator.CreatorUserID != "" {
+	creators := getCreatorsForTokenDefinitionIDs(ctx, api.loaders, []persist.DBID{tokenDefinitionID})
+	for creatorID, communityIDs := range creators {
 		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(userID),
 			Action:         persist.ActionUserPostedYourWork,
 			ResourceTypeID: persist.ResourceTypeCommunity,
-			UserID:         creator.CreatorUserID,
-			SubjectID:      creator.ContractID,
+			UserID:         creatorID,
+			SubjectID:      communityIDs[0],
 			PostID:         postID,
-			CommunityID:    creator.ContractID,
+			CommunityID:    communityIDs[0],
 		})
 		if err != nil {
 			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
