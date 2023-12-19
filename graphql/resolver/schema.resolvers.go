@@ -1187,7 +1187,7 @@ func (r *mutationResolver) SyncCreatedTokensForNewContracts(ctx context.Context,
 		chains = persist.AllChains
 	}
 
-	err := publicapi.For(ctx).Token.SyncCreatedTokensForNewContracts(ctx, chains)
+	err := publicapi.For(ctx).Token.SyncCreatedTokensForNewContracts(ctx, chains, util.FromPointer(input.Incrementally))
 	if err != nil {
 		return nil, err
 	}

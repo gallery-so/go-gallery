@@ -2391,6 +2391,7 @@ func (SyncCreatedTokensForExistingContractPayload) IsSyncCreatedTokensForExistin
 
 type SyncCreatedTokensForNewContractsInput struct {
 	IncludeChains []persist.Chain `json:"includeChains"`
+	Incrementally *bool           `json:"incrementally"`
 }
 
 type SyncCreatedTokensForNewContractsPayload struct {

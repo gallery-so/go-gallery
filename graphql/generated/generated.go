@@ -9574,6 +9574,7 @@ input CreatedCommunitiesInput {
 input SyncCreatedTokensForNewContractsInput {
   # When includeChains is empty, syncs tokens on all chains.
   includeChains: [Chain!]
+  incrementally: Boolean
 }
 
 input SyncCreatedTokensForExistingContractInput {
@@ -67523,7 +67524,7 @@ func (ec *executionContext) unmarshalInputSyncCreatedTokensForNewContractsInput(
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"includeChains"}
+	fieldsInOrder := [...]string{"includeChains", "incrementally"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -67539,6 +67540,15 @@ func (ec *executionContext) unmarshalInputSyncCreatedTokensForNewContractsInput(
 				return it, err
 			}
 			it.IncludeChains = data
+		case "incrementally":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("incrementally"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Incrementally = data
 		}
 	}
 

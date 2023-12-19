@@ -120,6 +120,7 @@ func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(fallbackProvider)),
+		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(indexerProvider)),
@@ -137,13 +138,14 @@ func ethRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tiof multichain.TokensIncrementalOwnerFetcher,
+	ticf multichain.TokensIncrementalContractFetcher,
 	cf multichain.ContractsFetcher,
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
 	tcof multichain.ContractsOwnerFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, tiof, cf, cr, tmf, tcof, tdf}
+	return ethProviderList{nr, v, tof, toc, tiof, ticf, cf, cr, tmf, tcof, tdf}
 }
 
 // tezosProviderSet is a wire injector that creates the set of Tezos providers
@@ -161,6 +163,7 @@ func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackP
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(tezosProvider)),
+		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(tezosProvider)),
@@ -173,11 +176,12 @@ func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackP
 func tezosRequirements(
 	tof multichain.TokensOwnerFetcher,
 	tiof multichain.TokensIncrementalOwnerFetcher,
+	ticf multichain.TokensIncrementalContractFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 	tcof multichain.ContractsOwnerFetcher,
 ) tezosProviderList {
-	return tezosProviderList{tof, tiof, toc, tmf, tcof}
+	return tezosProviderList{tof, tiof, ticf, toc, tmf, tcof}
 }
 
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
@@ -300,6 +304,7 @@ func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
 		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(zoraProvider)),
@@ -314,12 +319,13 @@ func zoraRequirements(
 	nr multichain.ContractsFetcher,
 	tof multichain.TokensOwnerFetcher,
 	tiof multichain.TokensIncrementalOwnerFetcher,
+	ticf multichain.TokensIncrementalContractFetcher,
 	toc multichain.TokensContractFetcher,
 	tcof multichain.ContractsOwnerFetcher,
 	tmf multichain.TokenMetadataFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 ) zoraProviderList {
-	return zoraProviderList{nr, tof, tiof, toc, tcof, tmf, tdf}
+	return zoraProviderList{nr, tof, tiof, ticf, toc, tcof, tmf, tdf}
 }
 
 func baseProviderSet(*http.Client) baseProviderList {

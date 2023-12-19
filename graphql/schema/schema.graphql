@@ -180,6 +180,7 @@ input CreatedCommunitiesInput {
 input SyncCreatedTokensForNewContractsInput {
   # When includeChains is empty, syncs tokens on all chains.
   includeChains: [Chain!]
+  incrementally: Boolean
 }
 
 input SyncCreatedTokensForExistingContractInput {

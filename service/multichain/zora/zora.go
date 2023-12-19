@@ -244,6 +244,21 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 }
 
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	url := fmt.Sprintf("%s/tokens/ZORA-MAINNET/%s?&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, addr.String())
+	go func() {
+		defer close(rec)
+		_, _, err := d.getTokens(ctx, url, rec, false)
+		if err != nil {
+			errChan <- err
+			return
+		}
+	}()
+	return rec, errChan
+}
+
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tokens, contracts, err := d.GetTokensByWalletAddress(ctx, ownerAddress)
 	if err != nil {
@@ -309,7 +324,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 			Descriptors: multichain.ChainAgnosticContractDescriptors{
 				Symbol:       contract.Symbol,
 				Name:         contract.Name,
-				OwnerAddress: persist.Address(strings.ToLower(contract.Creator)),
+				OwnerAddress: addr,
 			},
 			Address: persist.Address(strings.ToLower(contract.Address)),
 		}
@@ -448,11 +463,7 @@ func (d *Provider) balanceTokensToChainAgnostic(ctx context.Context, tokens []zo
 
 		result = append(result, converted)
 
-		if _, ok := contracts[token.Token.CollectionAddress]; ok {
-			continue
-		}
-
-		contracts[token.Token.CollectionAddress] = d.contractToChainAgnostic(ctx, token.Token)
+		contracts[token.Token.CollectionAddress] = d.contractToChainAgnostic(ctx, token.Token, contracts[token.Token.CollectionAddress])
 
 	}
 
@@ -475,11 +486,7 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraToken
 		}
 		result = append(result, converted)
 
-		if _, ok := contracts[token.CollectionAddress]; ok {
-			continue
-		}
-
-		contracts[token.CollectionAddress] = d.contractToChainAgnostic(ctx, token)
+		contracts[token.CollectionAddress] = d.contractToChainAgnostic(ctx, token, contracts[token.CollectionAddress])
 
 	}
 
@@ -557,23 +564,22 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 		Quantity:        persist.HexString("1"),
 		OwnerAddress:    persist.Address(strings.ToLower(token.Owner)),
 		ContractAddress: persist.Address(strings.ToLower(token.CollectionAddress)),
-
 		FallbackMedia: persist.FallbackMedia{
 			ImageURL: persist.NullString(token.Media.ImagePreview.EncodedPreview),
 		},
 	}, nil
 }
 
-func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken) multichain.ChainAgnosticContract {
-	creator := util.FirstNonEmptyString(token.CreatorAddress, token.Mintable.CreatorAddress)
+func (d *Provider) contractToChainAgnostic(ctx context.Context, token zoraToken, mergeContract multichain.ChainAgnosticContract) multichain.ChainAgnosticContract {
+	creator := util.FirstNonEmptyString(token.CreatorAddress, token.Mintable.CreatorAddress, mergeContract.Descriptors.OwnerAddress.String())
 	return multichain.ChainAgnosticContract{
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:          token.Collection.Symbol,
-			Name:            token.Collection.Name,
-			Description:     token.Collection.Description,
+			Symbol:          util.FirstNonEmptyString(token.Collection.Symbol, token.Mintable.Collection.Symbol, mergeContract.Descriptors.Symbol),
+			Name:            util.FirstNonEmptyString(token.Collection.Name, token.Mintable.Collection.Name, mergeContract.Descriptors.Name),
+			Description:     util.FirstNonEmptyString(token.Collection.Description, token.Mintable.Collection.Description, mergeContract.Descriptors.Description),
 			OwnerAddress:    persist.Address(strings.ToLower(creator)),
 			ProfileImageURL: token.Collection.Image,
 		},
-		Address: persist.Address(strings.ToLower(token.CollectionAddress)),
+		Address: persist.Address(strings.ToLower(util.FirstNonEmptyString(token.CollectionAddress, token.Mintable.Collection.Address, string(mergeContract.Address)))),
 	}
 }

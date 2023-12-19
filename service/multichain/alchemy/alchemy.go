@@ -202,6 +202,7 @@ type Provider struct {
 
 // NewProvider creates a new ethereum Provider
 func NewProvider(chain persist.Chain, httpClient *http.Client, cache *redis.Cache) *Provider {
+	// currently using v2 endpoints, alchemy recently added v3
 	var apiURL string
 	switch chain {
 	case persist.ChainETH:
@@ -295,6 +296,61 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 					break outer
 				}
 				cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
+				rec <- multichain.ChainAgnosticTokensAndContracts{
+					Tokens:    cTokens,
+					Contracts: cContracts,
+				}
+			}
+		}
+	}()
+
+	return rec, errChan
+}
+
+// GetTokensIncrementallyByContractAddress retrieves tokens incrementaly for a contract address on the Ethereum Blockchain
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+
+	url := fmt.Sprintf("%s/getNFTsForCollection?contractAddress=%s&withMetadata=true", d.alchemyAPIURL, addr)
+	if d.chain == persist.ChainPolygon {
+		url += "&excludeFilters[]=SPAM"
+	}
+	alchemyRec := make(chan []Token)
+	subErrChan := make(chan error)
+
+	go func() {
+		defer close(alchemyRec)
+		_, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, 0, "", d.httpClient, alchemyRec, &getNFTsForCollectionResponse{})
+		if err != nil {
+			subErrChan <- err
+			return
+		}
+	}()
+
+	go func() {
+		defer close(rec)
+		for {
+			select {
+			case err := <-subErrChan:
+				errChan <- err
+				return
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			case tokens, ok := <-alchemyRec:
+				if !ok {
+					return
+				}
+				cTokens, cContracts, err := d.alchemyContractTokensToChainAgnosticTokens(ctx, addr, tokens)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				if len(cContracts) == 0 {
+					errChan <- fmt.Errorf("no contract found for contract address %s", addr)
+					return
+				}
 				rec <- multichain.ChainAgnosticTokensAndContracts{
 					Tokens:    cTokens,
 					Contracts: cContracts,
@@ -511,9 +567,21 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	owners, err := d.getOwnersForContract(ctx, persist.EthereumAddress(contractAddress))
+	cTokens, cContracts, err := d.alchemyContractTokensToChainAgnosticTokens(ctx, contractAddress, tokens)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	if len(cContracts) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for contract address %s", contractAddress)
+	}
+
+	return cTokens, cContracts[0], d.cacheMetadatasForTokens(ctx, cTokens...)
+}
+
+func (d *Provider) alchemyContractTokensToChainAgnosticTokens(ctx context.Context, contractAddress persist.Address, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	owners, err := d.getOwnersForContract(ctx, persist.EthereumAddress(contractAddress))
+	if err != nil {
+		return nil, nil, err
 	}
 
 	tokenIDToOwner := make(map[TokenID][]persist.EthereumAddress)
@@ -532,13 +600,9 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 	cTokens, cContracts := alchemyTokensToChainAgnosticTokensWithOwners(ctx, ownersToTokens)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, nil, err
 	}
-	if len(cContracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for contract address %s", contractAddress)
-	}
-
-	return cTokens, cContracts[0], d.cacheMetadatasForTokens(ctx, cTokens...)
+	return cTokens, cContracts, nil
 }
 
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
