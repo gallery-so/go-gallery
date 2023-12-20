@@ -155,15 +155,15 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redi
 }
 
 func sendAnnouncementNotification() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
+	return func(c *gin.Context) {
 		var in persist.AnnouncementDetails
-		err := ctx.ShouldBindJSON(&in)
+		err := c.ShouldBindJSON(&in)
 		if err != nil {
-			util.ErrResponse(ctx, http.StatusBadRequest, err)
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		err = event.Dispatch(ctx, coredb.Event{
+		err = event.Dispatch(c, coredb.Event{
 			ID:             persist.GenerateID(),
 			ResourceTypeID: persist.ResourceTypeUser,
 			Action:         persist.ActionAnnouncement,
@@ -171,6 +171,12 @@ func sendAnnouncementNotification() gin.HandlerFunc {
 				AnnouncementDetails: &in,
 			},
 		})
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
