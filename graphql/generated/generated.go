@@ -160,6 +160,12 @@ type ComplexityRoot struct {
 	}
 
 	ArtBlocksCommunity struct {
+		CommunityKey func(childComplexity int) int
+		Contract     func(childComplexity int) int
+		ProjectID    func(childComplexity int) int
+	}
+
+	ArtBlocksCommunityKey struct {
 		Contract  func(childComplexity int) int
 		ProjectID func(childComplexity int) int
 	}
@@ -396,6 +402,11 @@ type ComplexityRoot struct {
 	}
 
 	ContractCommunity struct {
+		CommunityKey func(childComplexity int) int
+		Contract     func(childComplexity int) int
+	}
+
+	ContractCommunityKey struct {
 		Contract func(childComplexity int) int
 	}
 
@@ -2352,6 +2363,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AdmireTokenPayload.Viewer(childComplexity), true
 
+	case "ArtBlocksCommunity.communityKey":
+		if e.complexity.ArtBlocksCommunity.CommunityKey == nil {
+			break
+		}
+
+		return e.complexity.ArtBlocksCommunity.CommunityKey(childComplexity), true
+
 	case "ArtBlocksCommunity.contract":
 		if e.complexity.ArtBlocksCommunity.Contract == nil {
 			break
@@ -2365,6 +2383,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ArtBlocksCommunity.ProjectID(childComplexity), true
+
+	case "ArtBlocksCommunityKey.contract":
+		if e.complexity.ArtBlocksCommunityKey.Contract == nil {
+			break
+		}
+
+		return e.complexity.ArtBlocksCommunityKey.Contract(childComplexity), true
+
+	case "ArtBlocksCommunityKey.projectID":
+		if e.complexity.ArtBlocksCommunityKey.ProjectID == nil {
+			break
+		}
+
+		return e.complexity.ArtBlocksCommunityKey.ProjectID(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -3330,12 +3362,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Contract.ProfileImageURL(childComplexity), true
 
+	case "ContractCommunity.communityKey":
+		if e.complexity.ContractCommunity.CommunityKey == nil {
+			break
+		}
+
+		return e.complexity.ContractCommunity.CommunityKey(childComplexity), true
+
 	case "ContractCommunity.contract":
 		if e.complexity.ContractCommunity.Contract == nil {
 			break
 		}
 
 		return e.complexity.ContractCommunity.Contract(childComplexity), true
+
+	case "ContractCommunityKey.contract":
+		if e.complexity.ContractCommunityKey.Contract == nil {
+			break
+		}
+
+		return e.complexity.ContractCommunityKey.Contract(childComplexity), true
 
 	case "CreateCollectionPayload.collection":
 		if e.complexity.CreateCollectionPayload.Collection == nil {
@@ -9454,8 +9500,18 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
+
+type ContractCommunityKey {
+  contract: ChainAddress
+}
+
 input ContractCommunityKeyInput {
   contract: ChainAddressInput!
+}
+
+type ArtBlocksCommunityKey {
+    contract: ChainAddress
+    projectID: String
 }
 
 input ArtBlocksCommunityKeyInput {
@@ -9893,10 +9949,12 @@ type TokenHoldersConnection {
 }
 
 type ContractCommunity @goEmbedHelper {
+  communityKey: ContractCommunityKey
   contract: Contract @goField(forceResolver: true)
 }
 
 type ArtBlocksCommunity @goEmbedHelper {
+  communityKey: ArtBlocksCommunityKey
   contract: Contract @goField(forceResolver: true)
   projectID: String
 }
@@ -17193,6 +17251,53 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_admire(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _ArtBlocksCommunity_communityKey(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunity) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArtBlocksCommunity_communityKey(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CommunityKey, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ArtBlocksCommunityKey)
+	fc.Result = res
+	return ec.marshalOArtBlocksCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐArtBlocksCommunityKey(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArtBlocksCommunity_communityKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArtBlocksCommunity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "contract":
+				return ec.fieldContext_ArtBlocksCommunityKey_contract(ctx, field)
+			case "projectID":
+				return ec.fieldContext_ArtBlocksCommunityKey_projectID(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ArtBlocksCommunityKey", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ArtBlocksCommunity_contract(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunity) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ArtBlocksCommunity_contract(ctx, field)
 	if err != nil {
@@ -17291,6 +17396,94 @@ func (ec *executionContext) _ArtBlocksCommunity_projectID(ctx context.Context, f
 func (ec *executionContext) fieldContext_ArtBlocksCommunity_projectID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ArtBlocksCommunity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArtBlocksCommunityKey_contract(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunityKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArtBlocksCommunityKey_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Contract, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArtBlocksCommunityKey_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArtBlocksCommunityKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "address":
+				return ec.fieldContext_ChainAddress_address(ctx, field)
+			case "chain":
+				return ec.fieldContext_ChainAddress_chain(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainAddress", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArtBlocksCommunityKey_projectID(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunityKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArtBlocksCommunityKey_projectID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProjectID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArtBlocksCommunityKey_projectID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArtBlocksCommunityKey",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -24067,6 +24260,51 @@ func (ec *executionContext) fieldContext_Contract_isSpam(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _ContractCommunity_communityKey(ctx context.Context, field graphql.CollectedField, obj *model.ContractCommunity) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ContractCommunity_communityKey(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CommunityKey, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ContractCommunityKey)
+	fc.Result = res
+	return ec.marshalOContractCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContractCommunityKey(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ContractCommunity_communityKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ContractCommunity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "contract":
+				return ec.fieldContext_ContractCommunityKey_contract(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ContractCommunityKey", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ContractCommunity_contract(ctx context.Context, field graphql.CollectedField, obj *model.ContractCommunity) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ContractCommunity_contract(ctx, field)
 	if err != nil {
@@ -24129,6 +24367,53 @@ func (ec *executionContext) fieldContext_ContractCommunity_contract(ctx context.
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ContractCommunityKey_contract(ctx context.Context, field graphql.CollectedField, obj *model.ContractCommunityKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ContractCommunityKey_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Contract, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ContractCommunityKey_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ContractCommunityKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "address":
+				return ec.fieldContext_ChainAddress_address(ctx, field)
+			case "chain":
+				return ec.fieldContext_ChainAddress_chain(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainAddress", field.Name)
 		},
 	}
 	return fc, nil
@@ -72597,6 +72882,10 @@ func (ec *executionContext) _ArtBlocksCommunity(ctx context.Context, sel ast.Sel
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("ArtBlocksCommunity")
+		case "communityKey":
+
+			out.Values[i] = ec._ArtBlocksCommunity_communityKey(ctx, field, obj)
+
 		case "contract":
 			field := field
 
@@ -72617,6 +72906,35 @@ func (ec *executionContext) _ArtBlocksCommunity(ctx context.Context, sel ast.Sel
 		case "projectID":
 
 			out.Values[i] = ec._ArtBlocksCommunity_projectID(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var artBlocksCommunityKeyImplementors = []string{"ArtBlocksCommunityKey"}
+
+func (ec *executionContext) _ArtBlocksCommunityKey(ctx context.Context, sel ast.SelectionSet, obj *model.ArtBlocksCommunityKey) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, artBlocksCommunityKeyImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ArtBlocksCommunityKey")
+		case "contract":
+
+			out.Values[i] = ec._ArtBlocksCommunityKey_contract(ctx, field, obj)
+
+		case "projectID":
+
+			out.Values[i] = ec._ArtBlocksCommunityKey_projectID(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -74422,6 +74740,10 @@ func (ec *executionContext) _ContractCommunity(ctx context.Context, sel ast.Sele
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("ContractCommunity")
+		case "communityKey":
+
+			out.Values[i] = ec._ContractCommunity_communityKey(ctx, field, obj)
+
 		case "contract":
 			field := field
 
@@ -74439,6 +74761,31 @@ func (ec *executionContext) _ContractCommunity(ctx context.Context, sel ast.Sele
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var contractCommunityKeyImplementors = []string{"ContractCommunityKey"}
+
+func (ec *executionContext) _ContractCommunityKey(ctx context.Context, sel ast.SelectionSet, obj *model.ContractCommunityKey) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, contractCommunityKeyImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ContractCommunityKey")
+		case "contract":
+
+			out.Values[i] = ec._ContractCommunityKey_contract(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -86230,6 +86577,13 @@ func (ec *executionContext) marshalOAdmireTokenPayloadOrError2githubᚗcomᚋmik
 	return ec._AdmireTokenPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOArtBlocksCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐArtBlocksCommunityKey(ctx context.Context, sel ast.SelectionSet, v *model.ArtBlocksCommunityKey) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ArtBlocksCommunityKey(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -87096,6 +87450,13 @@ func (ec *executionContext) marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._Contract(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOContractCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContractCommunityKey(ctx context.Context, sel ast.SelectionSet, v *model.ContractCommunityKey) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ContractCommunityKey(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOCreateCollectionInGalleryInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInGalleryInput(ctx context.Context, v interface{}) ([]*model.CreateCollectionInGalleryInput, error) {

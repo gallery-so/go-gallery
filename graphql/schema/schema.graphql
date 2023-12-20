@@ -163,8 +163,18 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
+
+type ContractCommunityKey {
+  contract: ChainAddress
+}
+
 input ContractCommunityKeyInput {
   contract: ChainAddressInput!
+}
+
+type ArtBlocksCommunityKey {
+    contract: ChainAddress
+    projectID: String
 }
 
 input ArtBlocksCommunityKeyInput {
@@ -602,10 +612,12 @@ type TokenHoldersConnection {
 }
 
 type ContractCommunity @goEmbedHelper {
+  communityKey: ContractCommunityKey
   contract: Contract @goField(forceResolver: true)
 }
 
 type ArtBlocksCommunity @goEmbedHelper {
+  communityKey: ArtBlocksCommunityKey
   contract: Contract @goField(forceResolver: true)
   projectID: String
 }
