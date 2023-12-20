@@ -184,6 +184,17 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countAllUsers = `-- name: CountAllUsers :one
+SELECT count(*) FROM users WHERE deleted = false and universal = false
+`
+
+func (q *Queries) CountAllUsers(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllUsers)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countCommentsAndRepliesByFeedEventID = `-- name: CountCommentsAndRepliesByFeedEventID :one
 SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
 `
@@ -499,6 +510,85 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 		&i.MentionID,
 	)
 	return i, err
+}
+
+const createAnnouncementNotifications = `-- name: CreateAnnouncementNotifications :many
+WITH 
+id_with_row_number AS (
+    SELECT unnest($4::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($4::varchar(255)[])) AS rn
+),
+user_with_row_number AS (
+    SELECT id AS user_id, row_number() OVER () AS rn
+    FROM users
+    WHERE deleted = false AND universal = false
+)
+INSERT INTO notifications (id, owner_id, action, data, event_ids)
+SELECT 
+    i.id, 
+    u.user_id, 
+    $1, 
+    $2, 
+    $3
+FROM 
+    id_with_row_number i
+JOIN 
+    user_with_row_number u ON i.rn = u.rn
+RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+`
+
+type CreateAnnouncementNotificationsParams struct {
+	Action   persist.Action           `db:"action" json:"action"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	Ids      []string                 `db:"ids" json:"ids"`
+}
+
+// later on, we might want to add a "global" column to notifications or even an enum column like "match" to determine how largely consumed
+// notifications will get searched for for a given user. For example, global notifications will always return for a user and follower notifications will
+// perform the check to see if the user follows the owner of the notification. Where this breaks is how we handle "seen" notifications. Since there is 1:1 notifications to users
+// right now, we can't have a "seen" field on the notification itself. We would have to move seen out into a separate table.
+func (q *Queries) CreateAnnouncementNotifications(ctx context.Context, arg CreateAnnouncementNotificationsParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, createAnnouncementNotifications,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.Ids,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+			&i.PostID,
+			&i.TokenID,
+			&i.ContractID,
+			&i.MentionID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const createCollection = `-- name: CreateCollection :one

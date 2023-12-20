@@ -5,8 +5,8 @@ import (
 )
 
 type AnnouncementDetails struct {
-	Platform             string `json:"platform"`
-	InternalID           string `json:"internal_id"`
+	Platform             string `json:"platform" binding:"required"`
+	InternalID           string `json:"internal_id" binding:"required"`
 	ImageURL             string `json:"image_url,omitempty"`
 	Title                string `json:"title,omitempty"`
 	Description          string `json:"description,omitempty"`

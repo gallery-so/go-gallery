@@ -5,20 +5,25 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
+	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
 	"github.com/sendgrid/sendgrid-go"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/limiters"
+	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/task"
 )
 
-func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, papi *publicapi.PublicAPI) *gin.Engine {
+func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, papi *publicapi.PublicAPI, psub *pubsub.Client, t *task.Client, notifLock *redislock.Client) *gin.Engine {
 	sendGroup := router.Group("/send")
 
 	sendGroup.POST("/notifications", middleware.AdminRequired(), adminSendNotificationEmail(queries, s))
@@ -49,6 +54,14 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 
 	notificationsGroup := router.Group("/notifications")
 	notificationsGroup.GET("/send", middleware.CloudSchedulerMiddleware, sendNotificationEmails(queries, s, r))
+	notificationsGroup.POST("/announcement", middleware.RetoolMiddleware, useEventHandler(queries, psub, t, notifLock), sendAnnouncementNotification())
 
 	return router
+}
+
+func useEventHandler(q *coredb.Queries, p *pubsub.Client, t *task.Client, l *redislock.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		event.AddTo(c, false, notifications.New(q, p, t, l, false), q, t)
+		c.Next()
+	}
 }

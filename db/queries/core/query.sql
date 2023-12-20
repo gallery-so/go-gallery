@@ -886,6 +886,37 @@ JOIN
     follower_with_row_number f ON i.rn = f.rn
 RETURNING *;
 
+-- later on, we might want to add a "global" column to notifications or even an enum column like "match" to determine how largely consumed
+-- notifications will get searched for for a given user. For example, global notifications will always return for a user and follower notifications will
+-- perform the check to see if the user follows the owner of the notification. Where this breaks is how we handle "seen" notifications. Since there is 1:1 notifications to users
+-- right now, we can't have a "seen" field on the notification itself. We would have to move seen out into a separate table.
+-- name: CreateAnnouncementNotifications :many
+WITH 
+id_with_row_number AS (
+    SELECT unnest(@ids::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest(@ids::varchar(255)[])) AS rn
+),
+user_with_row_number AS (
+    SELECT id AS user_id, row_number() OVER () AS rn
+    FROM users
+    WHERE deleted = false AND universal = false
+)
+INSERT INTO notifications (id, owner_id, action, data, event_ids)
+SELECT 
+    i.id, 
+    u.user_id, 
+    $1, 
+    $2, 
+    $3
+FROM 
+    id_with_row_number i
+JOIN 
+    user_with_row_number u ON i.rn = u.rn
+RETURNING *;
+
+-- name: CountAllUsers :one
+SELECT count(*) FROM users WHERE deleted = false and universal = false;
+
+
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 

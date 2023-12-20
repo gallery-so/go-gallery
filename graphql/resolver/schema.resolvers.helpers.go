@@ -1099,6 +1099,22 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Comment:      nil, // handled by dedicated resolver
 			Admirers:     nil, // handled by dedicated resolver
 		}, nil
+	case persist.ActionAnnouncement:
+		return model.GalleryAnnouncementNotification{
+			Dbid:                 notif.ID,
+			Seen:                 &notif.Seen,
+			CreationTime:         &notif.CreatedAt,
+			UpdatedTime:          &notif.LastUpdated,
+			Platform:             model.Platform(notif.Data.AnnouncementDetails.Platform),
+			InternalID:           notif.Data.AnnouncementDetails.InternalID,
+			ImageURL:             util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.ImageURL),
+			Title:                util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.Title),
+			Description:          util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.Description),
+			CtaText:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTALink),
+			CtaLink:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTAText),
+			PushNotificationText: util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.PushNotificationText),
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}

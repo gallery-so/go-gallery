@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
@@ -150,6 +151,26 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redi
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			return
 		}
+	}
+}
+
+func sendAnnouncementNotification() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var in persist.AnnouncementDetails
+		err := ctx.ShouldBindJSON(&in)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusBadRequest, err)
+			return
+		}
+
+		err = event.Dispatch(ctx, coredb.Event{
+			ID:             persist.GenerateID(),
+			ResourceTypeID: persist.ResourceTypeUser,
+			Action:         persist.ActionAnnouncement,
+			Data: persist.EventData{
+				AnnouncementDetails: &in,
+			},
+		})
 	}
 }
 
