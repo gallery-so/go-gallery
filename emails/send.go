@@ -154,7 +154,11 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redi
 	}
 }
 
-func sendAnnouncementNotification() gin.HandlerFunc {
+func sendAnnouncementNotification(q *coredb.Queries) gin.HandlerFunc {
+	galleryUser, err := q.GetUserByUsername(context.Background(), "gallery")
+	if err != nil {
+		panic(err)
+	}
 	return func(c *gin.Context) {
 		var in persist.AnnouncementDetails
 		err := c.ShouldBindJSON(&in)
@@ -167,6 +171,8 @@ func sendAnnouncementNotification() gin.HandlerFunc {
 			ID:             persist.GenerateID(),
 			ResourceTypeID: persist.ResourceTypeUser,
 			Action:         persist.ActionAnnouncement,
+			UserID:         galleryUser.ID,
+			ActorID:        persist.DBIDToNullStr(galleryUser.ID),
 			Data: persist.EventData{
 				AnnouncementDetails: &in,
 			},
