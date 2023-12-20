@@ -2981,7 +2981,7 @@ type Mutation {
   ): FollowAllSocialConnectionsPayloadOrError @authRequired
   followAllOnboardingRecommendations(
     """
-    A cursor returned from `onboardingUserRecommendations` can be provided to follow all users from when the
+    A cursor returned from `Viewer.suggestedUsers` can be provided to follow all users from when the
     cursor was generated. Otherwise, all users from the current recommendation set will be followed instead.
     """
     cursor: String

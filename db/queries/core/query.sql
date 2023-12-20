@@ -1827,9 +1827,9 @@ WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
 
 -- name: GetOnboardingUserRecommendations :many
 with sources as (
-    select id from users where (traits->>'top_activity')::bool -- activity badges
-    union all select recommended_user_id from top_recommended_users -- most freq rec from last 30 days
-    union all select user_id from user_internal_recommendations -- hand picked
+    select id from users where (traits->>'top_activity')::bool
+    union all select recommended_user_id from top_recommended_users
+    union all select user_id from user_internal_recommendations
 ), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
 select users.* from users join top_recs using(id) where not users.deleted and not users.universal limit $1;
 
