@@ -687,7 +687,7 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, tokensCh <-chan chainTokens, contractsCh <-chan chainContracts, errCh <-chan error) ([]op.TokenFullDetails, error) {
 	tokensFromProviders := make([]chainTokens, 0, len(user.Wallets))
 	contractsFromProviders := make([]chainContracts, 0, len(user.Wallets))
-	discrepencyLog := map[int]int{}
+	discrepancyLog := map[int]int{}
 
 	var tokenOpen, contractOpen bool
 	var tokens chainTokens
@@ -699,7 +699,7 @@ receiverLoop:
 		select {
 		case tokens, tokenOpen = <-tokensCh:
 			if tokenOpen {
-				discrepencyLog[tokens.priority] = len(tokens.tokens)
+				discrepancyLog[tokens.priority] = len(tokens.tokens)
 				tokensFromProviders = append(tokensFromProviders, tokens)
 				logger.For(ctx).Infof("received %d incoming agnostic tokens for user %s", len(tokens.tokens), user.ID)
 				continue
@@ -737,8 +737,8 @@ receiverLoop:
 		logger.For(ctx).Warnf("error occured by a provider: %s; continuing since others succeeded", err)
 	}
 
-	if !util.AllEqual(util.MapValues(discrepencyLog)) {
-		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
+	if !util.AllEqual(util.MapValues(discrepancyLog)) {
+		logger.For(ctx).Warnf("number of tokens varied across providers: %+v", discrepancyLog)
 	}
 
 	_, persistedContracts, err := p.processContracts(ctx, contractsFromProviders, nil, false)
@@ -941,13 +941,13 @@ func (p *Provider) syncCreatedTokensForContract(ctx context.Context, user persis
 	contractsFromProviders := make([]chainContracts, 0, 1)
 
 	errs := []error{}
-	discrepencyLog := map[int]int{}
+	discrepancyLog := map[int]int{}
 
 outer:
 	for {
 		select {
 		case incomingTokens := <-incomingTokens:
-			discrepencyLog[incomingTokens.priority] = len(incomingTokens.tokens)
+			discrepancyLog[incomingTokens.priority] = len(incomingTokens.tokens)
 			tokensFromProviders = append(tokensFromProviders, incomingTokens)
 		case incomingContracts, ok := <-incomingContracts:
 			if !ok {
@@ -964,8 +964,8 @@ outer:
 	if len(errs) > 0 && len(tokensFromProviders) == 0 {
 		return errs[0]
 	}
-	if !util.AllEqual(util.MapValues(discrepencyLog)) {
-		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
+	if !util.AllEqual(util.MapValues(discrepancyLog)) {
+		logger.For(ctx).Warnf("number of tokens varied across providers: %+v", discrepancyLog)
 	}
 
 	_, persistedContracts, err := p.processContracts(ctx, contractsFromProviders, nil, false)
