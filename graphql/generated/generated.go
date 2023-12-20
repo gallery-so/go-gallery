@@ -9928,7 +9928,6 @@ type Community implements Node @goEmbedHelper {
     @deprecated(reason: "Use Community.creators to get an address")
   creator: GalleryUserOrAddress
     @goField(forceResolver: true)
-    @deprecated(reason: "Use Community.creators")
 
   tokensInCommunity(
     before: String
