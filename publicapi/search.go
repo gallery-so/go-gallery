@@ -66,16 +66,18 @@ func (api SearchAPI) SearchGalleries(ctx context.Context, query string, limit in
 	})
 }
 
-// SearchContracts searches for contracts with the given query, limit, and optional weights. Weights may be nil to accept default values.
+// SearchCommunities searches for contracts with the given query, limit, and optional weights. Weights may be nil to accept default values.
 // Weighting will probably be removed after we settle on defaults that feel correct!
-func (api SearchAPI) SearchContracts(ctx context.Context, query string, limit int, nameWeight float32, descriptionWeight float32, poapAddressWeight float32) ([]db.Contract, error) {
+func (api SearchAPI) SearchCommunities(ctx context.Context, query string, limit int, nameWeight float32,
+	descriptionWeight float32, poapAddressWeight float32, providerNameWeight float32) ([]db.Community, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"query":             validate.WithTag(query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)),
-		"limit":             validate.WithTag(limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)),
-		"nameWeight":        validate.WithTag(nameWeight, "gte=0.0,lte=1.0"),
-		"descriptionWeight": validate.WithTag(descriptionWeight, "gte=0.0,lte=1.0"),
-		"poapAddressWeight": validate.WithTag(poapAddressWeight, "gte=0.0,lte=1.0"),
+		"query":              validate.WithTag(query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)),
+		"limit":              validate.WithTag(limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)),
+		"nameWeight":         validate.WithTag(nameWeight, "gte=0.0,lte=1.0"),
+		"descriptionWeight":  validate.WithTag(descriptionWeight, "gte=0.0,lte=1.0"),
+		"poapAddressWeight":  validate.WithTag(poapAddressWeight, "gte=0.0,lte=1.0"),
+		"providerNameWeight": validate.WithTag(providerNameWeight, "gte=0.0,lte=1.0"),
 	}); err != nil {
 		return nil, err
 	}
@@ -83,11 +85,12 @@ func (api SearchAPI) SearchContracts(ctx context.Context, query string, limit in
 	// Sanitize
 	query = validate.SanitizationPolicy.Sanitize(query)
 
-	return api.queries.SearchContracts(ctx, db.SearchContractsParams{
-		Limit:             int32(limit),
-		Query:             query,
-		NameWeight:        nameWeight,
-		DescriptionWeight: descriptionWeight,
-		PoapAddressWeight: poapAddressWeight,
+	return api.queries.SearchCommunities(ctx, db.SearchCommunitiesParams{
+		Limit:              int32(limit),
+		Query:              query,
+		NameWeight:         nameWeight,
+		DescriptionWeight:  descriptionWeight,
+		PoapAddressWeight:  poapAddressWeight,
+		ProviderNameWeight: providerNameWeight,
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1041,9 +1042,9 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeoneMentionedYourCommunityNotification{
 			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
 
-				ContractID: notif.ContractID,
-				PostID:     postID,
-				CommentID:  commentID,
+				CommunityID: notif.CommunityID,
+				PostID:      postID,
+				CommentID:   commentID,
 			},
 			Dbid:          notif.ID,
 			Seen:          &notif.Seen,
@@ -1056,8 +1057,8 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeonePostedYourWorkNotification{
 			HelperSomeonePostedYourWorkNotificationData: model.HelperSomeonePostedYourWorkNotificationData{
 
-				ContractID: notif.ContractID,
-				PostID:     notif.PostID,
+				CommunityID: notif.CommunityID,
+				PostID:      notif.PostID,
 			},
 			Dbid:         notif.ID,
 			Seen:         &notif.Seen,
@@ -2101,15 +2102,48 @@ func collectionTokenToModel(ctx context.Context, token *model.Token, collectionI
 }
 
 func getContractCommunity(ctx context.Context, community db.Community) *model.ContractCommunity {
+	// TODO: There should really be a centralized way to convert generic community keys to subtype
+	// keys and vice-versa.
+	var key *model.ContractCommunityKey
+
+	chainInt, err := strconv.Atoi(community.Key1)
+	if err == nil {
+		key = &model.ContractCommunityKey{
+			Contract: util.ToPointer(persist.NewChainAddress(persist.Address(community.Key2), persist.Chain(chainInt))),
+		}
+	} else {
+		err = fmt.Errorf("failed to parse chain for community with ID %s: %w", community.ID, err)
+		logger.For(ctx).WithError(err).Error(err)
+		sentryutil.ReportError(ctx, err)
+	}
+
 	return &model.ContractCommunity{
 		HelperContractCommunityData: model.HelperContractCommunityData{Community: community},
+		CommunityKey:                key,
 		Contract:                    nil, // handled by dedicated resolver
 	}
 }
 
 func getArtBlocksCommunity(ctx context.Context, community db.Community) *model.ArtBlocksCommunity {
+	// TODO: There should really be a centralized way to convert generic community keys to subtype
+	// keys and vice-versa.
+	var key *model.ArtBlocksCommunityKey
+
+	chainInt, err := strconv.Atoi(community.Key1)
+	if err == nil {
+		key = &model.ArtBlocksCommunityKey{
+			Contract:  util.ToPointer(persist.NewChainAddress(persist.Address(community.Key2), persist.Chain(chainInt))),
+			ProjectID: util.ToPointer(community.Key3),
+		}
+	} else {
+		err = fmt.Errorf("failed to parse chain for community with ID %s: %w", community.ID, err)
+		logger.For(ctx).WithError(err).Error(err)
+		sentryutil.ReportError(ctx, err)
+	}
+
 	return &model.ArtBlocksCommunity{
 		HelperArtBlocksCommunityData: model.HelperArtBlocksCommunityData{Community: community},
+		CommunityKey:                 key,
 		Contract:                     nil, // handled by dedicated resolver
 		ProjectID:                    util.ToPointer(community.Key3),
 	}
@@ -2612,8 +2646,8 @@ func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
 	switch {
 	case mention.UserID != "":
 		m.HelperMentionData.UserID = &mention.UserID
-	case mention.ContractID != "":
-		m.HelperMentionData.CommunityID = &mention.ContractID
+	case mention.CommunityID != "":
+		m.HelperMentionData.CommunityID = &mention.CommunityID
 	default:
 		panic(fmt.Sprintf("unknown mention type: %+v", mention))
 	}

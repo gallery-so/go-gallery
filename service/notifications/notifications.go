@@ -971,12 +971,12 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		data.PreviewText = preview
 
 		if n.Action == persist.ActionMentionCommunity {
-			contract, err := queries.GetContractByID(ctx, n.ContractID)
+			community, err := queries.GetCommunityByID(ctx, n.CommunityID)
 			if err != nil {
 				return UserFacingNotificationData{}, err
 			}
 
-			data.Action = fmt.Sprintf("mentioned your community @%s in a comment", contract.Name.String)
+			data.Action = fmt.Sprintf("mentioned your community @%s in a comment", community.Name)
 		} else {
 			data.Action = "mentioned you in a comment"
 		}
@@ -1035,15 +1035,15 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		if !actor.Username.Valid {
 			return UserFacingNotificationData{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
 		}
-		contract, err := queries.GetContractByID(ctx, n.ContractID)
+		community, err := queries.GetCommunityByID(ctx, n.CommunityID)
 		if err != nil {
 			return UserFacingNotificationData{}, err
 		}
 		return UserFacingNotificationData{
 			Actor:          actor.Username.String,
 			Action:         "posted your work",
-			CollectionName: contract.Name.String,
-			CollectionID:   contract.ID,
+			CollectionName: community.Name,
+			CollectionID:   community.ID,
 			PreviewText:    util.TruncateWithEllipsis(post.Caption.String, 40),
 		}, nil
 
@@ -1372,27 +1372,27 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			MentionID: notif.MentionID,
 		})
 	case persist.ActionMentionCommunity:
-		return queries.CreateContractNotification(ctx, db.CreateContractNotificationParams{
-			ID:         id,
-			OwnerID:    notif.OwnerID,
-			Action:     notif.Action,
-			Data:       notif.Data,
-			EventIds:   notif.EventIds,
-			FeedEvent:  util.ToNullString(notif.FeedEventID.String(), true),
-			Post:       util.ToNullString(notif.PostID.String(), true),
-			Comment:    util.ToNullString(notif.CommentID.String(), true),
-			MentionID:  notif.MentionID,
-			ContractID: notif.ContractID,
+		return queries.CreateCommunityNotification(ctx, db.CreateCommunityNotificationParams{
+			ID:          id,
+			OwnerID:     notif.OwnerID,
+			Action:      notif.Action,
+			Data:        notif.Data,
+			EventIds:    notif.EventIds,
+			FeedEvent:   util.ToNullString(notif.FeedEventID.String(), true),
+			Post:        util.ToNullString(notif.PostID.String(), true),
+			Comment:     util.ToNullString(notif.CommentID.String(), true),
+			MentionID:   notif.MentionID,
+			CommunityID: notif.CommunityID,
 		})
 	case persist.ActionUserPostedYourWork:
 		return queries.CreateUserPostedYourWorkNotification(ctx, db.CreateUserPostedYourWorkNotificationParams{
-			ID:         id,
-			OwnerID:    notif.OwnerID,
-			Action:     notif.Action,
-			Data:       notif.Data,
-			EventIds:   notif.EventIds,
-			Post:       util.ToNullString(notif.PostID.String(), true),
-			ContractID: notif.ContractID,
+			ID:          id,
+			OwnerID:     notif.OwnerID,
+			Action:      notif.Action,
+			Data:        notif.Data,
+			EventIds:    notif.EventIds,
+			Post:        util.ToNullString(notif.PostID.String(), true),
+			CommunityID: notif.CommunityID,
 		})
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
