@@ -1372,7 +1372,7 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			MentionID: notif.MentionID,
 		})
 	case persist.ActionMentionCommunity:
-		return queries.CreateContractNotification(ctx, db.CreateContractNotificationParams{
+		return queries.CreateCommunityNotification(ctx, db.CreateCommunityNotificationParams{
 			ID:          id,
 			OwnerID:     notif.OwnerID,
 			Action:      notif.Action,

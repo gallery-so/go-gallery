@@ -767,11 +767,11 @@ func (q *Queries) CreateCommunityEvent(ctx context.Context, arg CreateCommunityE
 	return i, err
 }
 
-const createContractNotification = `-- name: CreateContractNotification :one
+const createCommunityNotification = `-- name: CreateCommunityNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, community_id, mention_id) VALUES ($1, $2, $3, $4, $5, $8, $9, $10, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
 `
 
-type CreateContractNotificationParams struct {
+type CreateCommunityNotificationParams struct {
 	ID          persist.DBID             `db:"id" json:"id"`
 	OwnerID     persist.DBID             `db:"owner_id" json:"owner_id"`
 	Action      persist.Action           `db:"action" json:"action"`
@@ -784,8 +784,8 @@ type CreateContractNotificationParams struct {
 	Comment     sql.NullString           `db:"comment" json:"comment"`
 }
 
-func (q *Queries) CreateContractNotification(ctx context.Context, arg CreateContractNotificationParams) (Notification, error) {
-	row := q.db.QueryRow(ctx, createContractNotification,
+func (q *Queries) CreateCommunityNotification(ctx context.Context, arg CreateCommunityNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createCommunityNotification,
 		arg.ID,
 		arg.OwnerID,
 		arg.Action,
