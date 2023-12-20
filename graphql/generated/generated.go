@@ -437,6 +437,7 @@ type ComplexityRoot struct {
 
 	EmailNotificationSettings struct {
 		UnsubscribedFromAll           func(childComplexity int) int
+		UnsubscribedFromDigest        func(childComplexity int) int
 		UnsubscribedFromNotifications func(childComplexity int) int
 	}
 
@@ -3444,6 +3445,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.EmailNotificationSettings.UnsubscribedFromAll(childComplexity), true
+
+	case "EmailNotificationSettings.unsubscribedFromDigest":
+		if e.complexity.EmailNotificationSettings.UnsubscribedFromDigest == nil {
+			break
+		}
+
+		return e.complexity.EmailNotificationSettings.UnsubscribedFromDigest(childComplexity), true
 
 	case "EmailNotificationSettings.unsubscribedFromNotifications":
 		if e.complexity.EmailNotificationSettings.UnsubscribedFromNotifications == nil {
@@ -10205,6 +10213,7 @@ enum EmailVerificationStatus {
 enum EmailUnsubscriptionType {
   All
   Notifications
+  Digest
 }
 
 type UserEmail {
@@ -10216,11 +10225,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -24946,6 +24957,47 @@ func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromNotificat
 }
 
 func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedFromNotifications(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EmailNotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromDigest(ctx context.Context, field graphql.CollectedField, obj *model.EmailNotificationSettings) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UnsubscribedFromDigest, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "EmailNotificationSettings",
 		Field:      field,
@@ -61332,6 +61384,8 @@ func (ec *executionContext) fieldContext_UserEmail_emailNotificationSettings(ctx
 				return ec.fieldContext_EmailNotificationSettings_unsubscribedFromAll(ctx, field)
 			case "unsubscribedFromNotifications":
 				return ec.fieldContext_EmailNotificationSettings_unsubscribedFromNotifications(ctx, field)
+			case "unsubscribedFromDigest":
+				return ec.fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type EmailNotificationSettings", field.Name)
 		},
@@ -67920,7 +67974,7 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"unsubscribedFromAll", "unsubscribedFromNotifications"}
+	fieldsInOrder := [...]string{"unsubscribedFromAll", "unsubscribedFromNotifications", "unsubscribedFromDigest"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -67945,6 +67999,15 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 				return it, err
 			}
 			it.UnsubscribedFromNotifications = data
+		case "unsubscribedFromDigest":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unsubscribedFromDigest"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UnsubscribedFromDigest = data
 		}
 	}
 
@@ -75338,6 +75401,10 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "unsubscribedFromDigest":
+
+			out.Values[i] = ec._EmailNotificationSettings_unsubscribedFromDigest(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

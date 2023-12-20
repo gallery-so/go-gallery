@@ -3,11 +3,15 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/redis"
-	"net/http"
+	"google.golang.org/api/idtoken"
 
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
@@ -250,4 +254,83 @@ func Tracing() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func CloudSchedulerMiddleware(c *gin.Context) {
+
+	idToken := c.GetHeader("Authorization")
+	if idToken == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "No ID token provided"})
+		return
+	}
+
+	_, err := validateIDToken(c, idToken)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid ID token"})
+		return
+	}
+
+	c.Next()
+}
+
+func validateIDToken(ctx context.Context, idToken string) (*idtoken.Payload, error) {
+
+	idToken = strings.TrimPrefix(idToken, "Bearer ")
+
+	validator, err := idtoken.NewValidator(ctx)
+	if err != nil {
+		logger.For(nil).Errorf("error creating id token validator: %s", err)
+		return nil, err
+	}
+
+	payload, err := validator.Validate(ctx, idToken, env.GetString("SCHEDULER_AUDIENCE"))
+	if err != nil {
+		logger.For(nil).Errorf("error validating id token: %s", err)
+		return nil, err
+	}
+
+	serviceEmail, err := getServiceAccountEmail()
+	if err != nil {
+		logger.For(nil).Errorf("error getting service account email: %s", err)
+		return nil, err
+	}
+
+	if payload.Claims["email"] != serviceEmail {
+		logger.For(nil).Errorf("id token email does not match service account email: %s", err)
+		return nil, err
+	}
+
+	return payload, nil
+}
+
+func getServiceAccountEmail() (string, error) {
+	const url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email"
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("Metadata-Flavor", "Google")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}
+
+func RetoolMiddleware(ctx *gin.Context) {
+	if err := auth.RetoolAuthorized(ctx); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.Next()
 }

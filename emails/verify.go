@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"net/http"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/emails"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -22,35 +24,9 @@ func init() {
 	env.RegisterValidation("SENDGRID_API_KEY", "required")
 }
 
-type VerifyEmailInput struct {
-	JWT string `json:"jwt" binding:"required"`
-}
-
-type VerifyEmailOutput struct {
-	UserID persist.DBID  `json:"user_id"`
-	Email  persist.Email `json:"email"`
-}
-
-type PreverifyEmailInput struct {
-	Email  persist.Email `form:"email" binding:"required"`
-	Source string        `form:"source" binding:"required"`
-}
-
-type PreverifyEmailOutput struct {
-	Result PreverifyEmailResult `json:"result"`
-}
-
-type PreverifyEmailResult int
-
-const (
-	PreverifyEmailResultInvalid PreverifyEmailResult = iota
-	PreverifyEmailResultRisky
-	PreverifyEmailResultValid
-)
-
 func preverifyEmail() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input PreverifyEmailInput
+		var input emails.PreverifyEmailInput
 		err := c.ShouldBindQuery(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -63,20 +39,20 @@ func preverifyEmail() gin.HandlerFunc {
 			return
 		}
 
-		var preverifyEmailResult PreverifyEmailResult
+		var preverifyEmailResult emails.PreverifyEmailResult
 
 		switch strings.ToLower(result.Result.Verdict) {
 		case "valid":
-			preverifyEmailResult = PreverifyEmailResultValid
+			preverifyEmailResult = emails.PreverifyEmailResultValid
 		case "risky":
-			preverifyEmailResult = PreverifyEmailResultRisky
+			preverifyEmailResult = emails.PreverifyEmailResultRisky
 		case "invalid":
-			preverifyEmailResult = PreverifyEmailResultInvalid
+			preverifyEmailResult = emails.PreverifyEmailResultInvalid
 		default:
-			preverifyEmailResult = PreverifyEmailResultInvalid
+			preverifyEmailResult = emails.PreverifyEmailResultInvalid
 		}
 
-		c.JSON(http.StatusOK, PreverifyEmailOutput{
+		c.JSON(http.StatusOK, emails.PreverifyEmailOutput{
 			Result: preverifyEmailResult,
 		})
 
@@ -86,7 +62,7 @@ func preverifyEmail() gin.HandlerFunc {
 func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input VerifyEmailInput
+		var input emails.VerifyEmailInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -130,7 +106,7 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, VerifyEmailOutput{
+		c.JSON(http.StatusOK, emails.VerifyEmailOutput{
 			UserID: userWithPII.ID,
 			Email:  userWithPII.PiiEmailAddress,
 		})

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/mikeydub/go-gallery/emails"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -18,44 +17,89 @@ func init() {
 	env.RegisterValidation("EMAILS_HOST", "required")
 }
 
-func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, error) {
-	input := emails.VerifyEmailInput{
+type VerifyEmailOutput struct {
+	UserID persist.DBID  `json:"user_id"`
+	Email  persist.Email `json:"email"`
+}
+
+type VerifyEmailInput struct {
+	JWT string `json:"jwt" binding:"required"`
+}
+
+type PreverifyEmailInput struct {
+	Email  persist.Email `form:"email" binding:"required"`
+	Source string        `form:"source" binding:"required"`
+}
+
+type PreverifyEmailOutput struct {
+	Result PreverifyEmailResult `json:"result"`
+}
+
+type PreverifyEmailResult int
+
+const (
+	PreverifyEmailResultInvalid PreverifyEmailResult = iota
+	PreverifyEmailResultRisky
+	PreverifyEmailResultValid
+)
+
+type UnsubInput struct {
+	JWT    string                          `json:"jwt" binding:"required"`
+	Unsubs []model.EmailUnsubscriptionType `json:"unsubscriptions" binding:"required"`
+}
+
+type ResubInput struct {
+	JWT    string                          `json:"jwt" binding:"required"`
+	Resubs []model.EmailUnsubscriptionType `json:"resubscriptions" binding:"required"`
+}
+
+type UpdateSubscriptionsTypeInput struct {
+	UserID persist.DBID                 `json:"user_id" binding:"required"`
+	Unsubs persist.EmailUnsubscriptions `json:"unsubscriptions" binding:"required"`
+}
+
+type VerificationEmailInput struct {
+	UserID persist.DBID `json:"user_id" binding:"required"`
+}
+
+func VerifyEmail(ctx context.Context, token string) (VerifyEmailOutput, error) {
+	input := VerifyEmailInput{
 		JWT: token,
 	}
 	body, err := json.Marshal(input)
 	if err != nil {
-		return emails.VerifyEmailOutput{}, err
+		return VerifyEmailOutput{}, err
 	}
 
 	buf := bytes.NewBuffer(body)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/verify", env.GetString("EMAILS_HOST")), buf)
 	if err != nil {
-		return emails.VerifyEmailOutput{}, err
+		return VerifyEmailOutput{}, err
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return emails.VerifyEmailOutput{}, err
+		return VerifyEmailOutput{}, err
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return emails.VerifyEmailOutput{}, util.GetErrFromResp(resp)
+		return VerifyEmailOutput{}, util.GetErrFromResp(resp)
 	}
 
-	var output emails.VerifyEmailOutput
+	var output VerifyEmailOutput
 	err = json.NewDecoder(resp.Body).Decode(&output)
 	if err != nil {
-		return emails.VerifyEmailOutput{}, err
+		return VerifyEmailOutput{}, err
 	}
 
 	return output, nil
 }
 
-func PreverifyEmail(ctx context.Context, email persist.Email, source string) (emails.PreverifyEmailOutput, error) {
-	var result emails.PreverifyEmailOutput
+func PreverifyEmail(ctx context.Context, email persist.Email, source string) (PreverifyEmailOutput, error) {
+	var result PreverifyEmailOutput
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/preverify?email=%s&source=%s", env.GetString("EMAILS_HOST"), email, source), nil)
 	if err != nil {
@@ -82,7 +126,7 @@ func PreverifyEmail(ctx context.Context, email persist.Email, source string) (em
 }
 
 func UnsubscribeByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
-	input := emails.UnsubInput{
+	input := UnsubInput{
 		JWT:    jwt,
 		Unsubs: unsubTypes,
 	}
@@ -114,7 +158,7 @@ func UnsubscribeByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailU
 }
 
 func UpdateUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID, unsubTypes persist.EmailUnsubscriptions) error {
-	input := emails.UpdateSubscriptionsTypeInput{
+	input := UpdateSubscriptionsTypeInput{
 		UserID: userID,
 		Unsubs: unsubTypes,
 	}
@@ -146,7 +190,7 @@ func UpdateUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID, uns
 }
 
 func RequestVerificationEmail(ctx context.Context, userID persist.DBID) error {
-	input := emails.VerificationEmailInput{
+	input := VerificationEmailInput{
 		UserID: userID,
 	}
 	body, err := json.Marshal(input)

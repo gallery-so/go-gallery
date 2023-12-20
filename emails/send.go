@@ -8,11 +8,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/redis"
 
-	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
@@ -30,13 +32,11 @@ func init() {
 	env.RegisterValidation("FROM_EMAIL", "required", "email")
 	env.RegisterValidation("SENDGRID_VERIFICATION_TEMPLATE_ID", "required")
 	env.RegisterValidation("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "required")
+	env.RegisterValidation("PUBSUB_DIGEST_EMAILS_SUBSCRIPTION", "required")
+
 }
 
 const emailsAtATime = 10_000
-
-type VerificationEmailInput struct {
-	UserID persist.DBID `json:"user_id" binding:"required"`
-}
 
 type sendNotificationEmailHttpInput struct {
 	UserID         persist.DBID  `json:"user_id" binding:"required"`
@@ -55,7 +55,7 @@ type errEmailMismatch struct {
 func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input VerificationEmailInput
+		var input emails.VerificationEmailInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -137,25 +137,20 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 	}
 }
 
-func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client, r *redis.Cache) error {
-	ctx := context.Background()
-	sub := psub.Subscription(env.GetString("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
-
-	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
 		l, _ := r.Get(ctx, "send-notification-emails")
 		if l != nil && len(l) > 0 {
-			msg.Ack()
+			logger.For(ctx).Infof("notification emails already being sent")
 			return
 		}
 		r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
 		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
-			msg.Ack()
 			return
 		}
-		msg.Ack()
-	})
+	}
 }
 
 func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {
@@ -257,6 +252,110 @@ outer:
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
 		m.SetTemplateID(env.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
+		p.DynamicTemplateData = asMap
+		m.AddPersonalizations(p)
+		p.AddTos(to)
+
+		response, err := s.Send(m)
+		if err != nil {
+			return nil, err
+		}
+		return response, nil
+	}
+
+	logger.For(c).Infof("would have sent email to %s (username: %s): %s", u.ID, u.Username.String, string(asJSON))
+
+	return &rest.Response{StatusCode: 200, Body: "not sending real emails", Headers: map[string][]string{}}, nil
+}
+
+type digestEmailDynamicTemplateData struct {
+	DigestValues     DigestValues `json:"digestValues"`
+	Username         string       `json:"username"`
+	UnsubscribeToken string       `json:"unsubscribeToken"`
+}
+
+func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, fapi *publicapi.FeedAPI) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		// mimic backend auth
+		ctx.Set("auth.user_id", persist.DBID(""))
+		ctx.Set("auth.auth_error", nil)
+
+		l, _ := r.Get(ctx, "send-digest-emails")
+		if l != nil && len(l) > 0 {
+			logger.For(ctx).Infof("digest emails already being sent")
+			return
+		}
+		r.Set(ctx, "send-digest-emails", []byte("sending"), 1*time.Hour)
+		vals, err := getDigest(ctx, stg, fapi, queries, loaders)
+		if err != nil {
+			logger.For(ctx).Errorf("error getting digest values: %s", err)
+			return
+		}
+		err = sendDigestEmailsToAllUsers(ctx, vals, queries, s, env.GetString("ENV") == "production")
+		if err != nil {
+			logger.For(ctx).Errorf("error sending notification emails: %s", err)
+			return
+		}
+	}
+}
+
+func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {
+
+	emailsSent := new(atomic.Uint64)
+	defer func() {
+		logger.For(c).Infof("sent %d emails", emailsSent.Load())
+	}()
+	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeDigest, queries, func(u coredb.PiiUserView) error {
+
+		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, v, s, sendRealEmails)
+		if err != nil {
+			return err
+		}
+		if response != nil {
+			if response.StatusCode >= 299 || response.StatusCode < 200 {
+				logger.For(c).Errorf("error sending email to %s: %s", u.Username.String, response.Body)
+			} else {
+				emailsSent.Add(1)
+			}
+		}
+
+		return nil
+	})
+}
+
+func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, digestValues DigestValues, s *sendgrid.Client, sendRealEmail bool) (*rest.Response, error) {
+
+	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
+	}
+
+	data := digestEmailDynamicTemplateData{
+		DigestValues:     digestValues,
+		Username:         u.Username.String,
+		UnsubscribeToken: j,
+	}
+
+	asJSON, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	asMap := make(map[string]interface{})
+
+	err = json.Unmarshal(asJSON, &asMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if sendRealEmail {
+		// send email
+		from := mail.NewEmail("Gallery", env.GetString("FROM_EMAIL"))
+		to := mail.NewEmail(u.Username.String, emailRecipient.String())
+		m := mail.NewV3Mail()
+		m.SetFrom(from)
+		p := mail.NewPersonalization()
+		m.SetTemplateID(env.GetString("SENDGRID_DIGEST_TEMPLATE_ID"))
 		p.DynamicTemplateData = asMap
 		m.AddPersonalizations(p)
 		p.AddTos(to)
