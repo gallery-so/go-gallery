@@ -874,6 +874,23 @@ func testSyncNewTokens(t *testing.T) {
 		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
 	})
 
+	t.Run("should not delete tokens if provider fails", func(t *testing.T) {
+		userF := newUserWithTokensFixture(t)
+		require.Greater(t, len(userF.TokenIDs), 0)
+		h := handlerWithProviders(t, submitUserTokensNoop, newStubProvider(withReturnError(fmt.Errorf("can't get tokens"))))
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		// Sync tokens with a failing provider
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
+
+		// Expect the sync to fail because of bad provider
+		require.NoError(t, err)
+		_ = (*response.SyncTokens).(*syncTokensMutationSyncTokensErrSyncFailed)
+		// Admire all the existing tokens to confirm that they are still displayable
+		for _, id := range userF.TokenIDs {
+			admireToken(t, ctx, c, id)
+		}
+	})
 }
 
 func testSyncNewTokensIncrementally(t *testing.T) {
