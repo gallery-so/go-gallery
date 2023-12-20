@@ -29,9 +29,9 @@ var (
 	defaultCursorAfterKey = ""
 
 	// Some position that comes after any other position
-	defaultCursorBeforePosition = -1
+	defaultCursorBeforePosition = math.MaxInt32 - 1
 	// Some position that comes before any other position
-	defaultCursorAfterPosition = math.MaxInt32
+	defaultCursorAfterPosition = -1
 )
 
 type PageInfo struct {
@@ -61,7 +61,7 @@ func validatePaginationParams(validator *validator.Validate, first *int, last *i
 	return nil
 }
 
-func pageFrom[T any](allEdges []T, countF func() (int, error), cF cursorable, before, after *string, first, last *int) ([]T, PageInfo, error) {
+func pageFrom[Node any, K cursor](allEdges []Node, countF func() (int, error), cF cursorable[Node, K], before, after *string, first, last *int) ([]Node, PageInfo, error) {
 	cursorEdges, err := applyCursors(allEdges, cF, before, after)
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -76,7 +76,7 @@ func pageFrom[T any](allEdges []T, countF func() (int, error), cF cursorable, be
 	return edgesPaged, pageInfo, err
 }
 
-func packNode(cF cursorable, node any) (string, error) {
+func packNode[Node any, K cursor](cF cursorable[Node, K], node Node) (string, error) {
 	cursor, err := cF(node)
 	if err != nil {
 		return "", err
@@ -84,7 +84,7 @@ func packNode(cF cursorable, node any) (string, error) {
 	return cursor.Pack()
 }
 
-func pageInfoFrom[T any](cursorEdges, edgesPaged []T, countF func() (int, error), cF cursorable, before, after *string, first, last *int) (pageInfo PageInfo, err error) {
+func pageInfoFrom[Node any, K cursor](cursorEdges, edgesPaged []Node, countF func() (int, error), cF cursorable[Node, K], before, after *string, first, last *int) (pageInfo PageInfo, err error) {
 	if len(edgesPaged) > 0 {
 		firstNode := edgesPaged[0]
 		lastNode := edgesPaged[len(edgesPaged)-1]
@@ -121,7 +121,7 @@ func pageInfoFrom[T any](cursorEdges, edgesPaged []T, countF func() (int, error)
 	return pageInfo, nil
 }
 
-func pageEdgesFrom[T any](edges []T, before, after *string, first, last *int) ([]T, error) {
+func pageEdgesFrom[Node any](edges []Node, before, after *string, first, last *int) ([]Node, error) {
 	if first != nil && len(edges) > *first {
 		return edges[:*first], nil
 	}
@@ -133,12 +133,12 @@ func pageEdgesFrom[T any](edges []T, before, after *string, first, last *int) ([
 	return edges, nil
 }
 
-func applyCursors[T any](allEdges []T, cursorable func(any) (cursorer, error), before, after *string) ([]T, error) {
-	edges := append([]T{}, allEdges...)
+func applyCursors[Node any, K cursor](allEdges []Node, cF cursorable[Node, K], before, after *string) ([]Node, error) {
+	edges := append([]Node{}, allEdges...)
 
 	if after != nil {
 		for i, edge := range edges {
-			cur, err := packNode(cursorable, edge)
+			cur, err := packNode(cF, edge)
 			if err != nil {
 				return nil, err
 			}
@@ -151,7 +151,7 @@ func applyCursors[T any](allEdges []T, cursorable func(any) (cursorer, error), b
 
 	if before != nil {
 		for i, edge := range edges {
-			cur, err := packNode(cursorable, edge)
+			cur, err := packNode(cF, edge)
 			if err != nil {
 				return nil, err
 			}
@@ -168,19 +168,19 @@ func applyCursors[T any](allEdges []T, cursorable func(any) (cursorer, error), b
 // keysetPaginator is the base keyset pagination struct. You probably don't want to use this directly;
 // use a cursor-specific helper like timeIDPaginator.
 // For reasons to favor keyset pagination, see: https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/
-type keysetPaginator struct {
+type keysetPaginator[Node any, Cur cursor] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(limit int32, pagingForward bool) (nodes []interface{}, err error)
+	QueryFunc func(limit int32, pagingForward bool) (nodes []Node, err error)
 
-	// Cursorable produces a cursorer for encoding nodes to cursor strings
-	Cursorable cursorable
+	// Cursorable produces a cursor for encoding nodes to cursor strings
+	Cursorable cursorable[Node, Cur]
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
 	CountFunc func() (count int, err error)
 }
 
-func (p *keysetPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+func (p *keysetPaginator[Node, Cur]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
 	// Limit is intentionally 1 more than requested, so we can see if there are additional pages
 	limit := 1
 	if first != nil {
@@ -213,12 +213,12 @@ func (p *keysetPaginator) paginate(before *string, after *string, first *int, la
 // By using the combination of a timestamp and a unique DBID for our ORDER BY clause,
 // we can achieve fast keyset pagination results while avoiding edge cases when multiple
 // rows have the same timestamp.
-type timeIDPaginator struct {
+type timeIDPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params timeIDPagingParams) ([]interface{}, error)
+	QueryFunc func(params timeIDPagingParams) ([]Node, error)
 
 	// CursorFunc returns a time and DBID that will be encoded into a cursor string
-	CursorFunc func(node interface{}) (time.Time, persist.DBID, error)
+	CursorFunc func(node Node) (time.Time, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
@@ -235,8 +235,8 @@ type timeIDPagingParams struct {
 	PagingForward    bool
 }
 
-func (p *timeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]any, error) {
+func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewTimeIDCursor()
 		beforeCur.Time = defaultCursorBeforeTime
 		beforeCur.ID = defaultCursorBeforeID
@@ -268,19 +268,19 @@ func (p *timeIDPaginator) paginate(before *string, after *string, first *int, la
 		return p.QueryFunc(queryParams)
 	}
 
-	paginator := keysetPaginator{
+	paginator := keysetPaginator[Node, *timeIDCursor]{
 		QueryFunc:  queryFunc,
-		Cursorable: cursorables.NewTimeIDCursorer(p.CursorFunc),
+		Cursorable: newTimeIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
 	return paginator.paginate(before, after, first, last)
 }
 
-type sharedFollowersPaginator struct{ timeIDPaginator }
+type sharedFollowersPaginator[Node any] struct{ timeIDPaginator[Node] }
 
-func (p *sharedFollowersPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+func (p *sharedFollowersPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		// The shared followers query orders results in descending order when
 		// paging forward (vs. ascending order which is more typical).
 		beforeCur := cursors.NewTimeIDCursor()
@@ -314,9 +314,9 @@ func (p *sharedFollowersPaginator) paginate(before *string, after *string, first
 		return p.QueryFunc(queryParams)
 	}
 
-	paginator := keysetPaginator{
+	paginator := keysetPaginator[Node, *timeIDCursor]{
 		QueryFunc:  queryFunc,
-		Cursorable: cursorables.NewTimeIDCursorer(p.CursorFunc),
+		Cursorable: newTimeIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
@@ -336,24 +336,24 @@ type sharedCommunitiesPaginatorParams struct {
 	PagingForward                bool
 }
 
-type sharedCommunitiesPaginator struct {
+type sharedCommunitiesPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params sharedCommunitiesPaginatorParams) ([]interface{}, error)
+	QueryFunc func(params sharedCommunitiesPaginatorParams) ([]Node, error)
 
 	// CursorFunc returns:
 	//  * A bool indicating that userA displays the community on their gallery
 	//  * A bool indicating that userB displays the community on their gallery
 	//  * An int indicating how many tokens userA owns for a community
 	//  * A DBID indicating the ID of the community
-	CursorFunc func(node interface{}) (bool, bool, int64, persist.DBID, error)
+	CursorFunc func(node Node) (bool, bool, int64, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
 	CountFunc func() (count int, err error)
 }
 
-func (p *sharedCommunitiesPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+func (p *sharedCommunitiesPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewBoolBoolIntIDCursor()
 		beforeCur.Bool1 = false
 		beforeCur.Bool2 = false
@@ -393,9 +393,9 @@ func (p *sharedCommunitiesPaginator) paginate(before *string, after *string, fir
 		return p.QueryFunc(queryParams)
 	}
 
-	paginator := keysetPaginator{
+	paginator := keysetPaginator[Node, *boolBoolIntIDCursor]{
 		QueryFunc:  queryFunc,
-		Cursorable: cursorables.NewBoolBoolIntIDCursorer(p.CursorFunc),
+		Cursorable: newBoolBoolIntIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
@@ -413,20 +413,20 @@ type boolTimeIDPagingParams struct {
 	PagingForward    bool
 }
 
-type boolTimeIDPaginator struct {
+type boolTimeIDPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params boolTimeIDPagingParams) ([]interface{}, error)
+	QueryFunc func(params boolTimeIDPagingParams) ([]Node, error)
 
 	// CursorFunc returns a time and DBID that will be encoded into a cursor string
-	CursorFunc func(node interface{}) (bool, time.Time, persist.DBID, error)
+	CursorFunc func(node Node) (bool, time.Time, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
 	CountFunc func() (count int, err error)
 }
 
-func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+func (p *boolTimeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewBoolTimeIDCursor()
 		beforeCur.Bool = true
 		beforeCur.Time = defaultCursorBeforeTime
@@ -462,21 +462,21 @@ func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int
 		return p.QueryFunc(queryParams)
 	}
 
-	paginator := keysetPaginator{
+	paginator := keysetPaginator[Node, *boolTimeIDCursor]{
 		QueryFunc:  queryFunc,
-		Cursorable: cursorables.NewBoolTimeIDCursorer(p.CursorFunc),
+		Cursorable: newBoolTimeIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
 	return paginator.paginate(before, after, first, last)
 }
 
-type lexicalPaginator struct {
+type lexicalPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params lexicalPagingParams) ([]interface{}, error)
+	QueryFunc func(params lexicalPagingParams) ([]Node, error)
 
 	// CursorFunc returns a time and DBID that will be encoded into a cursor string
-	CursorFunc func(node interface{}) (string, persist.DBID, error)
+	CursorFunc func(node Node) (string, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
@@ -492,8 +492,8 @@ type lexicalPagingParams struct {
 	PagingForward   bool
 }
 
-func (p *lexicalPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+func (p *lexicalPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewStringIDCursor()
 		beforeCur.String = defaultCursorBeforeKey
 		beforeCur.ID = defaultCursorBeforeID
@@ -525,9 +525,9 @@ func (p *lexicalPaginator) paginate(before *string, after *string, first *int, l
 		return p.QueryFunc(queryParams)
 	}
 
-	paginator := keysetPaginator{
+	paginator := keysetPaginator[Node, *stringIDCursor]{
 		QueryFunc:  queryFunc,
-		Cursorable: cursorables.NewStringIDCursorer(p.CursorFunc),
+		Cursorable: newStringIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
@@ -535,99 +535,58 @@ func (p *lexicalPaginator) paginate(before *string, after *string, first *int, l
 }
 
 // positionPaginator paginates results based on a position of an element in a fixed list
-type positionPaginator struct {
+type positionPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params positionPagingParams) ([]any, error)
+	QueryFunc func(params positionPagingParams) ([]Node, error)
 
 	// CursorFunc returns the current position and a fixed slice of DBIDs that will be encoded into a cursor string
-	CursorFunc func(node interface{}) (int64, []persist.DBID, error)
+	CursorFunc func(node Node) (curPos int64, ids []persist.DBID, err error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
 	CountFunc func() (count int, err error)
 }
 
-type positionPaginatorArgs struct {
-	CurBeforePos int
-	CurAfterPos  int
-}
-
-type positionPaginatorOpts struct{}
-
-var positionOpts positionPaginatorOpts
-
-// WithDefaultCursors configures the starting cursors to use when none are provided
-func (positionPaginatorOpts) WithStartingCursors(before, after int) func(a *positionPaginatorArgs) {
-	return func(a *positionPaginatorArgs) {
-		a.CurBeforePos = before
-		a.CurAfterPos = after
-	}
-}
-
 type positionPagingParams struct {
-	Limit           int32
 	CursorBeforePos int32
 	CursorAfterPos  int32
-	PagingForward   bool
-	IDs             []persist.DBID
 }
 
-func (p *positionPaginator) paginate(before *string, after *string, first *int, last *int, opts ...func(*positionPaginatorArgs)) ([]interface{}, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		var ids []persist.DBID
-
-		args := positionPaginatorArgs{
-			CurBeforePos: defaultCursorBeforePosition,
-			CurAfterPos:  defaultCursorAfterPosition,
-		}
-
-		beforeCur := cursors.NewPositionCursor()
-		afterCur := cursors.NewPositionCursor()
-
-		for _, opt := range opts {
-			opt(&args)
-		}
-
-		if before != nil {
-			if err := beforeCur.Unpack(*before); err != nil {
-				return nil, err
-			}
-			args.CurBeforePos = int(beforeCur.CurrentPosition)
-			ids = beforeCur.IDs
-		}
-
-		if after != nil {
-			if err := afterCur.Unpack(*after); err != nil {
-				return nil, err
-			}
-			args.CurAfterPos = int(afterCur.CurrentPosition)
-			ids = afterCur.IDs
-		}
-
-		queryParams := positionPagingParams{
-			Limit:           limit,
-			CursorBeforePos: int32(args.CurBeforePos),
-			CursorAfterPos:  int32(args.CurAfterPos),
-			PagingForward:   pagingForward,
-			IDs:             ids,
-		}
-
-		return p.QueryFunc(queryParams)
+func (p *positionPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	args := positionPagingParams{
+		CursorBeforePos: int32(defaultCursorBeforePosition),
+		CursorAfterPos:  int32(defaultCursorAfterPosition),
 	}
 
-	paginator := keysetPaginator{
-		QueryFunc:  queryFunc,
-		Cursorable: cursorables.NewPositionCursorer(p.CursorFunc),
-		CountFunc:  p.CountFunc,
+	beforeCur := cursors.NewPositionCursor()
+	afterCur := cursors.NewPositionCursor()
+
+	if before != nil {
+		if err := beforeCur.Unpack(*before); err != nil {
+			return nil, PageInfo{}, err
+		}
+		args.CursorBeforePos = int32(beforeCur.CurrentPosition)
 	}
 
-	return paginator.paginate(before, after, first, last)
+	if after != nil {
+		if err := afterCur.Unpack(*after); err != nil {
+			return nil, PageInfo{}, err
+		}
+		args.CursorAfterPos = int32(afterCur.CurrentPosition)
+	}
+
+	results, err := p.QueryFunc(args)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	return pageFrom(results, nil, newPositionCursor(p.CursorFunc), before, after, first, last)
 }
 
-type intTimeIDPaginator struct {
-	QueryFunc func(params intTimeIDPagingParams) ([]interface{}, error)
+type intTimeIDPaginator[Node any] struct {
+	QueryFunc func(params intTimeIDPagingParams) ([]Node, error)
 
-	CursorFunc func(node interface{}) (int64, time.Time, persist.DBID, error)
+	CursorFunc func(node Node) (int64, time.Time, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
@@ -646,8 +605,8 @@ type intTimeIDPagingParams struct {
 	PagingForward    bool
 }
 
-func (p *intTimeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
-	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+func (p *intTimeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewIntTimeIDCursor()
 		beforeCur.Int = math.MaxInt32
 		beforeCur.Time = defaultCursorBeforeTime
@@ -683,9 +642,9 @@ func (p *intTimeIDPaginator) paginate(before *string, after *string, first *int,
 		return p.QueryFunc(queryParams)
 	}
 
-	paginator := keysetPaginator{
+	paginator := keysetPaginator[Node, *intTimeIDCursor]{
 		QueryFunc:  queryFunc,
-		Cursorable: cursorables.NewIntTimeIDCursorer(p.CursorFunc),
+		Cursorable: newIntTimeIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
@@ -880,7 +839,7 @@ func (d *cursorDecoder) readFeedEntityType() (persist.FeedEntityType, error) {
 
 //------------------------------------------------------------------------------
 
-type cursorer interface {
+type cursor interface {
 	Pack() (string, error)
 	Unpack(string) error
 }
@@ -890,67 +849,77 @@ type baseCursor struct {
 	unpackable
 }
 
-type cursorable func(any) (cursorer, error)
+// cursorable is a function that creates a cursor N from a node of type T
+type cursorable[Node any, K cursor] func(Node) (K, error)
 
-type cursorN struct{}     // namespace for available cursors
-type cursorableN struct{} // namespace for available cursorables
+type cursorN struct{} // namespace for available cursors
 
-var cursorables cursorableN
 var cursors cursorN
 
-func (cursorableN) NewTimeIDCursorer(f func(any) (time.Time, persist.DBID, error)) cursorable {
-	return func(node any) (c cursorer, err error) {
-		cur := cursors.NewTimeIDCursor()
-		cur.Time, cur.ID, err = f(node)
-		return cur, err
+func newTimeIDCursor[Node any](f func(Node) (time.Time, persist.DBID, error)) cursorable[Node, *timeIDCursor] {
+	return func(node Node) (c *timeIDCursor, err error) {
+		c = cursors.NewTimeIDCursor()
+		c.Time, c.ID, err = f(node)
+		return c, err
 	}
 }
 
-func (cursorableN) NewBoolBoolIntIDCursorer(f func(any) (bool, bool, int64, persist.DBID, error)) cursorable {
-	return func(node any) (c cursorer, err error) {
-		cur := cursors.NewBoolBoolIntIDCursor()
-		cur.Bool1, cur.Bool2, cur.Int, cur.ID, err = f(node)
-		return cur, err
+func newBoolBoolIntIDCursor[Node any](f func(Node) (bool, bool, int64, persist.DBID, error)) cursorable[Node, *boolBoolIntIDCursor] {
+	return func(node Node) (c *boolBoolIntIDCursor, err error) {
+		c = cursors.NewBoolBoolIntIDCursor()
+		c.Bool1, c.Bool2, c.Int, c.ID, err = f(node)
+		return c, err
 	}
 }
 
-func (cursorableN) NewBoolTimeIDCursorer(f func(any) (bool, time.Time, persist.DBID, error)) cursorable {
-	return func(node any) (c cursorer, err error) {
-		cur := cursors.NewBoolTimeIDCursor()
-		cur.Bool, cur.Time, cur.ID, err = f(node)
-		return cur, err
+func newBoolTimeIDCursor[Node any](f func(Node) (bool, time.Time, persist.DBID, error)) cursorable[Node, *boolTimeIDCursor] {
+	return func(node Node) (c *boolTimeIDCursor, err error) {
+		c = cursors.NewBoolTimeIDCursor()
+		c.Bool, c.Time, c.ID, err = f(node)
+		return c, err
 	}
 }
 
-func (cursorableN) NewStringIDCursorer(f func(any) (string, persist.DBID, error)) cursorable {
-	return func(node any) (c cursorer, err error) {
-		cur := cursors.NewStringIDCursor()
-		cur.String, cur.ID, err = f(node)
-		return cur, err
+func newStringIDCursor[Node any](f func(Node) (string, persist.DBID, error)) cursorable[Node, *stringIDCursor] {
+	return func(node Node) (c *stringIDCursor, err error) {
+		c = cursors.NewStringIDCursor()
+		c.String, c.ID, err = f(node)
+		return c, err
 	}
 }
 
-func (cursorableN) NewIntTimeIDCursorer(f func(any) (int64, time.Time, persist.DBID, error)) cursorable {
-	return func(node any) (c cursorer, err error) {
-		cur := cursors.NewIntTimeIDCursor()
-		cur.Int, cur.Time, cur.ID, err = f(node)
-		return cur, err
+func newIntTimeIDCursor[Node any](f func(Node) (int64, time.Time, persist.DBID, error)) cursorable[Node, *intTimeIDCursor] {
+	return func(node Node) (c *intTimeIDCursor, err error) {
+		c = cursors.NewIntTimeIDCursor()
+		c.Int, c.Time, c.ID, err = f(node)
+		return c, err
 	}
 }
 
-func (cursorableN) NewPositionCursorer(f func(any) (int64, []persist.DBID, error)) cursorable {
-	return func(node any) (c cursorer, err error) {
-		cur := cursors.NewPositionCursor()
-		cur.CurrentPosition, cur.IDs, err = f(node)
-		return cur, err
+// sliceToMapIndex returns a lookup of each element's index in the slice
+func sliceToMapIndex[V comparable](s []V) map[V]int64 {
+	result := make(map[V]int64, len(s))
+	for i, v := range s {
+		result[v] = int64(i)
+	}
+	return result
+}
+
+func newPositionCursor[Node any](f func(Node) (int64, []persist.DBID, error)) cursorable[Node, *positionCursor] {
+	return func(node Node) (c *positionCursor, err error) {
+		c = cursors.NewPositionCursor()
+		c.CurrentPosition, c.IDs, err = f(node)
+		c.Positions = sliceToMapIndex(c.IDs)
+		return c, err
 	}
 }
 
-func (cursorableN) NewFeedPositionCursorer(f func(any) (int64, []persist.FeedEntityType, []persist.DBID, error)) cursorable {
-	return func(node any) (c cursorer, err error) {
-		cur := cursors.NewFeedPositionCursor()
-		cur.CurrentPosition, cur.EntityTypes, cur.EntityIDs, err = f(node)
-		return cur, err
+func newFeedPositionCursor[Node any](f func(Node) (int64, []persist.FeedEntityType, []persist.DBID, error)) cursorable[Node, *feedPositionCursor] {
+	return func(node Node) (c *feedPositionCursor, err error) {
+		c = cursors.NewFeedPositionCursor()
+		c.CurrentPosition, c.EntityTypes, c.EntityIDs, err = f(node)
+		c.Positions = sliceToMapIndex(c.EntityIDs)
+		return c, err
 	}
 }
 
@@ -1035,7 +1004,7 @@ type feedPositionCursor struct {
 	CurrentPosition int64
 	EntityTypes     []persist.FeedEntityType
 	EntityIDs       []persist.DBID
-	PositionLookup  map[persist.DBID]int64
+	Positions       map[persist.DBID]int64
 }
 
 func (f *feedPositionCursor) Unpack(s string) error {
@@ -1043,14 +1012,12 @@ func (f *feedPositionCursor) Unpack(s string) error {
 	if err != nil {
 		return err
 	}
-	for i, id := range f.EntityIDs {
-		f.PositionLookup[id] = int64(i)
-	}
+	f.Positions = sliceToMapIndex(f.EntityIDs)
 	return nil
 }
 
 func (cursorN) NewFeedPositionCursor() *feedPositionCursor {
-	c := feedPositionCursor{baseCursor: &baseCursor{}, PositionLookup: make(map[persist.DBID]int64)}
+	c := feedPositionCursor{baseCursor: &baseCursor{}, Positions: make(map[persist.DBID]int64)}
 	initCursor(c.baseCursor, &c.CurrentPosition, &c.EntityTypes, &c.EntityIDs)
 	return &c
 }
@@ -1061,10 +1028,20 @@ type positionCursor struct {
 	*baseCursor
 	CurrentPosition int64
 	IDs             []persist.DBID
+	Positions       map[persist.DBID]int64
+}
+
+func (f *positionCursor) Unpack(s string) error {
+	err := f.baseCursor.Unpack(s)
+	if err != nil {
+		return err
+	}
+	f.Positions = sliceToMapIndex(f.IDs)
+	return nil
 }
 
 func (cursorN) NewPositionCursor() *positionCursor {
-	c := positionCursor{baseCursor: &baseCursor{}}
+	c := positionCursor{baseCursor: &baseCursor{}, Positions: make(map[persist.DBID]int64)}
 	initCursor(c.baseCursor, &c.CurrentPosition, &c.IDs)
 	return &c
 }

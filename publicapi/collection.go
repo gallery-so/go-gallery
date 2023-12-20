@@ -4,22 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/util"
-
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/validate"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 const (
@@ -119,65 +117,49 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 		return nil, pageInfo, err
 	}
 
-	var collectionIDs []persist.DBID
 	cursor := cursors.NewPositionCursor()
-	var paginator positionPaginator
 
 	// If a cursor is provided, we can skip querying the cache
 	if before != nil {
-		if err = cursor.Unpack(*before); err != nil {
+		if err := cursor.Unpack(*before); err != nil {
 			return nil, pageInfo, err
 		}
 	} else if after != nil {
-		if err = cursor.Unpack(*after); err != nil {
+		if err := cursor.Unpack(*after); err != nil {
 			return nil, pageInfo, err
 		}
 	} else {
 		// No cursor provided, need to access the cache
 		key := fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address())
-		l := newDBIDCache(redis.NewCache(redis.SearchCache), key, time.Hour*2, func(ctx context.Context) ([]persist.DBID, error) {
+		l := newDBIDCache(redis.SearchCache, key, time.Hour*2, func(ctx context.Context) ([]persist.DBID, error) {
 			return api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
 				Chain:   chainAddress.Chain(),
 				Address: chainAddress.Address(),
 			})
 		})
-		if collectionIDs, err = l.Load(ctx); err != nil {
+
+		collectionIDs, err := l.Load(ctx)
+		if err != nil {
 			return nil, pageInfo, err
 		}
+
+		cursor.CurrentPosition = 0
+		cursor.IDs = collectionIDs
+		cursor.Positions = sliceToMapIndex(cursor.IDs)
 	}
 
-	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
-		cIDs := util.MapWithoutError(collectionIDs, func(id persist.DBID) string { return id.String() })
-		c, err := api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
-			CollectionIds: cIDs,
-			CurBeforePos:  params.CursorBeforePos,
-			CurAfterPos:   params.CursorAfterPos,
-			PagingForward: params.PagingForward,
-			Limit:         params.Limit,
-		})
-		a := util.MapWithoutError(c, func(c db.Collection) any { return c })
-		return a, err
+	paginator := positionPaginator[db.Collection]{}
+	paginator.QueryFunc = func(p positionPagingParams) ([]db.Collection, error) {
+		params := db.GetVisibleCollectionsByIDsPaginateBatchParams{
+			CollectionIds: util.MapWithoutError(cursor.IDs, func(id persist.DBID) string { return id.String() }),
+			// Postgres uses 1-based indexing
+			CurBeforePos: p.CursorBeforePos + 1,
+			CurAfterPos:  p.CursorAfterPos + 1,
+		}
+		return api.loaders.GetVisibleCollectionsByIDsPaginateBatch.Load(params)
 	}
-
-	posLookup := make(map[persist.DBID]int)
-	for i, id := range collectionIDs {
-		posLookup[id] = i + 1 // Postgres uses 1-based indexing
-	}
-
-	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
-		return int64(posLookup[node.(db.Collection).ID]), collectionIDs, nil
-	}
-
-	// The collections are sorted by ascending rank so we need to switch the cursor positions
-	// so that the default before position (posiiton that comes after any other position) has the largest idx
-	// and the default after position (position that comes before any other position) has the smallest idx
-	results, pageInfo, err := paginator.paginate(before, after, first, last, positionOpts.WithStartingCursors(math.MaxInt32, -1))
-
-	c, _ = util.Map(results, func(r any) (db.Collection, error) {
-		return r.(db.Collection), nil
-	})
-
-	return c, pageInfo, err
+	paginator.CursorFunc = func(c db.Collection) (int64, []persist.DBID, error) { return cursor.Positions[c.ID], cursor.IDs, nil }
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {

@@ -3,17 +3,19 @@ package publicapi
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"time"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"time"
 )
 
 type CommunityAPI struct {
@@ -89,9 +91,8 @@ func (api CommunityAPI) PaginateHoldersByCommunityID(ctx context.Context, commun
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		holders, err := api.loaders.PaginateHoldersByCommunityID.Load(db.PaginateHoldersByCommunityIDParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.User, error) {
+		return api.loaders.PaginateHoldersByCommunityID.Load(db.PaginateHoldersByCommunityIDParams{
 			CommunityID:   communityID,
 			Limit:         sql.NullInt32{Int32: int32(params.Limit), Valid: true},
 			CurBeforeTime: params.CursorBeforeTime,
@@ -100,17 +101,6 @@ func (api CommunityAPI) PaginateHoldersByCommunityID(ctx context.Context, commun
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(holders))
-		for i, owner := range holders {
-			results[i] = owner
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -118,32 +108,17 @@ func (api CommunityAPI) PaginateHoldersByCommunityID(ctx context.Context, commun
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if user, ok := i.(db.User); ok {
-			return user.CreatedAt, user.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not a coredb.User")
+	cursorFunc := func(u db.User) (time.Time, persist.DBID, error) {
+		return u.CreatedAt, u.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.User]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	holders := make([]db.User, len(results))
-	for i, result := range results {
-		if holder, ok := result.(db.User); ok {
-			holders[i] = holder
-		}
-	}
-
-	return holders, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api CommunityAPI) PaginatePostsByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
@@ -158,9 +133,8 @@ func (api CommunityAPI) PaginatePostsByCommunityID(ctx context.Context, communit
 		return nil, PageInfo{}, err
 	}
 
-	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		posts, err := api.loaders.PaginatePostsByCommunityID.Load(db.PaginatePostsByCommunityIDParams{
+	timeFunc := func(params timeIDPagingParams) ([]db.Post, error) {
+		return api.loaders.PaginatePostsByCommunityID.Load(db.PaginatePostsByCommunityIDParams{
 			CommunityID:   communityID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -169,17 +143,6 @@ func (api CommunityAPI) PaginatePostsByCommunityID(ctx context.Context, communit
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(posts))
-		for i, post := range posts {
-			results[i] = post
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -187,32 +150,17 @@ func (api CommunityAPI) PaginatePostsByCommunityID(ctx context.Context, communit
 		return int(total), err
 	}
 
-	timeCursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if user, ok := i.(db.Post); ok {
-			return user.CreatedAt, user.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not a post")
+	timeCursorFunc := func(p db.Post) (time.Time, persist.DBID, error) {
+		return p.CreatedAt, p.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Post]{
 		QueryFunc:  timeFunc,
 		CursorFunc: timeCursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	posts := make([]db.Post, len(results))
-	for i, result := range results {
-		if post, ok := result.(db.Post); ok {
-			posts[i] = post
-		}
-	}
-
-	return posts, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api CommunityAPI) PaginateTokensByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) ([]db.Token, PageInfo, error) {
@@ -227,9 +175,8 @@ func (api CommunityAPI) PaginateTokensByCommunityID(ctx context.Context, communi
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		rows, err := api.loaders.PaginateTokensByCommunityID.Load(db.PaginateTokensByCommunityIDParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Token, error) {
+		results, err := api.loaders.PaginateTokensByCommunityID.Load(db.PaginateTokensByCommunityIDParams{
 			CommunityID:   communityID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -238,16 +185,7 @@ func (api CommunityAPI) PaginateTokensByCommunityID(ctx context.Context, communi
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(rows))
-		for i, r := range rows {
-			results[i] = r.Token
-		}
-
-		return results, nil
+		return util.MapWithoutError(results, func(r db.PaginateTokensByCommunityIDRow) db.Token { return r.Token }), err
 	}
 
 	countFunc := func() (int, error) {
@@ -255,33 +193,15 @@ func (api CommunityAPI) PaginateTokensByCommunityID(ctx context.Context, communi
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if token, ok := i.(db.Token); ok {
-			return token.CreatedAt, token.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not a token")
+	cursorFunc := func(t db.Token) (time.Time, persist.DBID, error) {
+		return t.CreatedAt, t.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Token]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	tokens := make([]db.Token, len(results))
-	for i, result := range results {
-		if token, ok := result.(db.Token); ok {
-			tokens[i] = token
-		} else {
-			return nil, PageInfo{}, fmt.Errorf("interface{} is not a token: %T", token)
-		}
-	}
-
-	return tokens, pageInfo, nil
+	return paginator.paginate(before, after, first, last)
 }

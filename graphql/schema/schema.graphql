@@ -1488,7 +1488,6 @@ type Query {
   postComposerDraftDetails(
     input: PostComposerDraftDetailsInput!
   ): PostComposerDraftDetailsPayloadOrError
-
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
@@ -2725,6 +2724,15 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
+type FollowAllOnboardingRecommendationsPayload {
+  viewer: Viewer
+}
+
+union FollowAllOnboardingRecommendationsPayloadOrError =
+    FollowAllOnboardingRecommendationsPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type GenerateQRCodeLoginTokenPayload {
   token: String!
 }
@@ -2971,6 +2979,13 @@ type Mutation {
   followAllSocialConnections(
     accountType: SocialAccountType!
   ): FollowAllSocialConnectionsPayloadOrError @authRequired
+  followAllOnboardingRecommendations(
+    """
+    A cursor returned from `Viewer.suggestedUsers` can be provided to follow all users from when the
+    cursor was generated. Otherwise, all users from the current recommendation set will be followed instead.
+    """
+    cursor: String
+  ): FollowAllOnboardingRecommendationsPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired

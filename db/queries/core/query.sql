@@ -159,10 +159,11 @@ join token_definitions td on t.token_definition_id = td.id
 where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select sqlc.embed(t), sqlc.embed(td)
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(tm)
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
-where t.id = $1 and t.deleted = false and td.deleted = false;
+join token_medias tm on td.token_media_id = tm.id
+where t.id = $1 and t.deleted = false and td.deleted = false and tm.deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
 -- Fetch the definition and contract to cache since downstream queries will likely use them
@@ -178,6 +179,21 @@ where t.token_definition_id = td.id
     and not t.deleted
     and not td.deleted
     and not c.deleted;
+
+-- name: GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch :batchone
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c), sqlc.embed(tm)
+from tokens t, token_definitions td, contracts c, token_medias tm
+where t.token_definition_id = td.id
+    and td.contract_id = c.id
+    and t.owner_user_id = @owner_id
+    and td.token_id = @token_id
+    and td.chain = @chain
+    and td.contract_address = @contract_address
+    and td.token_media_id = tm.id
+    and not t.deleted
+    and not td.deleted
+    and not c.deleted
+    and not tm.deleted;
 
 -- name: GetTokenByUserTokenIdentifiers :one
 select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
@@ -315,7 +331,7 @@ where t.owned_by_wallets && $1 and t.displayable and t.deleted = false and td.de
 order by t.created_at desc, td.name desc, t.id desc;
 
 -- name: GetTokensByContractIdPaginate :many
-select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from tokens t
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c), sqlc.embed(u) from tokens t
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
@@ -368,16 +384,6 @@ select count(distinct users.id) from users, tokens, contracts
     and tokens.displayable
     and (not @gallery_users_only::bool or users.universal = false)
     and tokens.deleted = false and users.deleted = false and contracts.deleted = false;
-
--- name: GetTokenOwnerByID :one
-select u.* from tokens t
-    join users u on u.id = t.owner_user_id
-    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
-
--- name: GetTokenOwnerByIDBatch :batchone
-select u.* from tokens t
-    join users u on u.id = t.owner_user_id
-    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
 select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
@@ -595,12 +601,12 @@ and posts.deleted = false;
 -- name: GetFeedEventsByIds :many
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
--- name: GetPostsByIds :many
+-- name: GetPostsByIdsPaginateBatch :batchmany
 select posts.*
 from posts
-join unnest(@post_ids::varchar(255)[]) with ordinality t(id, pos) using(id)
-where not posts.deleted
-order by pos asc;
+join unnest(@post_ids::varchar[]) with ordinality t(id, pos) using(id)
+where not posts.deleted and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
+order by t.pos asc;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
@@ -996,13 +1002,21 @@ select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = 
              case when not @paging_forward::bool then (u.username_idempotent, u.id) end desc
     limit $1;
 
--- name: GetUsersByPositionPaginate :many
-select u.* from users u join unnest(@user_ids::text[]) with ordinality t(id, pos) using(id) where u.deleted = false
-  and t.pos > @cur_before_pos::int
-  and t.pos < @cur_after_pos::int
-  order by case when @paging_forward::bool then t.pos end desc,
-          case when not @paging_forward::bool then t.pos end asc
-  limit sqlc.arg('limit');
+-- name: GetUsersByPositionPaginateBatch :batchmany
+select u.*
+from users u
+join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
+where not u.deleted and not u.universal and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
+order by t.pos asc;
+
+-- name: GetUsersByPositionPersonalizedBatch :batchmany
+select u.*
+from users u
+join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using(id)
+left join follows on follows.follower = @viewer_id and follows.followee = u.id
+where not u.deleted and not u.universal and follows.id is null
+order by t.pos
+limit 100;
 
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
@@ -1253,7 +1267,7 @@ where case when @only_unfollowing::bool then f.id is null else true end;
 insert into follows (id, follower, followee, deleted) select unnest(@ids::varchar[]), @follower, unnest(@followees::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at;
 
 -- name: GetSharedFollowersBatchPaginate :batchmany
-select users.*, a.created_at followed_on
+select sqlc.embed(users), a.created_at followed_on
 from users, follows a, follows b
 where a.follower = @follower
 	and a.followee = b.follower
@@ -1280,7 +1294,7 @@ where a.follower = @follower
 	and users.deleted = false;
 
 -- name: GetSharedCommunitiesBatchPaginate :batchmany
-select communities.*, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+select sqlc.embed(communities), a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
 from owned_communities a, owned_communities b, communities
 left join contracts on communities.contract_id = contracts.id
 left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
@@ -1560,12 +1574,11 @@ ranking as (
 )
 select collections.id from collections join ranking using(id) where score <= 100 order by score asc;
 
--- name: GetVisibleCollectionsByIDsPaginate :many
+-- name: GetVisibleCollectionsByIDsPaginateBatch :batchmany
 select collections.*
 from collections, unnest(@collection_ids::varchar[]) with ordinality as t(id, pos)
-where collections.id = t.id and not deleted and not hidden and t.pos < @cur_before_pos::int and t.pos > @cur_after_pos::int
-order by case when @paging_forward::bool then t.pos end asc, case when not @paging_forward::bool then t.pos end desc
-limit $1;
+where collections.id = t.id and not deleted and not hidden and t.pos > @cur_after_pos::int and t.pos < @cur_before_pos::int
+order by t.pos asc;
 
 -- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = @creator_user_id, last_updated = now() where id = @contract_id and deleted = false;
@@ -1605,7 +1618,7 @@ with remove_image as (
 )
 update users set profile_image_id = null where users.id = $1 and not users.deleted;
 
--- name: GetProfileImageByID :batchone
+-- name: GetProfileImageByIdBatch :batchone
 select * from profile_images pfp
 where pfp.id = @id
 	and not deleted
@@ -1811,6 +1824,14 @@ SET traits = CASE
                     traits - 'top_activity'
              END
 WHERE id = ANY(@top_user_ids) OR traits ? 'top_activity';
+
+-- name: GetOnboardingUserRecommendations :many
+with sources as (
+    select id from users where (traits->>'top_activity')::bool
+    union all select recommended_user_id from top_recommended_users
+    union all select user_id from user_internal_recommendations
+), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
+select users.* from users join top_recs using(id) where not users.deleted and not users.universal limit $1;
 
 -- name: InsertMention :one
 insert into mentions (id, comment_id, user_id, community_id, start, length) values ($1, $2, sqlc.narg('user'), sqlc.narg('community'), $3, $4) returning id;

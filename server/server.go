@@ -7,25 +7,25 @@ import (
 	"os"
 	"time"
 
-	"github.com/everFinance/goar"
-	sentry "github.com/getsentry/sentry-go"
-	shell "github.com/ipfs/go-ipfs-api"
-	magicclient "github.com/magiclabs/magic-admin-go/client"
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/api/option"
-
 	"cloud.google.com/go/pubsub"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
+	sentry "github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	shell "github.com/ipfs/go-ipfs-api"
+	magicclient "github.com/magiclabs/magic-admin-go/client"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"google.golang.org/api/option"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -39,7 +39,8 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
-	"github.com/spf13/viper"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 func init() {
@@ -57,7 +58,7 @@ func Init() {
 	ctx := context.Background()
 	c := ClientInit(ctx)
 	provider, _ := NewMultichainProvider(ctx, SetDefaults)
-	recommender := recommend.NewRecommender(c.Queries)
+	recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
 	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
 	router := CoreInit(ctx, c, provider, recommender, p)
 	http.Handle("/", router)

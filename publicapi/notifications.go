@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -35,8 +34,8 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 		return nil, PageInfo{}, 0, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		notifs, err := api.loaders.GetUserNotificationsBatch.Load(db.GetUserNotificationsBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Notification, error) {
+		return api.loaders.GetUserNotificationsBatch.Load(db.GetUserNotificationsBatchParams{
 			OwnerID:       userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -45,17 +44,6 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(notifs))
-		for i, notif := range notifs {
-			results[i] = notif
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -63,32 +51,19 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if admire, ok := i.(db.Notification); ok {
-			return admire.CreatedAt, admire.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
+	cursorFunc := func(n db.Notification) (time.Time, persist.DBID, error) {
+		return n.CreatedAt, n.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Notification]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
+	notifications, pageInfo, err := paginator.paginate(before, after, first, last)
 	if err != nil {
 		return nil, PageInfo{}, 0, err
-	}
-
-	notifications := make([]db.Notification, len(results))
-	for i, result := range results {
-		if notification, ok := result.(db.Notification); ok {
-			notifications[i] = notification
-		} else {
-			return nil, PageInfo{}, 0, fmt.Errorf("interface{} is not a notification: %T", result)
-		}
 	}
 
 	count, err := api.queries.CountUserUnseenNotifications(ctx, userID)

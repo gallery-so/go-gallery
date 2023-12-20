@@ -3,7 +3,6 @@ package publicapi
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -76,8 +75,8 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]any, error) {
-		queryParams := db.GetChildContractsByParentIDBatchPaginateParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Contract, error) {
+		return api.loaders.GetChildContractsByParentIDBatchPaginate.Load(db.GetChildContractsByParentIDBatchPaginateParams{
 			ParentID:      contractID,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
@@ -85,43 +84,19 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
-		}
-
-		keys, err := api.loaders.GetChildContractsByParentIDBatchPaginate.Load(queryParams)
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]any, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		})
 	}
 
-	cursorFunc := func(i any) (time.Time, persist.DBID, error) {
-		if row, ok := i.(db.Contract); ok {
-			return row.CreatedAt, row.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("node is not a db.Contract")
+	cursorFunc := func(c db.Contract) (time.Time, persist.DBID, error) {
+		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Contract]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	contracts := make([]db.Contract, len(results))
-	for i, result := range results {
-		if contract, ok := result.(db.Contract); ok {
-			contracts[i] = contract
-		}
-	}
-
-	return contracts, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api ContractAPI) GetContractCreatorByContractID(ctx context.Context, contractID persist.DBID) (db.ContractCreator, error) {
@@ -193,9 +168,8 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, PageInfo{}, err
 	}
 
-	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
-
-		owners, err := api.loaders.GetOwnersByContractIdBatchPaginate.Load(db.GetOwnersByContractIdBatchPaginateParams{
+	boolFunc := func(params boolTimeIDPagingParams) ([]db.User, error) {
+		return api.loaders.GetOwnersByContractIdBatchPaginate.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			ID:                 contract.ID,
 			Limit:              sql.NullInt32{Int32: int32(params.Limit), Valid: true},
 			GalleryUsersOnly:   onlyGalleryUsers,
@@ -207,17 +181,6 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 			CurAfterID:         params.CursorAfterID,
 			PagingForward:      params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(owners))
-		for i, owner := range owners {
-			results[i] = owner
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -230,32 +193,17 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return int(total), err
 	}
 
-	boolCursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
-		if user, ok := i.(db.User); ok {
-			return user.Universal, user.CreatedAt, user.ID, nil
-		}
-		return false, time.Time{}, "", fmt.Errorf("interface{} is not a token")
+	boolCursorFunc := func(u db.User) (bool, time.Time, persist.DBID, error) {
+		return u.Universal, u.CreatedAt, u.ID, nil
 	}
 
-	paginator := boolTimeIDPaginator{
+	paginator := boolTimeIDPaginator[db.User]{
 		QueryFunc:  boolFunc,
 		CursorFunc: boolCursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	owners := make([]db.User, len(results))
-	for i, result := range results {
-		if owner, ok := result.(db.User); ok {
-			owners[i] = owner
-		}
-	}
-
-	return owners, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
@@ -270,9 +218,8 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 		return nil, PageInfo{}, err
 	}
 
-	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		posts, err := api.loaders.PaginatePostsByContractID.Load(db.PaginatePostsByContractIDParams{
+	timeFunc := func(params timeIDPagingParams) ([]db.Post, error) {
+		return api.loaders.PaginatePostsByContractID.Load(db.PaginatePostsByContractIDParams{
 			ContractID:    contractID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -281,17 +228,6 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(posts))
-		for i, post := range posts {
-			results[i] = post
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -299,32 +235,17 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 		return int(total), err
 	}
 
-	timeCursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if user, ok := i.(db.Post); ok {
-			return user.CreatedAt, user.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not a post")
+	timeCursorFunc := func(p db.Post) (time.Time, persist.DBID, error) {
+		return p.CreatedAt, p.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Post]{
 		QueryFunc:  timeFunc,
 		CursorFunc: timeCursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	posts := make([]db.Post, len(results))
-	for i, result := range results {
-		if post, ok := result.(db.Post); ok {
-			posts[i] = post
-		}
-	}
-
-	return posts, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 // ------ Temporary ------
@@ -341,9 +262,8 @@ func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Con
 		return nil, PageInfo{}, err
 	}
 
-	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		posts, err := api.queries.PaginatePostsByContractIDAndProjectID(ctx, db.PaginatePostsByContractIDAndProjectIDParams{
+	timeFunc := func(params timeIDPagingParams) ([]db.Post, error) {
+		return api.queries.PaginatePostsByContractIDAndProjectID(ctx, db.PaginatePostsByContractIDAndProjectIDParams{
 			ContractID:    contractID,
 			ProjectIDInt:  int32(projectID),
 			Limit:         params.Limit,
@@ -353,17 +273,6 @@ func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Con
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(posts))
-		for i, post := range posts {
-			results[i] = post
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -371,32 +280,17 @@ func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Con
 		return int(total), err
 	}
 
-	timeCursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if user, ok := i.(db.Post); ok {
-			return user.CreatedAt, user.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not a post")
+	timeCursorFunc := func(p db.Post) (time.Time, persist.DBID, error) {
+		return p.CreatedAt, p.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Post]{
 		QueryFunc:  timeFunc,
 		CursorFunc: timeCursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	posts := make([]db.Post, len(results))
-	for i, result := range results {
-		if post, ok := result.(db.Post); ok {
-			posts[i] = post
-		}
-	}
-
-	return posts, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 // End of temporary to-be-removed stuff

@@ -723,12 +723,12 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 
 // Feed is the resolver for the feed field.
 func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.UserFeed(ctx, obj.Dbid, before, after, first, last)
+	posts, pageInfo, err := publicapi.For(ctx).Feed.UserFeed(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	edges, err := entitiesToFeedEdges(events)
+	edges, err := entitiesToFeedEdges(util.MapWithoutError(posts, func(p coredb.Post) any { return p }))
 	if err != nil {
 		return nil, err
 	}
@@ -1460,6 +1460,15 @@ func (r *mutationResolver) FollowAllSocialConnections(ctx context.Context, accou
 	}
 
 	return output, nil
+}
+
+// FollowAllOnboardingRecommendations is the resolver for the followAllOnboardingRecommendations field.
+func (r *mutationResolver) FollowAllOnboardingRecommendations(ctx context.Context, cursor *string) (model.FollowAllOnboardingRecommendationsPayloadOrError, error) {
+	err := publicapi.For(ctx).User.FollowAllOnboardingRecommendations(ctx, cursor)
+	if err != nil {
+		return nil, err
+	}
+	return &model.FollowAllOnboardingRecommendationsPayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // UnfollowUser is the resolver for the unfollowUser field.
@@ -3354,7 +3363,7 @@ func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer)
 
 // SuggestedUsers is the resolver for the suggestedUsers field.
 func (r *viewerResolver) SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
-	users, pageInfo, err := publicapi.For(ctx).User.RecommendUsers(ctx, before, after, first, last)
+	users, pageInfo, err := publicapi.For(ctx).User.GetSuggestedUsers(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}

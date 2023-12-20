@@ -635,6 +635,10 @@ type ComplexityRoot struct {
 		PageInfo func(childComplexity int) int
 	}
 
+	FollowAllOnboardingRecommendationsPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	FollowAllSocialConnectionsPayload struct {
 		Viewer func(childComplexity int) int
 	}
@@ -900,6 +904,7 @@ type ComplexityRoot struct {
 		DeleteGallery                                   func(childComplexity int, galleryID persist.DBID) int
 		DeletePost                                      func(childComplexity int, postID persist.DBID) int
 		DisconnectSocialAccount                         func(childComplexity int, accountType persist.SocialProvider) int
+		FollowAllOnboardingRecommendations              func(childComplexity int, cursor *string) int
 		FollowAllSocialConnections                      func(childComplexity int, accountType persist.SocialProvider) int
 		FollowUser                                      func(childComplexity int, userID persist.DBID) int
 		GenerateQRCodeLoginToken                        func(childComplexity int) int
@@ -1969,6 +1974,7 @@ type MutationResolver interface {
 	UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
 	FollowAllSocialConnections(ctx context.Context, accountType persist.SocialProvider) (model.FollowAllSocialConnectionsPayloadOrError, error)
+	FollowAllOnboardingRecommendations(ctx context.Context, cursor *string) (model.FollowAllOnboardingRecommendationsPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 	AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error)
 	AdmirePost(ctx context.Context, postID persist.DBID) (model.AdmirePostPayloadOrError, error)
@@ -4016,6 +4022,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FeedEventCommentsConnection.PageInfo(childComplexity), true
 
+	case "FollowAllOnboardingRecommendationsPayload.viewer":
+		if e.complexity.FollowAllOnboardingRecommendationsPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.FollowAllOnboardingRecommendationsPayload.Viewer(childComplexity), true
+
 	case "FollowAllSocialConnectionsPayload.viewer":
 		if e.complexity.FollowAllSocialConnectionsPayload.Viewer == nil {
 			break
@@ -5295,6 +5308,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.DisconnectSocialAccount(childComplexity, args["accountType"].(persist.SocialProvider)), true
+
+	case "Mutation.followAllOnboardingRecommendations":
+		if e.complexity.Mutation.FollowAllOnboardingRecommendations == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_followAllOnboardingRecommendations_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.FollowAllOnboardingRecommendations(childComplexity, args["cursor"].(*string)), true
 
 	case "Mutation.followAllSocialConnections":
 		if e.complexity.Mutation.FollowAllSocialConnections == nil {
@@ -9625,7 +9650,6 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
-
 type ContractCommunityKey {
   contract: ChainAddress
 }
@@ -9635,8 +9659,8 @@ input ContractCommunityKeyInput {
 }
 
 type ArtBlocksCommunityKey {
-    contract: ChainAddress
-    projectID: String
+  contract: ChainAddress
+  projectID: String
 }
 
 input ArtBlocksCommunityKeyInput {
@@ -10125,8 +10149,7 @@ type Community implements Node @goEmbedHelper {
   creatorAddress: ChainAddress
     @goField(forceResolver: true)
     @deprecated(reason: "Use Community.creators to get an address")
-  creator: GalleryUserOrAddress
-    @goField(forceResolver: true)
+  creator: GalleryUserOrAddress @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -10296,13 +10319,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -10952,7 +10975,6 @@ type Query {
   postComposerDraftDetails(
     input: PostComposerDraftDetailsInput!
   ): PostComposerDraftDetailsPayloadOrError
-
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
@@ -12189,6 +12211,15 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
+type FollowAllOnboardingRecommendationsPayload {
+  viewer: Viewer
+}
+
+union FollowAllOnboardingRecommendationsPayloadOrError =
+    FollowAllOnboardingRecommendationsPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type GenerateQRCodeLoginTokenPayload {
   token: String!
 }
@@ -12435,6 +12466,13 @@ type Mutation {
   followAllSocialConnections(
     accountType: SocialAccountType!
   ): FollowAllSocialConnectionsPayloadOrError @authRequired
+  followAllOnboardingRecommendations(
+    """
+    A cursor returned from ` + "`" + `onboardingUserRecommendations` + "`" + ` can be provided to follow all users from when the
+    cursor was generated. Otherwise, all users from the current recommendation set will be followed instead.
+    """
+    cursor: String
+  ): FollowAllOnboardingRecommendationsPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
@@ -13673,6 +13711,21 @@ func (ec *executionContext) field_Mutation_disconnectSocialAccount_args(ctx cont
 		}
 	}
 	args["accountType"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_followAllOnboardingRecommendations_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["cursor"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cursor"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["cursor"] = arg0
 	return args, nil
 }
 
@@ -28622,6 +28675,69 @@ func (ec *executionContext) fieldContext_FeedEventCommentsConnection_pageInfo(ct
 	return fc, nil
 }
 
+func (ec *executionContext) _FollowAllOnboardingRecommendationsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.FollowAllOnboardingRecommendationsPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FollowAllOnboardingRecommendationsPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FollowAllOnboardingRecommendationsPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FollowAllOnboardingRecommendationsPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FollowAllSocialConnectionsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.FollowAllSocialConnectionsPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FollowAllSocialConnectionsPayload_viewer(ctx, field)
 	if err != nil {
@@ -38244,6 +38360,78 @@ func (ec *executionContext) fieldContext_Mutation_followAllSocialConnections(ctx
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_followAllSocialConnections_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_followAllOnboardingRecommendations(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_followAllOnboardingRecommendations(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().FollowAllOnboardingRecommendations(rctx, fc.Args["cursor"].(*string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.FollowAllOnboardingRecommendationsPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.FollowAllOnboardingRecommendationsPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.FollowAllOnboardingRecommendationsPayloadOrError)
+	fc.Result = res
+	return ec.marshalOFollowAllOnboardingRecommendationsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowAllOnboardingRecommendationsPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_followAllOnboardingRecommendations(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type FollowAllOnboardingRecommendationsPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_followAllOnboardingRecommendations_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -70202,6 +70390,36 @@ func (ec *executionContext) _FeedEventOrError(ctx context.Context, sel ast.Selec
 	}
 }
 
+func (ec *executionContext) _FollowAllOnboardingRecommendationsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.FollowAllOnboardingRecommendationsPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.FollowAllOnboardingRecommendationsPayload:
+		return ec._FollowAllOnboardingRecommendationsPayload(ctx, sel, &obj)
+	case *model.FollowAllOnboardingRecommendationsPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._FollowAllOnboardingRecommendationsPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _FollowAllSocialConnectionsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.FollowAllSocialConnectionsPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -76358,7 +76576,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -76519,7 +76737,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -77243,6 +77461,31 @@ func (ec *executionContext) _FeedEventCommentsConnection(ctx context.Context, se
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var followAllOnboardingRecommendationsPayloadImplementors = []string{"FollowAllOnboardingRecommendationsPayload", "FollowAllOnboardingRecommendationsPayloadOrError"}
+
+func (ec *executionContext) _FollowAllOnboardingRecommendationsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.FollowAllOnboardingRecommendationsPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, followAllOnboardingRecommendationsPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FollowAllOnboardingRecommendationsPayload")
+		case "viewer":
+
+			out.Values[i] = ec._FollowAllOnboardingRecommendationsPayload_viewer(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -79204,6 +79447,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_followAllSocialConnections(ctx, field)
+			})
+
+		case "followAllOnboardingRecommendations":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_followAllOnboardingRecommendations(ctx, field)
 			})
 
 		case "unfollowUser":
@@ -88877,6 +89126,13 @@ func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel as
 	}
 	res := graphql.MarshalFloatContext(*v)
 	return graphql.WrapContextMarshaler(ctx, res)
+}
+
+func (ec *executionContext) marshalOFollowAllOnboardingRecommendationsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowAllOnboardingRecommendationsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.FollowAllOnboardingRecommendationsPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FollowAllOnboardingRecommendationsPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFollowAllSocialConnectionsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowAllSocialConnectionsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.FollowAllSocialConnectionsPayloadOrError) graphql.Marshaler {

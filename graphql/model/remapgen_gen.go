@@ -163,6 +163,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"FollowAllOnboardingRecommendationsPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(FollowAllOnboardingRecommendationsPayloadOrError)
+		return obj, ok
+	},
+
 	"FollowAllSocialConnectionsPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(FollowAllSocialConnectionsPayloadOrError)
 		return obj, ok

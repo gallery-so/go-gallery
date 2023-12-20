@@ -1589,34 +1589,71 @@ func (*GetPostByIdBatch) getKeyForResult(result coredb.Post) persist.DBID {
 	return result.ID
 }
 
-// GetProfileImageByID batches and caches requests
-type GetProfileImageByID struct {
-	generator.Dataloader[coredb.GetProfileImageByIDParams, coredb.ProfileImage]
+// GetPostsByIdsPaginateBatch batches and caches requests
+type GetPostsByIdsPaginateBatch struct {
+	generator.Dataloader[coredb.GetPostsByIdsPaginateBatchParams, []coredb.Post]
 }
 
-// newGetProfileImageByID creates a new GetProfileImageByID with the given settings, functions, and options
-func newGetProfileImageByID(
+// newGetPostsByIdsPaginateBatch creates a new GetPostsByIdsPaginateBatch with the given settings, functions, and options
+func newGetPostsByIdsPaginateBatch(
 	ctx context.Context,
 	maxBatchSize int,
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetProfileImageByID, []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error),
+	fetch func(context.Context, *GetPostsByIdsPaginateBatch, []coredb.GetPostsByIdsPaginateBatchParams) ([][]coredb.Post, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
-) *GetProfileImageByID {
-	d := &GetProfileImageByID{}
+) *GetPostsByIdsPaginateBatch {
+	d := &GetPostsByIdsPaginateBatch{}
 
-	fetchWithHooks := func(ctx context.Context, keys []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetPostsByIdsPaginateBatchParams) ([][]coredb.Post, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetProfileImageByID")
+			ctx = preFetchHook(ctx, "GetPostsByIdsPaginateBatch")
 		}
 
 		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
-			postFetchHook(ctx, "GetProfileImageByID")
+			postFetchHook(ctx, "GetPostsByIdsPaginateBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetProfileImageByIdBatch batches and caches requests
+type GetProfileImageByIdBatch struct {
+	generator.Dataloader[coredb.GetProfileImageByIdBatchParams, coredb.ProfileImage]
+}
+
+// newGetProfileImageByIdBatch creates a new GetProfileImageByIdBatch with the given settings, functions, and options
+func newGetProfileImageByIdBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetProfileImageByIdBatch, []coredb.GetProfileImageByIdBatchParams) ([]coredb.ProfileImage, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetProfileImageByIdBatch {
+	d := &GetProfileImageByIdBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetProfileImageByIdBatchParams) ([]coredb.ProfileImage, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetProfileImageByIdBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetProfileImageByIdBatch")
 		}
 
 		return results, errors
@@ -1811,6 +1848,43 @@ func newGetTokenByUserTokenIdentifiersBatch(
 	return d
 }
 
+// GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch batches and caches requests
+type GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch struct {
+	generator.Dataloader[coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams, coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow]
+}
+
+// newGetTokenByUserTokenIdentifiersIgnoreDisplayableBatch creates a new GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch with the given settings, functions, and options
+func newGetTokenByUserTokenIdentifiersIgnoreDisplayableBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch, []coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch {
+	d := &GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams) ([]coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetTokenDefinitionByIdBatch batches and caches requests
 type GetTokenDefinitionByIdBatch struct {
 	generator.Dataloader[persist.DBID, coredb.TokenDefinition]
@@ -1849,47 +1923,6 @@ func newGetTokenDefinitionByIdBatch(
 }
 
 func (*GetTokenDefinitionByIdBatch) getKeyForResult(result coredb.TokenDefinition) persist.DBID {
-	return result.ID
-}
-
-// GetTokenOwnerByIDBatch batches and caches requests
-type GetTokenOwnerByIDBatch struct {
-	generator.Dataloader[persist.DBID, coredb.User]
-}
-
-// newGetTokenOwnerByIDBatch creates a new GetTokenOwnerByIDBatch with the given settings, functions, and options
-func newGetTokenOwnerByIDBatch(
-	ctx context.Context,
-	maxBatchSize int,
-	batchTimeout time.Duration,
-	cacheResults bool,
-	publishResults bool,
-	fetch func(context.Context, *GetTokenOwnerByIDBatch, []persist.DBID) ([]coredb.User, []error),
-	preFetchHook PreFetchHook,
-	postFetchHook PostFetchHook,
-) *GetTokenOwnerByIDBatch {
-	d := &GetTokenOwnerByIDBatch{}
-
-	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.User, []error) {
-		// Allow the preFetchHook to modify and return a new context
-		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetTokenOwnerByIDBatch")
-		}
-
-		results, errors := fetch(ctx, d, keys)
-
-		if postFetchHook != nil {
-			postFetchHook(ctx, "GetTokenOwnerByIDBatch")
-		}
-
-		return results, errors
-	}
-
-	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
-	return d
-}
-
-func (*GetTokenOwnerByIDBatch) getKeyForResult(result coredb.User) persist.DBID {
 	return result.ID
 }
 
@@ -2156,6 +2189,80 @@ func newGetUserNotificationsBatch(
 	return d
 }
 
+// GetUsersByPositionPaginateBatch batches and caches requests
+type GetUsersByPositionPaginateBatch struct {
+	generator.Dataloader[coredb.GetUsersByPositionPaginateBatchParams, []coredb.User]
+}
+
+// newGetUsersByPositionPaginateBatch creates a new GetUsersByPositionPaginateBatch with the given settings, functions, and options
+func newGetUsersByPositionPaginateBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetUsersByPositionPaginateBatch, []coredb.GetUsersByPositionPaginateBatchParams) ([][]coredb.User, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetUsersByPositionPaginateBatch {
+	d := &GetUsersByPositionPaginateBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetUsersByPositionPaginateBatchParams) ([][]coredb.User, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetUsersByPositionPaginateBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetUsersByPositionPaginateBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetUsersByPositionPersonalizedBatch batches and caches requests
+type GetUsersByPositionPersonalizedBatch struct {
+	generator.Dataloader[coredb.GetUsersByPositionPersonalizedBatchParams, []coredb.User]
+}
+
+// newGetUsersByPositionPersonalizedBatch creates a new GetUsersByPositionPersonalizedBatch with the given settings, functions, and options
+func newGetUsersByPositionPersonalizedBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetUsersByPositionPersonalizedBatch, []coredb.GetUsersByPositionPersonalizedBatchParams) ([][]coredb.User, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetUsersByPositionPersonalizedBatch {
+	d := &GetUsersByPositionPersonalizedBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetUsersByPositionPersonalizedBatchParams) ([][]coredb.User, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetUsersByPositionPersonalizedBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetUsersByPositionPersonalizedBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetUsersWithTraitBatch batches and caches requests
 type GetUsersWithTraitBatch struct {
 	generator.Dataloader[string, []coredb.User]
@@ -2190,6 +2297,43 @@ func newGetUsersWithTraitBatch(
 	}
 
 	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetVisibleCollectionsByIDsPaginateBatch batches and caches requests
+type GetVisibleCollectionsByIDsPaginateBatch struct {
+	generator.Dataloader[coredb.GetVisibleCollectionsByIDsPaginateBatchParams, []coredb.Collection]
+}
+
+// newGetVisibleCollectionsByIDsPaginateBatch creates a new GetVisibleCollectionsByIDsPaginateBatch with the given settings, functions, and options
+func newGetVisibleCollectionsByIDsPaginateBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetVisibleCollectionsByIDsPaginateBatch, []coredb.GetVisibleCollectionsByIDsPaginateBatchParams) ([][]coredb.Collection, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetVisibleCollectionsByIDsPaginateBatch {
+	d := &GetVisibleCollectionsByIDsPaginateBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetVisibleCollectionsByIDsPaginateBatchParams) ([][]coredb.Collection, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetVisibleCollectionsByIDsPaginateBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetVisibleCollectionsByIDsPaginateBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloaderWithNonComparableKey(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 	return d
 }
 

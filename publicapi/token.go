@@ -91,7 +91,7 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	r, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+	r, err := api.loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.Load(db.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams{
 		OwnerID:         userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
@@ -135,9 +135,8 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
-
-		rows, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
+	queryFunc := func(params boolTimeIDPagingParams) ([]db.GetTokensByContractIdPaginateRow, error) {
+		return api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			ID:                 contractID,
 			Limit:              params.Limit,
 			GalleryUsersOnly:   onlyGalleryUsers,
@@ -149,16 +148,6 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 			CurAfterID:         params.CursorAfterID,
 			PagingForward:      params.PagingForward,
 		})
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(rows))
-		for i, r := range rows {
-			results[i] = r.Token
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -169,39 +158,19 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
-		if token, ok := i.(db.Token); ok {
-			owner, err := api.loaders.GetTokenOwnerByIDBatch.Load(token.ID)
-			if err != nil {
-				return false, time.Time{}, "", err
-			}
-			return owner.Universal, token.CreatedAt, token.ID, nil
-		}
-		return false, time.Time{}, "", fmt.Errorf("interface{} is not a token")
+	cursorFunc := func(r db.GetTokensByContractIdPaginateRow) (bool, time.Time, persist.DBID, error) {
+		return r.User.Universal, r.Token.CreatedAt, r.Token.ID, nil
 	}
 
-	paginator := boolTimeIDPaginator{
+	paginator := boolTimeIDPaginator[db.GetTokensByContractIdPaginateRow]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	tokens := make([]db.Token, len(results))
-	for i, result := range results {
-		if token, ok := result.(db.Token); ok {
-			tokens[i] = token
-		} else {
-			return nil, PageInfo{}, fmt.Errorf("interface{} is not a token: %T", token)
-		}
-	}
-
-	return tokens, pageInfo, nil
+	tokens := util.MapWithoutError(results, func(r db.GetTokensByContractIdPaginateRow) db.Token { return r.Token })
+	return tokens, pageInfo, err
 }
 
 func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {

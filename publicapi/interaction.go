@@ -115,9 +115,8 @@ func (api InteractionAPI) loadInteractions(orderedKeys []InteractionKey,
 
 	return interactions, nil
 }
-
 func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]interface{}, PageInfo, error) {
+	first *int, last *int) ([]any, PageInfo, error) {
 
 	err := api.validateInteractionParams(feedEventID, first, last, "feedEventID")
 	if err != nil {
@@ -129,8 +128,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		interactionTypeAdmire:  2,
 	}
 
-	queryFunc := func(params intTimeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.PaginateInteractionsByFeedEventIDBatch.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
+	queryFunc := func(params intTimeIDPagingParams) ([]db.PaginateInteractionsByFeedEventIDBatchRow, error) {
+		return api.loaders.PaginateInteractionsByFeedEventIDBatch.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTag:  params.CursorBeforeInt,
@@ -143,17 +142,6 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 			AdmireTag:     tags[interactionTypeAdmire],
 			CommentTag:    tags[interactionTypeComment],
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -172,14 +160,11 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		return total, err
 	}
 
-	cursorFunc := func(i interface{}) (int64, time.Time, persist.DBID, error) {
-		if row, ok := i.(db.PaginateInteractionsByFeedEventIDBatchRow); ok {
-			return int64(row.Tag), row.CreatedAt, row.ID, nil
-		}
-		return 0, time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
+	cursorFunc := func(r db.PaginateInteractionsByFeedEventIDBatchRow) (int64, time.Time, persist.DBID, error) {
+		return int64(r.Tag), r.CreatedAt, r.ID, nil
 	}
 
-	paginator := intTimeIDPaginator{
+	paginator := intTimeIDPaginator[db.PaginateInteractionsByFeedEventIDBatchRow]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -195,12 +180,11 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	typeToIDs := make(map[int32][]persist.DBID)
 
 	for i, result := range results {
-		row := result.(db.PaginateInteractionsByFeedEventIDBatchRow)
 		orderedKeys[i] = InteractionKey{
-			ID:  row.ID,
-			Tag: row.Tag,
+			ID:  result.ID,
+			Tag: result.Tag,
 		}
-		typeToIDs[row.Tag] = append(typeToIDs[row.Tag], row.ID)
+		typeToIDs[result.Tag] = append(typeToIDs[result.Tag], result.ID)
 	}
 	interactions, err := api.loadInteractions(orderedKeys, typeToIDs, tags)
 	if err != nil {
@@ -210,7 +194,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	return interactions, pageInfo, nil
 }
 
-func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 
 	err := api.validateInteractionParams(postID, first, last, "postID")
 	if err != nil {
@@ -222,8 +206,8 @@ func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, post
 		interactionTypeAdmire:  2,
 	}
 
-	queryFunc := func(params intTimeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.PaginateInteractionsByPostIDBatch.Load(db.PaginateInteractionsByPostIDBatchParams{
+	queryFunc := func(params intTimeIDPagingParams) ([]db.PaginateInteractionsByPostIDBatchRow, error) {
+		return api.loaders.PaginateInteractionsByPostIDBatch.Load(db.PaginateInteractionsByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
 			CurBeforeTag:  params.CursorBeforeInt,
@@ -236,17 +220,6 @@ func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, post
 			AdmireTag:     tags[interactionTypeAdmire],
 			CommentTag:    tags[interactionTypeComment],
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -265,14 +238,11 @@ func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, post
 		return total, err
 	}
 
-	cursorFunc := func(i interface{}) (int64, time.Time, persist.DBID, error) {
-		if row, ok := i.(db.PaginateInteractionsByPostIDBatchRow); ok {
-			return int64(row.Tag), row.CreatedAt, row.ID, nil
-		}
-		return 0, time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
+	cursorFunc := func(r db.PaginateInteractionsByPostIDBatchRow) (int64, time.Time, persist.DBID, error) {
+		return int64(r.Tag), r.CreatedAt, r.ID, nil
 	}
 
-	paginator := intTimeIDPaginator{
+	paginator := intTimeIDPaginator[db.PaginateInteractionsByPostIDBatchRow]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -288,12 +258,11 @@ func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, post
 	typeToIDs := make(map[int32][]persist.DBID)
 
 	for i, result := range results {
-		row := result.(db.PaginateInteractionsByPostIDBatchRow)
 		orderedKeys[i] = InteractionKey{
-			ID:  row.ID,
-			Tag: row.Tag,
+			ID:  result.ID,
+			Tag: result.Tag,
 		}
-		typeToIDs[row.Tag] = append(typeToIDs[row.Tag], row.ID)
+		typeToIDs[result.Tag] = append(typeToIDs[result.Tag], result.ID)
 	}
 
 	interactions, err := api.loadInteractions(orderedKeys, typeToIDs, tags)
@@ -317,8 +286,8 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.PaginateAdmiresByFeedEventIDBatch.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+		return api.loaders.PaginateAdmiresByFeedEventIDBatch.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -327,17 +296,6 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(admires))
-		for i, admire := range admires {
-			results[i] = admire
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -345,27 +303,17 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if admire, ok := i.(db.Admire); ok {
-			return admire.CreatedAt, admire.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
+	cursorFunc := func(a db.Admire) (time.Time, persist.DBID, error) {
+		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	admires := make([]db.Admire, len(results))
-	for i, result := range results {
-		admires[i] = result.(db.Admire)
-	}
-
-	return admires, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commentID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Admire, PageInfo, error) {
@@ -380,8 +328,8 @@ func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commen
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]any, error) {
-		admires, err := api.loaders.PaginateAdmiresByCommentIDBatch.Load(db.PaginateAdmiresByCommentIDBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+		return api.loaders.PaginateAdmiresByCommentIDBatch.Load(db.PaginateAdmiresByCommentIDBatchParams{
 			CommentID:     commentID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -390,13 +338,6 @@ func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commen
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-		return util.MapWithoutError(admires, func(a db.Admire) any {
-			return a
-		}), nil
 	}
 
 	countFunc := func() (int, error) {
@@ -404,22 +345,17 @@ func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commen
 		return int(total), err
 	}
 
-	cursorFunc := func(i any) (time.Time, persist.DBID, error) {
-		if admire, ok := i.(db.Admire); ok {
-			return admire.CreatedAt, admire.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("node is not an admire")
+	cursorFunc := func(a db.Admire) (time.Time, persist.DBID, error) {
+		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-	admires := util.MapWithoutError(results, func(i any) db.Admire { return i.(db.Admire) })
-	return admires, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
@@ -434,8 +370,8 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		comments, err := api.loaders.PaginateCommentsByFeedEventIDBatch.Load(db.PaginateCommentsByFeedEventIDBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Comment, error) {
+		return api.loaders.PaginateCommentsByFeedEventIDBatch.Load(db.PaginateCommentsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -444,17 +380,6 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(comments))
-		for i, comment := range comments {
-			results[i] = comment
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -462,27 +387,17 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if comment, ok := i.(db.Comment); ok {
-			return comment.CreatedAt, comment.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an comment")
+	cursorFunc := func(c db.Comment) (time.Time, persist.DBID, error) {
+		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Comment]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	comments := make([]db.Comment, len(results))
-	for i, result := range results {
-		comments[i] = result.(db.Comment)
-	}
-
-	return comments, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commentID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
@@ -497,9 +412,8 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		comments, err := api.loaders.PaginateRepliesByCommentIDBatch.Load(db.PaginateRepliesByCommentIDBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Comment, error) {
+		return api.loaders.PaginateRepliesByCommentIDBatch.Load(db.PaginateRepliesByCommentIDBatchParams{
 			CommentID:     commentID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -508,17 +422,6 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(comments))
-		for i, comment := range comments {
-			results[i] = comment
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -526,27 +429,17 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if comment, ok := i.(db.Comment); ok {
-			return comment.CreatedAt, comment.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an comment")
+	cursorFunc := func(c db.Comment) (time.Time, persist.DBID, error) {
+		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Comment]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	comments := make([]db.Comment, len(results))
-	for i, result := range results {
-		comments[i] = result.(db.Comment)
-	}
-
-	return comments, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) GetTotalCommentsByPostID(ctx context.Context, postID persist.DBID) (*int, error) {
@@ -594,8 +487,8 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.PaginateAdmiresByPostIDBatch.Load(db.PaginateAdmiresByPostIDBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+		return api.loaders.PaginateAdmiresByPostIDBatch.Load(db.PaginateAdmiresByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -604,17 +497,6 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(admires))
-		for i, admire := range admires {
-			results[i] = admire
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -622,27 +504,17 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if admire, ok := i.(db.Admire); ok {
-			return admire.CreatedAt, admire.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
+	cursorFunc := func(a db.Admire) (time.Time, persist.DBID, error) {
+		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	admires := make([]db.Admire, len(results))
-	for i, result := range results {
-		admires[i] = result.(db.Admire)
-	}
-
-	return admires, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID persist.DBID, before *string, after *string,
@@ -666,8 +538,8 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 	}
 	onlyForActor := actorID != ""
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.PaginateAdmiresByTokenIDBatch.Load(db.PaginateAdmiresByTokenIDBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+		return api.loaders.PaginateAdmiresByTokenIDBatch.Load(db.PaginateAdmiresByTokenIDBatchParams{
 			TokenID:       tokenID,
 			Limit:         params.Limit,
 			OnlyForActor:  onlyForActor,
@@ -678,17 +550,6 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(admires))
-		for i, admire := range admires {
-			results[i] = admire
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -696,27 +557,17 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if admire, ok := i.(db.Admire); ok {
-			return admire.CreatedAt, admire.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
+	cursorFunc := func(a db.Admire) (time.Time, persist.DBID, error) {
+		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	admires := make([]db.Admire, len(results))
-	for i, result := range results {
-		admires[i] = result.(db.Admire)
-	}
-
-	return admires, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
@@ -731,8 +582,8 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		comments, err := api.loaders.PaginateCommentsByPostIDBatch.Load(db.PaginateCommentsByPostIDBatchParams{
+	queryFunc := func(params timeIDPagingParams) ([]db.Comment, error) {
+		return api.loaders.PaginateCommentsByPostIDBatch.Load(db.PaginateCommentsByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -741,17 +592,6 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(comments))
-		for i, comment := range comments {
-			results[i] = comment
-		}
-
-		return results, nil
 	}
 
 	countFunc := func() (int, error) {
@@ -759,27 +599,17 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if comment, ok := i.(db.Comment); ok {
-			return comment.CreatedAt, comment.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an comment")
+	cursorFunc := func(c db.Comment) (time.Time, persist.DBID, error) {
+		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator{
+	paginator := timeIDPaginator[db.Comment]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	comments := make([]db.Comment, len(results))
-	for i, result := range results {
-		comments[i] = result.(db.Comment)
-	}
-
-	return comments, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) GetAdmireByActorIDAndFeedEventID(ctx context.Context, actorID persist.DBID, feedEventID persist.DBID) (*db.Admire, error) {

@@ -90,7 +90,7 @@ func (*GetPostByIdBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrPostNotFoundByID{ID: key}
 }
 
-func (*GetProfileImageByID) getNotFoundError(key coredb.GetProfileImageByIDParams) error {
+func (*GetProfileImageByIdBatch) getNotFoundError(key coredb.GetProfileImageByIdBatchParams) error {
 	return persist.ErrProfileImageNotFound{Err: pgx.ErrNoRows, ProfileImageID: key.ID}
 }
 
@@ -113,8 +113,15 @@ func (*GetTokenByUserTokenIdentifiersBatch) getNotFoundError(key coredb.GetToken
 	}
 }
 
-func (*GetTokenOwnerByIDBatch) getNotFoundError(key persist.DBID) error {
-	return pgx.ErrNoRows
+func (*GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch) getNotFoundError(key coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams) error {
+	return persist.ErrTokenNotFoundByUserTokenIdentifers{
+		UserID: key.OwnerID,
+		Token: persist.TokenIdentifiers{
+			TokenID:         key.TokenID,
+			ContractAddress: key.ContractAddress,
+			Chain:           key.Chain,
+		},
+	}
 }
 
 func (*GetUserByAddressAndL1Batch) getNotFoundError(key coredb.GetUserByAddressAndL1BatchParams) error {
