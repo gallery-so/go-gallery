@@ -481,7 +481,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
-		ContractID:  persistedEvent.ContractID,
+		CommunityID: persistedEvent.CommunityID,
 		MentionID:   persistedEvent.MentionID,
 	})
 }
@@ -545,15 +545,19 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 		return event.SubjectID, nil
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
-	case persist.ResourceTypeContract:
-
-		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.ContractID.String())
-		if err != nil || u.CreatorUserID == "" {
-			logger.For(ctx).Warnf("error loading user by address: %s", err)
+	case persist.ResourceTypeCommunity:
+		// TODO: a community can technically have multiple creators. For now, just return the first one.
+		creators, err := h.dataloaders.GetCreatorsByCommunityID.Load(event.CommunityID)
+		if err != nil {
+			err = fmt.Errorf("error getting creators for community ID %s: %w", event.CommunityID, err)
+			logger.For(ctx).WithError(err).Warn(err)
+			sentryutil.ReportError(ctx, err)
 			return "", nil
 		}
-		return u.CreatorUserID, nil
-
+		if len(creators) > 0 && creators[0].CreatorUserID != "" {
+			return creators[0].CreatorUserID, nil
+		}
+		return "", nil
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)
@@ -613,7 +617,7 @@ func (h followerNotificationHandler) handleDelayed(ctx context.Context, persiste
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
-		ContractID:  persistedEvent.ContractID,
+		CommunityID: persistedEvent.CommunityID,
 		MentionID:   persistedEvent.MentionID,
 	})
 }

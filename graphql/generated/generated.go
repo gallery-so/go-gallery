@@ -160,6 +160,12 @@ type ComplexityRoot struct {
 	}
 
 	ArtBlocksCommunity struct {
+		CommunityKey func(childComplexity int) int
+		Contract     func(childComplexity int) int
+		ProjectID    func(childComplexity int) int
+	}
+
+	ArtBlocksCommunityKey struct {
 		Contract  func(childComplexity int) int
 		ProjectID func(childComplexity int) int
 	}
@@ -396,6 +402,11 @@ type ComplexityRoot struct {
 	}
 
 	ContractCommunity struct {
+		CommunityKey func(childComplexity int) int
+		Contract     func(childComplexity int) int
+	}
+
+	ContractCommunityKey struct {
 		Contract func(childComplexity int) int
 	}
 
@@ -1097,6 +1108,7 @@ type ComplexityRoot struct {
 		CollectionTokenByID        func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CollectionsByIds           func(childComplexity int, ids []persist.DBID) int
 		CommunityByAddress         func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		CommunityByID              func(childComplexity int, id persist.DBID) int
 		ContractCommunityByKey     func(childComplexity int, key model.ContractCommunityKeyInput) int
 		CuratedFeed                func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		FeedEventByID              func(childComplexity int, id persist.DBID) int
@@ -1109,7 +1121,7 @@ type ComplexityRoot struct {
 		Node                       func(childComplexity int, id model.GqlID) int
 		PostByID                   func(childComplexity int, id persist.DBID) int
 		PostComposerDraftDetails   func(childComplexity int, input model.PostComposerDraftDetailsInput) int
-		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
+		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64, providerNameWeight *float64) int
 		SearchGalleries            func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
 		SearchUsers                func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
 		SocialConnections          func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
@@ -2041,6 +2053,7 @@ type QueryResolver interface {
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
+	CommunityByID(ctx context.Context, id persist.DBID) (model.CommunityByIDOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
@@ -2054,7 +2067,7 @@ type QueryResolver interface {
 	TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error)
 	SearchUsers(ctx context.Context, query string, limit *int, usernameWeight *float64, bioWeight *float64) (model.SearchUsersPayloadOrError, error)
 	SearchGalleries(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64) (model.SearchGalleriesPayloadOrError, error)
-	SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) (model.SearchCommunitiesPayloadOrError, error)
+	SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64, providerNameWeight *float64) (model.SearchCommunitiesPayloadOrError, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
@@ -2370,6 +2383,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AdmireTokenPayload.Viewer(childComplexity), true
 
+	case "ArtBlocksCommunity.communityKey":
+		if e.complexity.ArtBlocksCommunity.CommunityKey == nil {
+			break
+		}
+
+		return e.complexity.ArtBlocksCommunity.CommunityKey(childComplexity), true
+
 	case "ArtBlocksCommunity.contract":
 		if e.complexity.ArtBlocksCommunity.Contract == nil {
 			break
@@ -2383,6 +2403,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ArtBlocksCommunity.ProjectID(childComplexity), true
+
+	case "ArtBlocksCommunityKey.contract":
+		if e.complexity.ArtBlocksCommunityKey.Contract == nil {
+			break
+		}
+
+		return e.complexity.ArtBlocksCommunityKey.Contract(childComplexity), true
+
+	case "ArtBlocksCommunityKey.projectID":
+		if e.complexity.ArtBlocksCommunityKey.ProjectID == nil {
+			break
+		}
+
+		return e.complexity.ArtBlocksCommunityKey.ProjectID(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -3348,12 +3382,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Contract.ProfileImageURL(childComplexity), true
 
+	case "ContractCommunity.communityKey":
+		if e.complexity.ContractCommunity.CommunityKey == nil {
+			break
+		}
+
+		return e.complexity.ContractCommunity.CommunityKey(childComplexity), true
+
 	case "ContractCommunity.contract":
 		if e.complexity.ContractCommunity.Contract == nil {
 			break
 		}
 
 		return e.complexity.ContractCommunity.Contract(childComplexity), true
+
+	case "ContractCommunityKey.contract":
+		if e.complexity.ContractCommunityKey.Contract == nil {
+			break
+		}
+
+		return e.complexity.ContractCommunityKey.Contract(childComplexity), true
 
 	case "CreateCollectionPayload.collection":
 		if e.complexity.CreateCollectionPayload.Collection == nil {
@@ -6582,6 +6630,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
+	case "Query.communityById":
+		if e.complexity.Query.CommunityByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_communityById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CommunityByID(childComplexity, args["id"].(persist.DBID)), true
+
 	case "Query.contractCommunityByKey":
 		if e.complexity.Query.ContractCommunityByKey == nil {
 			break
@@ -6726,7 +6786,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.SearchCommunities(childComplexity, args["query"].(string), args["limit"].(*int), args["nameWeight"].(*float64), args["descriptionWeight"].(*float64), args["poapAddressWeight"].(*float64)), true
+		return e.complexity.Query.SearchCommunities(childComplexity, args["query"].(string), args["limit"].(*int), args["nameWeight"].(*float64), args["descriptionWeight"].(*float64), args["poapAddressWeight"].(*float64), args["providerNameWeight"].(*float64)), true
 
 	case "Query.searchGalleries":
 		if e.complexity.Query.SearchGalleries == nil {
@@ -9565,8 +9625,18 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
+
+type ContractCommunityKey {
+  contract: ChainAddress
+}
+
 input ContractCommunityKeyInput {
   contract: ChainAddressInput!
+}
+
+type ArtBlocksCommunityKey {
+    contract: ChainAddress
+    projectID: String
 }
 
 input ArtBlocksCommunityKeyInput {
@@ -10006,10 +10076,12 @@ type TokenHoldersConnection {
 }
 
 type ContractCommunity @goEmbedHelper {
+  communityKey: ContractCommunityKey
   contract: Contract @goField(forceResolver: true)
 }
 
 type ArtBlocksCommunity @goEmbedHelper {
+  communityKey: ArtBlocksCommunityKey
   contract: Contract @goField(forceResolver: true)
   projectID: String
 }
@@ -10055,7 +10127,6 @@ type Community implements Node @goEmbedHelper {
     @deprecated(reason: "Use Community.creators to get an address")
   creator: GalleryUserOrAddress
     @goField(forceResolver: true)
-    @deprecated(reason: "Use Community.creators")
 
   tokensInCommunity(
     before: String
@@ -10284,6 +10355,7 @@ union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInp
 
 union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | ErrTokenNotFound
 
+union CommunityByIdOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 union CommunityByKeyOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
@@ -10783,6 +10855,7 @@ type Query {
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
   ): CommunityByAddressOrError
+  communityById(id: DBID!): CommunityByIdOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
   globalFeed(
@@ -10839,10 +10912,12 @@ type Query {
   ): SearchGalleriesPayloadOrError
   """
   Search for communities with optional weighting. Weights are floats in the [0.0. 1.0] range
-  that help determine how matches will be ranked. nameWeight defaults to 0.4, descriptionWeight
-  defaults to 0.2, and poapAddressWeight defaults to 0.1, meaning that a search result matching
-  a community name is considered twice as relevant as a search result matching a community
-  description, and four times as relevant as a search result matching a POAP address string.
+  that help determine how matches will be ranked. nameWeight defaults to 0.4, providerNameWeight
+  defaults to 0.3, descriptionWeight defaults to 0.2, and poapAddressWeight defaults to 0.1,
+  meaning that a search result matching a community name is considered twice as relevant as a
+  search result matching a community description, and four times as relevant as a search result
+  matching a POAP address string. providerNameWeight is used to return communities provided by
+  a provider (e.g. Art Blocks) when searching for that provider's name (e.g. "art blocks").
   """
   searchCommunities(
     query: String!
@@ -10850,6 +10925,7 @@ type Query {
     nameWeight: Float
     descriptionWeight: Float
     poapAddressWeight: Float
+    providerNameWeight: Float
   ): SearchCommunitiesPayloadOrError
 
   # Retool Specific
@@ -14821,6 +14897,21 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_communityById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_contractCommunityByKey_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -15091,6 +15182,15 @@ func (ec *executionContext) field_Query_searchCommunities_args(ctx context.Conte
 		}
 	}
 	args["poapAddressWeight"] = arg4
+	var arg5 *float64
+	if tmp, ok := rawArgs["providerNameWeight"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("providerNameWeight"))
+		arg5, err = ec.unmarshalOFloat2ᚖfloat64(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["providerNameWeight"] = arg5
 	return args, nil
 }
 
@@ -17304,6 +17404,53 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_admire(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _ArtBlocksCommunity_communityKey(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunity) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArtBlocksCommunity_communityKey(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CommunityKey, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ArtBlocksCommunityKey)
+	fc.Result = res
+	return ec.marshalOArtBlocksCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐArtBlocksCommunityKey(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArtBlocksCommunity_communityKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArtBlocksCommunity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "contract":
+				return ec.fieldContext_ArtBlocksCommunityKey_contract(ctx, field)
+			case "projectID":
+				return ec.fieldContext_ArtBlocksCommunityKey_projectID(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ArtBlocksCommunityKey", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ArtBlocksCommunity_contract(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunity) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ArtBlocksCommunity_contract(ctx, field)
 	if err != nil {
@@ -17402,6 +17549,94 @@ func (ec *executionContext) _ArtBlocksCommunity_projectID(ctx context.Context, f
 func (ec *executionContext) fieldContext_ArtBlocksCommunity_projectID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ArtBlocksCommunity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArtBlocksCommunityKey_contract(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunityKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArtBlocksCommunityKey_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Contract, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArtBlocksCommunityKey_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArtBlocksCommunityKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "address":
+				return ec.fieldContext_ChainAddress_address(ctx, field)
+			case "chain":
+				return ec.fieldContext_ChainAddress_chain(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainAddress", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArtBlocksCommunityKey_projectID(ctx context.Context, field graphql.CollectedField, obj *model.ArtBlocksCommunityKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArtBlocksCommunityKey_projectID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProjectID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArtBlocksCommunityKey_projectID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArtBlocksCommunityKey",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -24178,6 +24413,51 @@ func (ec *executionContext) fieldContext_Contract_isSpam(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _ContractCommunity_communityKey(ctx context.Context, field graphql.CollectedField, obj *model.ContractCommunity) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ContractCommunity_communityKey(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CommunityKey, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ContractCommunityKey)
+	fc.Result = res
+	return ec.marshalOContractCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContractCommunityKey(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ContractCommunity_communityKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ContractCommunity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "contract":
+				return ec.fieldContext_ContractCommunityKey_contract(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ContractCommunityKey", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ContractCommunity_contract(ctx context.Context, field graphql.CollectedField, obj *model.ContractCommunity) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ContractCommunity_contract(ctx, field)
 	if err != nil {
@@ -24240,6 +24520,53 @@ func (ec *executionContext) fieldContext_ContractCommunity_contract(ctx context.
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ContractCommunityKey_contract(ctx context.Context, field graphql.CollectedField, obj *model.ContractCommunityKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ContractCommunityKey_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Contract, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ContractCommunityKey_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ContractCommunityKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "address":
+				return ec.fieldContext_ChainAddress_address(ctx, field)
+			case "chain":
+				return ec.fieldContext_ChainAddress_chain(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainAddress", field.Name)
 		},
 	}
 	return fc, nil
@@ -45469,6 +45796,58 @@ func (ec *executionContext) fieldContext_Query_communityByAddress(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_communityById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_communityById(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().CommunityByID(rctx, fc.Args["id"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.CommunityByIDOrError)
+	fc.Result = res
+	return ec.marshalOCommunityByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByIDOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_communityById(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CommunityByIdOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_communityById_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_generalAllowlist(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_generalAllowlist(ctx, field)
 	if err != nil {
@@ -46209,7 +46588,7 @@ func (ec *executionContext) _Query_searchCommunities(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().SearchCommunities(rctx, fc.Args["query"].(string), fc.Args["limit"].(*int), fc.Args["nameWeight"].(*float64), fc.Args["descriptionWeight"].(*float64), fc.Args["poapAddressWeight"].(*float64))
+		return ec.resolvers.Query().SearchCommunities(rctx, fc.Args["query"].(string), fc.Args["limit"].(*int), fc.Args["nameWeight"].(*float64), fc.Args["descriptionWeight"].(*float64), fc.Args["poapAddressWeight"].(*float64), fc.Args["providerNameWeight"].(*float64))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -69114,6 +69493,36 @@ func (ec *executionContext) _CommunityByAddressOrError(ctx context.Context, sel 
 	}
 }
 
+func (ec *executionContext) _CommunityByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.CommunityByIDOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.Community:
+		return ec._Community(ctx, sel, &obj)
+	case *model.Community:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Community(ctx, sel, obj)
+	case model.ErrCommunityNotFound:
+		return ec._ErrCommunityNotFound(ctx, sel, &obj)
+	case *model.ErrCommunityNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCommunityNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _CommunityByKeyOrError(ctx context.Context, sel ast.SelectionSet, obj model.CommunityByKeyOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -73289,6 +73698,10 @@ func (ec *executionContext) _ArtBlocksCommunity(ctx context.Context, sel ast.Sel
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("ArtBlocksCommunity")
+		case "communityKey":
+
+			out.Values[i] = ec._ArtBlocksCommunity_communityKey(ctx, field, obj)
+
 		case "contract":
 			field := field
 
@@ -73309,6 +73722,35 @@ func (ec *executionContext) _ArtBlocksCommunity(ctx context.Context, sel ast.Sel
 		case "projectID":
 
 			out.Values[i] = ec._ArtBlocksCommunity_projectID(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var artBlocksCommunityKeyImplementors = []string{"ArtBlocksCommunityKey"}
+
+func (ec *executionContext) _ArtBlocksCommunityKey(ctx context.Context, sel ast.SelectionSet, obj *model.ArtBlocksCommunityKey) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, artBlocksCommunityKeyImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ArtBlocksCommunityKey")
+		case "contract":
+
+			out.Values[i] = ec._ArtBlocksCommunityKey_contract(ctx, field, obj)
+
+		case "projectID":
+
+			out.Values[i] = ec._ArtBlocksCommunityKey_projectID(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -74687,7 +75129,7 @@ func (ec *executionContext) _CommunitiesConnection(ctx context.Context, sel ast.
 	return out
 }
 
-var communityImplementors = []string{"Community", "Node", "CommunityByAddressOrError", "CommunityByKeyOrError", "MentionEntity"}
+var communityImplementors = []string{"Community", "Node", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "MentionEntity"}
 
 func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet, obj *model.Community) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, communityImplementors)
@@ -75114,6 +75556,10 @@ func (ec *executionContext) _ContractCommunity(ctx context.Context, sel ast.Sele
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("ContractCommunity")
+		case "communityKey":
+
+			out.Values[i] = ec._ContractCommunity_communityKey(ctx, field, obj)
+
 		case "contract":
 			field := field
 
@@ -75131,6 +75577,31 @@ func (ec *executionContext) _ContractCommunity(ctx context.Context, sel ast.Sele
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var contractCommunityKeyImplementors = []string{"ContractCommunityKey"}
+
+func (ec *executionContext) _ContractCommunityKey(ctx context.Context, sel ast.SelectionSet, obj *model.ContractCommunityKey) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, contractCommunityKeyImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ContractCommunityKey")
+		case "contract":
+
+			out.Values[i] = ec._ContractCommunityKey_contract(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -75719,7 +76190,7 @@ func (ec *executionContext) _ErrCommentNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errCommunityNotFoundImplementors = []string{"ErrCommunityNotFound", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostComposerDraftDetailsPayloadOrError", "Error", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError"}
+var errCommunityNotFoundImplementors = []string{"ErrCommunityNotFound", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostComposerDraftDetailsPayloadOrError", "Error", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError"}
 
 func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCommunityNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errCommunityNotFoundImplementors)
@@ -75887,7 +76358,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -80212,6 +80683,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_communityByAddress(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "communityById":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_communityById(ctx, field)
 				return res
 			}
 
@@ -87018,6 +87509,13 @@ func (ec *executionContext) marshalOAdmireTokenPayloadOrError2githubᚗcomᚋmik
 	return ec._AdmireTokenPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOArtBlocksCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐArtBlocksCommunityKey(ctx context.Context, sel ast.SelectionSet, v *model.ArtBlocksCommunityKey) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ArtBlocksCommunityKey(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -87756,6 +88254,13 @@ func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmik
 	return ec._CommunityByAddressOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOCommunityByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.CommunityByIDOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommunityByIdOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOCommunityByKeyOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByKeyOrError(ctx context.Context, sel ast.SelectionSet, v model.CommunityByKeyOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -87877,6 +88382,13 @@ func (ec *executionContext) marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._Contract(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOContractCommunityKey2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContractCommunityKey(ctx context.Context, sel ast.SelectionSet, v *model.ContractCommunityKey) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ContractCommunityKey(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOCreateCollectionInGalleryInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInGalleryInput(ctx context.Context, v interface{}) ([]*model.CreateCollectionInGalleryInput, error) {

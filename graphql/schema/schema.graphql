@@ -163,8 +163,17 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
+type ContractCommunityKey {
+  contract: ChainAddress
+}
+
 input ContractCommunityKeyInput {
   contract: ChainAddressInput!
+}
+
+type ArtBlocksCommunityKey {
+  contract: ChainAddress
+  projectID: String
 }
 
 input ArtBlocksCommunityKeyInput {
@@ -604,10 +613,12 @@ type TokenHoldersConnection {
 }
 
 type ContractCommunity @goEmbedHelper {
+  communityKey: ContractCommunityKey
   contract: Contract @goField(forceResolver: true)
 }
 
 type ArtBlocksCommunity @goEmbedHelper {
+  communityKey: ArtBlocksCommunityKey
   contract: Contract @goField(forceResolver: true)
   projectID: String
 }
@@ -651,9 +662,7 @@ type Community implements Node @goEmbedHelper {
   creatorAddress: ChainAddress
     @goField(forceResolver: true)
     @deprecated(reason: "Use Community.creators to get an address")
-  creator: GalleryUserOrAddress
-    @goField(forceResolver: true)
-    @deprecated(reason: "Use Community.creators")
+  creator: GalleryUserOrAddress @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -882,6 +891,7 @@ union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInp
 
 union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | ErrTokenNotFound
 
+union CommunityByIdOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 union CommunityByKeyOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
@@ -1381,6 +1391,7 @@ type Query {
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
   ): CommunityByAddressOrError
+  communityById(id: DBID!): CommunityByIdOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
   globalFeed(
@@ -1437,10 +1448,12 @@ type Query {
   ): SearchGalleriesPayloadOrError
   """
   Search for communities with optional weighting. Weights are floats in the [0.0. 1.0] range
-  that help determine how matches will be ranked. nameWeight defaults to 0.4, descriptionWeight
-  defaults to 0.2, and poapAddressWeight defaults to 0.1, meaning that a search result matching
-  a community name is considered twice as relevant as a search result matching a community
-  description, and four times as relevant as a search result matching a POAP address string.
+  that help determine how matches will be ranked. nameWeight defaults to 0.4, providerNameWeight
+  defaults to 0.3, descriptionWeight defaults to 0.2, and poapAddressWeight defaults to 0.1,
+  meaning that a search result matching a community name is considered twice as relevant as a
+  search result matching a community description, and four times as relevant as a search result
+  matching a POAP address string. providerNameWeight is used to return communities provided by
+  a provider (e.g. Art Blocks) when searching for that provider's name (e.g. "art blocks").
   """
   searchCommunities(
     query: String!
@@ -1448,6 +1461,7 @@ type Query {
     nameWeight: Float
     descriptionWeight: Float
     poapAddressWeight: Float
+    providerNameWeight: Float
   ): SearchCommunitiesPayloadOrError
 
   # Retool Specific

@@ -2444,6 +2444,11 @@ func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 
+// CommunityByID is the resolver for the communityById field.
+func (r *queryResolver) CommunityByID(ctx context.Context, id persist.DBID) (model.CommunityByIDOrError, error) {
+	return resolveCommunityByID(ctx, id)
+}
+
 // GeneralAllowlist is the resolver for the generalAllowlist field.
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
 	return resolveGeneralAllowlist(ctx)
@@ -2618,24 +2623,22 @@ func (r *queryResolver) SearchGalleries(ctx context.Context, query string, limit
 }
 
 // SearchCommunities is the resolver for the searchCommunities field.
-func (r *queryResolver) SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) (model.SearchCommunitiesPayloadOrError, error) {
+func (r *queryResolver) SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64, providerNameWeight *float64) (model.SearchCommunitiesPayloadOrError, error) {
 	limitParam := util.GetOptionalValue(limit, 100)
 	nameWeightParam := util.GetOptionalValue(nameWeight, 0.4)
 	descriptionWeightParam := util.GetOptionalValue(descriptionWeight, 0.2)
 	poapAddressWeightParam := util.GetOptionalValue(poapAddressWeight, 0.1)
+	providerNameWeightParam := util.GetOptionalValue(providerNameWeight, 0.3)
 
-	contracts, err := publicapi.For(ctx).Search.SearchContracts(ctx, query, limitParam, float32(nameWeightParam), float32(descriptionWeightParam), float32(poapAddressWeightParam))
+	communities, err := publicapi.For(ctx).Search.SearchCommunities(ctx, query, limitParam, float32(nameWeightParam), float32(descriptionWeightParam), float32(poapAddressWeightParam), float32(providerNameWeightParam))
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Convert these to updated communities
-	forceRefresh := false
-
-	results := make([]*model.CommunitySearchResult, len(contracts))
-	for i, contract := range contracts {
+	results := make([]*model.CommunitySearchResult, len(communities))
+	for i, community := range communities {
 		results[i] = &model.CommunitySearchResult{
-			Community: contractToCommunityModel(ctx, contract, &forceRefresh),
+			Community: communityToModel(ctx, community),
 		}
 	}
 
@@ -2923,7 +2926,7 @@ func (r *someoneMentionedYourCommunityNotificationResolver) MentionSource(ctx co
 
 // Community is the resolver for the community field.
 func (r *someoneMentionedYourCommunityNotificationResolver) Community(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.ContractID)
+	return resolveCommunityByID(ctx, obj.CommunityID)
 }
 
 // Post is the resolver for the post field.
@@ -2933,7 +2936,7 @@ func (r *someonePostedYourWorkNotificationResolver) Post(ctx context.Context, ob
 
 // Community is the resolver for the community field.
 func (r *someonePostedYourWorkNotificationResolver) Community(ctx context.Context, obj *model.SomeonePostedYourWorkNotification) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.ContractID)
+	return resolveCommunityByID(ctx, obj.CommunityID)
 }
 
 // Comment is the resolver for the comment field.

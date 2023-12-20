@@ -20,9 +20,9 @@ alter table users drop column if exists fts_bio_english;
 
 alter table wallets drop column if exists fts_address;
 
-alter table contracts drop column if exists fts_name;
-alter table contracts drop column if exists fts_address;
-alter table contracts drop column if exists fts_description_english;
+alter table communities drop column if exists fts_name;
+alter table communities drop column if exists fts_community_key;
+alter table communities drop column if exists fts_description_english;
 
 alter table galleries drop column if exists fts_name;
 alter table galleries drop column if exists fts_description_english;
