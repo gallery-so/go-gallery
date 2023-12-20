@@ -12,7 +12,6 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	emailService "github.com/mikeydub/go-gallery/emails"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -1187,7 +1186,7 @@ func (r *mutationResolver) SyncCreatedTokensForNewContracts(ctx context.Context,
 		chains = persist.AllChains
 	}
 
-	err := publicapi.For(ctx).Token.SyncCreatedTokensForNewContracts(ctx, chains)
+	err := publicapi.For(ctx).Token.SyncCreatedTokensForNewContracts(ctx, chains, util.FromPointer(input.Incrementally))
 	if err != nil {
 		return nil, err
 	}
@@ -1893,11 +1892,11 @@ func (r *mutationResolver) PreverifyEmail(ctx context.Context, input model.Preve
 	var modelResult model.PreverifyEmailResult
 
 	switch result.Result {
-	case emailService.PreverifyEmailResultValid:
+	case emails.PreverifyEmailResultValid:
 		modelResult = model.PreverifyEmailResultValid
-	case emailService.PreverifyEmailResultInvalid:
+	case emails.PreverifyEmailResultInvalid:
 		modelResult = model.PreverifyEmailResultInvalid
-	case emailService.PreverifyEmailResultRisky:
+	case emails.PreverifyEmailResultRisky:
 		modelResult = model.PreverifyEmailResultRisky
 	default:
 		return nil, fmt.Errorf("unknown preverify result: %d", result.Result)
@@ -2454,6 +2453,11 @@ func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 
+// CommunityByID is the resolver for the communityById field.
+func (r *queryResolver) CommunityByID(ctx context.Context, id persist.DBID) (model.CommunityByIDOrError, error) {
+	return resolveCommunityByID(ctx, id)
+}
+
 // GeneralAllowlist is the resolver for the generalAllowlist field.
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
 	return resolveGeneralAllowlist(ctx)
@@ -2628,24 +2632,22 @@ func (r *queryResolver) SearchGalleries(ctx context.Context, query string, limit
 }
 
 // SearchCommunities is the resolver for the searchCommunities field.
-func (r *queryResolver) SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) (model.SearchCommunitiesPayloadOrError, error) {
+func (r *queryResolver) SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64, providerNameWeight *float64) (model.SearchCommunitiesPayloadOrError, error) {
 	limitParam := util.GetOptionalValue(limit, 100)
 	nameWeightParam := util.GetOptionalValue(nameWeight, 0.4)
 	descriptionWeightParam := util.GetOptionalValue(descriptionWeight, 0.2)
 	poapAddressWeightParam := util.GetOptionalValue(poapAddressWeight, 0.1)
+	providerNameWeightParam := util.GetOptionalValue(providerNameWeight, 0.3)
 
-	contracts, err := publicapi.For(ctx).Search.SearchContracts(ctx, query, limitParam, float32(nameWeightParam), float32(descriptionWeightParam), float32(poapAddressWeightParam))
+	communities, err := publicapi.For(ctx).Search.SearchCommunities(ctx, query, limitParam, float32(nameWeightParam), float32(descriptionWeightParam), float32(poapAddressWeightParam), float32(providerNameWeightParam))
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Convert these to updated communities
-	forceRefresh := false
-
-	results := make([]*model.CommunitySearchResult, len(contracts))
-	for i, contract := range contracts {
+	results := make([]*model.CommunitySearchResult, len(communities))
+	for i, community := range communities {
 		results[i] = &model.CommunitySearchResult{
-			Community: contractToCommunityModel(ctx, contract, &forceRefresh),
+			Community: communityToModel(ctx, community),
 		}
 	}
 
@@ -2933,7 +2935,7 @@ func (r *someoneMentionedYourCommunityNotificationResolver) MentionSource(ctx co
 
 // Community is the resolver for the community field.
 func (r *someoneMentionedYourCommunityNotificationResolver) Community(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.ContractID)
+	return resolveCommunityByID(ctx, obj.CommunityID)
 }
 
 // Post is the resolver for the post field.
@@ -2943,7 +2945,7 @@ func (r *someonePostedYourWorkNotificationResolver) Post(ctx context.Context, ob
 
 // Community is the resolver for the community field.
 func (r *someonePostedYourWorkNotificationResolver) Community(ctx context.Context, obj *model.SomeonePostedYourWorkNotification) (*model.Community, error) {
-	return resolveCommunityByID(ctx, obj.ContractID)
+	return resolveCommunityByID(ctx, obj.CommunityID)
 }
 
 // Comment is the resolver for the comment field.
@@ -3196,6 +3198,30 @@ func (r *tokenDefinitionResolver) Community(ctx context.Context, obj *model.Toke
 // Communities is the resolver for the communities field.
 func (r *tokenDefinitionResolver) Communities(ctx context.Context, obj *model.TokenDefinition) ([]*model.Community, error) {
 	return resolveCommunitiesByTokenDefinitionID(ctx, obj.Dbid)
+}
+
+// MintURL is the resolver for the mintUrl field.
+func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenDefinition) (*string, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	var mintURL string
+
+	if contract.Address != "" && !contract.IsProviderMarkedSpam {
+		if contract.Chain == persist.ChainZora {
+			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s/%s", contract.Address, obj.HelperTokenDefinitionData.Definition.TokenID.Base10String())
+		} else if contract.Chain == persist.ChainBase {
+			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+		} else if contract.Chain == persist.ChainOptimism {
+			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+		} else if contract.Chain == persist.ChainETH {
+			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+		}
+	}
+
+	return &mintURL, nil
 }
 
 // Wallets is the resolver for the wallets field.

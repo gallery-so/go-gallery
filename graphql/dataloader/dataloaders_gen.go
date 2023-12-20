@@ -780,34 +780,34 @@ func newGetCommunitiesByTokenDefinitionID(
 	return d
 }
 
-// GetCommunityByID batches and caches requests
-type GetCommunityByID struct {
+// GetCommunityByIDBatch batches and caches requests
+type GetCommunityByIDBatch struct {
 	generator.Dataloader[persist.DBID, coredb.Community]
 }
 
-// newGetCommunityByID creates a new GetCommunityByID with the given settings, functions, and options
-func newGetCommunityByID(
+// newGetCommunityByIDBatch creates a new GetCommunityByIDBatch with the given settings, functions, and options
+func newGetCommunityByIDBatch(
 	ctx context.Context,
 	maxBatchSize int,
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetCommunityByID, []persist.DBID) ([]coredb.Community, []error),
+	fetch func(context.Context, *GetCommunityByIDBatch, []persist.DBID) ([]coredb.Community, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
-) *GetCommunityByID {
-	d := &GetCommunityByID{}
+) *GetCommunityByIDBatch {
+	d := &GetCommunityByIDBatch{}
 
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.Community, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetCommunityByID")
+			ctx = preFetchHook(ctx, "GetCommunityByIDBatch")
 		}
 
 		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
-			postFetchHook(ctx, "GetCommunityByID")
+			postFetchHook(ctx, "GetCommunityByIDBatch")
 		}
 
 		return results, errors
@@ -817,7 +817,7 @@ func newGetCommunityByID(
 	return d
 }
 
-func (*GetCommunityByID) getKeyForResult(result coredb.Community) persist.DBID {
+func (*GetCommunityByIDBatch) getKeyForResult(result coredb.Community) persist.DBID {
 	return result.ID
 }
 

@@ -16,7 +16,7 @@ const (
 	ResourceTypeGallery
 	ResourceTypeAdmire
 	ResourceTypeComment
-	ResourceTypeContract
+	ResourceTypeCommunity
 	ResourceTypePost
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"

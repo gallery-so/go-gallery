@@ -74,15 +74,15 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 	ms := make([]db.Mention, len(mentions))
 
 	for i, m := range mentions {
-		var userID, contractID sql.NullString
+		var userID, communityID sql.NullString
 		if m.UserID != "" {
 			userID = sql.NullString{
 				String: m.UserID.String(),
 				Valid:  true,
 			}
-		} else if m.ContractID != "" {
-			contractID = sql.NullString{
-				String: m.ContractID.String(),
+		} else if m.CommunityID != "" {
+			communityID = sql.NullString{
+				String: m.CommunityID.String(),
 				Valid:  true,
 			}
 		}
@@ -92,7 +92,7 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 			Start:     m.Start,
 			Length:    m.Length,
 			User:      userID,
-			Contract:  contractID,
+			Community: communityID,
 		})
 		if err != nil {
 			return "", nil, err

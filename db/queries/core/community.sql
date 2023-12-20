@@ -73,7 +73,12 @@ on conflict (community_id, token_definition_id) where not deleted
     do nothing
 returning *;
 
--- name: GetCommunityByID :batchone
+-- name: GetCommunityByID :one
+select * from communities
+    where id = @id
+        and not deleted;
+
+-- name: GetCommunityByIDBatch :batchone
 select * from communities
     where id = @id
         and not deleted;
@@ -203,7 +208,9 @@ community_posts as (
 select count(*) from community_posts;
 
 -- name: GetCreatorsByCommunityID :batchmany
-select u.id as creator_user_id,
+select
+    cc.community_id as community_id,
+    u.id as creator_user_id,
     cc.creator_address as creator_address,
     cc.creator_address_chain as creator_address_chain
     from community_creators cc

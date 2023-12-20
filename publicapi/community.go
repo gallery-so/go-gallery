@@ -36,7 +36,7 @@ func (api CommunityAPI) GetCommunityByID(ctx context.Context, communityID persis
 		return nil, err
 	}
 
-	community, err := api.loaders.GetCommunityByID.Load(communityID)
+	community, err := api.loaders.GetCommunityByIDBatch.Load(communityID)
 	if err != nil {
 		return nil, err
 	}

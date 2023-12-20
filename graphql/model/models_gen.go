@@ -79,6 +79,10 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
+type CommunityByIDOrError interface {
+	IsCommunityByIDOrError()
+}
+
 type CommunityByKeyOrError interface {
 	IsCommunityByKeyOrError()
 }
@@ -563,11 +567,17 @@ func (AdmireTokenPayload) IsAdmireTokenPayloadOrError() {}
 
 type ArtBlocksCommunity struct {
 	HelperArtBlocksCommunityData
-	Contract  *Contract `json:"contract"`
-	ProjectID *string   `json:"projectID"`
+	CommunityKey *ArtBlocksCommunityKey `json:"communityKey"`
+	Contract     *Contract              `json:"contract"`
+	ProjectID    *string                `json:"projectID"`
 }
 
 func (ArtBlocksCommunity) IsCommunitySubtype() {}
+
+type ArtBlocksCommunityKey struct {
+	Contract  *persist.ChainAddress `json:"contract"`
+	ProjectID *string               `json:"projectID"`
+}
 
 type ArtBlocksCommunityKeyInput struct {
 	Contract  *persist.ChainAddress `json:"contract"`
@@ -831,6 +841,7 @@ type Community struct {
 }
 
 func (Community) IsNode()                      {}
+func (Community) IsCommunityByIDOrError()      {}
 func (Community) IsCommunityByAddressOrError() {}
 func (Community) IsCommunityByKeyOrError()     {}
 func (Community) IsMentionEntity()             {}
@@ -868,10 +879,15 @@ func (Contract) IsNode() {}
 
 type ContractCommunity struct {
 	HelperContractCommunityData
-	Contract *Contract `json:"contract"`
+	CommunityKey *ContractCommunityKey `json:"communityKey"`
+	Contract     *Contract             `json:"contract"`
 }
 
 func (ContractCommunity) IsCommunitySubtype() {}
+
+type ContractCommunityKey struct {
+	Contract *persist.ChainAddress `json:"contract"`
+}
 
 type ContractCommunityKeyInput struct {
 	Contract *persist.ChainAddress `json:"contract"`
@@ -982,8 +998,9 @@ type DisconnectSocialAccountPayload struct {
 func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
 
 type EmailNotificationSettings struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        *bool `json:"unsubscribedFromDigest"`
 }
 
 type EnsProfileImage struct {
@@ -1064,6 +1081,7 @@ type ErrCommunityNotFound struct {
 	Message string `json:"message"`
 }
 
+func (ErrCommunityNotFound) IsCommunityByIDOrError()                                          {}
 func (ErrCommunityNotFound) IsCommunityByAddressOrError()                                     {}
 func (ErrCommunityNotFound) IsCommunityByKeyOrError()                                         {}
 func (ErrCommunityNotFound) IsPostComposerDraftDetailsPayloadOrError()                        {}
@@ -1124,6 +1142,7 @@ func (ErrInvalidInput) IsUserByUsernameOrError()                                
 func (ErrInvalidInput) IsUserByIDOrError()                                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                                          {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                                         {}
+func (ErrInvalidInput) IsCommunityByIDOrError()                                          {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                                     {}
 func (ErrInvalidInput) IsCommunityByKeyOrError()                                         {}
 func (ErrInvalidInput) IsPostOrError()                                                   {}
@@ -2404,6 +2423,7 @@ func (SyncCreatedTokensForExistingContractPayload) IsSyncCreatedTokensForExistin
 
 type SyncCreatedTokensForNewContractsInput struct {
 	IncludeChains []persist.Chain `json:"includeChains"`
+	Incrementally *bool           `json:"incrementally"`
 }
 
 type SyncCreatedTokensForNewContractsPayload struct {
@@ -2524,6 +2544,7 @@ type TokenDefinition struct {
 	Community     *Community     `json:"community"`
 	Communities   []*Community   `json:"communities"`
 	ExternalURL   *string        `json:"externalUrl"`
+	MintURL       *string        `json:"mintUrl"`
 }
 
 func (TokenDefinition) IsNode() {}
@@ -2701,8 +2722,9 @@ type UpdateEmailInput struct {
 }
 
 type UpdateEmailNotificationSettingsInput struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        *bool `json:"unsubscribedFromDigest"`
 }
 
 type UpdateEmailNotificationSettingsPayload struct {
@@ -2994,16 +3016,18 @@ type EmailUnsubscriptionType string
 const (
 	EmailUnsubscriptionTypeAll           EmailUnsubscriptionType = "All"
 	EmailUnsubscriptionTypeNotifications EmailUnsubscriptionType = "Notifications"
+	EmailUnsubscriptionTypeDigest        EmailUnsubscriptionType = "Digest"
 )
 
 var AllEmailUnsubscriptionType = []EmailUnsubscriptionType{
 	EmailUnsubscriptionTypeAll,
 	EmailUnsubscriptionTypeNotifications,
+	EmailUnsubscriptionTypeDigest,
 }
 
 func (e EmailUnsubscriptionType) IsValid() bool {
 	switch e {
-	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications:
+	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications, EmailUnsubscriptionTypeDigest:
 		return true
 	}
 	return false

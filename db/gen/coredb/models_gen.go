@@ -113,6 +113,11 @@ type CommunityCreator struct {
 	Deleted               bool                         `db:"deleted" json:"deleted"`
 }
 
+type CommunityRelevance struct {
+	ID    persist.DBID `db:"id" json:"id"`
+	Score int32        `db:"score" json:"score"`
+}
+
 type Contract struct {
 	ID                    persist.DBID    `db:"id" json:"id"`
 	Deleted               bool            `db:"deleted" json:"deleted"`
@@ -152,11 +157,6 @@ type ContractCreator struct {
 	CreatorAddress persist.Address `db:"creator_address" json:"creator_address"`
 }
 
-type ContractRelevance struct {
-	ID    persist.DBID `db:"id" json:"id"`
-	Score int32        `db:"score" json:"score"`
-}
-
 type DevMetadataUser struct {
 	UserID          persist.DBID  `db:"user_id" json:"user_id"`
 	HasEmailAddress persist.Email `db:"has_email_address" json:"has_email_address"`
@@ -189,8 +189,8 @@ type Event struct {
 	Caption        sql.NullString       `db:"caption" json:"caption"`
 	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
 	PostID         persist.DBID         `db:"post_id" json:"post_id"`
-	ContractID     persist.DBID         `db:"contract_id" json:"contract_id"`
 	MentionID      persist.DBID         `db:"mention_id" json:"mention_id"`
+	CommunityID    persist.DBID         `db:"community_id" json:"community_id"`
 }
 
 type ExternalSocialConnection struct {
@@ -319,15 +319,15 @@ type Membership struct {
 }
 
 type Mention struct {
-	ID         persist.DBID  `db:"id" json:"id"`
-	PostID     persist.DBID  `db:"post_id" json:"post_id"`
-	CommentID  persist.DBID  `db:"comment_id" json:"comment_id"`
-	UserID     persist.DBID  `db:"user_id" json:"user_id"`
-	ContractID persist.DBID  `db:"contract_id" json:"contract_id"`
-	Start      sql.NullInt32 `db:"start" json:"start"`
-	Length     sql.NullInt32 `db:"length" json:"length"`
-	CreatedAt  time.Time     `db:"created_at" json:"created_at"`
-	Deleted    bool          `db:"deleted" json:"deleted"`
+	ID          persist.DBID  `db:"id" json:"id"`
+	PostID      persist.DBID  `db:"post_id" json:"post_id"`
+	CommentID   persist.DBID  `db:"comment_id" json:"comment_id"`
+	UserID      persist.DBID  `db:"user_id" json:"user_id"`
+	Start       sql.NullInt32 `db:"start" json:"start"`
+	Length      sql.NullInt32 `db:"length" json:"length"`
+	CreatedAt   time.Time     `db:"created_at" json:"created_at"`
+	Deleted     bool          `db:"deleted" json:"deleted"`
+	CommunityID persist.DBID  `db:"community_id" json:"community_id"`
 }
 
 type Merch struct {
@@ -391,8 +391,8 @@ type Notification struct {
 	Amount      int32                    `db:"amount" json:"amount"`
 	PostID      persist.DBID             `db:"post_id" json:"post_id"`
 	TokenID     persist.DBID             `db:"token_id" json:"token_id"`
-	ContractID  persist.DBID             `db:"contract_id" json:"contract_id"`
 	MentionID   persist.DBID             `db:"mention_id" json:"mention_id"`
+	CommunityID persist.DBID             `db:"community_id" json:"community_id"`
 }
 
 type OwnedCommunity struct {

@@ -148,6 +148,24 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	return tokens, contract, nil
 }
 
+// GetTokensIncrementallyByWalletAddress returns a list of tokens for a wallet address
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+
+	assetsChan := make(chan assetsReceived)
+	go func() {
+		defer close(assetsChan)
+		streamAssetsForContract(ctx, p.httpClient, p.Chain, address, assetsChan)
+	}()
+
+	go func() {
+		defer close(rec)
+		p.streamAssetsToTokens(ctx, address, assetsChan, rec, errChan)
+	}()
+	return rec, errChan
+}
+
 // GetTokensByContractAddressAndOwner returns a list of tokens for a contract address and owner
 func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	outCh := make(chan assetsReceived)

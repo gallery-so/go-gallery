@@ -216,6 +216,41 @@ func (q *Queries) GetCommunitiesByKeys(ctx context.Context, arg GetCommunitiesBy
 	return items, nil
 }
 
+const getCommunityByID = `-- name: GetCommunityByID :one
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url from communities
+    where id = $1
+        and not deleted
+`
+
+func (q *Queries) GetCommunityByID(ctx context.Context, id persist.DBID) (Community, error) {
+	row := q.db.QueryRow(ctx, getCommunityByID, id)
+	var i Community
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.CommunityType,
+		&i.Key1,
+		&i.Key2,
+		&i.Key3,
+		&i.Key4,
+		&i.Name,
+		&i.OverrideName,
+		&i.Description,
+		&i.OverrideDescription,
+		&i.ProfileImageUrl,
+		&i.OverrideProfileImageUrl,
+		&i.BadgeUrl,
+		&i.OverrideBadgeUrl,
+		&i.ContractID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+		&i.WebsiteUrl,
+		&i.OverrideWebsiteUrl,
+	)
+	return i, err
+}
+
 const getCommunityContractProviders = `-- name: GetCommunityContractProviders :many
 select id, version, contract_id, community_type, is_valid_provider, created_at, last_updated, deleted from community_contract_providers
     where contract_id = any($1)

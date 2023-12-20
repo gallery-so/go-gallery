@@ -47,34 +47,35 @@ where (
 order by content_score * match_score desc, content_score desc, match_score desc
 limit sqlc.arg('limit');
 
--- name: SearchContracts :many
+-- name: SearchCommunities :many
 with min_content_score as (
-    select score from contract_relevance where id is null
+    select score from community_relevance where id is null
 ),
-poap_weight as (
+community_key_weights as (
     -- Using a CTE as a workaround because sqlc has trouble with this as an inline value
-    -- in the ts_rank_cd statement below. We want non-POAP addresses to get crazy high weighting,
-    -- but ts_rank weights have to be in the [0, 1] range, so we divide the POAP weight by 1000000000
-    -- to offset the fact that we're going to multiply all addresses by 1000000000.
-    select sqlc.arg(poap_address_weight)::float4 / 1000000000 as weight
+    -- in the ts_rank_cd statement below. We want addresses to get crazy high weighting,
+    -- but ts_rank weights have to be in the [0, 1] range, so we divide the non-address weights
+    -- by 1000000000 to offset the fact that we're going to multiply all addresses by 1000000000.
+    select sqlc.arg(poap_address_weight)::float4 / 1000000000 as poap_weight,
+           sqlc.arg(provider_name_weight)::float4 / 1000000000 as provider_weight
 )
-select contracts.* from contracts left join contract_relevance on contract_relevance.id = contracts.id,
+select communities.* from communities left join community_relevance on community_relevance.id = communities.id,
      to_tsquery('simple', websearch_to_tsquery('simple', @query)::text || ':*') simple_partial_query,
      websearch_to_tsquery('simple', @query) simple_full_query,
      websearch_to_tsquery('english', @query) english_full_query,
      min_content_score,
-     poap_weight,
+     community_key_weights,
      greatest (
         ts_rank_cd(concat('{', @name_weight::float4, ', 1, 1, 1}')::float4[], fts_name, simple_partial_query, 1),
         ts_rank_cd(concat('{', @description_weight::float4, ', 1, 1, 1}')::float4[], fts_description_english, english_full_query, 1),
-        ts_rank_cd(concat('{', poap_weight.weight::float4, ', 1, 1, 1}')::float4[], fts_address, simple_full_query, 1) * 1000000000
+        ts_rank_cd(concat('{', community_key_weights.poap_weight::float4, ', ', community_key_weights.provider_weight::float4, ', 1, 1}')::float4[], fts_community_key, simple_full_query, 1) * 1000000000
         ) as match_score,
-     coalesce(contract_relevance.score, min_content_score.score) as content_score
+     coalesce(community_relevance.score, min_content_score.score) as content_score
 where (
-    simple_full_query @@ fts_address or
+    simple_full_query @@ fts_community_key or
     simple_partial_query @@ fts_name or
     english_full_query @@ fts_description_english
     )
-    and contracts.deleted = false
+    and communities.deleted = false
 order by content_score * match_score desc, content_score desc, match_score desc
 limit sqlc.arg('limit');

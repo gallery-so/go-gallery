@@ -1023,14 +1023,14 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 				if err != nil {
 					return "", err
 				}
-			case mention.ContractID != "":
+			case mention.CommunityID != "":
 				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actor),
-					ResourceTypeID: persist.ResourceTypeContract,
-					SubjectID:      mention.ContractID,
+					ResourceTypeID: persist.ResourceTypeCommunity,
+					SubjectID:      mention.CommunityID,
 					PostID:         postID,
 					FeedEventID:    feedEventID,
-					ContractID:     mention.ContractID,
+					CommunityID:    mention.CommunityID,
 					CommentID:      commentID,
 					MentionID:      mention.ID,
 					Action:         persist.ActionMentionCommunity,
@@ -1122,10 +1122,10 @@ func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, quer
 
 		}
 		if m.CommunityID != nil {
-			if c, err := queries.GetContractByID(ctx, *m.CommunityID); c.ID == "" || err != nil {
+			if c, err := queries.GetCommunityByID(ctx, *m.CommunityID); c.ID == "" || err != nil {
 				return nil, fmt.Errorf("could retrieve community: %s (%s)", *m.CommunityID, err)
 			}
-			mention.ContractID = *m.CommunityID
+			mention.CommunityID = *m.CommunityID
 		}
 		if m.UserID != nil {
 			if u, err := queries.GetUserById(ctx, *m.UserID); u.ID == "" || err != nil {

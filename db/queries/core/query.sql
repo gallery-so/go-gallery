@@ -425,8 +425,8 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 -- name: CreateGalleryEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
 
--- name: CreateContractEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
+-- name: CreateCommunityEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, community_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
 
 -- name: CreatePostEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
@@ -859,11 +859,11 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 -- name: CreateCommentNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6) RETURNING *;
 
--- name: CreateContractNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
+-- name: CreateCommunityNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, community_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
 
 -- name: CreateUserPostedYourWorkNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, community_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
 
 -- name: CountFollowersByUserID :one
 SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
@@ -1747,10 +1747,10 @@ returning *;
 select * from pii.user_view u where u.pii_socials->sqlc.arg('social_account_type')::varchar->>'id' = any(@social_ids::varchar[]) and not u.deleted and not u.universal;
 
 -- name: InsertCommentMention :one
-insert into mentions (id, user_id, contract_id, comment_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @comment_id, @start, @length) returning *;
+insert into mentions (id, user_id, community_id, comment_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('community'), @comment_id, @start, @length) returning *;
 
 -- name: InsertPostMention :one
-insert into mentions (id, user_id, contract_id, post_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @post_id, @start, @length) returning *;
+insert into mentions (id, user_id, community_id, post_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('community'), @post_id, @start, @length) returning *;
 
 -- name: GetMentionsByCommentID :batchmany
 select * from mentions where comment_id = @comment_id and not deleted;
@@ -1834,7 +1834,7 @@ with sources as (
 select users.* from users join top_recs using(id) where not users.deleted and not users.universal limit $1;
 
 -- name: InsertMention :one
-INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, sqlc.narg('user'), sqlc.narg('contract'), $3, $4) RETURNING ID;
+insert into mentions (id, comment_id, user_id, community_id, start, length) values ($1, $2, sqlc.narg('user'), sqlc.narg('community'), $3, $4) returning id;
 
 -- name: InsertComment :one
 INSERT INTO comments 
@@ -1866,6 +1866,19 @@ on conflict(user_id, blocked_user_id) where not deleted do update set active = t
 
 -- name: UnblockUser :exec
 update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;
+
+
+-- posts has an array, contract_ids that maps to the contracts table. Find the top 10 contracts by post count in the last 7 days
+-- name: GetTopCommunitiesByPosts :many
+SELECT sqlc.embed(contracts), COUNT(*) as frequency
+FROM posts
+JOIN LATERAL UNNEST(posts.contract_ids) as contract_id ON true
+JOIN contracts ON contracts.id = contract_id
+WHERE posts.created_at >= NOW() - INTERVAL '7 days'
+GROUP BY contracts.id
+ORDER BY frequency DESC
+LIMIT $1;
+
 
 -- name: GetCommunitiesByTokenDefinitionID :batchmany
 select communities.* from communities

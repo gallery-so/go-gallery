@@ -9,82 +9,87 @@ import (
 	"context"
 )
 
-const searchContracts = `-- name: SearchContracts :many
+const searchCommunities = `-- name: SearchCommunities :many
 with min_content_score as (
-    select score from contract_relevance where id is null
+    select score from community_relevance where id is null
 ),
-poap_weight as (
+community_key_weights as (
     -- Using a CTE as a workaround because sqlc has trouble with this as an inline value
-    -- in the ts_rank_cd statement below. We want non-POAP addresses to get crazy high weighting,
-    -- but ts_rank weights have to be in the [0, 1] range, so we divide the POAP weight by 1000000000
-    -- to offset the fact that we're going to multiply all addresses by 1000000000.
-    select $5::float4 / 1000000000 as weight
+    -- in the ts_rank_cd statement below. We want addresses to get crazy high weighting,
+    -- but ts_rank weights have to be in the [0, 1] range, so we divide the non-address weights
+    -- by 1000000000 to offset the fact that we're going to multiply all addresses by 1000000000.
+    select $5::float4 / 1000000000 as poap_weight,
+           $6::float4 / 1000000000 as provider_weight
 )
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain from contracts left join contract_relevance on contract_relevance.id = contracts.id,
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url from communities left join community_relevance on community_relevance.id = communities.id,
      to_tsquery('simple', websearch_to_tsquery('simple', $1)::text || ':*') simple_partial_query,
      websearch_to_tsquery('simple', $1) simple_full_query,
      websearch_to_tsquery('english', $1) english_full_query,
      min_content_score,
-     poap_weight,
+     community_key_weights,
      greatest (
         ts_rank_cd(concat('{', $2::float4, ', 1, 1, 1}')::float4[], fts_name, simple_partial_query, 1),
         ts_rank_cd(concat('{', $3::float4, ', 1, 1, 1}')::float4[], fts_description_english, english_full_query, 1),
-        ts_rank_cd(concat('{', poap_weight.weight::float4, ', 1, 1, 1}')::float4[], fts_address, simple_full_query, 1) * 1000000000
+        ts_rank_cd(concat('{', community_key_weights.poap_weight::float4, ', ', community_key_weights.provider_weight::float4, ', 1, 1}')::float4[], fts_community_key, simple_full_query, 1) * 1000000000
         ) as match_score,
-     coalesce(contract_relevance.score, min_content_score.score) as content_score
+     coalesce(community_relevance.score, min_content_score.score) as content_score
 where (
-    simple_full_query @@ fts_address or
+    simple_full_query @@ fts_community_key or
     simple_partial_query @@ fts_name or
     english_full_query @@ fts_description_english
     )
-    and contracts.deleted = false
+    and communities.deleted = false
 order by content_score * match_score desc, content_score desc, match_score desc
 limit $4
 `
 
-type SearchContractsParams struct {
-	Query             string  `db:"query" json:"query"`
-	NameWeight        float32 `db:"name_weight" json:"name_weight"`
-	DescriptionWeight float32 `db:"description_weight" json:"description_weight"`
-	Limit             int32   `db:"limit" json:"limit"`
-	PoapAddressWeight float32 `db:"poap_address_weight" json:"poap_address_weight"`
+type SearchCommunitiesParams struct {
+	Query              string  `db:"query" json:"query"`
+	NameWeight         float32 `db:"name_weight" json:"name_weight"`
+	DescriptionWeight  float32 `db:"description_weight" json:"description_weight"`
+	Limit              int32   `db:"limit" json:"limit"`
+	PoapAddressWeight  float32 `db:"poap_address_weight" json:"poap_address_weight"`
+	ProviderNameWeight float32 `db:"provider_name_weight" json:"provider_name_weight"`
 }
 
-func (q *Queries) SearchContracts(ctx context.Context, arg SearchContractsParams) ([]Contract, error) {
-	rows, err := q.db.Query(ctx, searchContracts,
+func (q *Queries) SearchCommunities(ctx context.Context, arg SearchCommunitiesParams) ([]Community, error) {
+	rows, err := q.db.Query(ctx, searchCommunities,
 		arg.Query,
 		arg.NameWeight,
 		arg.DescriptionWeight,
 		arg.Limit,
 		arg.PoapAddressWeight,
+		arg.ProviderNameWeight,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Contract
+	var items []Community
 	for rows.Next() {
-		var i Contract
+		var i Community
 		if err := rows.Scan(
 			&i.ID,
-			&i.Deleted,
 			&i.Version,
+			&i.CommunityType,
+			&i.Key1,
+			&i.Key2,
+			&i.Key3,
+			&i.Key4,
+			&i.Name,
+			&i.OverrideName,
+			&i.Description,
+			&i.OverrideDescription,
+			&i.ProfileImageUrl,
+			&i.OverrideProfileImageUrl,
+			&i.BadgeUrl,
+			&i.OverrideBadgeUrl,
+			&i.ContractID,
 			&i.CreatedAt,
 			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
-			&i.L1Chain,
+			&i.Deleted,
+			&i.WebsiteUrl,
+			&i.OverrideWebsiteUrl,
 		); err != nil {
 			return nil, err
 		}
