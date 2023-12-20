@@ -29,6 +29,7 @@ type stubProvider struct {
 	Tokens        []multichain.ChainAgnosticToken
 	FetchMetadata func() (persist.TokenMetadata, error)
 	Info          multichain.BlockchainInfo
+	RetErr        error
 }
 
 func (p stubProvider) GetBlockchainInfo() multichain.BlockchainInfo {
@@ -36,7 +37,7 @@ func (p stubProvider) GetBlockchainInfo() multichain.BlockchainInfo {
 }
 
 func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	return p.Tokens, p.Contracts, nil
+	return p.Tokens, p.Contracts, p.RetErr
 }
 
 func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
@@ -96,6 +97,13 @@ func withContracts(contracts []multichain.ChainAgnosticContract) providerOpt {
 func withTokens(tokens []multichain.ChainAgnosticToken) providerOpt {
 	return func(p *stubProvider) {
 		p.Tokens = tokens
+	}
+}
+
+// withReturnError configures the stubProvider to return an error
+func withReturnError(err error) providerOpt {
+	return func(p *stubProvider) {
+		p.RetErr = err
 	}
 }
 

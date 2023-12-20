@@ -322,10 +322,11 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 	go func() {
 		defer close(incomingTokens)
 		defer close(incomingContracts)
+		defer close(errChan)
 		wg.Wait()
 	}()
 
-	_, err = p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, true)
+	_, err = p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan)
 	return err
 }
 
@@ -604,10 +605,11 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	go func() {
 		defer close(incomingTokens)
 		defer close(incomingContracts)
+		defer close(errChan)
 		wg.Wait()
 	}()
 
-	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
+	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan)
 }
 
 // TokenExists checks if a token exists according to any provider by its identifiers. It returns nil if the token exists.
@@ -682,36 +684,61 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 	return token, err
 }
 
-func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error, replace bool) ([]op.TokenFullDetails, error) {
+func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, tokensCh <-chan chainTokens, contractsCh <-chan chainContracts, errCh <-chan error) ([]op.TokenFullDetails, error) {
 	tokensFromProviders := make([]chainTokens, 0, len(user.Wallets))
 	contractsFromProviders := make([]chainContracts, 0, len(user.Wallets))
+	discrepancyLog := map[int]int{}
 
-	errs := []error{}
-	discrepencyLog := map[int]int{}
+	var tokenOpen, contractOpen bool
+	var tokens chainTokens
+	var contracts chainContracts
+	var err error
 
-outer:
+receiverLoop:
 	for {
 		select {
-		case incomingTokens := <-incomingTokens:
-			discrepencyLog[incomingTokens.priority] = len(incomingTokens.tokens)
-			tokensFromProviders = append(tokensFromProviders, incomingTokens)
-			logger.For(ctx).Infof("received %d incoming agnostic tokens for user %s", len(incomingTokens.tokens), user.ID)
-		case incomingContracts, ok := <-incomingContracts:
-			if !ok {
-				break outer
+		case tokens, tokenOpen = <-tokensCh:
+			if tokenOpen {
+				discrepancyLog[tokens.priority] = len(tokens.tokens)
+				tokensFromProviders = append(tokensFromProviders, tokens)
+				logger.For(ctx).Infof("received %d incoming agnostic tokens for user %s", len(tokens.tokens), user.ID)
+				continue
 			}
-			contractsFromProviders = append(contractsFromProviders, incomingContracts)
+			if !contractOpen {
+				break receiverLoop
+			}
+		case contracts, contractOpen = <-contractsCh:
+			if contractOpen {
+				contractsFromProviders = append(contractsFromProviders, contracts)
+				continue
+			}
+			if !tokenOpen {
+				break receiverLoop
+			}
+		case e := <-errCh:
+			if e != nil {
+				err = e
+			}
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case err := <-errChan:
-			errs = append(errs, err)
 		}
 	}
-	if len(errs) > 0 && len(tokensFromProviders) == 0 {
-		return nil, util.MultiErr(errs)
+
+	for e := range errCh {
+		if e != nil {
+			err = e
+		}
 	}
-	if !util.AllEqual(util.MapValues(discrepencyLog)) {
-		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
+
+	if err != nil {
+		if len(contractsFromProviders) == 0 {
+			return nil, err
+		}
+		logger.For(ctx).Warnf("error occured by a provider: %s; continuing since others succeeded", err)
+	}
+
+	if !util.AllEqual(util.MapValues(discrepancyLog)) {
+		logger.For(ctx).Warnf("number of tokens varied across providers: %+v", discrepancyLog)
 	}
 
 	_, persistedContracts, err := p.processContracts(ctx, contractsFromProviders, nil, false)
@@ -724,17 +751,8 @@ outer:
 		return nil, err
 	}
 
-	var newTokens []op.TokenFullDetails
-	if replace {
-		_, newTokens, err = p.ReplaceHolderTokensForUser(ctx, user, tokensFromProviders, persistedContracts, chains, currentTokens)
-	} else {
-		_, newTokens, err = p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, currentTokens)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return newTokens, nil
+	_, newTokens, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, currentTokens)
+	return newTokens, err
 }
 
 func (p *Provider) receiveSyncedCreatedTokensIncrementallyForUser(ctx context.Context, user persist.User, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) error {
@@ -811,7 +829,7 @@ outer:
 		}
 	}
 	if len(errs) > 0 && totalTokensReceived == 0 {
-		return nil, nil, util.MultiErr(errs)
+		return nil, nil, errs[0]
 	}
 
 	return currentTokens, currentContracts, nil
@@ -923,13 +941,13 @@ func (p *Provider) syncCreatedTokensForContract(ctx context.Context, user persis
 	contractsFromProviders := make([]chainContracts, 0, 1)
 
 	errs := []error{}
-	discrepencyLog := map[int]int{}
+	discrepancyLog := map[int]int{}
 
 outer:
 	for {
 		select {
 		case incomingTokens := <-incomingTokens:
-			discrepencyLog[incomingTokens.priority] = len(incomingTokens.tokens)
+			discrepancyLog[incomingTokens.priority] = len(incomingTokens.tokens)
 			tokensFromProviders = append(tokensFromProviders, incomingTokens)
 		case incomingContracts, ok := <-incomingContracts:
 			if !ok {
@@ -944,10 +962,10 @@ outer:
 	}
 
 	if len(errs) > 0 && len(tokensFromProviders) == 0 {
-		return util.MultiErr(errs)
+		return errs[0]
 	}
-	if !util.AllEqual(util.MapValues(discrepencyLog)) {
-		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
+	if !util.AllEqual(util.MapValues(discrepancyLog)) {
+		logger.For(ctx).Warnf("number of tokens varied across providers: %+v", discrepancyLog)
 	}
 
 	_, persistedContracts, err := p.processContracts(ctx, contractsFromProviders, nil, false)
@@ -1736,26 +1754,11 @@ func chainTokensToUpsertableTokenDefinitions(ctx context.Context, chainTokens []
 	}
 
 	tokenDefinitions := make([]db.TokenDefinition, 0, len(definitions))
-	for _, definition := range definitions {
-		go logFallbackFailure(ctx, definition)
-		tokenDefinitions = append(tokenDefinitions, definition)
+	for _, d := range definitions {
+		tokenDefinitions = append(tokenDefinitions, d)
 	}
 
 	return tokenDefinitions
-}
-
-func logFallbackFailure(ctx context.Context, tdef db.TokenDefinition) {
-	// make a get request to the fallback media url that disregards the response and just checks for valid statuses, logging any non-200 status codes
-	if tdef.FallbackMedia.ImageURL != "" {
-		resp, err := http.Get(tdef.FallbackMedia.ImageURL.String())
-		if err != nil || resp.StatusCode != http.StatusOK {
-			msg := fmt.Sprintf("error making request to fallback media url for token %s: (url: %s) (err: %s)", tdef.ID, tdef.FallbackMedia.ImageURL, err)
-			if resp != nil {
-				msg += fmt.Sprintf(" (status: %d)", resp.StatusCode)
-			}
-			logger.For(ctx).Error(msg)
-		}
-	}
 }
 
 // chainTokensToUpsertableTokens returns a unique slice of tokens that are ready to be upserted into the database.

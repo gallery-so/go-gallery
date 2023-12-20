@@ -53,11 +53,9 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 
 		asString := ""
 		if err := json.Unmarshal(data, &asString); err != nil {
-			fmt.Printf("failed to unmarshal Metadata as string: %s", err)
-			return nil
+			return err
 		}
 
-		fmt.Println("Metadata as string:", asString)
 		return nil
 	}
 
