@@ -544,7 +544,7 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 			return
 		}
 
-		logger.For(c).WithFields(logrus.Fields{"user_id": in.Data.New.User, "token_id": in.Data.New.ID, "token_and_contract": in.Data.New.TokenAndContract, "balance": in.Data.New.Balance}).Infof("GOLDSKY: %s - Processing Goldsky User Tokens Refresh", in.Data.New.User)
+		logger.For(c).WithFields(logrus.Fields{"user_address": in.Data.New.User, "token_id": in.Data.New.ID, "token_and_contract": in.Data.New.TokenAndContract, "balance": in.Data.New.Balance}).Infof("GOLDSKY: %s - Processing Goldsky User Tokens Refresh", in.Data.New.User)
 
 		signature := c.GetHeader("goldsky-webhook-secret")
 		if signature != env.GetString("GOLDSKY_WEBHOOK_SECRET") {
@@ -607,6 +607,8 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 		if len(newTokens) == 0 {
 			l.Info("no new tokens found")
+		} else {
+			l.Infof("found %d new tokens", len(newTokens))
 		}
 
 		for _, token := range newTokens {
