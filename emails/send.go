@@ -169,7 +169,7 @@ func sendAnnouncementNotification(q *coredb.Queries) gin.HandlerFunc {
 
 		err = event.Dispatch(c, coredb.Event{
 			ID:             persist.GenerateID(),
-			ResourceTypeID: persist.ResourceTypeUser,
+			ResourceTypeID: persist.ResourceTypeAllUsers,
 			Action:         persist.ActionAnnouncement,
 			UserID:         galleryUser.ID,
 			ActorID:        persist.DBIDToNullStr(galleryUser.ID),

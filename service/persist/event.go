@@ -18,6 +18,7 @@ const (
 	ResourceTypeComment
 	ResourceTypeContract
 	ResourceTypePost
+	ResourceTypeAllUsers
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
 	ActionUserPosted                      Action = "UserPosted"

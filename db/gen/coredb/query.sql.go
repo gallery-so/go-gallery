@@ -911,6 +911,59 @@ func (q *Queries) CreateContractNotification(ctx context.Context, arg CreateCont
 	return i, err
 }
 
+const createDataOnlyEvent = `-- name: CreateDataOnlyEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
+`
+
+type CreateDataOnlyEventParams struct {
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+}
+
+func (q *Queries) CreateDataOnlyEvent(ctx context.Context, arg CreateDataOnlyEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createDataOnlyEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.Data,
+		arg.GroupID,
+		arg.Caption,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+		&i.GroupID,
+		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
+	)
+	return i, err
+}
+
 const createFeedEvent = `-- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id
 `
