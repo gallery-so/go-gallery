@@ -172,6 +172,7 @@ func sendAnnouncementNotification(q *coredb.Queries) gin.HandlerFunc {
 			ResourceTypeID: persist.ResourceTypeAllUsers,
 			Action:         persist.ActionAnnouncement,
 			UserID:         galleryUser.ID,
+			SubjectID:      galleryUser.ID,
 			ActorID:        persist.DBIDToNullStr(galleryUser.ID),
 			Data: persist.EventData{
 				AnnouncementDetails: &in,

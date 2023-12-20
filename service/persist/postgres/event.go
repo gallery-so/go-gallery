@@ -187,6 +187,7 @@ func (r *EventRepository) AddDataOnlyEvent(ctx context.Context, event db.Event) 
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
+		SubjectID:      event.SubjectID,
 	})
 	return &event, err
 }

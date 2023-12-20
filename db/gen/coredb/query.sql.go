@@ -912,7 +912,7 @@ func (q *Queries) CreateContractNotification(ctx context.Context, arg CreateCont
 }
 
 const createDataOnlyEvent = `-- name: CreateDataOnlyEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
+INSERT INTO events (id, actor_id, action, resource_type_id, data, group_id, caption, subject_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateDataOnlyEventParams struct {
@@ -923,6 +923,7 @@ type CreateDataOnlyEventParams struct {
 	Data           persist.EventData    `db:"data" json:"data"`
 	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
 	Caption        sql.NullString       `db:"caption" json:"caption"`
+	SubjectID      persist.DBID         `db:"subject_id" json:"subject_id"`
 }
 
 func (q *Queries) CreateDataOnlyEvent(ctx context.Context, arg CreateDataOnlyEventParams) (Event, error) {
@@ -934,6 +935,7 @@ func (q *Queries) CreateDataOnlyEvent(ctx context.Context, arg CreateDataOnlyEve
 		arg.Data,
 		arg.GroupID,
 		arg.Caption,
+		arg.SubjectID,
 	)
 	var i Event
 	err := row.Scan(
