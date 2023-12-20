@@ -95,7 +95,7 @@ func testTokenSyncs(t *testing.T) {
 		{title: "should sync new tokens multichain", run: testSyncNewTokensMultichain},
 		{title: "should submit new tokens to tokenprocessing", run: testSyncOnlySubmitsNewTokens},
 		{title: "should not submit old tokens to tokenprocessing", run: testSyncSkipsSubmittingOldTokens},
-		{title: "should delete old tokens", run: testSyncDeletesOldTokens},
+		{title: "should not delete old tokens", run: testSyncNotDeletesOldTokens},
 		{title: "should combine all tokens from providers", run: testSyncShouldCombineProviders},
 		{title: "should merge duplicates within provider", run: testSyncShouldMergeDuplicatesInProvider},
 		{title: "should merge duplicates across providers", run: testSyncShouldMergeDuplicatesAcrossProviders},
@@ -979,7 +979,7 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 	tokenRecorder.AssertNotCalled(t, "Send")
 }
 
-func testSyncDeletesOldTokens(t *testing.T) {
+func testSyncNotDeletesOldTokens(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, 4))
 	h := handlerWithProviders(t, submitUserTokensNoop, provider)
@@ -988,7 +988,7 @@ func testSyncDeletesOldTokens(t *testing.T) {
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	require.NoError(t, err)
-	assertSyncedTokens(t, response, err, 4)
+	assertSyncedTokens(t, response, err, 4+len(userF.TokenIDs))
 }
 
 func testSyncShouldCombineProviders(t *testing.T) {
