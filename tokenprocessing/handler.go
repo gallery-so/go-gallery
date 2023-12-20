@@ -2,8 +2,9 @@ package tokenprocessing
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/task"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/task"
 
 	"github.com/gin-gonic/gin"
 
@@ -41,9 +42,9 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, retryManager))
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, retryManager, mc, repos.UserRepository))
 	ownersGroup := router.Group("/owners")
-	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, throttler))
 	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries))
+	ownersGroup.POST("/process/goldsky", processOwnersForGoldskyTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.POST("/detect-spam", detectSpamContracts(mc.Queries))

@@ -12,7 +12,6 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	emailService "github.com/mikeydub/go-gallery/emails"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -755,27 +754,23 @@ func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.Ga
 
 // SharedCommunities is the resolver for the sharedCommunities field.
 func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	// TODO: Currently used by frontend, but it's okay if we don't return shared communities for a bit.
-	// Needs to be updated to work with the new communities table.
-	return nil, nil
+	communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
 
-	//communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//edges := make([]*model.CommunityEdge, len(communities))
-	//for i, community := range communities {
-	//	edges[i] = &model.CommunityEdge{
-	//		Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
-	//		Cursor: nil, // not used by relay, but relay will complain without this field existing
-	//	}
-	//}
-	//
-	//return &model.CommunitiesConnection{
-	//	Edges:    edges,
-	//	PageInfo: pageInfoToModel(ctx, pageInfo),
-	//}, nil
+	edges := make([]*model.CommunityEdge, len(communities))
+	for i, community := range communities {
+		edges[i] = &model.CommunityEdge{
+			Node:   communityToModel(ctx, community),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.CommunitiesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // CreatedCommunities is the resolver for the createdCommunities field.
@@ -1191,7 +1186,7 @@ func (r *mutationResolver) SyncCreatedTokensForNewContracts(ctx context.Context,
 		chains = persist.AllChains
 	}
 
-	err := publicapi.For(ctx).Token.SyncCreatedTokensForNewContracts(ctx, chains)
+	err := publicapi.For(ctx).Token.SyncCreatedTokensForNewContracts(ctx, chains, util.FromPointer(input.Incrementally))
 	if err != nil {
 		return nil, err
 	}
@@ -1888,11 +1883,11 @@ func (r *mutationResolver) PreverifyEmail(ctx context.Context, input model.Preve
 	var modelResult model.PreverifyEmailResult
 
 	switch result.Result {
-	case emailService.PreverifyEmailResultValid:
+	case emails.PreverifyEmailResultValid:
 		modelResult = model.PreverifyEmailResultValid
-	case emailService.PreverifyEmailResultInvalid:
+	case emails.PreverifyEmailResultInvalid:
 		modelResult = model.PreverifyEmailResultInvalid
-	case emailService.PreverifyEmailResultRisky:
+	case emails.PreverifyEmailResultRisky:
 		modelResult = model.PreverifyEmailResultRisky
 	default:
 		return nil, fmt.Errorf("unknown preverify result: %d", result.Result)
@@ -3194,6 +3189,30 @@ func (r *tokenDefinitionResolver) Community(ctx context.Context, obj *model.Toke
 // Communities is the resolver for the communities field.
 func (r *tokenDefinitionResolver) Communities(ctx context.Context, obj *model.TokenDefinition) ([]*model.Community, error) {
 	return resolveCommunitiesByTokenDefinitionID(ctx, obj.Dbid)
+}
+
+// MintURL is the resolver for the mintUrl field.
+func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenDefinition) (*string, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	var mintURL string
+
+	if contract.Address != "" && !contract.IsProviderMarkedSpam {
+		if contract.Chain == persist.ChainZora {
+			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s/%s", contract.Address, obj.HelperTokenDefinitionData.Definition.TokenID.Base10String())
+		} else if contract.Chain == persist.ChainBase {
+			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+		} else if contract.Chain == persist.ChainOptimism {
+			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+		} else if contract.Chain == persist.ChainETH {
+			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+		}
+	}
+
+	return &mintURL, nil
 }
 
 // Wallets is the resolver for the wallets field.

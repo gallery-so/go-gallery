@@ -190,6 +190,7 @@ input CreatedCommunitiesInput {
 input SyncCreatedTokensForNewContractsInput {
   # When includeChains is empty, syncs tokens on all chains.
   includeChains: [Chain!]
+  incrementally: Boolean
 }
 
 input SyncCreatedTokensForExistingContractInput {
@@ -450,6 +451,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   community: Community @goField(forceResolver: true)
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
+  mintUrl: String @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
@@ -820,6 +822,7 @@ enum EmailVerificationStatus {
 enum EmailUnsubscriptionType {
   All
   Notifications
+  Digest
 }
 
 type UserEmail {
@@ -831,11 +834,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -2273,6 +2278,29 @@ type YouReceivedTopActivityBadgeNotification implements Notification & Node {
   updatedTime: Time
 
   threshold: Int!
+}
+
+enum Platform {
+  Web
+  Mobile
+  All
+}
+
+type GalleryAnnouncementNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  platform: Platform!
+  internalId: String!
+  imageUrl: String
+  title: String
+  description: String
+  ctaText: String
+  ctaLink: String
+  pushNotificationText: String
 }
 
 type ClearAllNotificationsPayload {

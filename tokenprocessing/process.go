@@ -7,8 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,7 +27,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -161,42 +162,6 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm
 		runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-	}
-}
-
-func processOwnersForContractTokens(mc *multichain.Provider, throttler *throttle.Locker) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var input task.TokenProcessingContractTokensMessage
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
-
-		contract, err := mc.Queries.GetContractByID(c, input.ContractID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		lockID := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
-
-		if !input.ForceRefresh {
-			if err := throttler.Lock(c, lockID); err != nil {
-				util.ErrResponse(c, http.StatusOK, err)
-				return
-			}
-		}
-
-		// do not unlock, let expiry handle the unlock
-		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", lockID)
-		cID := persist.NewContractIdentifiers(contract.Address, contract.Chain)
-		if err := mc.RefreshTokensForContract(c, cID); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", lockID)
-
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
@@ -490,7 +455,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 					var curTotal persist.HexString
 					dbUniqueTokenIDs, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
 					if err != nil {
-						logger.For(c).Errorf("error getting unique token identifiers: %s", err)
+						l.Errorf("error getting unique token identifiers: %s", err)
 						continue
 					}
 					for _, q := range dbUniqueTokenIDs.OwnerAddresses {
@@ -553,6 +518,129 @@ func isValidAlchemySignatureForStringBody(
 	h.Write([]byte(body))
 	digest := hex.EncodeToString(h.Sum(nil))
 	return digest == signature
+}
+
+type GoldskyWebhookInput struct {
+	Op   string `json:"op"`
+	Data struct {
+		Old GoldskyToken1155Holder `json:"old"` // in an update this will be what it was before, empty on insert
+		New GoldskyToken1155Holder `json:"new"` // this is what we care about
+	} `json:"data"`
+}
+type GoldskyToken1155Holder struct {
+	ID               string `json:"id"`                 // ID in this format "0x{user address}-0x{address}-{token_id}"
+	User             string `json:"user"`               // address in format "\\x{address}"
+	TokenAndContract string `json:"token_and_contract"` //  format "0x{address}-{token_id}"
+	Balance          string `json:"balance"`            //  base10 string, generated from javascript's BigInt
+
+}
+
+func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		var in GoldskyWebhookInput
+		if err := c.ShouldBindJSON(&in); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		signature := c.GetHeader("goldsky-webhook-secret")
+		if signature != env.GetString("GOLDSKY_WEBHOOK_SECRET") {
+			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid goldsky signature"))
+			return
+		}
+
+		fullIDs := strings.Split(in.Data.New.ID, "-")
+		if len(fullIDs) != 3 {
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid id: %s", in.Data.New.ID))
+			return
+		}
+
+		userAddress := persist.Address(strings.ToLower(fullIDs[0]))
+		user, _ := queries.GetUserByAddressAndL1(c, coredb.GetUserByAddressAndL1Params{
+			Address: userAddress,
+			L1Chain: persist.ChainZora.L1Chain(),
+		})
+		if user.ID == "" {
+			// it is a valid response to not find a user, not every transfer exists on gallery
+			c.String(http.StatusOK, fmt.Sprintf("user not found for address: %s", userAddress))
+			return
+		}
+
+		contractAddress := persist.Address(strings.ToLower(fullIDs[1]))
+		bigTokenID, ok := big.NewInt(0).SetString(fullIDs[2], 10)
+		if !ok {
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid token and contract: %s", in.Data.New.TokenAndContract))
+			return
+		}
+		tokenID := persist.TokenID(bigTokenID.Text(16))
+
+		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(c, coredb.GetTokenByUserTokenIdentifiersParams{
+			OwnerID:         user.ID,
+			TokenID:         tokenID,
+			Chain:           persist.ChainZora,
+			ContractAddress: contractAddress,
+		})
+
+		beforeBalance := persist.HexString("0")
+		if beforeToken.Token.ID != "" {
+			beforeBalance = beforeToken.Token.Quantity
+		}
+
+		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": tokenID, "contract_address": contractAddress, "user_address": userAddress})
+		l.Infof("Processing: %s - Processing Goldsky Zora User Tokens Refresh", user.ID)
+		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, user.ID, []persist.TokenUniqueIdentifiers{{
+			Chain:           persist.ChainZora,
+			ContractAddress: contractAddress,
+			TokenID:         tokenID,
+			OwnerAddress:    userAddress,
+		}})
+		if err != nil {
+			l.Errorf("error syncing tokens: %s", err)
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		if len(newTokens) == 0 {
+			l.Info("no new tokens found")
+		}
+
+		for _, token := range newTokens {
+
+			dbToken, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
+			if err != nil {
+				l.Errorf("error getting unique token identifiers: %s", err)
+				continue
+			}
+
+			newBalance := big.NewInt(0).Sub(dbToken.Quantity.BigInt(), beforeBalance.BigInt())
+
+			if newBalance.Cmp(big.NewInt(0)) == 0 || newBalance.Cmp(big.NewInt(0)) < 0 {
+				l.Infof("token quantity is 0 or less, skipping")
+				continue
+			}
+
+			// one event per token identifier (grouping ERC-1155s)
+			err = event.Dispatch(c, coredb.Event{
+				ID:             persist.GenerateID(),
+				ActorID:        persist.DBIDToNullStr(user.ID),
+				ResourceTypeID: persist.ResourceTypeToken,
+				SubjectID:      token.Instance.ID,
+				UserID:         user.ID,
+				TokenID:        token.Instance.ID,
+				Action:         persist.ActionNewTokensReceived,
+				Data: persist.EventData{
+					NewTokenID:       token.Instance.ID,
+					NewTokenQuantity: persist.HexString(newBalance.Text(16)),
+				},
+			})
+			if err != nil {
+				l.Errorf("error dispatching event: %s", err)
+			}
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
 }
 
 // detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy

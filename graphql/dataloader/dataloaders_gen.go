@@ -1626,34 +1626,34 @@ func newGetProfileImageByID(
 	return d
 }
 
-// GetSharedContractsBatchPaginate batches and caches requests
-type GetSharedContractsBatchPaginate struct {
-	generator.Dataloader[coredb.GetSharedContractsBatchPaginateParams, []coredb.GetSharedContractsBatchPaginateRow]
+// GetSharedCommunitiesBatchPaginate batches and caches requests
+type GetSharedCommunitiesBatchPaginate struct {
+	generator.Dataloader[coredb.GetSharedCommunitiesBatchPaginateParams, []coredb.GetSharedCommunitiesBatchPaginateRow]
 }
 
-// newGetSharedContractsBatchPaginate creates a new GetSharedContractsBatchPaginate with the given settings, functions, and options
-func newGetSharedContractsBatchPaginate(
+// newGetSharedCommunitiesBatchPaginate creates a new GetSharedCommunitiesBatchPaginate with the given settings, functions, and options
+func newGetSharedCommunitiesBatchPaginate(
 	ctx context.Context,
 	maxBatchSize int,
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *GetSharedContractsBatchPaginate, []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error),
+	fetch func(context.Context, *GetSharedCommunitiesBatchPaginate, []coredb.GetSharedCommunitiesBatchPaginateParams) ([][]coredb.GetSharedCommunitiesBatchPaginateRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
-) *GetSharedContractsBatchPaginate {
-	d := &GetSharedContractsBatchPaginate{}
+) *GetSharedCommunitiesBatchPaginate {
+	d := &GetSharedCommunitiesBatchPaginate{}
 
-	fetchWithHooks := func(ctx context.Context, keys []coredb.GetSharedContractsBatchPaginateParams) ([][]coredb.GetSharedContractsBatchPaginateRow, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetSharedCommunitiesBatchPaginateParams) ([][]coredb.GetSharedCommunitiesBatchPaginateRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetSharedContractsBatchPaginate")
+			ctx = preFetchHook(ctx, "GetSharedCommunitiesBatchPaginate")
 		}
 
 		results, errors := fetch(ctx, d, keys)
 
 		if postFetchHook != nil {
-			postFetchHook(ctx, "GetSharedContractsBatchPaginate")
+			postFetchHook(ctx, "GetSharedCommunitiesBatchPaginate")
 		}
 
 		return results, errors

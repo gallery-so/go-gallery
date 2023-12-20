@@ -353,7 +353,7 @@ func (api TokenAPI) SyncCreatedTokensAdmin(ctx context.Context, includeChains []
 	return api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
 }
 
-func (api TokenAPI) SyncCreatedTokensForNewContracts(ctx context.Context, includeChains []persist.Chain) error {
+func (api TokenAPI) SyncCreatedTokensForNewContracts(ctx context.Context, includeChains []persist.Chain, incrementally bool) error {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
@@ -366,7 +366,19 @@ func (api TokenAPI) SyncCreatedTokensForNewContracts(ctx context.Context, includ
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	return api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
+	if incrementally {
+		err := api.multichainProvider.SyncCreatedTokensForNewContractsIncrementally(ctx, userID, includeChains)
+		if err != nil {
+			return ErrTokenRefreshFailed{Message: err.Error()}
+		}
+	} else {
+		err := api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
+		if err != nil {
+			return ErrTokenRefreshFailed{Message: err.Error()}
+		}
+	}
+	return nil
+
 }
 
 func (api TokenAPI) SyncCreatedTokensForExistingContract(ctx context.Context, contractID persist.DBID) error {
@@ -426,21 +438,6 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	}
 
 	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain))
-	if err != nil {
-		return ErrTokenRefreshFailed{Message: err.Error()}
-	}
-
-	return nil
-}
-
-func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractIdentifiers": validate.WithTag(ci, "required"),
-	}); err != nil {
-		return err
-	}
-
-	err := api.multichainProvider.RefreshTokensForContract(ctx, ci)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}

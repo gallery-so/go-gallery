@@ -886,13 +886,13 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 	return users, pageInfo, err
 }
 
-func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
+func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Community, PageInfo, error) {
 	// Validate
 	curUserID, _ := getAuthenticatedUserID(ctx)
 
 	// If the user is not logged in, return an empty list of users
 	if curUserID == "" {
-		return []db.Contract{}, PageInfo{}, nil
+		return []db.Community{}, PageInfo{}, nil
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -905,18 +905,18 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params sharedContractsPaginatorParams) ([]any, error) {
-		keys, err := api.loaders.GetSharedContractsBatchPaginate.Load(db.GetSharedContractsBatchPaginateParams{
+	queryFunc := func(params sharedCommunitiesPaginatorParams) ([]any, error) {
+		keys, err := api.loaders.GetSharedCommunitiesBatchPaginate.Load(db.GetSharedCommunitiesBatchPaginateParams{
 			UserAID:                   curUserID,
 			UserBID:                   userID,
 			CurBeforeDisplayedByUserA: params.CursorBeforeDisplayedByUserA,
 			CurBeforeDisplayedByUserB: params.CursorBeforeDisplayedByUserB,
 			CurBeforeOwnedCount:       int32(params.CursorBeforeOwnedCount),
-			CurBeforeContractID:       params.CursorBeforeContractID,
+			CurBeforeContractID:       params.CursorBeforeCommunityID,
 			CurAfterDisplayedByUserA:  params.CursorAfterDisplayedByUserA,
 			CurAfterDisplayedByUserB:  params.CursorAfterDisplayedByUserB,
 			CurAfterOwnedCount:        int32(params.CursorAfterOwnedCount),
-			CurAfterContractID:        params.CursorAfterContractID,
+			CurAfterContractID:        params.CursorAfterCommunityID,
 			PagingForward:             params.PagingForward,
 			Limit:                     params.Limit,
 		})
@@ -933,7 +933,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountSharedContracts(ctx, db.CountSharedContractsParams{
+		total, err := api.queries.CountSharedCommunities(ctx, db.CountSharedCommunitiesParams{
 			UserAID: curUserID,
 			UserBID: userID,
 		})
@@ -941,13 +941,13 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 	}
 
 	cursorFunc := func(i any) (bool, bool, int64, persist.DBID, error) {
-		if row, ok := i.(db.GetSharedContractsBatchPaginateRow); ok {
+		if row, ok := i.(db.GetSharedCommunitiesBatchPaginateRow); ok {
 			return row.DisplayedByUserA, row.DisplayedByUserB, int64(row.OwnedCount), row.ID, nil
 		}
-		return false, false, 0, "", fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
+		return false, false, 0, "", fmt.Errorf("node is not a db.GetSharedCommunitiesBatchPaginateRow")
 	}
 
-	paginator := sharedContractsPaginator{
+	paginator := sharedCommunitiesPaginator{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -955,16 +955,16 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	contracts := make([]db.Contract, len(results))
+	communities := make([]db.Community, len(results))
 	for i, result := range results {
-		if row, ok := result.(db.GetSharedContractsBatchPaginateRow); ok {
-			var c db.Contract
+		if row, ok := result.(db.GetSharedCommunitiesBatchPaginateRow); ok {
+			var c db.Community
 			copier.Copy(&c, &row)
-			contracts[i] = c
+			communities[i] = c
 		}
 	}
 
-	return contracts, pageInfo, err
+	return communities, pageInfo, err
 }
 
 func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, includeChains []persist.Chain, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {

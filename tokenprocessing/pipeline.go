@@ -319,7 +319,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromOriginalURLs(ctx context.Context, i
 
 func (tpj *tokenProcessingJob) cacheMediaFromOpenSeaAssetURLs(ctx context.Context) (imgResult, animResult cacheResult) {
 	tID := persist.NewTokenIdentifiers(tpj.token.ContractAddress, tpj.token.TokenID, tpj.token.Chain)
-	assets, err := opensea.FetchAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(tID.ContractAddress), opensea.TokenID(tID.TokenID.Base10String()))
+	assets, err := opensea.FetchAssetsForTokenIdentifiers(ctx, tpj.token.Chain, tID.ContractAddress, tID.TokenID)
 	if err != nil || len(assets) == 0 {
 		result := cacheResult{err: errNoDataFromOpensea{err}}
 		return result, result
@@ -345,17 +345,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromOpenSeaAssetURLs(ctx context.Contex
 		LiveRenderGCP:                &tpj.pipelineMetadata.AlternateAnimationLiveRenderGCP,
 	}
 	for _, asset := range assets {
-		animURL := media.AnimationURL(util.FirstNonEmptyString(
-			asset.AnimationURL,
-			asset.AnimationOriginalURL,
-		))
-		imgURL := media.ImageURL(util.FirstNonEmptyString(
-			asset.ImageURL,
-			asset.ImagePreviewURL,
-			asset.ImageOriginalURL,
-			asset.ImageThumbnailURL,
-		))
-		imgResult, _, animResult = tpj.cacheMediaSources(ctx, imgURL, "", animURL, imgRunMetadata, nil, animRunMetadata)
+		imgResult, _, animResult = tpj.cacheMediaSources(ctx, media.ImageURL(asset.ImageURL), "", media.AnimationURL(asset.AnimationURL), imgRunMetadata, nil, animRunMetadata)
 		if animResult.IsSuccess() || imgResult.IsSuccess() {
 			return imgResult, animResult
 		}

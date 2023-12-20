@@ -9,11 +9,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 
 	"golang.org/x/net/html"
 
@@ -82,6 +83,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeonePostedYourWorkNotification:                fetchNotificationByID[model.SomeonePostedYourWorkNotification],
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
 	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
+	OnGalleryAnnouncementNotification:                  fetchNotificationByID[model.GalleryAnnouncementNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -499,10 +501,6 @@ func tokensToConnection(ctx context.Context, tokens []db.Token, pageInfo publica
 	}
 }
 
-func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
-	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
-}
-
 func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 
@@ -575,6 +573,7 @@ func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
 			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
+			// UnsubscribedFromDigest:        user.EmailUnsubscriptions.Digest.Bool(), // TODO -DIGEST
 		},
 	}
 
@@ -1379,6 +1378,7 @@ func updateUserEmailNotificationSettings(ctx context.Context, input model.Update
 	err := publicapi.For(ctx).User.UpdateUserEmailNotificationSettings(ctx, persist.EmailUnsubscriptions{
 		All:           persist.NullBool(input.UnsubscribedFromAll),
 		Notifications: persist.NullBool(input.UnsubscribedFromNotifications),
+		// Digest:        persist.NullBool(input.UnsubscribedFromDigest),
 	})
 	if err != nil {
 		return nil, err

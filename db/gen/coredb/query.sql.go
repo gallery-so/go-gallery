@@ -264,28 +264,28 @@ func (q *Queries) CountPostsByUserID(ctx context.Context, actorID persist.DBID) 
 	return count, err
 }
 
-const countSharedContracts = `-- name: CountSharedContracts :one
+const countSharedCommunities = `-- name: CountSharedCommunities :one
 select count(*)
-from owned_contracts a, owned_contracts b, contracts
-left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+from owned_communities a, owned_communities b, communities
+left join contracts on communities.contract_id = contracts.id
+left join marketplace_contracts on communities.contract_id = marketplace_contracts.contract_id
 where a.user_id = $1
   and b.user_id = $2
-  and a.contract_id = b.contract_id
-  and a.contract_id = contracts.id
+  and a.community_id = b.community_id
+  and a.community_id = communities.id
   and marketplace_contracts.contract_id is null
-  and contracts.name is not null
-  and contracts.name != ''
-  and contracts.name != 'Unidentified contract'
-  and not contracts.is_provider_marked_spam
+  and communities.name != ''
+  and communities.name != 'Unidentified contract'
+  and (contracts.is_provider_marked_spam is null or contracts.is_provider_marked_spam = false)
 `
 
-type CountSharedContractsParams struct {
+type CountSharedCommunitiesParams struct {
 	UserAID persist.DBID `db:"user_a_id" json:"user_a_id"`
 	UserBID persist.DBID `db:"user_b_id" json:"user_b_id"`
 }
 
-func (q *Queries) CountSharedContracts(ctx context.Context, arg CountSharedContractsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSharedContracts, arg.UserAID, arg.UserBID)
+func (q *Queries) CountSharedCommunities(ctx context.Context, arg CountSharedCommunitiesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSharedCommunities, arg.UserAID, arg.UserBID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -4393,6 +4393,64 @@ func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopC
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTopCommunitiesByPosts = `-- name: GetTopCommunitiesByPosts :many
+SELECT contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain, COUNT(*) as frequency
+FROM posts
+JOIN LATERAL UNNEST(posts.contract_ids) as contract_id ON true
+JOIN contracts ON contracts.id = contract_id
+WHERE posts.created_at >= NOW() - INTERVAL '7 days'
+GROUP BY contracts.id
+ORDER BY frequency DESC
+LIMIT $1
+`
+
+type GetTopCommunitiesByPostsRow struct {
+	Contract  Contract `db:"contract" json:"contract"`
+	Frequency int64    `db:"frequency" json:"frequency"`
+}
+
+// posts has an array, contract_ids that maps to the contracts table. Find the top 10 contracts by post count in the last 7 days
+func (q *Queries) GetTopCommunitiesByPosts(ctx context.Context, limit int32) ([]GetTopCommunitiesByPostsRow, error) {
+	rows, err := q.db.Query(ctx, getTopCommunitiesByPosts, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTopCommunitiesByPostsRow
+	for rows.Next() {
+		var i GetTopCommunitiesByPostsRow
+		if err := rows.Scan(
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.Contract.L1Chain,
+			&i.Frequency,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

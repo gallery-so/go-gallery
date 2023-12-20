@@ -994,8 +994,9 @@ type DisconnectSocialAccountPayload struct {
 func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
 
 type EmailNotificationSettings struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        *bool `json:"unsubscribedFromDigest"`
 }
 
 type EnsProfileImage struct {
@@ -1519,6 +1520,24 @@ type Gallery struct {
 
 func (Gallery) IsNode()                      {}
 func (Gallery) IsGalleryByIDPayloadOrError() {}
+
+type GalleryAnnouncementNotification struct {
+	Dbid                 persist.DBID `json:"dbid"`
+	Seen                 *bool        `json:"seen"`
+	CreationTime         *time.Time   `json:"creationTime"`
+	UpdatedTime          *time.Time   `json:"updatedTime"`
+	Platform             Platform     `json:"platform"`
+	InternalID           string       `json:"internalId"`
+	ImageURL             *string      `json:"imageUrl"`
+	Title                *string      `json:"title"`
+	Description          *string      `json:"description"`
+	CtaText              *string      `json:"ctaText"`
+	CtaLink              *string      `json:"ctaLink"`
+	PushNotificationText *string      `json:"pushNotificationText"`
+}
+
+func (GalleryAnnouncementNotification) IsNotification() {}
+func (GalleryAnnouncementNotification) IsNode()         {}
 
 type GalleryInfoUpdatedFeedEventData struct {
 	EventTime      *time.Time      `json:"eventTime"`
@@ -2391,6 +2410,7 @@ func (SyncCreatedTokensForExistingContractPayload) IsSyncCreatedTokensForExistin
 
 type SyncCreatedTokensForNewContractsInput struct {
 	IncludeChains []persist.Chain `json:"includeChains"`
+	Incrementally *bool           `json:"incrementally"`
 }
 
 type SyncCreatedTokensForNewContractsPayload struct {
@@ -2511,6 +2531,7 @@ type TokenDefinition struct {
 	Community     *Community     `json:"community"`
 	Communities   []*Community   `json:"communities"`
 	ExternalURL   *string        `json:"externalUrl"`
+	MintURL       *string        `json:"mintUrl"`
 }
 
 func (TokenDefinition) IsNode() {}
@@ -2688,8 +2709,9 @@ type UpdateEmailInput struct {
 }
 
 type UpdateEmailNotificationSettingsInput struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        *bool `json:"unsubscribedFromDigest"`
 }
 
 type UpdateEmailNotificationSettingsPayload struct {
@@ -2981,16 +3003,18 @@ type EmailUnsubscriptionType string
 const (
 	EmailUnsubscriptionTypeAll           EmailUnsubscriptionType = "All"
 	EmailUnsubscriptionTypeNotifications EmailUnsubscriptionType = "Notifications"
+	EmailUnsubscriptionTypeDigest        EmailUnsubscriptionType = "Digest"
 )
 
 var AllEmailUnsubscriptionType = []EmailUnsubscriptionType{
 	EmailUnsubscriptionTypeAll,
 	EmailUnsubscriptionTypeNotifications,
+	EmailUnsubscriptionTypeDigest,
 }
 
 func (e EmailUnsubscriptionType) IsValid() bool {
 	switch e {
-	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications:
+	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications, EmailUnsubscriptionTypeDigest:
 		return true
 	}
 	return false
@@ -3057,6 +3081,49 @@ func (e *MerchType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e MerchType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type Platform string
+
+const (
+	PlatformWeb    Platform = "Web"
+	PlatformMobile Platform = "Mobile"
+	PlatformAll    Platform = "All"
+)
+
+var AllPlatform = []Platform{
+	PlatformWeb,
+	PlatformMobile,
+	PlatformAll,
+}
+
+func (e Platform) IsValid() bool {
+	switch e {
+	case PlatformWeb, PlatformMobile, PlatformAll:
+		return true
+	}
+	return false
+}
+
+func (e Platform) String() string {
+	return string(e)
+}
+
+func (e *Platform) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Platform(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Platform", str)
+	}
+	return nil
+}
+
+func (e Platform) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

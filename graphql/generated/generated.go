@@ -448,6 +448,7 @@ type ComplexityRoot struct {
 
 	EmailNotificationSettings struct {
 		UnsubscribedFromAll           func(childComplexity int) int
+		UnsubscribedFromDigest        func(childComplexity int) int
 		UnsubscribedFromNotifications func(childComplexity int) int
 	}
 
@@ -668,6 +669,22 @@ type ComplexityRoot struct {
 		Owner         func(childComplexity int) int
 		Position      func(childComplexity int) int
 		TokenPreviews func(childComplexity int) int
+	}
+
+	GalleryAnnouncementNotification struct {
+		CreationTime         func(childComplexity int) int
+		CtaLink              func(childComplexity int) int
+		CtaText              func(childComplexity int) int
+		Dbid                 func(childComplexity int) int
+		Description          func(childComplexity int) int
+		ID                   func(childComplexity int) int
+		ImageURL             func(childComplexity int) int
+		InternalID           func(childComplexity int) int
+		Platform             func(childComplexity int) int
+		PushNotificationText func(childComplexity int) int
+		Seen                 func(childComplexity int) int
+		Title                func(childComplexity int) int
+		UpdatedTime          func(childComplexity int) int
 	}
 
 	GalleryInfoUpdatedFeedEventData struct {
@@ -1483,6 +1500,7 @@ type ComplexityRoot struct {
 		ID            func(childComplexity int) int
 		LastUpdated   func(childComplexity int) int
 		Media         func(childComplexity int) int
+		MintURL       func(childComplexity int) int
 		Name          func(childComplexity int) int
 		TokenID       func(childComplexity int) int
 		TokenMetadata func(childComplexity int) int
@@ -2160,6 +2178,8 @@ type TokenDefinitionResolver interface {
 	TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error)
 	Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error)
 	Communities(ctx context.Context, obj *model.TokenDefinition) ([]*model.Community, error)
+
+	MintURL(ctx context.Context, obj *model.TokenDefinition) (*string, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
@@ -3474,6 +3494,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.EmailNotificationSettings.UnsubscribedFromAll(childComplexity), true
 
+	case "EmailNotificationSettings.unsubscribedFromDigest":
+		if e.complexity.EmailNotificationSettings.UnsubscribedFromDigest == nil {
+			break
+		}
+
+		return e.complexity.EmailNotificationSettings.UnsubscribedFromDigest(childComplexity), true
+
 	case "EmailNotificationSettings.unsubscribedFromNotifications":
 		if e.complexity.EmailNotificationSettings.UnsubscribedFromNotifications == nil {
 			break
@@ -4135,6 +4162,97 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Gallery.TokenPreviews(childComplexity), true
+
+	case "GalleryAnnouncementNotification.creationTime":
+		if e.complexity.GalleryAnnouncementNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.CreationTime(childComplexity), true
+
+	case "GalleryAnnouncementNotification.ctaLink":
+		if e.complexity.GalleryAnnouncementNotification.CtaLink == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.CtaLink(childComplexity), true
+
+	case "GalleryAnnouncementNotification.ctaText":
+		if e.complexity.GalleryAnnouncementNotification.CtaText == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.CtaText(childComplexity), true
+
+	case "GalleryAnnouncementNotification.dbid":
+		if e.complexity.GalleryAnnouncementNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.Dbid(childComplexity), true
+
+	case "GalleryAnnouncementNotification.description":
+		if e.complexity.GalleryAnnouncementNotification.Description == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.Description(childComplexity), true
+
+	case "GalleryAnnouncementNotification.id":
+		if e.complexity.GalleryAnnouncementNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.ID(childComplexity), true
+
+	case "GalleryAnnouncementNotification.imageUrl":
+		if e.complexity.GalleryAnnouncementNotification.ImageURL == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.ImageURL(childComplexity), true
+
+	case "GalleryAnnouncementNotification.internalId":
+		if e.complexity.GalleryAnnouncementNotification.InternalID == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.InternalID(childComplexity), true
+
+	case "GalleryAnnouncementNotification.platform":
+		if e.complexity.GalleryAnnouncementNotification.Platform == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.Platform(childComplexity), true
+
+	case "GalleryAnnouncementNotification.pushNotificationText":
+		if e.complexity.GalleryAnnouncementNotification.PushNotificationText == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.PushNotificationText(childComplexity), true
+
+	case "GalleryAnnouncementNotification.seen":
+		if e.complexity.GalleryAnnouncementNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.Seen(childComplexity), true
+
+	case "GalleryAnnouncementNotification.title":
+		if e.complexity.GalleryAnnouncementNotification.Title == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.Title(childComplexity), true
+
+	case "GalleryAnnouncementNotification.updatedTime":
+		if e.complexity.GalleryAnnouncementNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.GalleryAnnouncementNotification.UpdatedTime(childComplexity), true
 
 	case "GalleryInfoUpdatedFeedEventData.action":
 		if e.complexity.GalleryInfoUpdatedFeedEventData.Action == nil {
@@ -8360,6 +8478,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenDefinition.Media(childComplexity), true
 
+	case "TokenDefinition.mintUrl":
+		if e.complexity.TokenDefinition.MintURL == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.MintURL(childComplexity), true
+
 	case "TokenDefinition.name":
 		if e.complexity.TokenDefinition.Name == nil {
 			break
@@ -9527,6 +9652,7 @@ input CreatedCommunitiesInput {
 input SyncCreatedTokensForNewContractsInput {
   # When includeChains is empty, syncs tokens on all chains.
   includeChains: [Chain!]
+  incrementally: Boolean
 }
 
 input SyncCreatedTokensForExistingContractInput {
@@ -9787,6 +9913,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   community: Community @goField(forceResolver: true)
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
+  mintUrl: String @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
@@ -10157,6 +10284,7 @@ enum EmailVerificationStatus {
 enum EmailUnsubscriptionType {
   All
   Notifications
+  Digest
 }
 
 type UserEmail {
@@ -10168,11 +10296,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -11610,6 +11740,29 @@ type YouReceivedTopActivityBadgeNotification implements Notification & Node {
   updatedTime: Time
 
   threshold: Int!
+}
+
+enum Platform {
+  Web
+  Mobile
+  All
+}
+
+type GalleryAnnouncementNotification implements Notification & Node {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  platform: Platform!
+  internalId: String!
+  imageUrl: String
+  title: String
+  description: String
+  ctaText: String
+  ctaLink: String
+  pushNotificationText: String
 }
 
 type ClearAllNotificationsPayload {
@@ -25143,6 +25296,47 @@ func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedF
 	return fc, nil
 }
 
+func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromDigest(ctx context.Context, field graphql.CollectedField, obj *model.EmailNotificationSettings) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UnsubscribedFromDigest, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EmailNotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _EnsProfileImage_wallet(ctx context.Context, field graphql.CollectedField, obj *model.EnsProfileImage) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_EnsProfileImage_wallet(ctx, field)
 	if err != nil {
@@ -29566,6 +29760,551 @@ func (ec *executionContext) fieldContext_Gallery_collections(ctx context.Context
 				return ec.fieldContext_Collection_tokens(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Collection", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_platform(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_platform(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Platform, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.Platform)
+	fc.Result = res
+	return ec.marshalNPlatform2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPlatform(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_platform(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Platform does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_internalId(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_internalId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.InternalID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_internalId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_imageUrl(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_imageUrl(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_imageUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_title(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_title(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Title, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_title(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_description(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_description(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_description(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_ctaText(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_ctaText(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CtaText, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_ctaText(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_ctaLink(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_ctaLink(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CtaLink, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_ctaLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryAnnouncementNotification_pushNotificationText(ctx context.Context, field graphql.CollectedField, obj *model.GalleryAnnouncementNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryAnnouncementNotification_pushNotificationText(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PushNotificationText, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryAnnouncementNotification_pushNotificationText(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryAnnouncementNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -55348,6 +56087,8 @@ func (ec *executionContext) fieldContext_Token_definition(ctx context.Context, f
 				return ec.fieldContext_TokenDefinition_communities(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_TokenDefinition_externalUrl(ctx, field)
+			case "mintUrl":
+				return ec.fieldContext_TokenDefinition_mintUrl(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TokenDefinition", field.Name)
 		},
@@ -57225,6 +57966,47 @@ func (ec *executionContext) fieldContext_TokenDefinition_externalUrl(ctx context
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_mintUrl(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_mintUrl(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDefinition().MintURL(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_mintUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -60981,6 +61763,8 @@ func (ec *executionContext) fieldContext_UserEmail_emailNotificationSettings(ctx
 				return ec.fieldContext_EmailNotificationSettings_unsubscribedFromAll(ctx, field)
 			case "unsubscribedFromNotifications":
 				return ec.fieldContext_EmailNotificationSettings_unsubscribedFromNotifications(ctx, field)
+			case "unsubscribedFromDigest":
+				return ec.fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type EmailNotificationSettings", field.Name)
 		},
@@ -67173,7 +67957,7 @@ func (ec *executionContext) unmarshalInputSyncCreatedTokensForNewContractsInput(
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"includeChains"}
+	fieldsInOrder := [...]string{"includeChains", "incrementally"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -67189,6 +67973,15 @@ func (ec *executionContext) unmarshalInputSyncCreatedTokensForNewContractsInput(
 				return it, err
 			}
 			it.IncludeChains = data
+		case "incrementally":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("incrementally"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Incrementally = data
 		}
 	}
 
@@ -67560,7 +68353,7 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"unsubscribedFromAll", "unsubscribedFromNotifications"}
+	fieldsInOrder := [...]string{"unsubscribedFromAll", "unsubscribedFromNotifications", "unsubscribedFromDigest"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -67585,6 +68378,15 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 				return it, err
 			}
 			it.UnsubscribedFromNotifications = data
+		case "unsubscribedFromDigest":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unsubscribedFromDigest"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UnsubscribedFromDigest = data
 		}
 	}
 
@@ -70293,6 +71095,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
+	case model.GalleryAnnouncementNotification:
+		return ec._GalleryAnnouncementNotification(ctx, sel, &obj)
+	case *model.GalleryAnnouncementNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryAnnouncementNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -70419,6 +71228,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
+	case model.GalleryAnnouncementNotification:
+		return ec._GalleryAnnouncementNotification(ctx, sel, &obj)
+	case *model.GalleryAnnouncementNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryAnnouncementNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -75056,6 +75872,10 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "unsubscribedFromDigest":
+
+			out.Values[i] = ec._EmailNotificationSettings_unsubscribedFromDigest(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -76683,6 +77503,91 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var galleryAnnouncementNotificationImplementors = []string{"GalleryAnnouncementNotification", "Notification", "Node"}
+
+func (ec *executionContext) _GalleryAnnouncementNotification(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryAnnouncementNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, galleryAnnouncementNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GalleryAnnouncementNotification")
+		case "id":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dbid":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "seen":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_updatedTime(ctx, field, obj)
+
+		case "platform":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_platform(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "internalId":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_internalId(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "imageUrl":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_imageUrl(ctx, field, obj)
+
+		case "title":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_title(ctx, field, obj)
+
+		case "description":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_description(ctx, field, obj)
+
+		case "ctaText":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_ctaText(ctx, field, obj)
+
+		case "ctaLink":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_ctaLink(ctx, field, obj)
+
+		case "pushNotificationText":
+
+			out.Values[i] = ec._GalleryAnnouncementNotification_pushNotificationText(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -83015,6 +83920,23 @@ func (ec *executionContext) _TokenDefinition(ctx context.Context, sel ast.Select
 
 			out.Values[i] = ec._TokenDefinition_externalUrl(ctx, field, obj)
 
+		case "mintUrl":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDefinition_mintUrl(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -85650,6 +86572,16 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._PageInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNPlatform2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPlatform(ctx context.Context, v interface{}) (model.Platform, error) {
+	var res model.Platform
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPlatform2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPlatform(ctx context.Context, sel ast.SelectionSet, v model.Platform) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalNPost2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v model.Post) graphql.Marshaler {

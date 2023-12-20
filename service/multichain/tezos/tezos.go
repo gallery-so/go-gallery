@@ -171,7 +171,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	resultTokens := []tzktBalanceToken{}
 	for {
 
-		tzktBalances, err := d.fetchBalancesByAddress(tzAddr, limit, offset)
+		tzktBalances, err := d.fetchBalancesByAddress(ctx, tzAddr, limit, offset)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -204,7 +204,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 		limit := 100
 		offset := 0
 		for {
-			tzktBalances, err := d.fetchBalancesByAddress(tzAddr, limit, offset)
+			tzktBalances, err := d.fetchBalancesByAddress(ctx, tzAddr, limit, offset)
 			if err != nil {
 				errChan <- err
 				return
@@ -239,8 +239,8 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 	return rec, errChan
 }
 
-func (d *Provider) fetchBalancesByAddress(tzAddr persist.Address, limit, offset int) ([]tzktBalanceToken, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
+func (d *Provider) fetchBalancesByAddress(ctx context.Context, tzAddr persist.Address, limit, offset int) ([]tzktBalanceToken, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -270,20 +270,9 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	resultTokens := []tzktBalanceToken{}
 
 	for {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.contract=%s&limit=%d&offset=%d", d.apiURL, contractAddress.String(), limit, offset), nil)
+
+		tzktBalances, err := d.fetchBalancesByContract(ctx, contractAddress, limit, offset)
 		if err != nil {
-			return nil, multichain.ChainAgnosticContract{}, err
-		}
-		resp, err := retry.RetryRequest(d.httpClient, req)
-		if err != nil {
-			return nil, multichain.ChainAgnosticContract{}, err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
-		}
-		var tzktBalances []tzktBalanceToken
-		if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
@@ -310,6 +299,84 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	contract := contracts[0]
 
 	return tokens, contract, nil
+}
+
+func (d *Provider) fetchBalancesByContract(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]tzktBalanceToken, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.contract=%s&limit=%d&offset=%d", d.apiURL, contractAddress.String(), limit, offset), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := retry.RetryRequest(d.httpClient, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, util.GetErrFromResp(resp)
+	}
+	var tzktBalances []tzktBalanceToken
+	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
+		return nil, err
+	}
+
+	return tzktBalances, nil
+}
+
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		defer close(rec)
+
+		tzAddr, err := toTzAddress(addr)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+		if limit < 1 {
+			limit = pageSize
+		}
+		offset := 0
+		for {
+			tzktBalances, err := d.fetchBalancesByContract(ctx, tzAddr, limit, offset)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(tzktBalances), tzAddr.String(), limit, offset)
+
+			resultTokens, resultContracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, addr.String())
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			logger.For(ctx).Debugf("converted %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
+
+			if len(resultTokens) > 0 || len(resultContracts) > 0 {
+				rec <- multichain.ChainAgnosticTokensAndContracts{
+					Tokens:    resultTokens,
+					Contracts: resultContracts,
+				}
+			}
+
+			if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
+				break
+			}
+
+			if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+				// this will ensure that we don't go over the max limit
+				limit = maxLimit - len(resultTokens)
+			}
+
+			offset += limit
+
+			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
+		}
+	}()
+	return rec, errChan
 }
 
 // GetTokensByContractAddressAndOwner retrieves tokens for a contract address and owner on the Tezos Blockchain
@@ -630,69 +697,6 @@ query account($usernameOrAddress: String ) {
 
 
 */
-
-type fxhashGenerativeToken struct {
-	GentkContractAddress string `json:"gentkContractAddress"`
-	Name                 string `json:"name"`
-	Slug                 string `json:"slug"`
-	ThumbnailUri         string `json:"thumbnailUri"`
-}
-
-type fxhashAccount struct {
-	Username         string
-	GenerativeTokens []fxhashGenerativeToken
-}
-
-type accountWithCollectionsQuery struct {
-	Account fxhashAccount `graphql:"account(usernameOrAddress: $usernameOrAddress)"`
-}
-
-// TODO will be removed along with the ChildContract and Parent types, but this is how you would do it
-func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
-	// fxhash and objkt are two known omnibus contracts, let objkt provider handle objkt
-	var query accountWithCollectionsQuery
-
-	if err := retry.RetryQuery(ctx, p.fxGQL, &query, inputArgs{
-		"usernameOrAddress": sgql.String(creatorAddress),
-	}); err != nil {
-		return nil, err
-	}
-
-	// No matching query results
-	if len(query.Account.GenerativeTokens) < 1 {
-		return nil, fmt.Errorf("no child contracts found for creator")
-	}
-
-	groups := util.GroupBy(query.Account.GenerativeTokens, func(gt fxhashGenerativeToken) string {
-		return gt.GentkContractAddress
-	})
-
-	edges := make([]multichain.ParentToChildEdge, 0, len(query.Account.GenerativeTokens))
-	for gtca, ts := range groups {
-
-		// get the contract
-		contract, err := p.GetContractByAddress(ctx, persist.Address(gtca))
-		if err != nil {
-			return nil, err
-		}
-
-		children := make([]multichain.ChildContract, 0, len(ts))
-		for _, t := range ts {
-			children = append(children, multichain.ChildContract{
-				ChildID:        fmt.Sprintf("%s:%s", contract.Address, t.Slug),
-				Name:           t.Name,
-				CreatorAddress: creatorAddress,
-				Tokens:         nil, // expensive to fetch, we can sort tokens from an owner into these collections
-			})
-		}
-		edges = append(edges, multichain.ParentToChildEdge{
-			Parent:   contract,
-			Children: children,
-		})
-	}
-
-	return edges, nil
-}
 
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
