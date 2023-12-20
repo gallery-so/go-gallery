@@ -811,6 +811,7 @@ enum EmailVerificationStatus {
 enum EmailUnsubscriptionType {
   All
   Notifications
+  Digest
 }
 
 type UserEmail {
@@ -822,11 +823,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {

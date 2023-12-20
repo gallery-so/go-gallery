@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"net/http"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/emails"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/sendgrid-go"
 	"golang.org/x/sync/errgroup"
@@ -26,25 +27,10 @@ func init() {
 
 var emailTypes = []model.EmailUnsubscriptionType{model.EmailUnsubscriptionTypeAll, model.EmailUnsubscriptionTypeNotifications}
 
-type UpdateSubscriptionsTypeInput struct {
-	UserID persist.DBID                 `json:"user_id" binding:"required"`
-	Unsubs persist.EmailUnsubscriptions `json:"unsubscriptions" binding:"required"`
-}
-
-type UnsubInput struct {
-	JWT    string                          `json:"jwt" binding:"required"`
-	Unsubs []model.EmailUnsubscriptionType `json:"unsubscriptions" binding:"required"`
-}
-
-type ResubInput struct {
-	JWT    string                          `json:"jwt" binding:"required"`
-	Resubs []model.EmailUnsubscriptionType `json:"resubscriptions" binding:"required"`
-}
-
 func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input UpdateSubscriptionsTypeInput
+		var input emails.UpdateSubscriptionsTypeInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -84,6 +70,13 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 					}
 					return removeEmailFromUnsubscribeGroup(c, emailAddress, env.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
+			// case model.EmailUnsubscriptionTypeDigest: TODO -DIGEST add back in when digest is implemented
+			// 	errGroup.Go(func() error {
+			// 		if input.Unsubs.Digest {
+			// 			return addEmailToUnsubscribeGroup(c, emailAddress, env.GetString("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID"))
+			// 		}
+			// 		return removeEmailFromUnsubscribeGroup(c, emailAddress, env.GetString("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID"))
+			// 	})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
 				return
@@ -112,7 +105,7 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input UnsubInput
+		var input emails.UnsubInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -159,6 +152,11 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 				errGroup.Go(func() error {
 					return addEmailToUnsubscribeGroup(c, emailAddress, env.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
+			// case model.EmailUnsubscriptionTypeDigest:  TODO -DIGEST
+			// 	unsubs.Digest = true
+			// 	errGroup.Go(func() error {
+			// 		return addEmailToUnsubscribeGroup(c, emailAddress, env.GetString("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID"))
+			// 	})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
 				return
@@ -187,7 +185,7 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input ResubInput
+		var input emails.ResubInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -234,6 +232,12 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 				errGroup.Go(func() error {
 					return removeEmailFromUnsubscribeGroup(c, emailAddress, env.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
+			// case model.EmailUnsubscriptionTypeDigest:  TODO -DIGEST
+			// 	unsubs.Digest = false
+			// 	errGroup.Go(func() error {
+			// 		return removeEmailFromUnsubscribeGroup(c, emailAddress, env.GetString("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID"))
+			// 	})
+
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
 				return
