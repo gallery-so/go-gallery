@@ -876,6 +876,7 @@ union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInp
 
 union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | ErrTokenNotFound
 
+union CommunityByIdOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 union CommunityByKeyOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
@@ -1375,6 +1376,7 @@ type Query {
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
   ): CommunityByAddressOrError
+  communityById(id: DBID!): CommunityByIdOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
   globalFeed(

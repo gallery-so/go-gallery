@@ -2449,6 +2449,11 @@ func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 
+// CommunityByID is the resolver for the communityById field.
+func (r *queryResolver) CommunityByID(ctx context.Context, id persist.DBID) (model.CommunityByIDOrError, error) {
+	return resolveCommunityByID(ctx, id)
+}
+
 // GeneralAllowlist is the resolver for the generalAllowlist field.
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
 	return resolveGeneralAllowlist(ctx)
