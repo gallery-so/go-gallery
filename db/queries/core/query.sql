@@ -914,6 +914,12 @@ FROM
     id_with_row_number i
 JOIN 
     user_with_row_number u ON i.rn = u.rn
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM notifications n
+    WHERE n.owner_id = u.user_id 
+    AND n.data ->> 'internal_id' = $2 ->> 'internal_id'
+)
 RETURNING *;
 
 -- name: CountAllUsers :one

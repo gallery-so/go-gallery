@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -20,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -1220,7 +1218,7 @@ func insertAndPublishAnnouncementNotifs(ctx context.Context, notif db.Notificati
 		return fmt.Errorf("failed to create notification: %w", err)
 	}
 
-	if (strings.EqualFold(notif.Data.AnnouncementDetails.Platform, model.PlatformMobile.String()) || strings.EqualFold(notif.Data.AnnouncementDetails.Platform, model.PlatformAll.String())) && notif.Data.AnnouncementDetails.PushNotificationText != "" {
+	if (notif.Data.AnnouncementDetails.Platform == persist.AnnouncementPlatformAll || notif.Data.AnnouncementDetails.Platform == persist.AnnouncementPlatformMobile) && notif.Data.AnnouncementDetails.PushNotificationText != "" {
 		logger.For(ctx).Infof("sending push notifications for announcement: %s", notif.Data.AnnouncementDetails.InternalID)
 		p := pool.New().WithErrors().WithContext(ctx).WithMaxGoroutines(10)
 		for _, notif := range notifs {

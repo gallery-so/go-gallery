@@ -533,6 +533,12 @@ FROM
     id_with_row_number i
 JOIN 
     user_with_row_number u ON i.rn = u.rn
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM notifications n
+    WHERE n.owner_id = u.user_id 
+    AND n.data ->> 'internal_id' = $2 ->> 'internal_id'
+)
 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
 `
 
