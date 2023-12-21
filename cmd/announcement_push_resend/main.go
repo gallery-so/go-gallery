@@ -28,19 +28,19 @@ func main() {
 
 	// get every wallet with their owner user ID
 	rows, err := pg.Query(ctx, `with tickets as (
-    select * from push_notification_tickets
-    where created_at > '2023-12-21 16:30:00 +00:00'
-      and created_at < '2023-12-21 17:00:00 +00:00'
-)
-select pnt.id, n.id as notification_id, n.owner_id
-from push_notification_tokens pnt
-left join tickets on pnt.id = tickets.push_token_id
-join users u on pnt.user_id = u.id
-left join notifications n on u.id = n.owner_id and n.action = 'Announcement' and n.seen = false
-where tickets.id is null
-  and not pnt.deleted
-  and n.id is not null;
-`)
+	    select * from push_notification_tickets
+	    where created_at > '2023-12-21 16:30:00 +00:00'
+	      and created_at < '2023-12-21 17:00:00 +00:00'
+	)
+	select pnt.id, n.id as notification_id, n.owner_id
+	from push_notification_tokens pnt
+	left join tickets on pnt.id = tickets.push_token_id
+	join users u on pnt.user_id = u.id
+	left join notifications n on u.id = n.owner_id and n.action = 'Announcement' and n.seen = false
+	where tickets.id is null
+	  and not pnt.deleted
+	  and n.id is not null;
+	`)
 	if err != nil {
 		panic(err)
 	}
@@ -94,6 +94,9 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("GCLOUD_SERVICE_KEY_OVERRIDE", "./secrets/prod/service-key.json")
+	viper.SetDefault("GCLOUD_PUSH_NOTIFICATIONS_QUEUE", "projects/gallery-local/locations/here/queues/push-notifications")
+	viper.SetDefault("PUSH_NOTIFICATIONS_URL", "http://localhost:8000")
+	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
 
 	viper.AutomaticEnv()
 
