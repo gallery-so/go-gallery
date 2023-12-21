@@ -795,10 +795,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 	}
 
 	if notif.Action == persist.ActionAnnouncement {
-		if err := limiter.tryUsers(ctx, notif.OwnerID); err != nil {
-			return task.PushNotificationMessage{}, err
-		}
-
 		return message, nil
 	}
 
