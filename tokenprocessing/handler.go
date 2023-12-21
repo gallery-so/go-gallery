@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/task"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 )
@@ -26,10 +26,10 @@ var (
 
 var contractSpecificRetries = map[persist.ContractIdentifiers]int{prohibitionContract: 24}
 
-func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *task.Client) *gin.Engine {
+func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *task.Client, tokenManageCache *redis.Cache) *gin.Engine {
 	// Retry tokens that failed during syncs, but don't retry tokens that failed during manual refreshes
-	noRetryManager := tokenmanage.New(ctx, taskClient)
-	retryManager := tokenmanage.NewWithRetries(ctx, taskClient, syncMaxRetries)
+	noRetryManager := tokenmanage.New(ctx, taskClient, tokenManageCache)
+	retryManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, syncMaxRetries)
 
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/process", func(c *gin.Context) {
