@@ -1111,8 +1111,8 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			ImageURL:             util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.ImageURL),
 			Title:                util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.Title),
 			Description:          util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.Description),
-			CtaText:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTALink),
-			CtaLink:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTAText),
+			CtaText:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTAText),
+			CtaLink:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTALink),
 			PushNotificationText: util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.PushNotificationText),
 		}, nil
 

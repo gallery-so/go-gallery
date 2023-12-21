@@ -9625,7 +9625,6 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
-
 type ContractCommunityKey {
   contract: ChainAddress
 }
@@ -9635,8 +9634,8 @@ input ContractCommunityKeyInput {
 }
 
 type ArtBlocksCommunityKey {
-    contract: ChainAddress
-    projectID: String
+  contract: ChainAddress
+  projectID: String
 }
 
 input ArtBlocksCommunityKeyInput {
@@ -10125,8 +10124,7 @@ type Community implements Node @goEmbedHelper {
   creatorAddress: ChainAddress
     @goField(forceResolver: true)
     @deprecated(reason: "Use Community.creators to get an address")
-  creator: GalleryUserOrAddress
-    @goField(forceResolver: true)
+  creator: GalleryUserOrAddress @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -10296,13 +10294,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {
