@@ -18,6 +18,7 @@ const (
 	ResourceTypeComment
 	ResourceTypeCommunity
 	ResourceTypePost
+	ResourceTypeAllUsers
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
 	ActionUserPosted                      Action = "UserPosted"
@@ -43,28 +44,30 @@ const (
 	ActionGalleryInfoUpdated              Action = "GalleryInfoUpdated"
 	ActionNewTokensReceived               Action = "NewTokensReceived"
 	ActionTopActivityBadgeReceived        Action = "ActivityBadgeReceived"
+	ActionAnnouncement                    Action = "Announcement"
 )
 
 type EventData struct {
-	UserBio                             string            `json:"user_bio"`
-	UserFollowedBack                    bool              `json:"user_followed_back"`
-	UserRefollowed                      bool              `json:"user_refollowed"`
-	NewTokenID                          DBID              `json:"new_token_id"`
-	NewTokenQuantity                    HexString         `json:"new_token_quantity"`
-	TokenCollectorsNote                 string            `json:"token_collectors_note"`
-	TokenCollectionID                   DBID              `json:"token_collection_id"`
-	TokenContractID                     DBID              `json:"token_contract_id"`
-	TokenDefinitionID                   DBID              `json:"token_definition_id"`
-	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`
-	CollectionCollectorsNote            string            `json:"collection_collectors_note"`
-	GalleryName                         *string           `json:"gallery_name"`
-	GalleryDescription                  *string           `json:"gallery_description"`
-	GalleryNewCollectionCollectorsNotes map[DBID]string   `json:"gallery_new_collection_collectors_notes"`
-	GalleryNewTokenIDs                  map[DBID]DBIDList `json:"gallery_new_token_ids"`
-	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`
-	GalleryNewTokenCollectorsNotes      map[DBID]string   `json:"gallery_new_token_collectors_notes"`
-	ActivityBadgeThreshold              int               `json:"activity_badge_threshold"`
-	NewTopActiveUser                    bool              `json:"new_top_active_user"`
+	UserBio                             string               `json:"user_bio"`
+	UserFollowedBack                    bool                 `json:"user_followed_back"`
+	UserRefollowed                      bool                 `json:"user_refollowed"`
+	NewTokenID                          DBID                 `json:"new_token_id"`
+	NewTokenQuantity                    HexString            `json:"new_token_quantity"`
+	TokenCollectorsNote                 string               `json:"token_collectors_note"`
+	TokenCollectionID                   DBID                 `json:"token_collection_id"`
+	TokenContractID                     DBID                 `json:"token_contract_id"`
+	TokenDefinitionID                   DBID                 `json:"token_definition_id"`
+	CollectionTokenIDs                  DBIDList             `json:"collection_token_ids"`
+	CollectionCollectorsNote            string               `json:"collection_collectors_note"`
+	GalleryName                         *string              `json:"gallery_name"`
+	GalleryDescription                  *string              `json:"gallery_description"`
+	GalleryNewCollectionCollectorsNotes map[DBID]string      `json:"gallery_new_collection_collectors_notes"`
+	GalleryNewTokenIDs                  map[DBID]DBIDList    `json:"gallery_new_token_ids"`
+	GalleryNewCollections               DBIDList             `json:"gallery_new_collections"`
+	GalleryNewTokenCollectorsNotes      map[DBID]string      `json:"gallery_new_token_collectors_notes"`
+	ActivityBadgeThreshold              int                  `json:"activity_badge_threshold"`
+	NewTopActiveUser                    bool                 `json:"new_top_active_user"`
+	AnnouncementDetails                 *AnnouncementDetails `json:"announcement_details"`
 }
 
 type FeedEventData struct {

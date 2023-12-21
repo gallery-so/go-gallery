@@ -196,6 +196,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	tokenGroupedHandler := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	viewHandler := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	topActivityHandler := topActivityHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	announcementHandler := announcementNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 
 	// notification actions that are grouped by owner
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, ownerGroupedHandler)
@@ -223,6 +224,9 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 
 	// viewed notifications are handled separately
 	notifDispatcher.AddHandler(persist.ActionViewedGallery, viewHandler)
+
+	// announcements are handled separately
+	notifDispatcher.AddHandler(persist.ActionAnnouncement, announcementHandler)
 
 	new := map[persist.DBID]chan db.Notification{}
 	updated := map[persist.DBID]chan db.Notification{}
@@ -339,6 +343,17 @@ type followerNotificationHandler struct {
 
 func (h followerNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	return insertAndPublishFollowerNotifs(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
+}
+
+type announcementNotificationHandler struct {
+	queries    *db.Queries
+	pubSub     *pubsub.Client
+	taskClient *task.Client
+	limiter    *pushLimiter
+}
+
+func (h announcementNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+	return insertAndPublishAnnouncementNotifs(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 
 type ownerGroupedNotificationHandler struct {
@@ -779,6 +794,14 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		return message, nil
 	}
 
+	if notif.Action == persist.ActionAnnouncement {
+		if err := limiter.tryUsers(ctx, notif.OwnerID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		return message, nil
+	}
+
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 }
 
@@ -1069,6 +1092,11 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			Actor:  "You",
 			Action: "received a new badge for being amongst the top active users on Gallery this week!",
 		}, nil
+
+	case persist.ActionAnnouncement:
+		return UserFacingNotificationData{
+			Action: n.Data.AnnouncementDetails.PushNotificationText,
+		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
 	}
@@ -1101,7 +1129,9 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionUserPostedFirstPost:
 		return true
 	case persist.ActionTopActivityBadgeReceived:
-		return false
+		return false // TODO -activity
+	case persist.ActionAnnouncement:
+		return true
 	default:
 		return false
 	}
@@ -1175,6 +1205,28 @@ func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, 
 		p.Go(func(ctx context.Context) error {
 			return sendNotifications(ctx, notif, queries, taskClient, limiter, ps)
 		})
+	}
+
+	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
+
+	return nil
+}
+
+func insertAndPublishAnnouncementNotifs(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *task.Client, limiter *pushLimiter) error {
+	notifs, err := addGlobalNotifications(ctx, notif, queries)
+	if err != nil {
+		return fmt.Errorf("failed to create notification: %w", err)
+	}
+
+	if (notif.Data.AnnouncementDetails.Platform == persist.AnnouncementPlatformAll || notif.Data.AnnouncementDetails.Platform == persist.AnnouncementPlatformMobile) && notif.Data.AnnouncementDetails.PushNotificationText != "" {
+		logger.For(ctx).Infof("sending push notifications for announcement: %s", notif.Data.AnnouncementDetails.InternalID)
+		p := pool.New().WithErrors().WithContext(ctx).WithMaxGoroutines(10)
+		for _, notif := range notifs {
+			notif := notif
+			p.Go(func(ctx context.Context) error {
+				return sendNotifications(ctx, notif, queries, taskClient, limiter, ps)
+			})
+		}
 	}
 
 	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
@@ -1434,6 +1486,32 @@ func addFollowerNotifications(ctx context.Context, notif db.Notification, querie
 	default:
 		return nil, fmt.Errorf("unknown follower notification action: %s", notif.Action)
 	}
+}
+
+func addGlobalNotifications(ctx context.Context, notif db.Notification, queries *db.Queries) ([]db.Notification, error) {
+
+	userCount, err := queries.CountAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, userCount)
+	for i := 0; i < int(userCount); i++ {
+		ids[i] = persist.GenerateID().String()
+	}
+
+	notifs, err := queries.CreateAnnouncementNotifications(ctx, db.CreateAnnouncementNotificationsParams{
+		Ids:      ids,
+		Action:   notif.Action,
+		Data:     notif.Data,
+		EventIds: notif.EventIds,
+		Internal: notif.Data.AnnouncementDetails.InternalID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create follower notifications: %w", err)
+	}
+
+	return notifs, nil
 }
 
 func (l lockKey) String() string {

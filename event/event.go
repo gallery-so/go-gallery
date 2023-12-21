@@ -57,7 +57,8 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 
 	notifications := newEventDispatcher()
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
-	followerNotificationHandler := newFollowerNotificationHandler(notif, disableDataloaderCaching, queries)
+	followerNotificationHandler := newFollowerNotificationHandler(notif)
+	announcementNotificationHandler := newAnnouncementNotificationHandler(notif)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
@@ -73,6 +74,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, followerNotificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionTopActivityBadgeReceived, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionAnnouncement, announcementNotificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
@@ -596,14 +598,12 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 
 // followerNotificationHandler handles events for consumption as notifications.
 type followerNotificationHandler struct {
-	dataloaders          *dataloader.Loaders
 	notificationHandlers *notifications.NotificationHandlers
 }
 
-func newFollowerNotificationHandler(notifiers *notifications.NotificationHandlers, disableDataloaderCaching bool, queries *db.Queries) *followerNotificationHandler {
+func newFollowerNotificationHandler(notifiers *notifications.NotificationHandlers) *followerNotificationHandler {
 	return &followerNotificationHandler{
 		notificationHandlers: notifiers,
-		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook),
 	}
 }
 
@@ -619,6 +619,28 @@ func (h followerNotificationHandler) handleDelayed(ctx context.Context, persiste
 		TokenID:     persistedEvent.TokenID,
 		CommunityID: persistedEvent.CommunityID,
 		MentionID:   persistedEvent.MentionID,
+	})
+}
+
+// global handles events for consumption as global notifications.
+type announcementNotificationHandler struct {
+	notificationHandlers *notifications.NotificationHandlers
+}
+
+func newAnnouncementNotificationHandler(notifiers *notifications.NotificationHandlers) *announcementNotificationHandler {
+	return &announcementNotificationHandler{
+		notificationHandlers: notifiers,
+	}
+}
+
+func (h announcementNotificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
+	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
+		// no owner or data for follower notifications
+		Action:   persistedEvent.Action,
+		EventIds: persist.DBIDList{persistedEvent.ID},
+		Data: persist.NotificationData{
+			AnnouncementDetails: persistedEvent.Data.AnnouncementDetails,
+		},
 	})
 }
 

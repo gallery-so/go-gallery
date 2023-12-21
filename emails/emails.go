@@ -15,9 +15,11 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/sendgrid-go"
@@ -60,9 +62,12 @@ func coreInitServer() *gin.Engine {
 	logger.For(nil).Info("Registering handlers...")
 
 	r := redis.NewCache(redis.EmailThrottleCache)
-	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, nil, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil)
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	psub := gcp.NewClient(context.Background())
+	t := task.NewClient(context.Background())
+	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, t, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil)
 
-	return handlersInitServer(router, loaders, queries, sendgridClient, r, stg, p)
+	return handlersInitServer(router, loaders, queries, sendgridClient, r, stg, p, psub, t, lock)
 }
 
 func setDefaults() {
@@ -91,6 +96,12 @@ func setDefaults() {
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
 	viper.SetDefault("RETOOL_AUTH_TOKEN", "")
 	viper.SetDefault("CONFIGURATION_BUCKET", "gallery-dev-configurations")
+	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
+	viper.SetDefault("PUBSUB_EMULATOR_HOST", "[::1]:8085")
+	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
+	viper.SetDefault("GCLOUD_PUSH_NOTIFICATIONS_QUEUE", "projects/gallery-local/locations/here/queues/push-notifications")
+	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
+	viper.SetDefault("PUSH_NOTIFICATIONS_URL", "http://localhost:8000")
 
 	viper.AutomaticEnv()
 

@@ -201,6 +201,7 @@ func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 	}
 
 	if resultToken.TokenID == "" || resultContract.Address == "" {
+		logger.For(ctx).Errorf("no token found for identifiers %+v (%+v | %+v) [%+v]", ti, resultToken, resultContract, tokens)
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for identifiers %+v", ti)
 	}
 

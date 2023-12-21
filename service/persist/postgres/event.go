@@ -35,6 +35,8 @@ func (r *EventRepository) Add(ctx context.Context, event db.Event) (*db.Event, e
 		return r.AddCommunityEvent(ctx, event)
 	case persist.ResourceTypePost:
 		return r.AddPostEvent(ctx, event)
+	case persist.ResourceTypeAllUsers:
+		return r.AddDataOnlyEvent(ctx, event)
 	default:
 		return nil, persist.ErrUnknownResourceType{ResourceType: event.ResourceTypeID}
 	}
@@ -172,6 +174,20 @@ func (r *EventRepository) AddPostEvent(ctx context.Context, event db.Event) (*db
 		UserID:         event.UserID,
 		SubjectID:      event.SubjectID,
 		PostID:         event.PostID,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddDataOnlyEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateDataOnlyEvent(ctx, db.CreateDataOnlyEventParams{
+		ID:             persist.GenerateID(),
+		ActorID:        event.ActorID,
+		Action:         event.Action,
+		ResourceTypeID: event.ResourceTypeID,
+		Data:           event.Data,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
+		SubjectID:      event.SubjectID,
 	})
 	return &event, err
 }

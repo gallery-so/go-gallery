@@ -544,6 +544,8 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 			return
 		}
 
+		logger.For(c).WithFields(logrus.Fields{"user_address": in.Data.New.User, "token_id": in.Data.New.ID, "token_and_contract": in.Data.New.TokenAndContract, "balance": in.Data.New.Balance}).Infof("GOLDSKY: %s - Processing Goldsky User Tokens Refresh", in.Data.New.User)
+
 		signature := c.GetHeader("goldsky-webhook-secret")
 		if signature != env.GetString("GOLDSKY_WEBHOOK_SECRET") {
 			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid goldsky signature"))
@@ -562,6 +564,7 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 			L1Chain: persist.ChainZora.L1Chain(),
 		})
 		if user.ID == "" {
+			logger.For(c).Warnf("user not found for address: %s", userAddress)
 			// it is a valid response to not find a user, not every transfer exists on gallery
 			c.String(http.StatusOK, fmt.Sprintf("user not found for address: %s", userAddress))
 			return
@@ -570,6 +573,7 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 		contractAddress := persist.Address(strings.ToLower(fullIDs[1]))
 		bigTokenID, ok := big.NewInt(0).SetString(fullIDs[2], 10)
 		if !ok {
+			logger.For(c).Errorf("invalid token and contract: %s", in.Data.New.TokenAndContract)
 			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid token and contract: %s", in.Data.New.TokenAndContract))
 			return
 		}
@@ -603,6 +607,8 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 		if len(newTokens) == 0 {
 			l.Info("no new tokens found")
+		} else {
+			l.Infof("found %d new tokens", len(newTokens))
 		}
 
 		for _, token := range newTokens {

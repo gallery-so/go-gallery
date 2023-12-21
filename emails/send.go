@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
@@ -150,6 +151,39 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redi
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			return
 		}
+	}
+}
+
+func sendAnnouncementNotification(q *coredb.Queries) gin.HandlerFunc {
+	galleryUser, err := q.GetUserByUsername(context.Background(), "gallery")
+	if err != nil {
+		panic(err)
+	}
+	return func(c *gin.Context) {
+		var in persist.AnnouncementDetails
+		err := c.ShouldBindJSON(&in)
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		err = event.Dispatch(c, coredb.Event{
+			ID:             persist.GenerateID(),
+			ResourceTypeID: persist.ResourceTypeAllUsers,
+			Action:         persist.ActionAnnouncement,
+			UserID:         galleryUser.ID,
+			SubjectID:      galleryUser.ID,
+			ActorID:        persist.DBIDToNullStr(galleryUser.ID),
+			Data: persist.EventData{
+				AnnouncementDetails: &in,
+			},
+		})
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 

@@ -184,6 +184,17 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countAllUsers = `-- name: CountAllUsers :one
+SELECT count(*) FROM users WHERE deleted = false and universal = false
+`
+
+func (q *Queries) CountAllUsers(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllUsers)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countCommentsAndRepliesByFeedEventID = `-- name: CountCommentsAndRepliesByFeedEventID :one
 SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
 `
@@ -501,6 +512,93 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 	return i, err
 }
 
+const createAnnouncementNotifications = `-- name: CreateAnnouncementNotifications :many
+WITH 
+id_with_row_number AS (
+    SELECT unnest($5::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($5::varchar(255)[])) AS rn
+),
+user_with_row_number AS (
+    SELECT id AS user_id, row_number() OVER () AS rn
+    FROM users
+    WHERE deleted = false AND universal = false
+)
+INSERT INTO notifications (id, owner_id, action, data, event_ids)
+SELECT 
+    i.id, 
+    u.user_id, 
+    $1, 
+    $2, 
+    $3
+FROM 
+    id_with_row_number i
+JOIN 
+    user_with_row_number u ON i.rn = u.rn
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM notifications n
+    WHERE n.owner_id = u.user_id 
+    AND n.data ->> 'internal_id' = $4::varchar
+)
+RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
+`
+
+type CreateAnnouncementNotificationsParams struct {
+	Action   persist.Action           `db:"action" json:"action"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	Internal string                   `db:"internal" json:"internal"`
+	Ids      []string                 `db:"ids" json:"ids"`
+}
+
+// later on, we might want to add a "global" column to notifications or even an enum column like "match" to determine how largely consumed
+// notifications will get searched for for a given user. For example, global notifications will always return for a user and follower notifications will
+// perform the check to see if the user follows the owner of the notification. Where this breaks is how we handle "seen" notifications. Since there is 1:1 notifications to users
+// right now, we can't have a "seen" field on the notification itself. We would have to move seen out into a separate table.
+func (q *Queries) CreateAnnouncementNotifications(ctx context.Context, arg CreateAnnouncementNotificationsParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, createAnnouncementNotifications,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.Internal,
+		arg.Ids,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+			&i.PostID,
+			&i.TokenID,
+			&i.MentionID,
+			&i.CommunityID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createCollection = `-- name: CreateCollection :one
 insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) returning id
 `
@@ -815,6 +913,61 @@ func (q *Queries) CreateCommunityNotification(ctx context.Context, arg CreateCom
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.MentionID,
+		&i.CommunityID,
+	)
+	return i, err
+}
+
+const createDataOnlyEvent = `-- name: CreateDataOnlyEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, data, group_id, caption, subject_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, mention_id, community_id
+`
+
+type CreateDataOnlyEventParams struct {
+	ID             persist.DBID         `db:"id" json:"id"`
+	ActorID        sql.NullString       `db:"actor_id" json:"actor_id"`
+	Action         persist.Action       `db:"action" json:"action"`
+	ResourceTypeID persist.ResourceType `db:"resource_type_id" json:"resource_type_id"`
+	Data           persist.EventData    `db:"data" json:"data"`
+	GroupID        sql.NullString       `db:"group_id" json:"group_id"`
+	Caption        sql.NullString       `db:"caption" json:"caption"`
+	SubjectID      persist.DBID         `db:"subject_id" json:"subject_id"`
+}
+
+func (q *Queries) CreateDataOnlyEvent(ctx context.Context, arg CreateDataOnlyEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createDataOnlyEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.Data,
+		arg.GroupID,
+		arg.Caption,
+		arg.SubjectID,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+		&i.GroupID,
+		&i.PostID,
 		&i.MentionID,
 		&i.CommunityID,
 	)
