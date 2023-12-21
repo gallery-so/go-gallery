@@ -294,7 +294,11 @@ func newGCPClient(ctx context.Context) *gcptasks.Client {
 				option.WithoutAuthentication(),
 			)
 		} else {
-			fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+			key := "./secrets/dev/service-key-dev.json"
+			if env.GetString("GCLOUD_SERVICE_KEY_OVERRIDE") != "" {
+				key = env.GetString("GCLOUD_SERVICE_KEY_OVERRIDE")
+			}
+			fi, err := util.LoadEncryptedServiceKeyOrError(key)
 			if err != nil {
 				logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
 				return nil
