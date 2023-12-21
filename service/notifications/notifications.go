@@ -1505,6 +1505,7 @@ func addGlobalNotifications(ctx context.Context, notif db.Notification, queries 
 		Action:   notif.Action,
 		Data:     notif.Data,
 		EventIds: notif.EventIds,
+		Internal: notif.Data.AnnouncementDetails.InternalID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create follower notifications: %w", err)

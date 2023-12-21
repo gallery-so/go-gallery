@@ -918,7 +918,7 @@ WHERE NOT EXISTS (
     SELECT 1
     FROM notifications n
     WHERE n.owner_id = u.user_id 
-    AND n.data ->> 'internal_id' = $2 ->> 'internal_id'
+    AND n.data ->> 'internal_id' = sqlc.arg('internal')::varchar
 )
 RETURNING *;
 

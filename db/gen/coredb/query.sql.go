@@ -515,7 +515,7 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 const createAnnouncementNotifications = `-- name: CreateAnnouncementNotifications :many
 WITH 
 id_with_row_number AS (
-    SELECT unnest($4::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($4::varchar(255)[])) AS rn
+    SELECT unnest($5::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($5::varchar(255)[])) AS rn
 ),
 user_with_row_number AS (
     SELECT id AS user_id, row_number() OVER () AS rn
@@ -537,7 +537,7 @@ WHERE NOT EXISTS (
     SELECT 1
     FROM notifications n
     WHERE n.owner_id = u.user_id 
-    AND n.data ->> 'internal_id' = $2 ->> 'internal_id'
+    AND n.data ->> 'internal_id' = $4::varchar
 )
 RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
 `
@@ -546,6 +546,7 @@ type CreateAnnouncementNotificationsParams struct {
 	Action   persist.Action           `db:"action" json:"action"`
 	Data     persist.NotificationData `db:"data" json:"data"`
 	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	Internal string                   `db:"internal" json:"internal"`
 	Ids      []string                 `db:"ids" json:"ids"`
 }
 
@@ -558,6 +559,7 @@ func (q *Queries) CreateAnnouncementNotifications(ctx context.Context, arg Creat
 		arg.Action,
 		arg.Data,
 		arg.EventIds,
+		arg.Internal,
 		arg.Ids,
 	)
 	if err != nil {
