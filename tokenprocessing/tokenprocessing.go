@@ -68,7 +68,7 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	t := newThrottler()
 	tp := NewTokenProcessor(clients.Queries, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), metric.NewLogMetricReporter())
 
-	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient)
+	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient, redis.NewCache(redis.TokenManageCache))
 }
 
 func setDefaults() {

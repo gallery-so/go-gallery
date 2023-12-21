@@ -25,8 +25,7 @@ type Manager struct {
 	maxRetryF MaxRetryF
 }
 
-func New(ctx context.Context, taskClient *task.Client) *Manager {
-	cache := redis.NewCache(redis.TokenManageCache)
+func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Manager {
 	return &Manager{
 		cache:           cache,
 		processRegistry: &registry{cache},
@@ -35,8 +34,8 @@ func New(ctx context.Context, taskClient *task.Client) *Manager {
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *task.Client, maxRetryF MaxRetryF) *Manager {
-	m := New(ctx, taskClient)
+func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, maxRetryF MaxRetryF) *Manager {
+	m := New(ctx, taskClient, cache)
 	m.maxRetryF = maxRetryF
 	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
 	return m

@@ -53,7 +53,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverPolygonProviderList := polygonProviderSet(httpClient, serverTokenMetadataCache)
 	serverArbitrumProviderList := arbitrumProviderSet(httpClient, serverTokenMetadataCache)
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
-	manager := tokenmanage.New(ctx, client)
+	manager := tokenmanage.New(ctx, client, cache)
 	submitTokensF := newSubmitBatch(manager)
 	provider := &multichain.Provider{
 		Repos:        repositories,
@@ -89,7 +89,7 @@ var (
 
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
 func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider) ethProviderList {
-	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, fallbackProvider, fallbackProvider, fallbackProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider)
+	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, openseaProvider, fallbackProvider, fallbackProvider, fallbackProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider)
 	return serverEthProviderList
 }
 
