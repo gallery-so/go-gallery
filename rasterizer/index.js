@@ -46,8 +46,6 @@ const args = [
   '--disable-inotify',
 ];
 
-const MAX_DIMENSION = 1000;
-
 (async () => {
   console.log('Launching cluster');
   const cluster = await Cluster.launch({
@@ -137,22 +135,15 @@ async function createAnimation(page) {
       throw new Error('SVG found but no viewBox or baseVal for width/height available');
     }
 
-    if (height > 500) {
-      const aspectRatio = width / height;
-      return {
-        width: 500 * aspectRatio,
-        height: 500, // Fixed height
-      };
-    } else {
-      return {
-        width,
-        height,
-      };
-    }
-  });
+    const fixedHeight = 500;
+    const aspectRatio = width / height;
+    const scaledWidth = fixedHeight * aspectRatio;
 
-  svgDimensions.width = Math.min(svgDimensions.width, MAX_DIMENSION);
-  svgDimensions.height = Math.min(svgDimensions.height, MAX_DIMENSION);
+    return {
+      width: scaledWidth,
+      height: fixedHeight,
+    };
+  });
 
   await page.setViewport({
     width: Math.ceil(svgDimensions.width),
@@ -211,7 +202,7 @@ async function createAnimation(page) {
 
   const pngBuffer = PNG.sync.write(frames[0]);
 
-  // fs.writeFileSync('test.png', pngBuffer);
+  fs.writeFileSync('test.png', pngBuffer);
 
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
