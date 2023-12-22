@@ -47,6 +47,7 @@ const args = [
 ];
 
 const MAX_DIMENSION = 1000;
+const MIN_DIMENSION = 350;
 
 (async () => {
   console.log('Launching cluster');
@@ -153,6 +154,15 @@ async function createAnimation(page) {
 
   svgDimensions.width = Math.min(svgDimensions.width, MAX_DIMENSION);
   svgDimensions.height = Math.min(svgDimensions.height, MAX_DIMENSION);
+
+  const scaleFactor = Math.max(
+    MIN_DIMENSION / svgDimensions.width,
+    MIN_DIMENSION / svgDimensions.height
+  );
+
+  // Scale up the dimensions
+  svgDimensions.width *= scaleFactor;
+  svgDimensions.height *= scaleFactor;
 
   await page.setViewport({
     width: Math.ceil(svgDimensions.width),
