@@ -806,10 +806,13 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		personalizationScores := make(map[persist.DBID]float64)
 
 		for _, e := range postScores {
-			engagementScores[e.Post.ID] = scorePost(e.Post, now, e.IsGalleryPost, float64(e.FeedEntityScore.Interactions))
+			age := now.Sub(e.Post.CreatedAt).Minutes()
+			isFresh := isFreshPost(age)
+			engagementScores[e.Post.ID] = scorePost(age, e.IsGalleryPost, e.Post.IsFirstPost, isFresh)
 			personalizationScores[e.Post.ID] = engagementScores[e.Post.ID]
 			engagementScores[e.Post.ID] *= engagementFactor(float64(e.FeedEntityScore.Interactions))
-			if !e.IsGalleryPost {
+			// Don't apply personalization to gallery posts or fresh posts
+			if !e.IsGalleryPost && !isFresh {
 				personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(viewerID, e.FeedEntityScore)
 			}
 		}
@@ -1068,13 +1071,16 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 	return scoredEntities
 }
 
-func scorePost(p db.Post, t time.Time, isGallery bool, interactions float64) (s float64) {
-	age := t.Sub(p.CreatedAt).Minutes()
+func isFreshPost(age float64) bool {
+	return age < feedOpts.FreshnessWindow
+}
+
+func scorePost(age float64, isGallery, isFirstPost, isFresh bool) (s float64) {
 	s = timeFactor(age, isGallery)
-	if age < feedOpts.FreshnessWindow {
+	if isFresh {
 		s *= feedOpts.FreshnessFactor
 	}
-	if p.IsFirstPost {
+	if isFirstPost {
 		s *= feedOpts.FirstPostFactor
 	}
 	return s
