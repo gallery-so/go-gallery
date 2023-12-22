@@ -404,12 +404,14 @@ func (p *Provider) streamTokenAndContract(ctx context.Context, ownerAddress pers
 
 		// Process the contract
 		var err error
+
 		func() {
 			jobMu.Lock()
 			defer jobMu.Unlock()
 			// Check again if we've seen the contract, since another job may have processed it while we were waiting for the lock
+			var c contractCollection
 			if _, ok := seenContracts.Load(asset.Contract); !ok {
-				c, err := fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, persist.Address(asset.Contract))
+				c, err = fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, persist.Address(asset.Contract))
 				if err == nil {
 					contractCh <- contractToChainAgnosticContract(c.Contract, c.Collection)
 					seenContracts.Store(asset.Contract, c)
