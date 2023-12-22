@@ -553,6 +553,35 @@ func (o objectType) String() string {
 	}
 }
 
+// nonOverridableObjectTypes are object types that have a specific purpose and should not be overriden to other types
+var nonOverridableObjectTypes = map[objectType]bool{
+	objectTypeThumbnail:    true,
+	objectTypeLiveRender:   true,
+	objectTypeProfileImage: true,
+}
+
+// mediaTypeToObjectTypeLookup are default mappings from media type to object type
+var mediaTypeToObjectTypeLookup = map[persist.MediaType]objectType{
+	persist.MediaTypeVideo:     objectTypeAnimation,
+	persist.MediaTypeImage:     objectTypeImage,
+	persist.MediaTypeGIF:       objectTypeImage,
+	persist.MediaTypeSVG:       objectTypeSVG,
+	persist.MediaTypeAnimation: objectTypeAnimation,
+}
+
+// mediaTypeToObjectType returns the corresponding objectType from mediaType. If startType is an non-overridable type, startType is returned.
+// A token's metadata can be inaccurate e.g. a video asset is stored under "image_url". In such cases, we want to correct the initial objectType
+// to what the object type is from downloading the asset and figuring out the media type.
+func mediaTypeToObjectType(mediaType persist.MediaType, startType objectType) objectType {
+	if _, nonOverride := nonOverridableObjectTypes[startType]; nonOverride {
+		return startType
+	}
+	if oType, ok := mediaTypeToObjectTypeLookup[mediaType]; ok {
+		return oType
+	}
+	return startType
+}
+
 type cachedMediaObject struct {
 	MediaType       persist.MediaType
 	TokenID         persist.TokenID
@@ -578,10 +607,6 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.StoreGCP, "StoreGCP")
 	defer traceCallback()
 
-	if mediaType == persist.MediaTypeSVG {
-		oType = objectTypeSVG
-	}
-
 	object := cachedMediaObject{
 		MediaType:       mediaType,
 		TokenID:         tids.TokenID,
@@ -589,7 +614,7 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		Chain:           tids.Chain,
 		ContentType:     contentType,
 		ContentLength:   contentLength,
-		ObjectType:      oType,
+		ObjectType:      mediaTypeToObjectType(mediaType, oType),
 	}
 
 	err := persistToStorage(ctx, client, reader, bucket, object, map[string]string{
@@ -614,7 +639,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 		TokenID:         tids.TokenID,
 		ContractAddress: tids.ContractAddress,
 		Chain:           tids.Chain,
-		ObjectType:      oType,
+		ObjectType:      mediaTypeToObjectType(mediaType, oType),
 	}
 
 	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil,
@@ -704,7 +729,7 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		ContractAddress: tids.ContractAddress,
 		Chain:           tids.Chain,
 		ContentLength:   util.ToPointer(int64(len(data))),
-		ObjectType:      objectTypeThumbnail,
+		ObjectType:      mediaTypeToObjectType(persist.MediaTypeImage, objectTypeThumbnail),
 	}
 
 	sw := newObjectWriter(ctx, client, bucket, pngObject.fileName(), pngObject.ContentLength,
@@ -743,7 +768,7 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 			Chain:           tids.Chain,
 			ContentType:     "image/gif",
 			ContentLength:   util.ToPointer(int64(len(data))),
-			ObjectType:      objectTypeLiveRender,
+			ObjectType:      mediaTypeToObjectType(persist.MediaTypeGIF, objectTypeLiveRender),
 		}
 
 		sw := newObjectWriter(ctx, client, bucket, gifObject.fileName(), gifObject.ContentLength,
@@ -776,7 +801,7 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 	defer traceCallback()
 
 	obj := cachedMediaObject{
-		ObjectType:      objectTypeThumbnail,
+		ObjectType:      mediaTypeToObjectType(persist.MediaTypeImage, objectTypeThumbnail),
 		MediaType:       persist.MediaTypeImage,
 		TokenID:         tids.TokenID,
 		ContractAddress: tids.ContractAddress,
@@ -817,7 +842,7 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	defer traceCallback()
 
 	obj := cachedMediaObject{
-		ObjectType:      objectTypeLiveRender,
+		ObjectType:      mediaTypeToObjectType(persist.MediaTypeVideo, objectTypeLiveRender),
 		MediaType:       persist.MediaTypeVideo,
 		TokenID:         tids.TokenID,
 		ContractAddress: tids.ContractAddress,
