@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -534,10 +535,13 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 			readerChan <- util.NewFileHeaderReader(resp, bufSize)
 		case persist.URITypeJSON, persist.URITypeSVG:
 			// query unescape asString first
-			asString, err := url.QueryUnescape(asString)
-			if err != nil {
-				logger.For(ctx).Warnf("error unescaping uri: %s", err)
-				asString = turi.String()
+			if needsUnescape(asString) {
+				escaped, err := url.QueryUnescape(asString)
+				if err == nil {
+					logger.For(ctx).Warnf("error unescaping uri: %s", err)
+				} else {
+					asString = escaped
+				}
 			}
 			if strings.HasPrefix(asString, "data:") {
 				idx := strings.IndexByte(asString, ',')
@@ -581,6 +585,12 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 	case <-time.After(retrieveTimeout):
 		return nil, mediaType, fmt.Errorf("%s: timeout retrieving data from uri: %s", context.DeadlineExceeded.Error(), turi.String())
 	}
+}
+
+func needsUnescape(str string) bool {
+	// Regex to match percent-encoded characters
+	re := regexp.MustCompile(`%[0-9a-fA-F]{2}`)
+	return re.MatchString(str)
 }
 
 func getHeaders(ctx context.Context, method, url string) (http.Header, error) {
