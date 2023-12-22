@@ -202,7 +202,7 @@ async function createAnimation(page) {
 
   const pngBuffer = PNG.sync.write(frames[0]);
 
-  fs.writeFileSync('test.png', pngBuffer);
+  // fs.writeFileSync('test.png', pngBuffer);
 
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
