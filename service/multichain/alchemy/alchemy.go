@@ -14,7 +14,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -32,35 +31,6 @@ type Media struct {
 	Thumbnail string `json:"thumbnail"`
 	Format    string `json:"format"`
 	Bytes     int    `json:"bytes"`
-}
-
-type Metadata struct {
-	Image           string `json:"image"`
-	AnimationURL    string `json:"animation_url"`
-	ExternalURL     string `json:"external_url"`
-	BackgroundColor string `json:"background_color"`
-	Name            string `json:"name"`
-	Description     string `json:"description"`
-}
-
-// UnmarshalJSON is a custom unmarshaler for the Metadata struct
-func (m *Metadata) UnmarshalJSON(data []byte) error {
-
-	type Alias Metadata
-	aux := Alias{}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-
-		asString := ""
-		if err := json.Unmarshal(data, &asString); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	*m = Metadata(aux)
-	return nil
 }
 
 type OpenseaCollection struct {
@@ -122,17 +92,17 @@ type SpamInfo struct {
 }
 
 type Token struct {
-	Contract         Contract         `json:"contract"`
-	ID               TokenIdentifiers `json:"id"`
-	Balance          string           `json:"balance"`
-	Title            string           `json:"title"`
-	Description      string           `json:"description"`
-	TokenURI         TokenURI         `json:"tokenUri"`
-	Media            []Media          `json:"media"`
-	Metadata         Metadata         `json:"metadata"`
-	ContractMetadata ContractMetadata `json:"contractMetadata"`
-	TimeLastUpdated  time.Time        `json:"timeLastUpdated"`
-	SpamInfo         SpamInfo         `json:"spamInfo"`
+	Contract         Contract              `json:"contract"`
+	ID               TokenIdentifiers      `json:"id"`
+	Balance          string                `json:"balance"`
+	Title            string                `json:"title"`
+	Description      string                `json:"description"`
+	TokenURI         TokenURI              `json:"tokenUri"`
+	Media            []Media               `json:"media"`
+	Metadata         persist.TokenMetadata `json:"metadata"`
+	ContractMetadata ContractMetadata      `json:"contractMetadata"`
+	TimeLastUpdated  time.Time             `json:"timeLastUpdated"`
+	SpamInfo         SpamInfo              `json:"spamInfo"`
 }
 
 type OwnerWithBalances struct {
@@ -514,10 +484,6 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to decode token metadata response: %w (url: %s)", err, url)
 	}
 
-	if token.Metadata.Image == "" && !forceRefresh {
-		return d.getTokenWithMetadata(ctx, ti, true, timeout)
-	}
-
 	tokens, contracts, err := d.alchemyTokensToChainAgnosticTokens(ctx, []Token{token})
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to convert token to chain agnostic token: %w (url: %s)", err, url)
@@ -843,6 +809,8 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		bal = big.NewInt(1)
 	}
 
+	externalURL, _ := token.Metadata["external_url"].(string)
+
 	t := multichain.ChainAgnosticToken{
 		TokenType: tokenType,
 		Descriptors: multichain.ChainAgnosticTokenDescriptors{
@@ -850,12 +818,12 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 			Description: token.Description,
 		},
 		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
-		TokenMetadata:   alchemyTokenToMetadata(token),
+		TokenMetadata:   token.Metadata,
 		TokenID:         token.ID.TokenID.ToTokenID(),
 		Quantity:        persist.HexString(bal.Text(16)),
 		OwnerAddress:    persist.Address(owner),
 		ContractAddress: persist.Address(token.Contract.Address),
-		ExternalURL:     token.Metadata.ExternalURL,
+		ExternalURL:     externalURL,
 	}
 
 	isSpam, err := strconv.ParseBool(token.SpamInfo.IsSpam)
@@ -874,42 +842,6 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		},
 		IsSpam: &contractSpam,
 	}
-}
-
-func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
-	firstWithFormat, hasFormat := util.FindFirst(token.Media, func(m Media) bool {
-		return m.Format != ""
-	})
-	metadata := persist.TokenMetadata{
-		"name":         token.Metadata.Name,
-		"description":  token.Metadata.Description,
-		"external_url": token.Metadata.ExternalURL,
-	}
-
-	if token.Metadata.AnimationURL != "" {
-		metadata["animation_url"] = token.Metadata.AnimationURL
-	}
-
-	if hasFormat {
-		metadata["media_type"] = firstWithFormat.Format
-		metadata["format"] = firstWithFormat.Format
-
-		if _, ok := metadata["animation_url"]; !ok {
-			medType := media.RawFormatToMediaType(firstWithFormat.Format)
-			if medType.IsAnimationLike() {
-				metadata["animation_url"] = token.Metadata.Image
-				if firstWithFormat.Thumbnail != "" {
-					metadata["image_url"] = firstWithFormat.Thumbnail
-				}
-				return metadata
-			}
-		}
-	}
-
-	if token.Metadata.Image != "" {
-		metadata["image_url"] = token.Metadata.Image
-	}
-	return metadata
 }
 
 func contractNameIsSpam(name string) bool {
