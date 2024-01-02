@@ -13,7 +13,7 @@ import (
 type SyncWithContractEvalFallbackProvider struct {
 	Primary  SyncWithContractEvalPrimary
 	Fallback SyncWithContractEvalSecondary
-	Eval     func(context.Context, ChainAgnosticToken) bool
+	Eval     func(ChainAgnosticToken) bool
 }
 
 type SyncWithContractEvalPrimary interface {
@@ -89,7 +89,7 @@ func (f SyncWithContractEvalFallbackProvider) GetTokenByTokenIdentifiersAndOwner
 	if err != nil {
 		return ChainAgnosticToken{}, ChainAgnosticContract{}, err
 	}
-	if !f.Eval(ctx, token) {
+	if !f.Eval(token) {
 		token.TokenMetadata = f.callFallbackIdentifiers(ctx, token).TokenMetadata
 	}
 	return token, contract, nil
@@ -117,7 +117,7 @@ func (f SyncWithContractEvalFallbackProvider) resolveTokens(ctx context.Context,
 		go func(i int, token ChainAgnosticToken) {
 			defer wg.Done()
 			usableTokens[i] = token
-			if !f.Eval(ctx, token) {
+			if !f.Eval(token) {
 				usableTokens[i].TokenMetadata = f.callFallbackIdentifiers(ctx, token).TokenMetadata
 			}
 		}(i, token)
@@ -131,7 +131,7 @@ func (f SyncWithContractEvalFallbackProvider) resolveTokens(ctx context.Context,
 func (f *SyncWithContractEvalFallbackProvider) callFallbackIdentifiers(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
 	id := ChainAgnosticIdentifiers{primary.ContractAddress, primary.TokenID}
 	backup, _, err := f.Fallback.GetTokenByTokenIdentifiersAndOwner(ctx, id, primary.OwnerAddress)
-	if err == nil && f.Eval(ctx, backup) {
+	if err == nil && f.Eval(backup) {
 		return backup
 	}
 	logger.For(ctx).WithError(err).Warn("failed to call fallback")
