@@ -6034,28 +6034,28 @@ const paginateTokensByCommunityID = `-- name: PaginateTokensByCommunityID :batch
 with community_data as (
     select community_type, contract_id
     from communities
-    where communities.id = $7 and not deleted
+    where communities.id = $1 and not deleted
 ),
 
-community_token_ids as (
+contract_memberships as (
     select tokens.id
     from community_data, tokens
     where community_data.community_type = 0
-        and tokens.contract_id = community_data.contract_id
-        and not tokens.deleted
+      and tokens.contract_id = community_data.contract_id
+      and not tokens.deleted
+),
 
-    union all
-
+token_memberships as (
     select tokens.id
     from community_data, tokens
         join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
-            and token_community_memberships.community_id = $7
+            and token_community_memberships.community_id = $1
             and not token_community_memberships.deleted
     where community_data.community_type != 0
         and not tokens.deleted
 )
 
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_token_ids ct
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from contract_memberships ct
     join tokens t on t.id = ct.id
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
@@ -6064,12 +6064,32 @@ select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_no
     and t.deleted = false
     and c.deleted = false
     and td.deleted = false
+    and u.deleted = false
     and u.universal = false
-    and (t.created_at,t.id) < ($1::timestamptz, $2)
-    and (t.created_at,t.id) > ($3::timestamptz, $4)
-    order by case when $5::bool then (t.created_at,t.id) end asc,
-             case when not $5::bool then (t.created_at,t.id) end desc
-    limit $6
+    and (t.created_at,t.id) < ($2::timestamptz, $3)
+    and (t.created_at,t.id) > ($4::timestamptz, $5)
+    order by case when $6::bool then (t.created_at,t.id) end asc,
+             case when not $6::bool then (t.created_at,t.id) end desc
+    limit $7)
+
+union all
+
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from token_memberships ct
+    join tokens t on t.id = ct.id
+    join token_definitions td on t.token_definition_id = td.id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+    where t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+    and (t.created_at,t.id) < ($2::timestamptz, $3)
+    and (t.created_at,t.id) > ($4::timestamptz, $5)
+    order by case when $6::bool then (t.created_at,t.id) end asc,
+             case when not $6::bool then (t.created_at,t.id) end desc
+    limit $7)
 `
 
 type PaginateTokensByCommunityIDBatchResults struct {
@@ -6079,13 +6099,13 @@ type PaginateTokensByCommunityIDBatchResults struct {
 }
 
 type PaginateTokensByCommunityIDParams struct {
+	CommunityID   persist.DBID `db:"community_id" json:"community_id"`
 	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
 	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
 	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
 	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
 	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
 	Limit         int32        `db:"limit" json:"limit"`
-	CommunityID   persist.DBID `db:"community_id" json:"community_id"`
 }
 
 type PaginateTokensByCommunityIDRow struct {
@@ -6094,17 +6114,24 @@ type PaginateTokensByCommunityIDRow struct {
 	Contract        Contract        `db:"contract" json:"contract"`
 }
 
+// At present, a community is either entirely token-based or contract-based, so only
+// one of these two union clauses will return any tokens (which means it's okay for each
+// clause to have its own ordering). This query was originally written with a union
+// of results from contract_memberships and token_memberships and a single outer
+// select + join on the results of that union, but that prevented the query planner from
+// using indexes correctly (since the referenced tables might be indexed, but the union
+// of results is not). The current method is verbose and brittle, but it's fast!
 func (q *Queries) PaginateTokensByCommunityID(ctx context.Context, arg []PaginateTokensByCommunityIDParams) *PaginateTokensByCommunityIDBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
+			a.CommunityID,
 			a.CurBeforeTime,
 			a.CurBeforeID,
 			a.CurAfterTime,
 			a.CurAfterID,
 			a.PagingForward,
 			a.Limit,
-			a.CommunityID,
 		}
 		batch.Queue(paginateTokensByCommunityID, vals...)
 	}

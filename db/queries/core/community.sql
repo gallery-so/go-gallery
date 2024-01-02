@@ -311,15 +311,15 @@ with community_data as (
     where communities.id = @community_id and not deleted
 ),
 
-community_token_ids as (
+contract_memberships as (
     select tokens.id
     from community_data, tokens
     where community_data.community_type = 0
-        and tokens.contract_id = community_data.contract_id
-        and not tokens.deleted
+      and tokens.contract_id = community_data.contract_id
+      and not tokens.deleted
+),
 
-    union all
-
+token_memberships as (
     select tokens.id
     from community_data, tokens
         join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
@@ -329,7 +329,14 @@ community_token_ids as (
         and not tokens.deleted
 )
 
-select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_token_ids ct
+-- At present, a community is either entirely token-based or contract-based, so only
+-- one of these two union clauses will return any tokens (which means it's okay for each
+-- clause to have its own ordering). This query was originally written with a union
+-- of results from contract_memberships and token_memberships and a single outer
+-- select + join on the results of that union, but that prevented the query planner from
+-- using indexes correctly (since the referenced tables might be indexed, but the union
+-- of results is not). The current method is verbose and brittle, but it's fast!
+(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from contract_memberships ct
     join tokens t on t.id = ct.id
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
@@ -338,12 +345,32 @@ select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_token_ids ct
     and t.deleted = false
     and c.deleted = false
     and td.deleted = false
+    and u.deleted = false
     and u.universal = false
     and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id)
     and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id)
     order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
              case when not @paging_forward::bool then (t.created_at,t.id) end desc
-    limit sqlc.arg('limit');
+    limit sqlc.arg('limit'))
+
+union all
+
+(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from token_memberships ct
+    join tokens t on t.id = ct.id
+    join token_definitions td on t.token_definition_id = td.id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+    where t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+    and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id)
+    and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id)
+    order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
+             case when not @paging_forward::bool then (t.created_at,t.id) end desc
+    limit sqlc.arg('limit'));
 
 -- name: CountTokensByCommunityID :one
 with community_data as (
