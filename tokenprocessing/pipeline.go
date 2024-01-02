@@ -70,7 +70,7 @@ type tokenProcessingJob struct {
 	requireImage bool
 	// requireFxHashSigned indicates that the pipeline should return an error if the token is FxHash but it isn't signed yet.
 	requireFxHashSigned bool
-	fxHashIsSignedF     func() bool
+	fxHashIsSignedF     func(persist.TokenMetadata) bool
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -121,7 +121,7 @@ func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) Pipel
 	return func(j *tokenProcessingJob) {
 		if isFxHash(td, c) {
 			j.requireFxHashSigned = true
-			j.fxHashIsSignedF = func() bool { return isFxHashSigned(td, c) }
+			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return isFxHashSigned(td, c, m) }
 		}
 	}
 }
@@ -208,11 +208,11 @@ func wrapWithBadTokenErr(err error) error {
 	return err
 }
 
-func (tpj *tokenProcessingJob) createErrFromResults(animResult cacheResult, imgResult cacheResult, requireImg, requireSigned bool) error {
+func (tpj *tokenProcessingJob) createErrFromResults(animResult cacheResult, imgResult cacheResult, metadata persist.TokenMetadata, requireImg, requireSigned bool) error {
 	if requireImg && !imgResult.IsSuccess() {
 		return ErrImageResultRequired{Err: wrapWithBadTokenErr(imgResult.err)}
 	}
-	if requireSigned && !tpj.fxHashIsSignedF() {
+	if requireSigned && !tpj.fxHashIsSignedF(metadata) {
 		return wrapWithBadTokenErr(ErrRequiredSignedToken)
 	}
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
@@ -235,9 +235,9 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist
 		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, wrapWithBadTokenErr(err)
 	}
 
-	newMedia, err := tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL,
-		tpj.requireImage && imgURL != "", // is image required?
-		tpj.requireFxHashSigned,          // is signed token required?
+	newMedia, err := tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL, metadata,
+		tpj.requireImage && imgURL != "",
+		tpj.requireFxHashSigned,
 	)
 
 	return newMedia, metadata, err
@@ -421,7 +421,7 @@ func (tpj *tokenProcessingJob) cacheMediaSources(
 	return imgResult, pfpResult, animResult
 }
 
-func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, pfpURL media.ImageURL, animURL media.AnimationURL, requireImg, requireSigned bool) (m persist.Media, err error) {
+func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, pfpURL media.ImageURL, animURL media.AnimationURL, metadata persist.TokenMetadata, requireImg, requireSigned bool) (m persist.Media, err error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"imgURL":        imgURL,
 		"pfpURL":        pfpURL,
@@ -433,7 +433,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 	imgResult, pfpResult, animResult := tpj.cacheMediaFromOriginalURLs(ctx, imgURL, pfpURL, animURL)
 
 	if (!requireImg && animResult.IsSuccess()) || imgResult.IsSuccess() {
-		err = tpj.createErrFromResults(animResult, imgResult, requireImg, requireSigned)
+		err = tpj.createErrFromResults(animResult, imgResult, metadata, requireImg, requireSigned)
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
@@ -451,7 +451,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 
 	// Now check if we got any result from OpenSea
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
-		err = tpj.createErrFromResults(animResult, imgResult, requireImg, requireSigned)
+		err = tpj.createErrFromResults(animResult, imgResult, metadata, requireImg, requireSigned)
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
@@ -459,7 +459,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 	defer traceCallback()
 
 	// At this point we don't have a way to make media so we return an error
-	err = tpj.createErrFromResults(animResult, imgResult, requireImg, requireSigned)
+	err = tpj.createErrFromResults(animResult, imgResult, metadata, requireImg, requireSigned)
 	return mustCreateMediaFromErr(ctx, err, tpj), err
 }
 

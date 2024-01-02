@@ -931,6 +931,15 @@ func isFxHash(td db.TokenDefinition, c db.Contract) bool {
 	return false
 }
 
-func isFxHashSigned(td db.TokenDefinition, c db.Contract) bool {
-	return !isFxHash(td, c) || td.Name.String != "[WAITING TO BE SIGNED]"
+func isFxHashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadata) bool {
+	if !isFxHash(td, c) {
+		return true
+	}
+	if td.Chain == persist.ChainTezos {
+		return tezos.IsFxHashSigned(c.Address, td.Name.String)
+	}
+	if td.Chain == persist.ChainETH {
+		return m["authenticityHash"] != "" && m["authenticityHash"] != nil
+	}
+	return true
 }
