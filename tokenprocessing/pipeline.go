@@ -66,7 +66,7 @@ type tokenProcessingJob struct {
 	defaultMetadata persist.TokenMetadata
 	// isSpamJob indicates that the job is processing a spam token. It's currently used to exclude events from Sentry.
 	isSpamJob bool
-	// requireImage indicates that the pipeline should return an error if Prohibition image URL is present but an image wasn't cached.
+	// requireImage indicates that the pipeline should return an error if an image URL is present but an image wasn't cached.
 	requireImage bool
 	// requireFxHashSigned indicates that the pipeline should return an error if the token is FxHash but it isn't signed yet.
 	requireFxHashSigned bool
@@ -106,6 +106,14 @@ func (pOpts) WithIsSpamJob(isSpamJob bool) PipelineOption {
 func (pOpts) WithRequireImage() PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.requireImage = true
+	}
+}
+
+func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		if isProhibition(c) {
+			j.requireImage = true
+		}
 	}
 }
 

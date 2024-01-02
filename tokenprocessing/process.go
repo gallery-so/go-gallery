@@ -74,6 +74,7 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
 				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0,
 					addIsSpamJobOption(c),
+					PipelineOpts.WithRequireProhibitionimage(c), // Require image to be processed if Prohibition token
 					PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
 				)
 				return err
@@ -819,7 +820,7 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 
 			runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
 				addIsSpamJobOption(contract),
-				PipelineOpts.WithRequireImage(),                    // Require an image if available
+				PipelineOpts.WithRequireImage(),                    // Require an image if token is Prohibition token
 				PipelineOpts.WithRequireFxHashSigned(td, contract), // Require token to be signed if it is an FxHash token
 			)
 		}
@@ -901,11 +902,15 @@ var (
 // numRetriesF returns a function that when called, returns the number of retries allotted for a token and contract
 func numRetriesF(td db.TokenDefinition, c db.Contract) tokenmanage.NumRetryF {
 	return func() int {
-		if persist.NewContractIdentifiers(c.Address, c.Chain) == prohibitionContract || isFxHash(td, c) {
+		if isProhibition(c) || isFxHash(td, c) {
 			return 24
 		}
 		return defaultSyncMaxRetries
 	}
+}
+
+func isProhibition(c db.Contract) bool {
+	return persist.NewContractIdentifiers(c.Address, c.Chain) == prohibitionContract
 }
 
 func isFxHash(td db.TokenDefinition, c db.Contract) bool {
@@ -916,9 +921,11 @@ func isFxHash(td db.TokenDefinition, c db.Contract) bool {
 		if strings.ToLower(c.Symbol.String) == "fxgen" {
 			return true
 		}
-		parsed, _ := url.Parse(td.Metadata["external_url"].(string))
-		if td.Chain == persist.ChainETH && strings.HasPrefix(parsed.Hostname(), "fxhash") {
-			return true
+		if u, ok := td.Metadata["external_url"].(string); ok {
+			parsed, _ := url.Parse(u)
+			if td.Chain == persist.ChainETH && strings.HasPrefix(parsed.Hostname(), "fxhash") {
+				return true
+			}
 		}
 	}
 	return false
