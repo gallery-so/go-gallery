@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/metric"
@@ -26,7 +26,7 @@ import (
 )
 
 type tokenProcessor struct {
-	queries       *coredb.Queries
+	queries       *db.Queries
 	httpClient    *http.Client
 	mc            *multichain.Provider
 	ipfsClient    *shell.Shell
@@ -36,7 +36,7 @@ type tokenProcessor struct {
 	mr            metric.MetricReporter
 }
 
-func NewTokenProcessor(queries *coredb.Queries, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, mr metric.MetricReporter) *tokenProcessor {
+func NewTokenProcessor(queries *db.Queries, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, mr metric.MetricReporter) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
 		mc:            mc,
@@ -68,6 +68,9 @@ type tokenProcessingJob struct {
 	isSpamJob bool
 	// requireImage indicates that the pipeline should return an error if an image URL is present but an image wasn't cached.
 	requireImage bool
+	// requireFxHashSigned indicates that the pipeline should return an error if the token is FxHash but it isn't signed yet.
+	requireFxHashSigned bool
+	fxHashIsSignedF     func(persist.TokenMetadata) bool
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -106,6 +109,23 @@ func (pOpts) WithRequireImage() PipelineOption {
 	}
 }
 
+func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		if isProhibition(c) {
+			j.requireImage = true
+		}
+	}
+}
+
+func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		if isFxHash(td, c) {
+			j.requireFxHashSigned = true
+			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return isFxHashSigned(td, c, m) }
+		}
+	}
+}
+
 type ErrImageResultRequired struct{ Err error }
 
 func (e ErrImageResultRequired) Unwrap() error { return e.Err }
@@ -123,7 +143,10 @@ type ErrBadToken struct{ Err error }
 func (e ErrBadToken) Unwrap() error { return e.Err }
 func (m ErrBadToken) Error() string { return fmt.Sprintf("issue with token: %s", m.Err) }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractIdentifiers, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
+// ErrRequiredSignedToken indicates that the token isn't signed
+var ErrRequiredSignedToken = errors.New("token isn't signed")
+
+func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractIdentifiers, cause persist.ProcessingCause, opts ...PipelineOption) (db.TokenMedia, error) {
 	runID := persist.GenerateID()
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"runID": runID})
@@ -153,7 +176,7 @@ func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persis
 }
 
 // Run runs the pipeline, returning the media that was created by the run.
-func (tpj *tokenProcessingJob) Run(ctx context.Context) (coredb.TokenMedia, error) {
+func (tpj *tokenProcessingJob) Run(ctx context.Context) (db.TokenMedia, error) {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
@@ -179,15 +202,18 @@ func findURLsToDownloadFrom(ctx context.Context, tpj *tokenProcessingJob, metada
 }
 
 func wrapWithBadTokenErr(err error) error {
-	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorIs[errInvalidMedia](err) || util.ErrorIs[errNoDataFromReader](err) {
+	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorIs[errInvalidMedia](err) || util.ErrorIs[errNoDataFromReader](err) || errors.Is(err, ErrRequiredSignedToken) {
 		err = ErrBadToken{Err: err}
 	}
 	return err
 }
 
-func createErrFromResults(animResult cacheResult, imgResult cacheResult, imageRequired bool) error {
-	if imageRequired && !imgResult.IsSuccess() {
+func (tpj *tokenProcessingJob) createErrFromResults(animResult cacheResult, imgResult cacheResult, metadata persist.TokenMetadata, requireImg, requireSigned bool) error {
+	if requireImg && !imgResult.IsSuccess() {
 		return ErrImageResultRequired{Err: wrapWithBadTokenErr(imgResult.err)}
+	}
+	if requireSigned && !tpj.fxHashIsSignedF(metadata) {
+		return wrapWithBadTokenErr(ErrRequiredSignedToken)
 	}
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
 		return nil
@@ -201,6 +227,7 @@ func createErrFromResults(animResult cacheResult, imgResult cacheResult, imageRe
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist.Media, persist.TokenMetadata, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
+
 	metadata := tpj.retrieveMetadata(ctx)
 
 	imgURL, pfpURL, animURL, err := findURLsToDownloadFrom(ctx, tpj, metadata)
@@ -208,7 +235,11 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist
 		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, wrapWithBadTokenErr(err)
 	}
 
-	newMedia, err := tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL)
+	newMedia, err := tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL, metadata,
+		tpj.requireImage && imgURL != "",
+		tpj.requireFxHashSigned,
+	)
+
 	return newMedia, metadata, err
 }
 
@@ -390,14 +421,19 @@ func (tpj *tokenProcessingJob) cacheMediaSources(
 	return imgResult, pfpResult, animResult
 }
 
-func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, pfpURL media.ImageURL, animURL media.AnimationURL) (m persist.Media, err error) {
-	imgRequired := tpj.requireImage && imgURL != ""
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"imgURL": imgURL, "pfpURL": pfpURL, "animURL": animURL, "imgRequired": imgRequired})
+func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, pfpURL media.ImageURL, animURL media.AnimationURL, metadata persist.TokenMetadata, requireImg, requireSigned bool) (m persist.Media, err error) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"imgURL":        imgURL,
+		"pfpURL":        pfpURL,
+		"animURL":       animURL,
+		"requireImg":    requireImg,
+		"requireSigned": requireSigned,
+	})
 
 	imgResult, pfpResult, animResult := tpj.cacheMediaFromOriginalURLs(ctx, imgURL, pfpURL, animURL)
 
-	if (!imgRequired && animResult.IsSuccess()) || imgResult.IsSuccess() {
-		err = createErrFromResults(animResult, imgResult, imgRequired)
+	if (!requireImg && animResult.IsSuccess()) || imgResult.IsSuccess() {
+		err = tpj.createErrFromResults(animResult, imgResult, metadata, requireImg, requireSigned)
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
@@ -415,7 +451,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 
 	// Now check if we got any result from OpenSea
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
-		err = createErrFromResults(animResult, imgResult, imgRequired)
+		err = tpj.createErrFromResults(animResult, imgResult, metadata, requireImg, requireSigned)
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
@@ -423,7 +459,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 	defer traceCallback()
 
 	// At this point we don't have a way to make media so we return an error
-	err = createErrFromResults(animResult, imgResult, imgRequired)
+	err = tpj.createErrFromResults(animResult, imgResult, metadata, requireImg, requireSigned)
 	return mustCreateMediaFromErr(ctx, err, tpj), err
 }
 
@@ -468,20 +504,20 @@ func toJSONB(v any) (pgtype.JSONB, error) {
 	return j, err
 }
 
-func (tpj *tokenProcessingJob) persistResults(ctx context.Context, media persist.Media, metadata persist.TokenMetadata) (coredb.TokenMedia, error) {
+func (tpj *tokenProcessingJob) persistResults(ctx context.Context, media persist.Media, metadata persist.TokenMetadata) (db.TokenMedia, error) {
 	newMedia, err := toJSONB(media)
 	if err != nil {
-		return coredb.TokenMedia{}, err
+		return db.TokenMedia{}, err
 	}
 
 	newMetadata, err := toJSONB(metadata)
 	if err != nil {
-		return coredb.TokenMedia{}, err
+		return db.TokenMedia{}, err
 	}
 
 	name, description := findNameAndDescription(metadata)
 
-	params := coredb.InsertTokenPipelineResultsParams{
+	params := db.InsertTokenPipelineResultsParams{
 		ProcessingJobID:  tpj.id,
 		PipelineMetadata: *tpj.pipelineMetadata,
 		ProcessingCause:  tpj.cause,
@@ -536,7 +572,7 @@ func pipelineErroredMetric() metric.Measure {
 	return metric.Measure{Name: metricPipelineErrored}
 }
 
-func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, tokenMedia coredb.TokenMedia, err error, d time.Duration, cause persist.ProcessingCause) {
+func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, tokenMedia db.TokenMedia, err error, d time.Duration, cause persist.ProcessingCause) {
 	baseOpts := append([]any{}, metric.LogOptions.WithTags(map[string]string{
 		"chain":      fmt.Sprintf("%d", chain),
 		"mediaType":  tokenMedia.Media.MediaType.String(),

@@ -18,13 +18,16 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
@@ -38,7 +41,7 @@ type ProcessMediaForTokenInput struct {
 	Chain           persist.Chain   `json:"chain"`
 }
 
-func processBatch(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
+func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingBatchMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -66,8 +69,14 @@ func processBatch(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.M
 					return err
 				}
 
+				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td, c))
+
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0, addIsSpamJobOption(c))
+				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0,
+					addIsSpamJobOption(c),
+					PipelineOpts.WithRequireProhibitionimage(c), // Require image to be processed if Prohibition token
+					PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
+				)
 				return err
 			})
 		}
@@ -79,7 +88,7 @@ func processBatch(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.M
 	}
 }
 
-func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
+func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaForTokenInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -87,7 +96,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 			return
 		}
 
-		td, err := queries.GetTokenDefinitionByTokenIdentifiers(c, coredb.GetTokenDefinitionByTokenIdentifiersParams{
+		td, err := queries.GetTokenDefinitionByTokenIdentifiers(c, db.GetTokenDefinitionByTokenIdentifiersParams{
 			Chain:           input.Chain,
 			ContractAddress: input.ContractAddress,
 			TokenID:         input.TokenID,
@@ -127,7 +136,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 }
 
 // processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
-func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
+func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingTokenMessage
 
@@ -159,6 +168,8 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm
 			return
 		}
 
+		tm := tokenmanage.NewWithRetries(c, taskClient, cache, numRetriesF(td, contract))
+
 		runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
@@ -166,7 +177,7 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm
 	}
 }
 
-func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
+func processOwnersForUserTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -206,7 +217,7 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 				}
 
 				// one event per token identifier (grouping ERC-1155s)
-				err = event.Dispatch(c, coredb.Event{
+				err = event.Dispatch(c, db.Event{
 					ID:             persist.GenerateID(),
 					ActorID:        persist.DBIDToNullStr(input.UserID),
 					ResourceTypeID: persist.ResourceTypeToken,
@@ -310,7 +321,7 @@ var alchemyIPs = []string{
 	"34.237.24.169",
 }
 
-func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
+func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		if !util.Contains(alchemyIPs, c.ClientIP()) {
@@ -372,7 +383,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 			userID, ok := addressToUsers[persist.NewChainAddress(activity.ToAddress, chain)]
 			if !ok {
-				user, err := queries.GetUserByAddressAndL1(c, coredb.GetUserByAddressAndL1Params{
+				user, err := queries.GetUserByAddressAndL1(c, db.GetUserByAddressAndL1Params{
 					Address: persist.Address(chain.NormalizeAddress(activity.ToAddress)),
 					L1Chain: persist.L1Chain(persist.ChainETH),
 				})
@@ -474,7 +485,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 					}
 
 					// one event per token identifier (grouping ERC-1155s)
-					err = event.Dispatch(c, coredb.Event{
+					err = event.Dispatch(c, db.Event{
 						ID:             persist.GenerateID(),
 						ActorID:        persist.DBIDToNullStr(userID),
 						ResourceTypeID: persist.ResourceTypeToken,
@@ -535,7 +546,7 @@ type GoldskyToken1155Holder struct {
 
 }
 
-func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
+func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var in GoldskyWebhookInput
@@ -559,7 +570,7 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 		}
 
 		userAddress := persist.Address(strings.ToLower(fullIDs[0]))
-		user, _ := queries.GetUserByAddressAndL1(c, coredb.GetUserByAddressAndL1Params{
+		user, _ := queries.GetUserByAddressAndL1(c, db.GetUserByAddressAndL1Params{
 			Address: userAddress,
 			L1Chain: persist.ChainZora.L1Chain(),
 		})
@@ -579,7 +590,7 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 		}
 		tokenID := persist.TokenID(bigTokenID.Text(16))
 
-		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(c, coredb.GetTokenByUserTokenIdentifiersParams{
+		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(c, db.GetTokenByUserTokenIdentifiersParams{
 			OwnerID:         user.ID,
 			TokenID:         tokenID,
 			Chain:           persist.ChainZora,
@@ -627,7 +638,7 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 			}
 
 			// one event per token identifier (grouping ERC-1155s)
-			err = event.Dispatch(c, coredb.Event{
+			err = event.Dispatch(c, db.Event{
 				ID:             persist.GenerateID(),
 				ActorID:        persist.DBIDToNullStr(user.ID),
 				ResourceTypeID: persist.ResourceTypeToken,
@@ -650,9 +661,9 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *coredb.Quer
 }
 
 // detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy
-func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
+func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var params coredb.InsertSpamContractsParams
+		var params db.InsertSpamContractsParams
 
 		now := time.Now()
 
@@ -731,7 +742,7 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
+func processWalletRemoval(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingWalletRemovalMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -745,7 +756,7 @@ func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 		// processing multiple wallet removals, we'll just process them in a loop here, because tuning the
 		// underlying query to handle multiple wallet removals at a time is difficult.
 		for _, walletID := range input.WalletIDs {
-			err := queries.RemoveWalletFromTokens(c, coredb.RemoveWalletFromTokensParams{
+			err := queries.RemoveWalletFromTokens(c, db.RemoveWalletFromTokensParams{
 				WalletID: walletID.String(),
 				UserID:   input.UserID,
 			})
@@ -765,7 +776,7 @@ func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multichain.Provider, userRepo *postgres.UserRepository) gin.HandlerFunc {
+func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo *postgres.UserRepository, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.PostPreflightMessage
 
@@ -775,7 +786,7 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 			return
 		}
 
-		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiersIgnoringStatus(c, coredb.GetMediaByTokenIdentifiersIgnoringStatusParams{
+		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiersIgnoringStatus(c, db.GetMediaByTokenIdentifiersIgnoringStatusParams{
 			Chain:           input.Token.Chain,
 			ContractAddress: input.Token.ContractAddress,
 			TokenID:         input.Token.TokenID,
@@ -805,9 +816,12 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 				return
 			}
 
+			tm := tokenmanage.NewWithRetries(c, taskClient, cache, numRetriesF(td, contract))
+
 			runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
 				addIsSpamJobOption(contract),
-				PipelineOpts.WithRequireImage(), // Require an image if available
+				PipelineOpts.WithRequireImage(),                    // Require an image if token is Prohibition token
+				PipelineOpts.WithRequireFxHashSigned(td, contract), // Require token to be signed if it is an FxHash token
 			)
 		}
 
@@ -834,7 +848,7 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 	}
 }
 
-func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td coredb.TokenDefinition, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
+func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDefinitionDBID": td.ID,
 		"contractDBID":        td.ContractID,
@@ -848,7 +862,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
 	closing, err := tm.StartProcessing(ctx, td.ID, tID, attempts)
 	if err != nil {
-		return coredb.TokenMedia{}, err
+		return db.TokenMedia{}, err
 	}
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
 	runOpts = append(runOpts, addContextRunOptions(cause)...)
@@ -875,6 +889,57 @@ func addContractRunOptions(contract persist.ContractIdentifiers) (opts []Pipelin
 	return opts
 }
 
-func addIsSpamJobOption(c coredb.Contract) PipelineOption {
+func addIsSpamJobOption(c db.Contract) PipelineOption {
 	return PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam)
+}
+
+var (
+	defaultSyncMaxRetries = 4
+	prohibitionContract   = persist.NewContractIdentifiers("0x47a91457a3a1f700097199fd63c039c4784384ab", persist.ChainArbitrum)
+	ensContract           = persist.NewContractIdentifiers(eth.EnsAddress, persist.ChainETH)
+)
+
+// numRetriesF returns a function that when called, returns the number of retries allotted for a token and contract
+func numRetriesF(td db.TokenDefinition, c db.Contract) tokenmanage.NumRetryF {
+	return func() int {
+		if isProhibition(c) || isFxHash(td, c) {
+			return 24
+		}
+		return defaultSyncMaxRetries
+	}
+}
+
+func isProhibition(c db.Contract) bool {
+	return persist.NewContractIdentifiers(c.Address, c.Chain) == prohibitionContract
+}
+
+func isFxHash(td db.TokenDefinition, c db.Contract) bool {
+	if td.Chain == persist.ChainTezos && tezos.IsFxHash(c.Address) {
+		return true
+	}
+	if td.Chain == persist.ChainETH {
+		if strings.ToLower(c.Symbol.String) == "fxgen" {
+			return true
+		}
+		if u, ok := td.Metadata["external_url"].(string); ok {
+			parsed, _ := url.Parse(u)
+			if td.Chain == persist.ChainETH && strings.HasPrefix(parsed.Hostname(), "fxhash") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isFxHashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadata) bool {
+	if !isFxHash(td, c) {
+		return true
+	}
+	if td.Chain == persist.ChainTezos {
+		return tezos.IsFxHashSigned(c.Address, td.Name.String)
+	}
+	if td.Chain == persist.ChainETH {
+		return m["authenticityHash"] != "" && m["authenticityHash"] != nil
+	}
+	return true
 }

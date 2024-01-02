@@ -12,7 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/throttle"
 )
 
-type MaxRetryF func(tID persist.TokenIdentifiers) int
+type NumRetryF func() int
 
 type Manager struct {
 	cache           *redis.Cache
@@ -21,8 +21,8 @@ type Manager struct {
 	throttle        *throttle.Locker
 	// delayer sets the linear delay for retrying tokens up to MaxRetries
 	delayer *limiters.KeyRateLimiter
-	// maxRetryF is a function that defines the maximum number of times a token can be reenqueued before it is not retried again
-	maxRetryF MaxRetryF
+	// numRetryF is a function that returns the number of times a token can be re-enqueued before it is not retried again
+	numRetryF NumRetryF
 }
 
 func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Manager {
@@ -34,9 +34,9 @@ func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Mana
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, maxRetryF MaxRetryF) *Manager {
+func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, numRetryF NumRetryF) *Manager {
 	m := New(ctx, taskClient, cache)
-	m.maxRetryF = maxRetryF
+	m.numRetryF = numRetryF
 	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
 	return m
 }
@@ -97,7 +97,7 @@ func (m Manager) SubmitBatch(ctx context.Context, tDefIDs []persist.DBID) error 
 }
 
 func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, err error, attempts int) error {
-	if err == nil || m.maxRetryF == nil || attempts >= m.maxRetryF(tID) {
+	if err == nil || m.numRetryF == nil || attempts >= m.numRetryF() {
 		m.processRegistry.finish(ctx, tDefID)
 		return nil
 	}

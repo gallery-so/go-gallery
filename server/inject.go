@@ -452,9 +452,9 @@ func tezosFallbackProvider(e envInit, httpClient *http.Client) multichain.SyncWi
 	return multichain.SyncWithContractEvalFallbackProvider{}
 }
 
-func tezosTokenEvalFunc() func(context.Context, multichain.ChainAgnosticToken) bool {
-	return func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
-		return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
+func tezosTokenEvalFunc() func(multichain.ChainAgnosticToken) bool {
+	return func(t multichain.ChainAgnosticToken) bool {
+		return tezos.IsFxHashSigned(t.ContractAddress, t.Descriptors.Name) && tezos.ContainsTezosKeywords(t)
 	}
 }
 
