@@ -23,8 +23,8 @@ const client = new opensea.OpenSeaStreamClient({
   });
 
   client.onItemTransferred('*', (event) => {
-    // only do zora events
-    if (event.payload.chain !== 'zora') {
+    // skip matic transfers
+    if (event.payload.chain === 'matic') {
       return;
     }
     console.log('Item transferred: ', event);

@@ -568,13 +568,16 @@ func (o OpenseaNFTID) String() string {
 	cstring := "ethereum"
 	switch o.Chain {
 	case persist.ChainPolygon:
-		cstring = "polygon"
+		cstring = "matic"
 	case persist.ChainArbitrum:
 		cstring = "arbitrum"
 	case persist.ChainOptimism:
 		cstring = "optimism"
 	case persist.ChainZora:
 		cstring = "zora"
+	case persist.ChainBase:
+		cstring = "base"
+
 	}
 	return fmt.Sprintf("%s/%s/%s", cstring, o.ContractAddress, o.TokenID)
 }
@@ -594,7 +597,7 @@ func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
 	switch split[0] {
 	case "ethereum":
 		chain = persist.ChainETH
-	case "polygon":
+	case "matic":
 		chain = persist.ChainPolygon
 	case "arbitrum":
 		chain = persist.ChainArbitrum
@@ -602,6 +605,9 @@ func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
 		chain = persist.ChainOptimism
 	case "zora":
 		chain = persist.ChainZora
+	case "base":
+		chain = persist.ChainBase
+
 	default:
 		return fmt.Errorf("invalid opensea chain: %s", split[0])
 	}
