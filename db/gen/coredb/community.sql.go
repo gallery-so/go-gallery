@@ -51,6 +51,7 @@ func (q *Queries) CountHoldersByCommunityID(ctx context.Context, communityID per
 }
 
 const countPostsByCommunityID = `-- name: CountPostsByCommunityID :one
+
 with community_data as (
     select community_type, contract_id
     from communities
@@ -71,7 +72,7 @@ community_posts as (
     (
         select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
             from community_data, posts
-                join tokens on tokens.id = any(posts.token_ids) and not tokens.deleted
+                join tokens on posts.token_ids @> array[tokens.id] and not tokens.deleted
                 join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
                     and token_community_memberships.community_id = $1
                     and not token_community_memberships.deleted
@@ -83,6 +84,9 @@ community_posts as (
 select count(*) from community_posts
 `
 
+// set role to access_rw;
+// create index posts_token_ids_idx on posts using gin (token_ids) where (deleted = false);
+// drop index if exists posts_token_ids_idx;
 func (q *Queries) CountPostsByCommunityID(ctx context.Context, communityID persist.DBID) (int64, error) {
 	row := q.db.QueryRow(ctx, countPostsByCommunityID, communityID)
 	var count int64

@@ -1,0 +1,1 @@
+create index posts_token_ids_idx on posts using gin (token_ids) where (deleted = false);
