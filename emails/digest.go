@@ -140,7 +140,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 
 	topPosts := util.Filter(util.MapWithoutError(trendingFeed, func(a any) any {
 		if post, ok := a.(coredb.Post); ok {
-			up, err := postToUserFacing(c, q, post, loaders, true)
+			up, err := postToUserFacing(c, q, post, loaders, false)
 			if err != nil {
 				logger.For(c).Errorf("error converting post to user facing: %s", err)
 				return nil
