@@ -279,6 +279,7 @@ $(DEPLOY)-%-emails-notifications             : CRON_SCHEDULE  := '0 14 * * 5'
 $(DEPLOY)-%-emails-notifications             : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/notifications/send
 $(DEPLOY)-%-emails-notifications             : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
 $(DEPLOY)-%-emails-notifications             : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-emails-notifications        : URI_NAME       := emails-dev
 $(DEPLOY)-$(PROD)-emails-notifications       : URI_NAME       := emails-v2
 
 $(DEPLOY)-%-emails-digest             : CRON_PREFIX    := emails_digest
@@ -287,6 +288,7 @@ $(DEPLOY)-%-emails-digest             : CRON_SCHEDULE  := '0 14 * * 3'
 $(DEPLOY)-%-emails-digest             : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/digest/send
 $(DEPLOY)-%-emails-digest             : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
 $(DEPLOY)-%-emails-digest             : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-emails-digest        : URI_NAME       := emails-dev
 $(DEPLOY)-$(PROD)-emails-digest       : URI_NAME       := emails-v2
 
 # Cloud Jobs
@@ -454,6 +456,8 @@ $(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-che
 $(DEPLOY)-$(DEV)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 $(DEPLOY)-$(DEV)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
 $(DEPLOY)-$(DEV)-activity-stats-top : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
+$(DEPLOY)-$(DEV)-emails-notifications : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-notifications _$(CRON)-$(PAUSE)-emails-notifications
+$(DEPLOY)-$(DEV)-emails-digest : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-digest _$(CRON)-$(PAUSE)-emails-digest
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services

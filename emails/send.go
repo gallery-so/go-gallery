@@ -314,12 +314,14 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 		ctx.Set("auth.user_id", persist.DBID(""))
 		ctx.Set("auth.auth_error", nil)
 
-		l, _ := r.Get(ctx, "send-digest-emails")
-		if l != nil && len(l) > 0 {
-			logger.For(ctx).Infof("digest emails already being sent")
-			return
+		if env.GetString("ENV") == "production" {
+			l, _ := r.Get(ctx, "send-digest-emails")
+			if l != nil && len(l) > 0 {
+				logger.For(ctx).Infof("digest emails already being sent")
+				return
+			}
+			r.Set(ctx, "send-digest-emails", []byte("sending"), 1*time.Hour)
 		}
-		r.Set(ctx, "send-digest-emails", []byte("sending"), 1*time.Hour)
 		vals, err := getDigest(ctx, stg, fapi, queries, loaders)
 		if err != nil {
 			logger.For(ctx).Errorf("error getting digest values: %s", err)
@@ -340,8 +342,9 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 		logger.For(c).Infof("sent %d emails", emailsSent.Load())
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeDigest, queries, func(u coredb.PiiUserView) error {
-		// only send to admins on dev
+
 		if !sendToAll {
+			// only send to admins on dev
 			roles, err := auth.RolesByUserID(c, queries, u.ID)
 			if err != nil {
 				return err
@@ -409,9 +412,6 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 	}
 	return response, nil
 
-	logger.For(c).Infof("would have sent email to %s (username: %s): %s", u.ID, u.Username.String, string(asJSON))
-
-	return &rest.Response{StatusCode: 200, Body: "not sending real emails", Headers: map[string][]string{}}, nil
 }
 
 func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.PiiUserView) error) error {
