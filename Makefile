@@ -479,6 +479,8 @@ $(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-ch
 $(DEPLOY)-$(PROD)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 $(DEPLOY)-$(PROD)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
 $(DEPLOY)-$(PROD)-activity-stats-top : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
+$(DEPLOY)-$(PROD)-emails-notifications : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-notifications _$(CRON)-$(PAUSE)-emails-notifications
+$(DEPLOY)-$(PROD)-emails-digest : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-digest _$(CRON)-$(PAUSE)-emails-digest
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
