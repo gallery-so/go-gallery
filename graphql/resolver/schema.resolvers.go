@@ -3169,10 +3169,17 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 
 // Media is the resolver for the media field.
 func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error) {
-	media, err := publicapi.For(ctx).Token.GetMediaByMediaID(ctx, obj.HelperTokenDefinitionData.Definition.TokenMediaID)
-	if err != nil {
-		return nil, err
+	var media coredb.TokenMedia
+	var err error
+
+	// It's possible that the token is waiting to be processed so there is no media ID yet
+	if mediaID := obj.HelperTokenDefinitionData.Definition.TokenMediaID; mediaID != "" {
+		media, err = publicapi.For(ctx).Token.GetMediaByMediaID(ctx, obj.HelperTokenDefinitionData.Definition.TokenMediaID)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return resolveTokenMedia(ctx, obj.HelperTokenDefinitionData.Definition, media, false), nil
 }
 
