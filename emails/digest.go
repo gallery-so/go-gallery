@@ -29,10 +29,18 @@ type GalleryWithUser struct {
 }
 
 type DigestValues struct {
-	TopPosts       IncludedSelected `json:"posts"`
-	TopCommunities IncludedSelected `json:"communities"`
-	TopGalleries   IncludedSelected `json:"galleries"`
-	TopFirstPosts  IncludedSelected `json:"first_posts"`
+	TopPosts              IncludedSelected `json:"posts"`
+	TopCommunities        IncludedSelected `json:"communities"`
+	TopGalleries          IncludedSelected `json:"galleries"`
+	TopFirstPosts         IncludedSelected `json:"first_posts"`
+	PostCount             int              `json:"post_count"`
+	CommunityCount        int              `json:"community_count"`
+	GalleryCount          int              `json:"gallery_count"`
+	FirstPostCount        int              `json:"first_post_count"`
+	IncludeTopPosts       *bool            `json:"include_top_posts,omitempty"`
+	IncludeTopCommunities *bool            `json:"include_top_communities,omitempty"`
+	IncludeTopGalleries   *bool            `json:"include_top_galleries,omitempty"`
+	IncludeTopFirstPosts  *bool            `json:"include_top_first,omitempty"`
 }
 
 type IncludedSelected struct {

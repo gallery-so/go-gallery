@@ -343,17 +343,6 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeDigest, queries, func(u coredb.PiiUserView) error {
 
-		if !sendToAll {
-			// only send to admins on dev
-			roles, err := auth.RolesByUserID(c, queries, u.ID)
-			if err != nil {
-				return err
-			}
-			if !util.Contains(roles, persist.RoleAdmin) {
-				return nil
-			}
-			logger.For(c).Infof("sending digest email to admin %s", u.ID)
-		}
 		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, v, s)
 		if err != nil {
 			return err
