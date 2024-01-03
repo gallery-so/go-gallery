@@ -333,15 +333,25 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 	}
 }
 
-func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {
+func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client, sendToAll bool) error {
 
 	emailsSent := new(atomic.Uint64)
 	defer func() {
 		logger.For(c).Infof("sent %d emails", emailsSent.Load())
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeDigest, queries, func(u coredb.PiiUserView) error {
-
-		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, v, s, sendRealEmails)
+		// only send to admins on dev
+		if !sendToAll {
+			roles, err := auth.RolesByUserID(c, queries, u.ID)
+			if err != nil {
+				return err
+			}
+			if !util.Contains(roles, persist.RoleAdmin) {
+				return nil
+			}
+			logger.For(c).Infof("sending digest email to admin %s", u.ID)
+		}
+		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, v, s)
 		if err != nil {
 			return err
 		}
@@ -357,7 +367,7 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 	})
 }
 
-func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, digestValues DigestValues, s *sendgrid.Client, sendRealEmail bool) (*rest.Response, error) {
+func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, digestValues DigestValues, s *sendgrid.Client) (*rest.Response, error) {
 
 	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
 	if err != nil {
@@ -382,24 +392,22 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 		return nil, err
 	}
 
-	if sendRealEmail {
-		// send email
-		from := mail.NewEmail("Gallery", env.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(u.Username.String, emailRecipient.String())
-		m := mail.NewV3Mail()
-		m.SetFrom(from)
-		p := mail.NewPersonalization()
-		m.SetTemplateID(env.GetString("SENDGRID_DIGEST_TEMPLATE_ID"))
-		p.DynamicTemplateData = asMap
-		m.AddPersonalizations(p)
-		p.AddTos(to)
+	// send email
+	from := mail.NewEmail("Gallery", env.GetString("FROM_EMAIL"))
+	to := mail.NewEmail(u.Username.String, emailRecipient.String())
+	m := mail.NewV3Mail()
+	m.SetFrom(from)
+	p := mail.NewPersonalization()
+	m.SetTemplateID(env.GetString("SENDGRID_DIGEST_TEMPLATE_ID"))
+	p.DynamicTemplateData = asMap
+	m.AddPersonalizations(p)
+	p.AddTos(to)
 
-		response, err := s.Send(m)
-		if err != nil {
-			return nil, err
-		}
-		return response, nil
+	response, err := s.Send(m)
+	if err != nil {
+		return nil, err
 	}
+	return response, nil
 
 	logger.For(c).Infof("would have sent email to %s (username: %s): %s", u.ID, u.Username.String, string(asJSON))
 
