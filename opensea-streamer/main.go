@@ -3,10 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -60,8 +60,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	logger.For(nil).Infof("Initialized bloom filter, starting opensea streamer server... (approx. %d filter size)", bf.ApproximatedSize())
 
 	// Health endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -160,8 +158,6 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 			if !enabledChains[win.Payload.Chain] {
 				continue
 			}
-
-			logger.For(nil).Debugf("Received valid message: %+v\n", oe.Payload)
 
 			// check if the wallet is in the bloom filter
 			chainAddress, err := persist.NewL1ChainAddress(persist.Address(win.Payload.ToAccount.Address.String()), win.Payload.Item.NFTID.Chain).MarshalJSON()
@@ -288,13 +284,13 @@ func initializeBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cach
 
 		if dbWalletCount == curWalletCount {
 			// convert cur from bytes to uint64 array
-			var curUint64 []uint64
-			for i := 0; i < len(cur); i += 8 {
-				curUint64 = append(curUint64, binary.BigEndian.Uint64(cur[i:i+8]))
+			buf := bytes.NewBuffer(cur)
+			var bf bloom.BloomFilter
+			_, err = bf.ReadFrom(buf)
+			if err != nil {
+				return nil, err
 			}
-
-			bf := bloom.From(curUint64, 4)
-			return bf, nil
+			return &bf, nil
 		}
 	}
 
@@ -319,6 +315,21 @@ func setDefaults() {
 	viper.SetDefault("SENTRY_TRACES_SAMPLE_RATE", 0.2)
 
 	viper.AutomaticEnv()
+
+	if env.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+	} else {
+		fi := "local"
+		if len(os.Args) > 1 {
+			fi = os.Args[1]
+		}
+		envFile := util.ResolveEnvFile("opensea-streamer", fi)
+		util.LoadEncryptedEnvFile(envFile)
+	}
+
+	if env.GetString("ENV") != "local" {
+		util.VarNotSetTo("SENTRY_DSN", "")
+	}
 }
 
 func InitSentry() {
