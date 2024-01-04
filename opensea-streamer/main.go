@@ -178,7 +178,12 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 				func() {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 					defer cancel()
-					req, err := http.NewRequestWithContext(ctx, http.MethodPost, env.GetString("TOKEN_PROCESSING_URL")+"/owners/process/opensea", bytes.NewBuffer(message))
+					payloadJSON, err := json.Marshal(win)
+					if err != nil {
+						logger.For(nil).Error(err)
+						return
+					}
+					req, err := http.NewRequestWithContext(ctx, http.MethodPost, env.GetString("TOKEN_PROCESSING_URL")+"/owners/process/opensea", bytes.NewBuffer(payloadJSON))
 					if err != nil {
 						logger.For(nil).Error(err)
 						return
