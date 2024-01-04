@@ -165,13 +165,13 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 			logger.For(nil).Debugf("Received valid message: %+v\n", oe.Payload)
 
 			// check if the wallet is in the bloom filter
-			chainAddress, err := persist.NewL1ChainAddress(persist.Address(win.Payload.FromAccount.Address.String()), win.Payload.Item.NFTID.Chain).MarshalJSON()
+			chainAddress, err := persist.NewL1ChainAddress(persist.Address(win.Payload.ToAccount.Address.String()), win.Payload.Item.NFTID.Chain).MarshalJSON()
 			if err != nil {
 				logger.For(nil).Error(err)
 				continue
 			}
 			if bf.Test(chainAddress) {
-				logger.For(nil).Infof("received user item transfer event for wallet %s on chain %d", win.Payload.FromAccount.Address.String(), win.Payload.Item.NFTID.Chain)
+				logger.For(nil).Infof("received user item transfer event for wallet %s on chain %d", win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
 
 				// send to token processing service
 				func() {
