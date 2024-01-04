@@ -146,15 +146,10 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 		defer wg.Done()
 		// Listen for messages
 		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("Error reading message:", err)
-				break
-			}
-
 			var oe openseaEvent
-			err = json.Unmarshal(message, &oe)
+			err := conn.ReadJSON(&oe)
 			if err != nil {
+				logger.For(nil).Error(err)
 				continue
 			}
 
@@ -168,7 +163,7 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 				continue
 			}
 
-			logger.For(nil).Debugf("Received valid message: %s\n", message)
+			logger.For(nil).Debugf("Received valid message: %+v\n", oe.Payload)
 
 			// check if the wallet is in the bloom filter
 			chainAddress, err := persist.NewL1ChainAddress(persist.Address(win.Payload.FromAccount.Address.String()), win.Payload.Item.NFTID.Chain).MarshalJSON()
