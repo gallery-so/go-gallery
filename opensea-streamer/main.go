@@ -61,7 +61,7 @@ func main() {
 		panic(err)
 	}
 
-	logger.For(nil).Info("Initialized bloom filter, starting opensea streamer server...")
+	logger.For(nil).Infof("Initialized bloom filter, starting opensea streamer server... (approx. %d filter size)", bf.ApproximatedSize())
 
 	// Health endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -118,7 +118,6 @@ func main() {
 func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 
 	apiKey := env.GetString("OPENSEA_API_KEY")
-	logger.For(nil).Debugf("using opensea api key: %s", apiKey)
 	// Set up WebSocket connection
 	var dialer *websocket.Dialer
 	conn, _, err := dialer.Dial("wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
@@ -233,6 +232,8 @@ func resetBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cache) (*
 		return nil, err
 	}
 
+	logger.For(nil).Infof("resetting bloom filter with %d wallets", len(wallets))
+
 	bf := bloom.NewWithEstimates(uint(len(wallets)), falsePositiveRate)
 	for _, w := range wallets {
 		chainAddress, err := persist.NewL1ChainAddress(w.Address, w.Chain).MarshalJSON()
@@ -284,6 +285,7 @@ func initializeBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cach
 		if err != nil {
 			return nil, err
 		}
+		logger.For(nil).Infof("loaded bloom filter from cache, %d db wallets and %d cached wallets", dbWalletCount, curWalletCount)
 
 		if dbWalletCount == curWalletCount {
 			// convert cur from bytes to uint64 array
@@ -296,6 +298,8 @@ func initializeBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cach
 			return bf, nil
 		}
 	}
+
+	logger.For(nil).Info("bloom filter not found in cache or wallet count discrepency, resetting...")
 
 	return resetBloomFilter(ctx, q, r)
 }
