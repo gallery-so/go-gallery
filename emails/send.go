@@ -322,7 +322,7 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 			}
 			r.Set(ctx, "send-digest-emails", []byte("sending"), 1*time.Hour)
 		}
-		vals, err := getDigest(ctx, stg, fapi, queries, loaders)
+		vals, err := getDigest(ctx, stg, fapi, queries, loaders, true)
 		if err != nil {
 			logger.For(ctx).Errorf("error getting digest values: %s", err)
 			return

@@ -110,7 +110,7 @@ func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storag
 		c.Set("auth.user_id", persist.DBID(""))
 		c.Set("auth.auth_error", nil)
 
-		result, err := getDigest(c, stg, f, q, loaders)
+		result, err := getDigest(c, stg, f, q, loaders, false)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -119,7 +119,7 @@ func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storag
 	}
 }
 
-func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders) (DigestValues, error) {
+func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders, onlyPositioned bool) (DigestValues, error) {
 	// TODO top galleries and top first posts
 	overrides, err := getOverrides(c, stg)
 	if err != nil {
@@ -171,7 +171,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Entity:   up,
 			Position: &s.Position,
 		}
-	}, postCount)
+	}, postCount, onlyPositioned)
 
 	topCollectionsDB, err := q.GetTopCommunitiesByPosts(c, 10)
 	if err != nil {
@@ -191,7 +191,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Entity:   contractToUserFacing(c, q, loaders, co, true),
 			Position: &s.Position,
 		}
-	}, collectionCount)
+	}, collectionCount, onlyPositioned)
 
 	includePosts := defaultIncludeTopPosts
 	includeCommunities := defaultIncludeTopCommunities
@@ -328,7 +328,7 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 	}, nil
 }
 
-func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int) []Selected {
+func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
 	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
 	for _, post := range overrides {
 		selectedResults[post.Position] = overrideFetcher(post)
@@ -362,6 +362,12 @@ outer:
 				Position: nil,
 			}
 		}
+	}
+
+	if onlyPositioned {
+		selectedResults = util.Filter(selectedResults, func(s Selected) bool {
+			return s.Position != nil
+		}, false)
 	}
 	return selectedResults
 }
