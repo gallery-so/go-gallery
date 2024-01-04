@@ -29,18 +29,14 @@ type GalleryWithUser struct {
 }
 
 type DigestValues struct {
-	TopPosts              IncludedSelected `json:"posts"`
-	TopCommunities        IncludedSelected `json:"communities"`
-	TopGalleries          IncludedSelected `json:"galleries"`
-	TopFirstPosts         IncludedSelected `json:"first_posts"`
-	PostCount             int              `json:"post_count"`
-	CommunityCount        int              `json:"community_count"`
-	GalleryCount          int              `json:"gallery_count"`
-	FirstPostCount        int              `json:"first_post_count"`
-	IncludeTopPosts       *bool            `json:"include_top_posts,omitempty"`
-	IncludeTopCommunities *bool            `json:"include_top_communities,omitempty"`
-	IncludeTopGalleries   *bool            `json:"include_top_galleries,omitempty"`
-	IncludeTopFirstPosts  *bool            `json:"include_top_first,omitempty"`
+	TopPosts       IncludedSelected `json:"posts"`
+	TopCommunities IncludedSelected `json:"communities"`
+	TopGalleries   IncludedSelected `json:"galleries"`
+	TopFirstPosts  IncludedSelected `json:"first_posts"`
+	PostCount      int              `json:"post_count"`
+	CommunityCount int              `json:"community_count"`
+	GalleryCount   int              `json:"gallery_count"`
+	FirstPostCount int              `json:"first_post_count"`
 }
 
 type IncludedSelected struct {
@@ -206,6 +202,13 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 		includeCommunities = *overrides.IncludeTopCommunities
 	}
 
+	topPostCount, _ := util.FindFirst([]int{overrides.FirstPostCount, defaultFirstPostCount, 5}, func(i int) bool {
+		return i >= 0
+	})
+	topCommunityCount, _ := util.FindFirst([]int{overrides.CommunityCount, defaultCommunityCount, 5}, func(i int) bool {
+		return i >= 0
+	})
+
 	result := DigestValues{
 		TopPosts: IncludedSelected{
 			Selected: selectedPosts,
@@ -215,6 +218,8 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Selected: selectedCollections,
 			Include:  includeCommunities,
 		},
+		FirstPostCount: topPostCount,
+		CommunityCount: topCommunityCount,
 	}
 	return result, nil
 }
