@@ -148,7 +148,6 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 			var oe openseaEvent
 			err := conn.ReadJSON(&oe)
 			if err != nil {
-				logger.For(nil).Error(err)
 				continue
 			}
 
