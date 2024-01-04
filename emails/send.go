@@ -327,7 +327,7 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 			logger.For(ctx).Errorf("error getting digest values: %s", err)
 			return
 		}
-		err = sendDigestEmailsToAllUsers(ctx, vals, queries, s, env.GetString("ENV") == "production")
+		err = sendDigestEmailsToAllUsers(ctx, vals, queries, s)
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			return
@@ -335,7 +335,7 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 	}
 }
 
-func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client, sendToAll bool) error {
+func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client) error {
 
 	emailsSent := new(atomic.Uint64)
 	defer func() {

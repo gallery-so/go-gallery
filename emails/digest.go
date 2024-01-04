@@ -156,7 +156,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 		return p.(UserFacingPost).PostID != ""
 	}, false)
 
-	selectedPosts := selectResults(topPosts, overrides.TopPosts, func(s SelectedID) Selected {
+	selectedPosts := selectWithOverrides(topPosts, overrides.TopPosts, func(s SelectedID) Selected {
 		p, err := q.GetPostByID(c, s.ID)
 		if err != nil {
 			logger.For(c).Errorf("error getting post by id: %s", err)
@@ -182,7 +182,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 		return contractToUserFacing(c, q, loaders, co.Contract, false)
 	})
 
-	selectedCollections := selectResults(topCollectionsUserFacing, overrides.TopCommunities, func(s SelectedID) Selected {
+	selectedCollections := selectWithOverrides(topCollectionsUserFacing, overrides.TopCommunities, func(s SelectedID) Selected {
 		co, err := q.GetContractByID(c, s.ID)
 		if err != nil {
 			return Selected{}
@@ -328,7 +328,7 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 	}, nil
 }
 
-func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
+func selectWithOverrides(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
 	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
 	for _, post := range overrides {
 		selectedResults[post.Position] = overrideFetcher(post)
@@ -407,6 +407,8 @@ func updateDigestValues(stg *storage.Client) gin.HandlerFunc {
 func mergeOverrides(first, second DigestValueOverrides) DigestValueOverrides {
 	seenPostPositions := make(map[int]bool)
 	seenCommunityPositions := make(map[int]bool)
+	seenGalleryPositions := make(map[int]bool)
+	seenFirstPostPositions := make(map[int]bool)
 	for _, p := range second.TopPosts {
 		seenPostPositions[p.Position] = true
 	}
@@ -426,12 +428,32 @@ func mergeOverrides(first, second DigestValueOverrides) DigestValueOverrides {
 		}
 	}
 
+	for _, p := range first.TopGalleries {
+		if _, ok := seenGalleryPositions[p.Position]; !ok {
+			second.TopGalleries = append(second.TopGalleries, p)
+		}
+	}
+
+	for _, p := range first.TopFirstPosts {
+		if _, ok := seenFirstPostPositions[p.Position]; !ok {
+			second.TopFirstPosts = append(second.TopFirstPosts, p)
+		}
+	}
+
 	if second.PostCount == 0 {
 		second.PostCount = first.PostCount
 	}
 
 	if second.CommunityCount == 0 {
 		second.CommunityCount = first.CommunityCount
+	}
+
+	if second.GalleryCount == 0 {
+		second.GalleryCount = first.GalleryCount
+	}
+
+	if second.FirstPostCount == 0 {
+		second.FirstPostCount = first.FirstPostCount
 	}
 
 	return second
