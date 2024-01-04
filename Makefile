@@ -80,6 +80,7 @@ $(DEPLOY)-$(DEV)-activitystats      : SERVICE_FILE := activitystats-env.yaml
 $(DEPLOY)-$(DEV)-autosocial-orch    : SERVICE_FILE := autosocial-env.yaml
 $(DEPLOY)-$(DEV)-pushnotifications  : SERVICE_FILE := pushnotifications-env.yaml
 $(DEPLOY)-$(DEV)-emails             : SERVICE_FILE := emails-server-env.yaml
+$(DEPLOY)-$(DEV)-opensea-streamer   : SERVICE_FILE := opensea-streamer-env.yaml
 $(DEPLOY)-$(DEV)-feedbot            : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(DEV)-routing-rules      : SERVICE_FILE := dispatch.yaml
 $(DEPLOY)-$(SANDBOX)-backend        : SERVICE_FILE := backend-sandbox-env.yaml
@@ -90,10 +91,11 @@ $(DEPLOY)-$(PROD)-admin             : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed              : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(PROD)-feedbot           : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(PROD)-autosocial        : SERVICE_FILE := autosocial-env.yaml
-$(DEPLOY)-$(PROD)-activitystats        : SERVICE_FILE := activitystats-env.yaml
+$(DEPLOY)-$(PROD)-activitystats     : SERVICE_FILE := activitystats-env.yaml
 $(DEPLOY)-$(PROD)-autosocial-orch   : SERVICE_FILE := autosocial-env.yaml
 $(DEPLOY)-$(PROD)-tokenprocessing   : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(PROD)-pushnotifications : SERVICE_FILE := pushnotifications-env.yaml
+$(DEPLOY)-$(PROD)-opensea-streamer  : SERVICE_FILE := opensea-streamer-env.yaml
 $(DEPLOY)-$(PROD)-dummymetadata     : SERVICE_FILE := dummymetadata-env.yaml
 $(DEPLOY)-$(PROD)-emails            : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(PROD)-routing-rules     : SERVICE_FILE := dispatch.yaml
@@ -114,6 +116,7 @@ $(DEPLOY)-%-feedbot               : SENTRY_PROJECT := feedbot
 $(DEPLOY)-%-emails                : SENTRY_PROJECT := emails
 $(DEPLOY)-%-userpref-upload       : SENTRY_PROJECT := userpref
 $(DEPLOY)-%-activitystats         : SENTRY_PROJECT := activitystats
+$(DEPLOY)-%-opensea-streamer      : SENTRY_PROJECT := opensea-streamer
 $(DEPLOY)-%-autosocial            : SENTRY_PROJECT := autosocial
 $(DEPLOY)-%-autosocial-orch       : SENTRY_PROJECT := autosocial
 
@@ -239,6 +242,15 @@ $(DEPLOY)-%-graphql-gateway            : MEMORY         := $(GRAPHQL_GATEWAY_MEM
 $(DEPLOY)-%-graphql-gateway            : CONCURRENCY    := $(GRAPHQL_GATEWAY_CONCURRENCY)
 $(DEPLOY)-$(DEV)-graphql-gateway       : SERVICE        := graphql-gateway-dev
 $(DEPLOY)-$(PROD)-graphql-gateway      : SERVICE        := graphql-gateway
+$(DEPLOY)-%-opensea-streamer           : REPO           := opensea-streamer
+$(DEPLOY)-%-opensea-streamer           : DOCKER_FILE    := $(DOCKER_DIR)/opensea-streamer/Dockerfile
+$(DEPLOY)-%-opensea-streamer           : PORT           := 3000
+$(DEPLOY)-%-opensea-streamer           : TIMEOUT        := $(OPENSEA_STREAMER_TIMEOUT)
+$(DEPLOY)-%-opensea-streamer           : CPU            := $(OPENSEA_STREAMER_CPU)
+$(DEPLOY)-%-opensea-streamer           : MEMORY         := $(OPENSEA_STREAMER_MEMORY)
+$(DEPLOY)-%-opensea-streamer           : CONCURRENCY    := $(OPENSEA_STREAMER_CONCURRENCY)
+$(DEPLOY)-$(DEV)-opensea-streamer      : SERVICE        := opensea-streamer
+$(DEPLOY)-$(PROD)-opensea-streamer     : SERVICE        := opensea-streamer
 
 # Cloud Scheduler Jobs
 $(DEPLOY)-%-alchemy-spam               : CRON_PREFIX    := alchemy-spam
@@ -449,6 +461,7 @@ $(DEPLOY)-$(DEV)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-e
 $(DEPLOY)-$(DEV)-admin              : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(DEV)-feed               : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
 $(DEPLOY)-$(DEV)-feedbot            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(DEV)-opensea-streamer   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-opensea-streamer _$(RELEASE)-opensea-streamer
 $(DEPLOY)-$(DEV)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rules
 $(DEPLOY)-$(DEV)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
@@ -475,6 +488,7 @@ $(DEPLOY)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-
 $(DEPLOY)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
 $(DEPLOY)-$(PROD)-feed               : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
 $(DEPLOY)-$(PROD)-feedbot            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(PROD)-opensea-streamer   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-opensea-streamer _$(RELEASE)-opensea-streamer
 $(DEPLOY)-$(PROD)-admin              : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(PROD)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rules
 $(DEPLOY)-$(PROD)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
@@ -502,6 +516,7 @@ $(PROMOTE)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE
 $(PROMOTE)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
 $(PROMOTE)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
 $(PROMOTE)-$(PROD)-feed               : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-feed
+$(PROMOTE)-$(PROD)-opensea-streamer   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-opensea-streamer
 $(PROMOTE)-$(PROD)-feedbot            : _set-project-$(ENV) _$(PROMOTE)-feedbot
 $(PROMOTE)-$(PROD)-admin              : _set-project-$(ENV) _$(PROMOTE)-admin
 

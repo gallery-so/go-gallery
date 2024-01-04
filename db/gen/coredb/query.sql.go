@@ -184,6 +184,17 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countActiveWallets = `-- name: CountActiveWallets :one
+select count(w.*) from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal
+`
+
+func (q *Queries) CountActiveWallets(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveWallets)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countAllUsers = `-- name: CountAllUsers :one
 SELECT count(*) FROM users WHERE deleted = false and universal = false
 `
@@ -1673,6 +1684,40 @@ update wallets set deleted = true, last_updated = now() where id = $1
 func (q *Queries) DeleteWalletByID(ctx context.Context, id persist.DBID) error {
 	_, err := q.db.Exec(ctx, deleteWalletByID, id)
 	return err
+}
+
+const getActiveWallets = `-- name: GetActiveWallets :many
+select w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal
+`
+
+func (q *Queries) GetActiveWallets(ctx context.Context) ([]Wallet, error) {
+	rows, err := q.db.Query(ctx, getActiveWallets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Wallet
+	for rows.Next() {
+		var i Wallet
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.Address,
+			&i.WalletType,
+			&i.Chain,
+			&i.L1Chain,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getActorForGroup = `-- name: GetActorForGroup :one

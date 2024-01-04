@@ -1,13 +1,19 @@
-FROM node:latest
+# syntax=docker/dockerfile:1
 
+FROM golang:1.19-bullseye
+
+ARG VERSION
+
+# Install deps
 WORKDIR /app
-COPY package*.json ./
+COPY go.mod go.sum /app/
+RUN go mod download
 
-USER root
+COPY . /app
+RUN go build -o ./bin/opensea-streamer ./opensea-streamer/main.go
 
-RUN npm install
+ENV GAE_VERSION=$VERSION
 
-COPY ./opensea-streamer/index.js ./
-
-EXPOSE 3000
-CMD [ "node", "index.js" ]
+EXPOSE 4000
+USER nobody
+ENTRYPOINT ["./bin/opensea-streamer"]
