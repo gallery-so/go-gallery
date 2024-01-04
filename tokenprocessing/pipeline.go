@@ -15,6 +15,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/metric"
@@ -111,7 +112,7 @@ func (pOpts) WithRequireImage() PipelineOption {
 
 func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		if isProhibition(c) {
+		if platform.IsProhibition(c.Chain, c.Address) {
 			j.requireImage = true
 		}
 	}
@@ -119,9 +120,9 @@ func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
 
 func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		if isFxHash(td, c) {
+		if platform.IsFxhash(td, c) {
 			j.requireFxHashSigned = true
-			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return isFxHashSigned(td, c, m) }
+			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return platform.IsFxhashSigned(td, c, m) }
 		}
 	}
 }

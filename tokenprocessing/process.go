@@ -21,10 +21,9 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -883,7 +882,7 @@ func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption)
 
 // addContractRunOptions adds pipeline options for specific contracts
 func addContractRunOptions(contract persist.ContractIdentifiers) (opts []PipelineOption) {
-	if contract == ensContract {
+	if platform.IsEns(contract.Chain, contract.ContractAddress) {
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
@@ -893,53 +892,12 @@ func addIsSpamJobOption(c db.Contract) PipelineOption {
 	return PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam)
 }
 
-var (
-	defaultSyncMaxRetries = 4
-	prohibitionContract   = persist.NewContractIdentifiers("0x47a91457a3a1f700097199fd63c039c4784384ab", persist.ChainArbitrum)
-	ensContract           = persist.NewContractIdentifiers(eth.EnsAddress, persist.ChainETH)
-)
-
 // numRetriesF returns a function that when called, returns the number of retries allotted for a token and contract
 func numRetriesF(td db.TokenDefinition, c db.Contract) tokenmanage.NumRetryF {
 	return func() int {
-		if isProhibition(c) || isFxHash(td, c) {
+		if platform.IsProhibition(c.Chain, c.Address) || platform.IsFxhash(td, c) {
 			return 24
 		}
-		return defaultSyncMaxRetries
+		return 4
 	}
-}
-
-func isProhibition(c db.Contract) bool {
-	return persist.NewContractIdentifiers(c.Address, c.Chain) == prohibitionContract
-}
-
-func isFxHash(td db.TokenDefinition, c db.Contract) bool {
-	if td.Chain == persist.ChainTezos && tezos.IsFxHash(c.Address) {
-		return true
-	}
-	if td.Chain == persist.ChainETH {
-		if strings.ToLower(c.Symbol.String) == "fxgen" {
-			return true
-		}
-		if u, ok := td.Metadata["external_url"].(string); ok {
-			parsed, _ := url.Parse(u)
-			if td.Chain == persist.ChainETH && strings.HasPrefix(parsed.Hostname(), "fxhash") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func isFxHashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadata) bool {
-	if !isFxHash(td, c) {
-		return true
-	}
-	if td.Chain == persist.ChainTezos {
-		return tezos.IsFxHashSigned(c.Address, td.Name.String)
-	}
-	if td.Chain == persist.ChainETH {
-		return m["authenticityHash"] != "" && m["authenticityHash"] != nil
-	}
-	return true
 }

@@ -24,13 +24,13 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
@@ -2277,8 +2277,8 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 	}
 }
 
-func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
-	isFxHash := tezos.IsFxHash(td.ContractAddress)
+func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, c db.Contract, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
+	isFxHash := platform.IsFxhash(td, c)
 
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
@@ -2311,14 +2311,15 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool, isFxHash bool) model.MediaSubtype {
 	// Rewrite fallback IPFS and Arweave URLs to HTTP
-
-	if fallbackURL := fallback.ImageURL.String(); strings.HasPrefix(fallbackURL, "ipfs://") || strings.HasPrefix(fallbackURL, "https://gallery.infura-ipfs.io") {
+	if fallbackURL := fallback.ImageURL.String(); ipfs.IsIpfsURL(fallbackURL) {
 		fallback.ImageURL = persist.NullString(ipfs.BestGatewayNodeFrom(fallbackURL, isFxHash))
 	} else if strings.HasPrefix(fallbackURL, "ar://") {
 		fallback.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
 	}
 
-	if mediaURL := tokenMedia.Media.MediaURL.String(); strings.HasPrefix(mediaURL, "ipfs://") || strings.HasPrefix(mediaURL, "https://gallery.infura-ipfs.io") {
+	// Rewrite media IPFS and Arweave URLs to HTTP
+	// Temporarily re-write URLs using the infura gateway node to a more reliable one
+	if mediaURL := tokenMedia.Media.MediaURL.String(); ipfs.IsIpfsURL(mediaURL) {
 		tokenMedia.Media.MediaURL = persist.NullString(ipfs.BestGatewayNodeFrom(mediaURL, isFxHash))
 	} else if strings.HasPrefix(mediaURL, "ar://") {
 		tokenMedia.Media.MediaURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(mediaURL, false)))

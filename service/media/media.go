@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
@@ -330,10 +330,10 @@ func predictTrueURLs(ctx context.Context, curImg ImageURL, curV AnimationURL) (I
 
 func keywordsForToken(contract persist.Address, chain persist.Chain) ([]string, []string) {
 	switch {
-	case tezos.IsHicEtNunc(contract):
+	case platform.IsHicEtNunc(chain, contract):
 		_, anim := chain.BaseKeywords()
 		return []string{"artifactUri", "displayUri", "image"}, anim
-	case tezos.IsFxHash(contract):
+	case platform.IsFxhashTezos(chain, contract):
 		return []string{"displayUri", "artifactUri", "image", "uri"}, []string{"artifactUri", "displayUri"}
 	default:
 		return chain.BaseKeywords()

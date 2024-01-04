@@ -2723,10 +2723,15 @@ func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input mode
 		return nil, err
 	}
 
+	c, err := publicapi.For(ctx).Contract.GetContractByID(ctx, td.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
 	highDef := false
 
 	return model.PostComposerDraftDetailsPayload{
-		Media:            resolveTokenMedia(ctx, td, media, highDef),
+		Media:            resolveTokenMedia(ctx, td, *c, media, highDef),
 		TokenName:        util.ToPointer(td.Name.String),
 		TokenDescription: util.ToPointer(td.Description.String),
 		Community:        nil, // handled by dedicated resolver
@@ -3067,6 +3072,11 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		return nil, err
 	}
 
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, td.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
 	var media coredb.TokenMedia
 
 	if td.TokenMediaID != "" {
@@ -3076,7 +3086,7 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		}
 	}
 
-	return resolveTokenMedia(ctx, td, media, highDef), err
+	return resolveTokenMedia(ctx, td, *contract, media, highDef), err
 }
 
 // TokenType is the resolver for the tokenType field.
@@ -3180,7 +3190,12 @@ func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDef
 		}
 	}
 
-	return resolveTokenMedia(ctx, obj.HelperTokenDefinitionData.Definition, media, false), nil
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveTokenMedia(ctx, obj.HelperTokenDefinitionData.Definition, *contract, media, false), nil
 }
 
 // Contract is the resolver for the contract field.

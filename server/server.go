@@ -25,7 +25,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/publicapi"
+	// "github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -58,9 +58,10 @@ func Init() {
 	ctx := context.Background()
 	c := ClientInit(ctx)
 	provider, _ := NewMultichainProvider(ctx, SetDefaults)
-	recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
-	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
-	router := CoreInit(ctx, c, provider, recommender, p)
+	// XXX recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
+	// XXX p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
+	// XXX router := CoreInit(ctx, c, provider, recommender, p)
+	router := CoreInit(ctx, c, provider, nil, nil)
 	http.Handle("/", router)
 }
 
@@ -130,8 +131,8 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
 	tokenManageCache := redis.NewCache(redis.TokenManageCache)
 
-	recommender.Loop(ctx, time.NewTicker(time.Hour))
-	p.Loop(ctx, time.NewTicker(time.Minute*15))
+	// XXX recommender.Loop(ctx, time.NewTicker(time.Hour))
+	// XXX p.Loop(ctx, time.NewTicker(time.Minute*15))
 
 	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, c.MagicLinkClient, recommender, p)
 }
