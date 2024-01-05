@@ -67,7 +67,7 @@ func main() {
 	})
 
 	router.GET("/updateBloomFilter", func(c *gin.Context) {
-		bf, err = resetBloomFilter(initCtx, queries, bloomCache)
+		bf, err = resetBloomFilter(c, queries, bloomCache)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
