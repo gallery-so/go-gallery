@@ -1769,14 +1769,14 @@ func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRec
 	case eth.EnsIpfsRecord:
 		return standardizeURI(u.URL), nil
 	case eth.EnsTokenRecord:
-		uri, err = uriFromENSTokenRecord(ctx, mc, u)
+		uri, err = uriFromEnsTokenRecord(ctx, mc, u)
 		return standardizeURI(uri), err
 	default:
 		return "", eth.ErrUnknownEnsAvatarURI
 	}
 }
 
-func uriFromENSTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.EnsTokenRecord) (string, error) {
+func uriFromEnsTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.EnsTokenRecord) (string, error) {
 	chain, contractAddr, _, tokenID, err := eth.TokenInfoFor(r)
 	if err != nil {
 		return "", err
@@ -1788,9 +1788,9 @@ func uriFromENSTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.E
 		return "", err
 	}
 
-	imgKeys, animKeys := chain.BaseKeywords()
+	imgK, animK := chain.BaseKeywords()
 
-	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, metadata, imgKeys, animKeys)
+	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, metadata, imgK, animK)
 	if err != nil {
 		if errors.Is(err, media.ErrNoMediaURLs) {
 			return "", nil

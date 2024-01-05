@@ -22,9 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/rpc/arweave"
-	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
-	"github.com/mikeydub/go-gallery/service/rpc/onchfs"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -252,25 +250,12 @@ func (tpj *tokenProcessingJob) createErrFromResults(animResult cacheResult, imgR
 	return wrapWithBadTokenErr(animResult.err)
 }
 
-func rewriteURLs(u string, isFxhash bool) string {
-	if ipfs.IsIpfsURL(u) {
-		return ipfs.BestGatewayNodeFrom(u, isFxhash)
-	}
-	if arweave.IsArweaveURL(u) {
-		return arweave.BestGatewayNodeFrom(u)
-	}
-	if onchfs.IsOnchfsURL(u) {
-		return onchfs.BestGatewayNodeFrom(u)
-	}
-	return u
-}
-
 func (tpj *tokenProcessingJob) urlsToDownload(ctx context.Context, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
 	pfpURL = findProfileImageURL(metadata, tpj.profileImageKey)
 	imgURL, animURL, err = findImageAndAnimationURLs(ctx, metadata, tpj.imgKeywords, tpj.animKeywords, tpj.pipelineMetadata)
-	imgURL = media.ImageURL(rewriteURLs(string(imgURL), tpj.isFxhash))
-	pfpURL = media.ImageURL(rewriteURLs(string(pfpURL), tpj.isFxhash))
-	animURL = media.AnimationURL(rewriteURLs(string(animURL), tpj.isFxhash))
+	imgURL = media.ImageURL(rpc.RewriteURIToHTTP(string(imgURL), tpj.isFxhash))
+	pfpURL = media.ImageURL(rpc.RewriteURIToHTTP(string(pfpURL), tpj.isFxhash))
+	animURL = media.AnimationURL(rpc.RewriteURIToHTTP(string(animURL), tpj.isFxhash))
 	return imgURL, pfpURL, animURL, err
 }
 

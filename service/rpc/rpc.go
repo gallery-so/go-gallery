@@ -43,7 +43,9 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
+	"github.com/mikeydub/go-gallery/service/rpc/onchfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -707,20 +709,6 @@ func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddre
 	return bal, nil
 }
 
-// RetryGetBalanceOfERC1155Token calls GetBalanceOfERC1155Token with backoff.
-func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
-	var balance *big.Int
-	var err error
-	for i := 0; i < retry.DefaultRetry.Tries; i++ {
-		balance, err = GetBalanceOfERC1155Token(ctx, pOwnerAddress, pContractAddress, pTokenID, ethClient)
-		if !isRateLimitedError(err) {
-			break
-		}
-		retry.DefaultRetry.Sleep(i)
-	}
-	return balance, err
-}
-
 // GetOwnerOfERC721Token returns the Owner of an ERC721 token
 func GetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
 	contract := common.HexToAddress(string(pContractAddress))
@@ -738,20 +726,6 @@ func GetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.Ethereu
 	}
 
 	return persist.EthereumAddress(strings.ToLower(owner.String())), nil
-}
-
-// RetryGetOwnerOfERC721Token calls GetOwnerOfERC721Token with backoff.
-func RetryGetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
-	var owner persist.EthereumAddress
-	var err error
-	for i := 0; i < retry.DefaultRetry.Tries; i++ {
-		owner, err = GetOwnerOfERC721Token(ctx, pContractAddress, pTokenID, ethClient)
-		if !isRateLimitedError(err) {
-			break
-		}
-		retry.DefaultRetry.Sleep(i)
-	}
-	return owner, err
 }
 
 // GetContractCreator returns the address of the contract creator
@@ -868,4 +842,17 @@ func isRateLimitedError(err error) bool {
 		return true
 	}
 	return false
+}
+
+func RewriteURIToHTTP(u string, isFxhash bool) string {
+	if ipfs.IsIpfsURL(u) {
+		return ipfs.BestGatewayNodeFrom(u, isFxhash)
+	}
+	if arweave.IsArweaveURL(u) {
+		return arweave.BestGatewayNodeFrom(u)
+	}
+	if onchfs.IsOnchfsURL(u) {
+		return onchfs.BestGatewayNodeFrom(u)
+	}
+	return u
 }
