@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -135,8 +135,7 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, strin
 
 			return MediaFromContentType(ctl.contentType), ctl.contentType, &ctl.length, nil
 		case persist.URITypeArweave:
-			path := util.GetURIPath(asURI.String(), false)
-			url = fmt.Sprintf("https://arweave.net/%s", path)
+			url = arweave.BestGatewayNodeFrom(asURI.String())
 			fallthrough
 		case persist.URITypeHTTP, persist.URITypeIPFSAPI, persist.URITypeArweaveGateway:
 			header, err := rpc.GetHTTPHeaders(ctx, url)

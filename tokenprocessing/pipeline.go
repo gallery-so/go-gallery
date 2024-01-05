@@ -128,6 +128,12 @@ func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
 	}
 }
 
+func (pOpts) WithIsFxhash() PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.isFxhash = true
+	}
+}
+
 func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		if platform.IsFxhash(td, c) {
@@ -250,10 +256,10 @@ func rewriteURLs(u string, isFxhash bool) string {
 	if ipfs.IsIpfsURL(u) {
 		return ipfs.BestGatewayNodeFrom(u, isFxhash)
 	}
-	if arweave.IsArweave(u) {
+	if arweave.IsArweaveURL(u) {
 		return arweave.BestGatewayNodeFrom(u)
 	}
-	if onchfs.IsOnchfs(u) {
+	if onchfs.IsOnchfsURL(u) {
 		return onchfs.BestGatewayNodeFrom(u)
 	}
 	return u

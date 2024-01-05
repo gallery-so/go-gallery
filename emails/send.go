@@ -141,7 +141,7 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		l, _ := r.Get(ctx, "send-notification-emails")
-		if l != nil && len(l) > 0 {
+		if len(l) > 0 {
 			logger.For(ctx).Infof("notification emails already being sent")
 			return
 		}
@@ -315,7 +315,7 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 		ctx.Set("auth.auth_error", nil)
 
 		l, _ := r.Get(ctx, "send-digest-emails")
-		if l != nil && len(l) > 0 {
+		if len(l) > 0 {
 			logger.For(ctx).Infof("digest emails already being sent")
 			return
 		}

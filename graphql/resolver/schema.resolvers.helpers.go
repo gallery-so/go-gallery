@@ -33,6 +33,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/twitter"
@@ -2313,15 +2314,15 @@ func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persis
 	// Rewrite fallback IPFS and Arweave URLs to HTTP
 	if fallbackURL := fallback.ImageURL.String(); ipfs.IsIpfsURL(fallbackURL) {
 		fallback.ImageURL = persist.NullString(ipfs.BestGatewayNodeFrom(fallbackURL, isFxHash))
-	} else if strings.HasPrefix(fallbackURL, "ar://") {
-		fallback.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
+	} else if arweave.IsArweaveURL(fallbackURL) {
+		fallback.ImageURL = persist.NullString(arweave.BestGatewayNodeFrom(fallbackURL))
 	}
 
 	// Rewrite media IPFS and Arweave URLs to HTTP
 	if mediaURL := tokenMedia.Media.MediaURL.String(); ipfs.IsIpfsURL(mediaURL) {
 		tokenMedia.Media.MediaURL = persist.NullString(ipfs.BestGatewayNodeFrom(mediaURL, isFxHash))
-	} else if strings.HasPrefix(mediaURL, "ar://") {
-		tokenMedia.Media.MediaURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(mediaURL, false)))
+	} else if arweave.IsArweaveURL(mediaURL) {
+		tokenMedia.Media.MediaURL = persist.NullString(arweave.BestGatewayNodeFrom(mediaURL))
 	}
 
 	fallbackMedia := getFallbackMedia(ctx, fallback)

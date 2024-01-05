@@ -266,16 +266,6 @@ var expectedResults expectedTokenResults = expectedTokenResults{
 	},
 }
 
-func expectedTokensForAddress(address persist.EthereumAddress) int {
-	count := 0
-	for _, token := range expectedResults {
-		if token.OwnerAddress == address {
-			count++
-		}
-	}
-	return count
-}
-
 func expectedContracts() []persist.EthereumAddress {
 	contracts := make([]persist.EthereumAddress, 0, len(expectedResults))
 	seen := map[persist.EthereumAddress]struct{}{}

@@ -863,10 +863,12 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	if err != nil {
 		return db.TokenMedia{}, err
 	}
+	// Runtime options that should be applied to every run
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
 	runOpts = append(runOpts, addCauseRunOptions(cause)...)
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
 	runOpts = append(runOpts, PipelineOpts.WithKeywords(td, c))
+	runOpts = append(runOpts, PipelineOpts.WithIsFxhash())
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessTokenPipeline(ctx, tID, cID, cause, runOpts...)
 	defer closing(err)

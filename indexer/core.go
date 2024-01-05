@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -58,7 +59,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	tClient := task.NewClient(context.Background())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := ipfs.NewShell()
-	arweaveClient := rpc.NewArweaveClient()
+	arweaveClient := arweave.NewClient()
 
 	if env.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
@@ -96,7 +97,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	tClient := task.NewClient(context.Background())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := ipfs.NewShell()
-	arweaveClient := rpc.NewArweaveClient()
+	arweaveClient := arweave.NewClient()
 
 	if env.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true

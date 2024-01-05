@@ -25,7 +25,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
-	// "github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -35,6 +35,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -58,10 +59,9 @@ func Init() {
 	ctx := context.Background()
 	c := ClientInit(ctx)
 	provider, _ := NewMultichainProvider(ctx, SetDefaults)
-	// XXX recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
-	// XXX p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
-	// XXX router := CoreInit(ctx, c, provider, recommender, p)
-	router := CoreInit(ctx, c, provider, nil, nil)
+	recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
+	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
+	router := CoreInit(ctx, c, provider, recommender, p)
 	http.Handle("/", router)
 }
 
@@ -93,7 +93,7 @@ func ClientInit(ctx context.Context) *Clients {
 		HTTPClient:      &http.Client{Timeout: 0},
 		EthClient:       rpc.NewEthClient(),
 		IPFSClient:      ipfs.NewShell(),
-		ArweaveClient:   rpc.NewArweaveClient(),
+		ArweaveClient:   arweave.NewClient(),
 		StorageClient:   rpc.NewStorageClient(ctx),
 		TaskClient:      task.NewClient(ctx),
 		SecretClient:    newSecretsClient(),
@@ -131,8 +131,8 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
 	tokenManageCache := redis.NewCache(redis.TokenManageCache)
 
-	// XXX recommender.Loop(ctx, time.NewTicker(time.Hour))
-	// XXX p.Loop(ctx, time.NewTicker(time.Minute*15))
+	recommender.Loop(ctx, time.NewTicker(time.Hour))
+	p.Loop(ctx, time.NewTicker(time.Minute*15))
 
 	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, c.MagicLinkClient, recommender, p)
 }

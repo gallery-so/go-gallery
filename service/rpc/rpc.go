@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -25,16 +24,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"golang.org/x/image/bmp"
-	"google.golang.org/api/option"
-
-	"github.com/getsentry/sentry-go"
-	"github.com/googleapis/gax-go/v2"
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/tracing"
-	"github.com/mikeydub/go-gallery/util/retry"
-
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,14 +32,22 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
-	goartypes "github.com/everFinance/goar/types"
+	"github.com/getsentry/sentry-go"
+	"github.com/googleapis/gax-go/v2"
 	shell "github.com/ipfs/go-ipfs-api"
+	"golang.org/x/image/bmp"
+	"google.golang.org/api/option"
+	htransport "google.golang.org/api/transport/http"
+
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	htransport "google.golang.org/api/transport/http"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 func init() {
@@ -241,11 +238,6 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,
 		}, continueTrace, spanOptions...),
 	}
-}
-
-// NewArweaveClient returns an Arweave client
-func NewArweaveClient() *goar.Client {
-	return goar.NewClient("https://arweave.net")
 }
 
 // GetBlockNumber returns the current block height.
@@ -828,121 +820,6 @@ func GetContractOwner(ctx context.Context, contractAddress persist.EthereumAddre
 	return persist.EthereumAddress(strings.ToLower(owner.String())), nil
 }
 
-/*
-	{
-	  "manifest": "arweave/paths",
-	  "version": "0.1.0",
-	  "index": { "path": "0" },
-	  "paths": {
-	    "0": { "id": "4vdubhlnXQp7jGjEjXwWjOa-6Pm44zOF7o6lAHEAYB4" },
-	    "1": { "id": "O6ZosH1YVePA7n31UVKJLY9OORIs2ukxwarxE7JYJdY" },
-	    "2": { "id": "1ROXHTSaTTKSCpPVlDhRpxEJ6JE3WQ5ZAgfglo_z4W8" },
-	    "3": { "id": "LF7g-RV4dob0yNAjIaPEjxs8UgXShJI4GFxx6CjVavM" },
-	    "4": { "id": "fudz-Ig2CtM4ZhZcwEn9jnWFWH9S4loZ2taoJoQP1b8" },
-	    "5": { "id": "qYaBEv7QaBKeXPZP9LohHHzr1rwYWMY3bJrDaRoRQ2Q" },
-	    "6": { "id": "jI-4Q2_Z9ZpefzBVBeowpDizAmFtXFSe7w5eOP_CCvA" },
-	    "7": { "id": "2B_s60w4ZS0_QdO6dd0qi0GKqAkYeTJ_bL05kr_tkgk" }
-	  }
-	}
-*/
-type arweaveManifest struct {
-	Manifest string `json:"manifest"`
-	Version  string `json:"version"`
-	Index    struct {
-		Path string `json:"path"`
-	} `json:"index"`
-	Paths map[string]struct {
-		ID string `json:"id"`
-	} `json:"paths"`
-}
-
-// GetArweaveData returns the data from an Arweave transaction
-func GetArweaveData(ctx context.Context, client *goar.Client, id string) ([]byte, error) {
-
-	resultChan := make(chan []byte)
-	errChan := make(chan error)
-	f := func() ([]byte, error) {
-		splitPath := strings.Split(id, "/")
-		var data []byte
-		var tx *goartypes.Transaction
-		currentID := splitPath[0]
-		for i := range splitPath {
-			t, err := client.GetTransactionByID(currentID)
-			if err != nil {
-				return nil, fmt.Errorf("error getting transaction: %s", err.Error())
-			}
-			tx = t
-			data, err = client.GetTransactionData(currentID)
-			if err != nil {
-				return nil, fmt.Errorf("error getting transaction data: %s", err.Error())
-			}
-			if i < len(splitPath)-1 {
-				decoded, err := base64.RawStdEncoding.DecodeString(string(data))
-				if err != nil {
-					return nil, fmt.Errorf("error decoding data: %s", err.Error())
-				}
-				var manifest arweaveManifest
-				err = json.Unmarshal(decoded, &manifest)
-				if err != nil {
-					return nil, fmt.Errorf("error unmarshalling manifest: %s - %s", err.Error(), string(decoded))
-				}
-				currentID = manifest.Paths[splitPath[i+1]].ID
-			}
-		}
-
-		decoded, err := base64.RawURLEncoding.DecodeString(string(data))
-		if err == nil {
-			data = decoded
-		}
-
-		for _, tag := range tx.Tags {
-			decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding tag name: %s", err.Error())
-			}
-			if strings.EqualFold(string(decodedName), "Content-Encoding") {
-				decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
-				if err != nil {
-					return nil, fmt.Errorf("error decoding tag value: %s", err.Error())
-				}
-				if strings.EqualFold(string(decodedValue), "gzip") {
-					zipped, err := gzip.NewReader(bytes.NewReader(data))
-					if err != nil {
-						return nil, fmt.Errorf("error unzipping data: %s", err.Error())
-					}
-					defer zipped.Close()
-					buf := new(bytes.Buffer)
-					_, err = io.Copy(buf, zipped)
-					if err != nil {
-						return nil, fmt.Errorf("error copying data: %s", err.Error())
-					}
-					data = buf.Bytes()
-				}
-			}
-		}
-		return util.RemoveBOM(data), nil
-	}
-
-	go func() {
-		data, err := f()
-		if err != nil {
-			errChan <- err
-			return
-		}
-		resultChan <- data
-	}()
-
-	select {
-	case data := <-resultChan:
-		return data, nil
-	case err := <-errChan:
-		return nil, err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-
-}
-
 func GetArweaveDataHTTPReader(ctx context.Context, id string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://arweave.net/%s", id), nil)
 	if err != nil {
@@ -974,29 +851,6 @@ func GetArweaveDataHTTP(ctx context.Context, id string) ([]byte, error) {
 		return nil, fmt.Errorf("error reading data: %s", err.Error())
 	}
 	return data, nil
-}
-
-// GetArweaveContentType returns the content-type from an Arweave transaction
-func GetArweaveContentType(client *goar.Client, id string) (string, error) {
-	data, err := client.GetTransactionTags(id)
-	if err != nil {
-		return "", err
-	}
-
-	for _, tag := range data {
-		decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
-		if err != nil {
-			return "", err
-		}
-		if strings.EqualFold(string(decodedName), "Content-Encoding") || strings.EqualFold(string(decodedName), "Content-Type") {
-			decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
-			if err != nil {
-				return "", err
-			}
-			return string(decodedValue), nil
-		}
-	}
-	return "", nil
 }
 
 // valFromSlice returns the value from a slice formatted as [key val key val ...]
