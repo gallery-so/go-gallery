@@ -249,6 +249,7 @@ $(DEPLOY)-%-opensea-streamer           : TIMEOUT        := $(OPENSEA_STREAMER_TI
 $(DEPLOY)-%-opensea-streamer           : CPU            := $(OPENSEA_STREAMER_CPU)
 $(DEPLOY)-%-opensea-streamer           : MEMORY         := $(OPENSEA_STREAMER_MEMORY)
 $(DEPLOY)-%-opensea-streamer           : CONCURRENCY    := $(OPENSEA_STREAMER_CONCURRENCY)
+$(DEPLOY)-%-opensea-streamer           : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
 $(DEPLOY)-$(DEV)-opensea-streamer      : SERVICE        := opensea-streamer
 $(DEPLOY)-$(PROD)-opensea-streamer     : SERVICE        := opensea-streamer
 
