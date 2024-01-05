@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"github.com/everFinance/goar"
-
-	"github.com/mikeydub/go-gallery/util"
 )
 
 const ArweaveHost = "https://arweave.net"
@@ -25,7 +23,14 @@ func BestGatewayNodeFrom(u string) string {
 }
 
 func DefaultGatewayFrom(u string) string {
-	return pathURL(ArweaveHost, util.GetURIPath(u, false))
+	return pathURL(ArweaveHost, uriFrom(u))
+}
+
+func uriFrom(u string) string {
+	u = strings.TrimSpace(u)
+	u = strings.TrimPrefix(u, "arweave://")
+	u = strings.TrimPrefix(u, "ar://")
+	return u
 }
 
 func pathURL(host, uri string) string {

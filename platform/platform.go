@@ -92,7 +92,7 @@ func KeywordsFor(td db.TokenDefinition) ([]string, []string) {
 	}
 
 	if td.IsFxhash {
-		imgK := append([]string{"displayUri", "artifactUri", "image", "uri"}, imgK...)
+		imgK := append([]string{"displayUri", "artifactUri", "image", "thumbnailUri", "uri"}, imgK...)
 		animK := append([]string{"artifactUri", "displayUri"}, animK...)
 		return imgK, animK
 	}

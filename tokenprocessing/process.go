@@ -537,6 +537,7 @@ type GoldskyWebhookInput struct {
 		New GoldskyToken1155Holder `json:"new"` // this is what we care about
 	} `json:"data"`
 }
+
 type GoldskyToken1155Holder struct {
 	ID               string `json:"id"`                 // ID in this format "0x{user address}-0x{address}-{token_id}"
 	User             string `json:"user"`               // address in format "\\x{address}"
@@ -865,22 +866,14 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	}
 	// Runtime options that should be applied to every run
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
-	runOpts = append(runOpts, addCauseRunOptions(cause)...)
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
 	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
 	runOpts = append(runOpts, PipelineOpts.WithIsFxhash(td.IsFxhash))
+	runOpts = append(runOpts, PipelineOpts.WithRefreshMetadata())
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessTokenPipeline(ctx, tID, cID, cause, runOpts...)
 	defer closing(err)
 	return media, err
-}
-
-// addCauseRunOptions adds pipeline options for specific types of runs
-func addCauseRunOptions(cause persist.ProcessingCause) (opts []PipelineOption) {
-	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry || cause == persist.ProcessingCausePostPreflight {
-		opts = append(opts, PipelineOpts.WithRefreshMetadata())
-	}
-	return opts
 }
 
 // addContractRunOptions adds pipeline options for specific contracts

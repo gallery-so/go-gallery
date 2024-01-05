@@ -202,7 +202,7 @@ func DefaultGatewayFrom(ipfsURL string) string {
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
 func PathGatewayFrom(gatewayHost, ipfsURL string) string {
-	return pathURL(gatewayHost, util.GetURIPath(ipfsURL, false))
+	return pathURL(gatewayHost, uriFrom(ipfsURL))
 }
 
 func IsIpfsURL(ipfsURL string) bool {
@@ -234,6 +234,17 @@ type authTransport struct {
 func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.SetBasicAuth(t.ProjectID, t.ProjectSecret)
 	return t.RoundTripper.RoundTrip(r)
+}
+
+func uriFrom(u string) string {
+	u = strings.TrimSpace(u)
+	u = strings.TrimPrefix(u, "ipfs://")
+	u = strings.TrimPrefix(u, "https://")
+	pathIdx := strings.Index(u, "/ipfs/")
+	if pathIdx != -1 {
+		u = u[pathIdx+6:] // len("/ipfs/") == 6
+	}
+	return u
 }
 
 // pathURL returns the gateway URL in path resolution sytle

@@ -1339,12 +1339,11 @@ metadatas:
 
 			for _, fieldRequest := range requestedFields {
 				if !fieldRequest.MatchesFilter(metadata.Metadata) {
-					logger.For(ctx).Infof("metadata %+v does not match field request %+v", metadata, fieldRequest)
+					logger.For(ctx).Infof("metadata does not match field request %+v", fieldRequest)
 					prioritiesEncountered = append(prioritiesEncountered, metadata.Priority)
 					continue metadatas
 				}
 			}
-			logger.For(ctx).Infof("got metadata %+v", metadata)
 			if lowestIntNotInList(prioritiesEncountered, len(metadataFetchers)) == metadata.Priority {
 				// short circuit if we've found the highest priority metadata
 				return metadata.Metadata, nil
@@ -1739,12 +1738,14 @@ func chainTokensToUpsertableTokenDefinitions(ctx context.Context, chainTokens []
 				externalURL := util.FirstNonEmptyString(definition.ExternalUrl.String, token.ExternalURL)
 				fallbackMedia, _ := util.FindFirst([]persist.FallbackMedia{definition.FallbackMedia, token.FallbackMedia}, func(m persist.FallbackMedia) bool { return m.IsServable() })
 				metadata, _ := util.FindFirst([]persist.TokenMetadata{definition.Metadata, token.TokenMetadata}, func(m persist.TokenMetadata) bool { return len(m) > 0 })
+				isFxhash := definition.IsFxhash || platform.IsFxhash(contractLookup[contractIdentifiers])
 
 				definition.Name = util.ToNullString(name, true)
 				definition.Description = util.ToNullString(description, true)
 				definition.ExternalUrl = util.ToNullString(externalURL, true)
 				definition.FallbackMedia = fallbackMedia
 				definition.Metadata = metadata
+				definition.IsFxhash = isFxhash
 				definitions[tokenIdentifiers] = definition
 			}
 		}
