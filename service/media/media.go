@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -254,7 +253,7 @@ func MediaFromContentType(contentType string) persist.MediaType {
 }
 
 // FindImageAndAnimationURLs will attempt to find the image and animation URLs for a given token
-func FindImageAndAnimationURLs(ctx context.Context, chain persist.Chain, contractAddress persist.Address, metadata persist.TokenMetadata) (imgURL ImageURL, vURL AnimationURL, err error) {
+func FindImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords []string, animKeywords []string) (imgURL ImageURL, animURL AnimationURL, err error) {
 	if metaMedia, ok := metadata["media"].(map[string]any); ok {
 		logger.For(ctx).Debugf("found media metadata: %s", metaMedia)
 		var mediaType persist.MediaType
@@ -267,40 +266,33 @@ func FindImageAndAnimationURLs(ctx context.Context, chain persist.Chain, contrac
 			case persist.MediaTypeImage, persist.MediaTypeSVG, persist.MediaTypeGIF:
 				imgURL = ImageURL(uri)
 			default:
-				vURL = AnimationURL(uri)
+				animURL = AnimationURL(uri)
 			}
 		}
 	}
 
-	image, anim := keywordsForToken(contractAddress, chain)
-
-	for _, keyword := range anim {
+	for _, keyword := range imgKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
-			vURL = AnimationURL(it)
+			animURL = AnimationURL(it)
 			break
 		}
 	}
 
-	for _, keyword := range image {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && AnimationURL(it) != vURL {
+	for _, keyword := range animKeywords {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && AnimationURL(it) != animURL {
 			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
 			imgURL = ImageURL(it)
 			break
 		}
 	}
 
-	if imgURL == "" && vURL == "" {
+	if imgURL == "" && animURL == "" {
 		return "", "", ErrNoMediaURLs
 	}
 
-	// Ethereum has a consistent naming standard for metadata fields
-	// but other chains like Tezos do not
-	if chain != persist.ChainETH {
-		imgURL, vURL = predictTrueURLs(ctx, imgURL, vURL)
-	}
-
-	return imgURL, vURL, nil
+	imgURL, animURL = predictTrueURLs(ctx, imgURL, animURL)
+	return imgURL, animURL, nil
 }
 
 func predictTrueURLs(ctx context.Context, curImg ImageURL, curV AnimationURL) (ImageURL, AnimationURL) {
@@ -326,18 +318,6 @@ func predictTrueURLs(ctx context.Context, curImg ImageURL, curV AnimationURL) (I
 	}
 
 	return curImg, curV
-}
-
-func keywordsForToken(contract persist.Address, chain persist.Chain) ([]string, []string) {
-	switch {
-	case platform.IsHicEtNunc(chain, contract):
-		_, anim := chain.BaseKeywords()
-		return []string{"artifactUri", "displayUri", "image"}, anim
-	case platform.IsFxhashTezos(chain, contract):
-		return []string{"displayUri", "artifactUri", "image", "uri"}, []string{"artifactUri", "displayUri"}
-	default:
-		return chain.BaseKeywords()
-	}
 }
 
 func parseContentLength(h http.Header) (int64, error) {

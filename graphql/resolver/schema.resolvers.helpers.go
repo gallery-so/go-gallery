@@ -2318,7 +2318,6 @@ func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persis
 	}
 
 	// Rewrite media IPFS and Arweave URLs to HTTP
-	// Temporarily re-write URLs using the infura gateway node to a more reliable one
 	if mediaURL := tokenMedia.Media.MediaURL.String(); ipfs.IsIpfsURL(mediaURL) {
 		tokenMedia.Media.MediaURL = persist.NullString(ipfs.BestGatewayNodeFrom(mediaURL, isFxHash))
 	} else if strings.HasPrefix(mediaURL, "ar://") {

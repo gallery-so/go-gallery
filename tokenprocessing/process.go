@@ -71,7 +71,7 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td, c))
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0,
+				_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSync, 0,
 					addIsSpamJobOption(c),
 					PipelineOpts.WithRequireProhibitionimage(c), // Require image to be processed if Prohibition token
 					PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
@@ -88,91 +88,91 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 }
 
 func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
 		var input ProcessMediaForTokenInput
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
+		if err := ctx.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(ctx, http.StatusBadRequest, err)
 			return
 		}
 
-		td, err := queries.GetTokenDefinitionByTokenIdentifiers(c, db.GetTokenDefinitionByTokenIdentifiersParams{
+		td, err := queries.GetTokenDefinitionByTokenIdentifiers(ctx, db.GetTokenDefinitionByTokenIdentifiersParams{
 			Chain:           input.Chain,
 			ContractAddress: input.ContractAddress,
 			TokenID:         input.TokenID,
 		})
 		if err == pgx.ErrNoRows {
-			util.ErrResponse(c, http.StatusNotFound, err)
+			util.ErrResponse(ctx, http.StatusNotFound, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		contract, err := queries.GetContractByID(c, td.ContractID)
+		c, err := queries.GetContractByID(ctx, td.ContractID)
 		if err == pgx.ErrNoRows {
-			util.ErrResponse(c, http.StatusNotFound, err)
+			util.ErrResponse(ctx, http.StatusNotFound, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(contract))
+		_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(c))
 
 		if err != nil {
 			if util.ErrorIs[ErrBadToken](err) {
-				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
+				util.ErrResponse(ctx, http.StatusUnprocessableEntity, err)
 				return
 			}
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
 // processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
 func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
 		var input task.TokenProcessingTokenMessage
 
 		// Remove from queue if bad message
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
+		if err := ctx.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 
-		td, err := queries.GetTokenDefinitionById(c, input.TokenDefinitionID)
+		td, err := queries.GetTokenDefinitionById(ctx, input.TokenDefinitionID)
 		if err == pgx.ErrNoRows {
 			// Remove from queue if not found
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		contract, err := queries.GetContractByID(c, td.ContractID)
+		c, err := queries.GetContractByID(ctx, td.ContractID)
 		if err == pgx.ErrNoRows {
 			// Remove from queue if not found
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		tm := tokenmanage.NewWithRetries(c, taskClient, cache, numRetriesF(td, contract))
+		tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td, c))
 
-		runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
+		runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(c))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -776,78 +776,78 @@ func processWalletRemoval(queries *db.Queries) gin.HandlerFunc {
 }
 
 func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo *postgres.UserRepository, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
 		var input task.PostPreflightMessage
 
-		if err := c.ShouldBindJSON(&input); err != nil {
+		if err := ctx.ShouldBindJSON(&input); err != nil {
 			// Remove from queue if bad message
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 
-		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiersIgnoringStatus(c, db.GetMediaByTokenIdentifiersIgnoringStatusParams{
+		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiersIgnoringStatus(ctx, db.GetMediaByTokenIdentifiersIgnoringStatusParams{
 			Chain:           input.Token.Chain,
 			ContractAddress: input.Token.ContractAddress,
 			TokenID:         input.Token.TokenID,
 		})
 		if err != nil && err != pgx.ErrNoRows {
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 
 		// Process media for the token
 		if !existingMedia.Active {
-			td, err := mc.TokenExists(c, input.Token, retry.DefaultRetry)
+			td, err := mc.TokenExists(ctx, input.Token, retry.DefaultRetry)
 			if err != nil {
 				// Keep retrying until we get the token or reach max retries
-				util.ErrResponse(c, http.StatusInternalServerError, err)
+				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
 
-			contract, err := mc.Queries.GetContractByID(c, td.ContractID)
+			c, err := mc.Queries.GetContractByID(ctx, td.ContractID)
 			if err == pgx.ErrNoRows {
 				// Remove from queue if not found
-				util.ErrResponse(c, http.StatusOK, err)
+				util.ErrResponse(ctx, http.StatusOK, err)
 				return
 			}
 			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
+				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
 
-			tm := tokenmanage.NewWithRetries(c, taskClient, cache, numRetriesF(td, contract))
+			tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td, c))
 
-			runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
-				addIsSpamJobOption(contract),
-				PipelineOpts.WithRequireImage(),                    // Require an image if token is Prohibition token
-				PipelineOpts.WithRequireFxHashSigned(td, contract), // Require token to be signed if it is an FxHash token
+			runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCausePostPreflight, 0,
+				addIsSpamJobOption(c),
+				PipelineOpts.WithRequireImage(),             // Require an image if token is Prohibition token
+				PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
 			)
 		}
 
 		// Try to sync the user's token if a user is provided
 		if input.UserID != "" {
-			user, err := userRepo.GetByID(c, input.UserID)
+			user, err := userRepo.GetByID(ctx, input.UserID)
 			if err != nil {
 				// If the user doesn't exist, remove the message from the queue
-				util.ErrResponse(c, http.StatusOK, err)
+				util.ErrResponse(ctx, http.StatusOK, err)
 				return
 			}
 			// Try to sync the user's tokens by searching for the token in each of the user's wallets
 			// SyncTokenByUserWalletsAndTokenIdentifiersRetry processes media for the token if it is found
 			// so we don't need to run the pipeline again here
-			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(c, user, input.Token, retry.DefaultRetry)
+			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, input.Token, retry.DefaultRetry)
 			if err != nil {
 				// Keep retrying until we get the token or reach max retries
-				util.ErrResponse(c, http.StatusInternalServerError, err)
+				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
 		}
 
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
-func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
+func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, c db.Contract, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDefinitionDBID": td.ID,
 		"contractDBID":        td.ContractID,
@@ -864,16 +864,17 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 		return db.TokenMedia{}, err
 	}
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
-	runOpts = append(runOpts, addContextRunOptions(cause)...)
+	runOpts = append(runOpts, addCauseRunOptions(cause)...)
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
+	runOpts = append(runOpts, PipelineOpts.WithKeywords(td, c))
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessTokenPipeline(ctx, tID, cID, cause, runOpts...)
 	defer closing(err)
 	return media, err
 }
 
-// addContextRunOptions adds pipeline options for specific types of runs
-func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption) {
+// addCauseRunOptions adds pipeline options for specific types of runs
+func addCauseRunOptions(cause persist.ProcessingCause) (opts []PipelineOption) {
 	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry || cause == persist.ProcessingCausePostPreflight {
 		opts = append(opts, PipelineOpts.WithRefreshMetadata())
 	}

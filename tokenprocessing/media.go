@@ -443,11 +443,11 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func findImageAndAnimationURLs(ctx context.Context, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
+func findImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords, animKeywords []string, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
 
-	imgURL, vURL, err := media.FindImageAndAnimationURLs(ctx, chain, contractAddress, metadata)
+	imgURL, vURL, err := media.FindImageAndAnimationURLs(ctx, metadata, imgKeywords, animKeywords)
 	if err != nil {
 		persist.FailStep(&pMeta.MediaURLsRetrieval)
 	}

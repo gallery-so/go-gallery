@@ -71,7 +71,12 @@ type tokenProcessingJob struct {
 	requireImage bool
 	// requireFxHashSigned indicates that the pipeline should return an error if the token is FxHash but it isn't signed yet.
 	requireFxHashSigned bool
-	fxHashIsSignedF     func(persist.TokenMetadata) bool
+	//fxHashIsSignedF is called to determine if a token is signed by Fxhash. It's currently used to determine if the token should be retried at a later time if it is not signed yet.
+	fxHashIsSignedF func(persist.TokenMetadata) bool
+	// imgKeywords are fields in the token's metadata that the pipeline should treat as images. If imgKeywords is empty, the chain's default keywords are used instead.
+	imgKeywords []string
+	// animKeywords are fields in the token's metadata that the pipeline should treat as animations. If animKeywords is empty, the chain's default keywords are used instead.
+	animKeywords []string
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -127,6 +132,10 @@ func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) Pipel
 	}
 }
 
+func (pOpts) WithKeywords(td db.TokenDefinition, c db.Contract) PipelineOption {
+	return func(j *tokenProcessingJob) { j.imgKeywords, j.animKeywords = platform.KeywordsFor(td, c) }
+}
+
 type ErrImageResultRequired struct{ Err error }
 
 func (e ErrImageResultRequired) Unwrap() error { return e.Err }
@@ -165,6 +174,16 @@ func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persis
 		opt(job)
 	}
 
+	if len(job.imgKeywords) == 0 {
+		k, _ := token.Chain.BaseKeywords()
+		job.imgKeywords = k
+	}
+
+	if len(job.animKeywords) == 0 {
+		_, k := token.Chain.BaseKeywords()
+		job.animKeywords = k
+	}
+
 	startTime := time.Now()
 	media, err := job.Run(ctx)
 	recordPipelineEndState(ctx, tp.mr, job.token.Chain, media, err, time.Since(startTime), cause)
@@ -198,7 +217,7 @@ func (tpj *tokenProcessingJob) Run(ctx context.Context) (db.TokenMedia, error) {
 
 func findURLsToDownloadFrom(ctx context.Context, tpj *tokenProcessingJob, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
 	pfpURL = findProfileImageURL(metadata, tpj.profileImageKey)
-	imgURL, animURL, err = findImageAndAnimationURLs(ctx, tpj.token.ContractAddress, tpj.token.Chain, metadata, tpj.pipelineMetadata)
+	imgURL, animURL, err = findImageAndAnimationURLs(ctx, metadata, tpj.imgKeywords, tpj.animKeywords, tpj.pipelineMetadata)
 	return imgURL, pfpURL, animURL, err
 }
 

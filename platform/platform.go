@@ -95,3 +95,21 @@ func IsFxhashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadat
 	}
 	return true
 }
+
+// KeywordsFor returns the fields in a token's metadata that should be used to download assets from
+func KeywordsFor(td db.TokenDefinition, c db.Contract) ([]string, []string) {
+	imgK, animK := td.Chain.BaseKeywords()
+
+	if IsHicEtNunc(td.Chain, td.ContractAddress) {
+		imgK = append([]string{"artifactUri", "displayUri", "image"}, imgK...)
+		return imgK, animK
+	}
+
+	if IsFxhash(td, c) {
+		imgK := append([]string{"displayUri", "artifactUri", "image", "uri"}, imgK...)
+		animK := append([]string{"artifactUri", "displayUri"}, animK...)
+		return imgK, animK
+	}
+
+	return imgK, animK
+}
