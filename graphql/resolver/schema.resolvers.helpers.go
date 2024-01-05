@@ -24,7 +24,6 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
@@ -2278,12 +2277,10 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 	}
 }
 
-func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, c db.Contract, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
-	isFxHash := platform.IsFxhash(td, c)
-
+func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2297,7 +2294,7 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, c db.Contract
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
@@ -2307,7 +2304,7 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, c db.Contract
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, isFxHash)
+	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash)
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool, isFxHash bool) model.MediaSubtype {

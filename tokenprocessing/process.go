@@ -68,10 +68,10 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 					return err
 				}
 
-				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td, c))
+				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td))
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSync, 0,
+				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0,
 					addIsSpamJobOption(c),
 					PipelineOpts.WithRequireProhibitionimage(c), // Require image to be processed if Prohibition token
 					PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
@@ -119,7 +119,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm
 			return
 		}
 
-		_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(c))
+		_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(c))
 
 		if err != nil {
 			if util.ErrorIs[ErrBadToken](err) {
@@ -167,9 +167,9 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskCl
 			return
 		}
 
-		tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td, c))
+		tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
 
-		runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(c))
+		runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(c))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
 		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -815,9 +815,9 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 				return
 			}
 
-			tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td, c))
+			tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
 
-			runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCausePostPreflight, 0,
+			runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
 				addIsSpamJobOption(c),
 				PipelineOpts.WithRequireImage(),             // Require an image if token is Prohibition token
 				PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
@@ -847,7 +847,7 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 	}
 }
 
-func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, c db.Contract, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
+func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDefinitionDBID": td.ID,
 		"contractDBID":        td.ContractID,
@@ -867,8 +867,8 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
 	runOpts = append(runOpts, addCauseRunOptions(cause)...)
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
-	runOpts = append(runOpts, PipelineOpts.WithKeywords(td, c))
-	runOpts = append(runOpts, PipelineOpts.WithIsFxhash())
+	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
+	runOpts = append(runOpts, PipelineOpts.WithIsFxhash(td.IsFxhash))
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessTokenPipeline(ctx, tID, cID, cause, runOpts...)
 	defer closing(err)
@@ -896,9 +896,9 @@ func addIsSpamJobOption(c db.Contract) PipelineOption {
 }
 
 // numRetriesF returns a function that when called, returns the number of retries allotted for a token and contract
-func numRetriesF(td db.TokenDefinition, c db.Contract) tokenmanage.NumRetryF {
+func numRetriesF(td db.TokenDefinition) tokenmanage.NumRetryF {
 	return func() int {
-		if platform.IsProhibition(c.Chain, c.Address) || platform.IsFxhash(td, c) {
+		if platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash {
 			return 24
 		}
 		return 4

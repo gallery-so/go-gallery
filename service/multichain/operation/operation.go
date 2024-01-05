@@ -143,6 +143,7 @@ func BulkUpsert(ctx context.Context, q *db.Queries, tokens []UpsertToken, defini
 		appendJSONB(&params.DefinitionMetadata, d.Metadata, &errors)
 		params.DefinitionContractAddress = append(params.DefinitionContractAddress, d.ContractAddress.String())
 		params.DefinitionContractID = append(params.DefinitionContractID, d.ContractID.String())
+		params.DefinitionIsFxhash = append(params.DefinitionIsFxhash, d.IsFxhash)
 		// Defer error checking until now to keep the code above from being
 		// littered with multiline "if" statements
 		if len(errors) > 0 {

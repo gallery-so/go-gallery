@@ -51,7 +51,6 @@ func (q *Queries) CountHoldersByCommunityID(ctx context.Context, communityID per
 }
 
 const countPostsByCommunityID = `-- name: CountPostsByCommunityID :one
-
 with community_data as (
     select community_type, contract_id
     from communities
@@ -84,9 +83,6 @@ community_posts as (
 select count(*) from community_posts
 `
 
-// set role to access_rw;
-// create index posts_token_ids_idx on posts using gin (token_ids) where (deleted = false);
-// drop index if exists posts_token_ids_idx;
 func (q *Queries) CountPostsByCommunityID(ctx context.Context, communityID persist.DBID) (int64, error) {
 	row := q.db.QueryRow(ctx, countPostsByCommunityID, communityID)
 	var count int64
@@ -298,7 +294,7 @@ with community_data as (
 ),
 
 community_token_definitions as (
-    select td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id
+    select td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash
     from community_data, token_definitions td
     where community_data.community_type = 0
         and td.contract_id = community_data.contract_id
@@ -306,7 +302,7 @@ community_token_definitions as (
 
     union all
 
-    select td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id
+    select td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash
     from community_data, token_definitions td
         join token_community_memberships on td.id = token_community_memberships.token_definition_id
             and token_community_memberships.community_id = $2

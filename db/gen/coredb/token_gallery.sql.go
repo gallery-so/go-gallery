@@ -75,6 +75,7 @@ with token_definitions_insert as (
     , contract_address
     , contract_id
     , metadata
+    , is_fxhash
   ) (
     select unnest($1::varchar[]) as id
       , now()
@@ -90,6 +91,7 @@ with token_definitions_insert as (
       , unnest($9::varchar[]) as contract_address
       , unnest($10::varchar[]) as contract_id
       , unnest($11::jsonb[]) as metadata
+      , unnest($12::boolean[]) as is_fxhash
   )
   on conflict (chain, contract_id, token_id) where deleted = false
   do update set
@@ -101,7 +103,8 @@ with token_definitions_insert as (
     , fallback_media = excluded.fallback_media
     , contract_address = excluded.contract_address
     , metadata = excluded.metadata
-  returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id
+    , is_fxhash = excluded.is_fxhash
+  returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id, is_fxhash
 )
 , tokens_insert as (
   insert into tokens
@@ -131,34 +134,34 @@ with token_definitions_insert as (
       , bulk_upsert.quantity
       , bulk_upsert.block_number
       , bulk_upsert.owner_user_id
-      , case when $12::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
-      , case when $13::bool then bulk_upsert.is_creator_token else false end
+      , case when $13::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
+      , case when $14::bool then bulk_upsert.is_creator_token else false end
       , now()
       , token_definitions_insert.id
       , bulk_upsert.contract_id
     from (
-      select unnest($14::varchar[]) as id
-        , unnest($15::int[]) as version
-        , unnest($16::varchar[]) as collectors_note
-        , unnest($17::varchar[]) as quantity
-        , unnest($18::bigint[]) as block_number
-        , unnest($19::varchar[]) as owner_user_id
-        , $20::varchar[] as owned_by_wallets
-        , unnest($21::int[]) as owned_by_wallets_start_idx
-        , unnest($22::int[]) as owned_by_wallets_end_idx
-        , unnest($23::bool[]) as is_creator_token
-        , unnest($24::varchar[]) as token_id
-        , unnest($25::varchar[]) as contract_address
-        , unnest($26::int[]) as chain
-        , unnest($27::varchar[]) as contract_id
+      select unnest($15::varchar[]) as id
+        , unnest($16::int[]) as version
+        , unnest($17::varchar[]) as collectors_note
+        , unnest($18::varchar[]) as quantity
+        , unnest($19::bigint[]) as block_number
+        , unnest($20::varchar[]) as owner_user_id
+        , $21::varchar[] as owned_by_wallets
+        , unnest($22::int[]) as owned_by_wallets_start_idx
+        , unnest($23::int[]) as owned_by_wallets_end_idx
+        , unnest($24::bool[]) as is_creator_token
+        , unnest($25::varchar[]) as token_id
+        , unnest($26::varchar[]) as contract_address
+        , unnest($27::int[]) as chain
+        , unnest($28::varchar[]) as contract_id
     ) bulk_upsert
     join token_definitions_insert on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions_insert.chain, token_definitions_insert.contract_address, token_definitions_insert.token_id)
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
     quantity = excluded.quantity
-    , owned_by_wallets = case when $12 then excluded.owned_by_wallets else tokens.owned_by_wallets end
-    , is_creator_token = case when $13 then excluded.is_creator_token else tokens.is_creator_token end
+    , owned_by_wallets = case when $13 then excluded.owned_by_wallets else tokens.owned_by_wallets end
+    , is_creator_token = case when $14 then excluded.is_creator_token else tokens.is_creator_token end
     , block_number = excluded.block_number
     , version = excluded.version
     , last_updated = excluded.last_updated
@@ -166,7 +169,7 @@ with token_definitions_insert as (
     , contract_id = excluded.contract_id
   returning id, deleted, version, created_at, last_updated, collectors_note, quantity, block_number, owner_user_id, owned_by_wallets, contract_id, is_user_marked_spam, last_synced, is_creator_token, token_definition_id, is_holder_token, displayable
 )
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
 from tokens_insert tokens
 join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id
 join contracts on token_definitions.contract_id = contracts.id
@@ -184,6 +187,7 @@ type UpsertTokensParams struct {
 	DefinitionContractAddress   []string       `db:"definition_contract_address" json:"definition_contract_address"`
 	DefinitionContractID        []string       `db:"definition_contract_id" json:"definition_contract_id"`
 	DefinitionMetadata          []pgtype.JSONB `db:"definition_metadata" json:"definition_metadata"`
+	DefinitionIsFxhash          []bool         `db:"definition_is_fxhash" json:"definition_is_fxhash"`
 	SetHolderFields             bool           `db:"set_holder_fields" json:"set_holder_fields"`
 	SetCreatorFields            bool           `db:"set_creator_fields" json:"set_creator_fields"`
 	TokenDbid                   []string       `db:"token_dbid" json:"token_dbid"`
@@ -221,6 +225,7 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 		arg.DefinitionContractAddress,
 		arg.DefinitionContractID,
 		arg.DefinitionMetadata,
+		arg.DefinitionIsFxhash,
 		arg.SetHolderFields,
 		arg.SetCreatorFields,
 		arg.TokenDbid,
@@ -278,6 +283,7 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 			&i.TokenDefinition.ContractAddress,
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
+			&i.TokenDefinition.IsFxhash,
 			&i.Contract.ID,
 			&i.Contract.Deleted,
 			&i.Contract.Version,

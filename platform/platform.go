@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"net/url"
 	"strings"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -44,12 +43,12 @@ func IsHicEtNunc(chain persist.Chain, address persist.Address) bool {
 	return util.Contains(HicEtNuncContracts, persist.NewContractIdentifiers(address, chain))
 }
 
-func IsFxhash(td db.TokenDefinition, c db.Contract) bool {
-	if td.Chain == persist.ChainTezos {
-		return IsFxhashTezos(td.Chain, td.ContractAddress)
+func IsFxhash(c db.Contract) bool {
+	if c.Chain == persist.ChainTezos {
+		return IsFxhashTezos(c.Chain, c.Address)
 	}
-	if td.Chain == persist.ChainETH {
-		return IsFxhashEth(td.Chain, td.ContractAddress, c.Symbol.String, td.Metadata)
+	if c.Chain == persist.ChainETH {
+		return IsFxhashEth(c.Chain, c.Address, c.Symbol.String)
 	}
 	return false
 }
@@ -58,33 +57,20 @@ func IsFxhashTezos(chain persist.Chain, address persist.Address) bool {
 	return util.Contains(FxHashContracts, persist.NewContractIdentifiers(address, chain))
 }
 
-func IsFxhashEth(chain persist.Chain, address persist.Address, contractSymbol string, tokenMetadata persist.TokenMetadata) bool {
-	if chain == persist.ChainETH {
-		// fxhash contracts on eth are deployed with "FXGEN" as the contract symbol
-		if strings.ToLower(contractSymbol) == "fxgen" {
-			return true
-		}
-		// check if the external_url has fxhash as the domain
-		if u, ok := tokenMetadata["external_url"].(string); ok {
-			parsed, _ := url.Parse(u)
-			if chain == persist.ChainETH && strings.HasPrefix(parsed.Hostname(), "fxhash") {
-				return true
-			}
-		}
-	}
-	return false
+func IsFxhashEth(chain persist.Chain, address persist.Address, contractSymbol string) bool {
+	return chain == persist.ChainETH && strings.ToLower(contractSymbol) == "fxgen"
 }
 
 func IsFxhashSignedTezos(chain persist.Chain, address persist.Address, tokenName string) bool {
-	return !IsFxhashTezos(chain, address) || tokenName != "[WAITING TO BE SIGNED]"
+	return !IsFxhashTezos(chain, address) || strings.ToLower(tokenName) != "[waiting to be signed]"
 }
 
 func IsFxhashSignedEth(chain persist.Chain, address persist.Address, contractSymbol string, tokenMetadata persist.TokenMetadata) bool {
-	return !IsFxhashEth(chain, address, contractSymbol, tokenMetadata) || (tokenMetadata["authenticityHash"] != "" && tokenMetadata["authenticityHash"] != nil)
+	return !IsFxhashEth(chain, address, contractSymbol) || (tokenMetadata["authenticityHash"] != "" && tokenMetadata["authenticityHash"] != nil)
 }
 
 func IsFxhashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadata) bool {
-	if !IsFxhash(td, c) {
+	if td.IsFxhash {
 		return true
 	}
 	if td.Chain == persist.ChainTezos {
@@ -97,7 +83,7 @@ func IsFxhashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadat
 }
 
 // KeywordsFor returns the fields in a token's metadata that should be used to download assets from
-func KeywordsFor(td db.TokenDefinition, c db.Contract) ([]string, []string) {
+func KeywordsFor(td db.TokenDefinition) ([]string, []string) {
 	imgK, animK := td.Chain.BaseKeywords()
 
 	if IsHicEtNunc(td.Chain, td.ContractAddress) {
@@ -105,7 +91,7 @@ func KeywordsFor(td db.TokenDefinition, c db.Contract) ([]string, []string) {
 		return imgK, animK
 	}
 
-	if IsFxhash(td, c) {
+	if td.IsFxhash {
 		imgK := append([]string{"displayUri", "artifactUri", "image", "uri"}, imgK...)
 		animK := append([]string{"artifactUri", "displayUri"}, animK...)
 		return imgK, animK

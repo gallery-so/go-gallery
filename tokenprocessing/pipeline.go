@@ -128,15 +128,15 @@ func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
 	}
 }
 
-func (pOpts) WithIsFxhash() PipelineOption {
+func (pOpts) WithIsFxhash(isFxhash bool) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		j.isFxhash = true
+		j.isFxhash = isFxhash
 	}
 }
 
 func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		if platform.IsFxhash(td, c) {
+		if td.IsFxhash {
 			j.isFxhash = true
 			j.requireFxHashSigned = true
 			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return platform.IsFxhashSigned(td, c, m) }
@@ -144,9 +144,9 @@ func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) Pipel
 	}
 }
 
-func (pOpts) WithKeywords(td db.TokenDefinition, c db.Contract) PipelineOption {
+func (pOpts) WithKeywords(td db.TokenDefinition) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		j.imgKeywords, j.animKeywords = platform.KeywordsFor(td, c)
+		j.imgKeywords, j.animKeywords = platform.KeywordsFor(td)
 	}
 }
 
