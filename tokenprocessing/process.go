@@ -579,7 +579,7 @@ func (o OpenseaNFTID) String() string {
 		cstring = "base"
 
 	}
-	return fmt.Sprintf("%s/%s/%s", cstring, o.ContractAddress, o.TokenID)
+	return fmt.Sprintf("%s/%s/%s", cstring, o.ContractAddress, o.TokenID.Base10String())
 }
 
 func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
@@ -616,7 +616,10 @@ func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
 	o.ContractAddress = persist.Address(strings.ToLower(split[1]))
 	asBig, ok := big.NewInt(0).SetString(split[2], 10)
 	if !ok {
-		return fmt.Errorf("invalid opensea token id: %s", split[2])
+		asBig, ok = big.NewInt(0).SetString(split[2], 16)
+		if !ok {
+			return fmt.Errorf("invalid opensea token id: %s", split[2])
+		}
 	}
 	o.TokenID = persist.TokenID(asBig.Text(16))
 
