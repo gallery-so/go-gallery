@@ -164,37 +164,40 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 				logger.For(nil).Error(err)
 				continue
 			}
-			if bf.Test(chainAddress) {
-				logger.For(nil).Infof("received user item transfer event for wallet %s on chain %d", win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
-
-				// send to token processing service
-				func() {
-					ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-					defer cancel()
-					payloadJSON, err := json.Marshal(win)
-					if err != nil {
-						logger.For(nil).Error(err)
-						return
-					}
-					req, err := http.NewRequestWithContext(ctx, http.MethodPost, env.GetString("TOKEN_PROCESSING_URL")+"/owners/process/opensea", bytes.NewBuffer(payloadJSON))
-					if err != nil {
-						logger.For(nil).Error(err)
-						return
-					}
-					req.Header.Set("Content-Type", "application/json")
-					req.Header.Set("Authorization", env.GetString("WEBHOOK_TOKEN"))
-					resp, err := http.DefaultClient.Do(req)
-					if err != nil {
-						logger.For(nil).Error(err)
-						return
-					}
-
-					if resp.StatusCode != http.StatusOK {
-						logger.For(nil).Errorf("non-200 response from token processing service: %d", resp.StatusCode)
-						return
-					}
-				}()
+			if !bf.Test(chainAddress) {
+				continue
 			}
+
+			logger.For(nil).Infof("received user item transfer event for wallet %s on chain %d", win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
+
+			// send to token processing service
+			func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+				defer cancel()
+				payloadJSON, err := json.Marshal(win)
+				if err != nil {
+					logger.For(nil).Error(err)
+					return
+				}
+				req, err := http.NewRequestWithContext(ctx, http.MethodPost, env.GetString("TOKEN_PROCESSING_URL")+"/owners/process/opensea", bytes.NewBuffer(payloadJSON))
+				if err != nil {
+					logger.For(nil).Error(err)
+					return
+				}
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", env.GetString("WEBHOOK_TOKEN"))
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					logger.For(nil).Error(err)
+					return
+				}
+
+				if resp.StatusCode != http.StatusOK {
+					logger.For(nil).Errorf("non-200 response from token processing service: %d", resp.StatusCode)
+					return
+				}
+			}()
+
 		}
 	}()
 
