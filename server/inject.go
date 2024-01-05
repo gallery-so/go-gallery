@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
@@ -454,7 +455,8 @@ func tezosFallbackProvider(e envInit, httpClient *http.Client) multichain.SyncWi
 
 func tezosTokenEvalFunc() func(multichain.ChainAgnosticToken) bool {
 	return func(t multichain.ChainAgnosticToken) bool {
-		return tezos.IsFxHashSigned(t.ContractAddress, t.Descriptors.Name) && tezos.ContainsTezosKeywords(t)
+		return platform.IsFxhashSignedTezos(persist.ChainTezos, t.ContractAddress, t.Descriptors.Name) &&
+			tezos.ContainsTezosKeywords(t)
 	}
 }
 

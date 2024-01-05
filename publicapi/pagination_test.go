@@ -278,12 +278,7 @@ func TestMain(t *testing.T) {
 			expected := []string{"a", "b", "c", "d", "e"}
 			first := 5
 
-			ret, _, err := p.paginate(nil, nil, &first, nil)
-
-			actual := make([]string, len(ret))
-			for i, v := range ret {
-				actual[i] = v
-			}
+			actual, _, err := p.paginate(nil, nil, &first, nil)
 
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
@@ -307,12 +302,7 @@ func TestMain(t *testing.T) {
 			expected := []string{"a", "b", "c", "d", "e"}
 			last := 5
 
-			ret, _, err := p.paginate(nil, nil, nil, &last)
-
-			actual := make([]string, len(ret))
-			for i, v := range ret {
-				actual[i] = v
-			}
+			actual, _, err := p.paginate(nil, nil, nil, &last)
 
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
