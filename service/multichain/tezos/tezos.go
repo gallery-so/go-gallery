@@ -26,35 +26,6 @@ import (
 	"github.com/mikeydub/go-gallery/util/retry"
 )
 
-const (
-	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
-	objktCom  = "KT19xbD2xn6A81an18S35oKtnkFNr9CVwY5m"
-	fxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
-	fxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
-	fxHash3   = "KT1EfsNuqwLAWDd3o4pvfUx1CAh5GMdTrRvr"
-	fxHash4   = "KT1GtbuswcNMGhHF2TSuH1Yfaqn16do8Qtva"
-)
-
-var hicContracts = []persist.Address{
-	persist.Address(hicEtNunc),
-	persist.Address(objktCom),
-}
-
-var fxContracts = []persist.Address{
-	persist.Address(fxHash),
-	persist.Address(fxHash2),
-	persist.Address(fxHash3),
-	persist.Address(fxHash4),
-}
-
-func IsHicEtNunc(contract persist.Address) bool {
-	return util.Contains(hicContracts, contract)
-}
-
-func IsFxHash(contract persist.Address) bool {
-	return util.Contains(fxContracts, contract)
-}
-
 const pageSize = 1000
 
 const tezDomainsApiURL = "https://api.tezos.domains/graphql"
@@ -1064,15 +1035,6 @@ func (b balance) ToBigInt() *big.Int {
 		panic(fmt.Sprintf("failed to convert tokenID to int: %s", b))
 	}
 	return asInt
-}
-
-// IsFxHashSigned returns false if the token is an unsigned FxHash token (metadata hasn't yet been uploaded to the FxHash contract).
-// It's possible for tzkt to index a token before FxHash signs a token which results in the API returning placeholder metadata.
-// This seems to happen infrequently, but there are a few cases where the token is never updated with the signed metadata
-// (either because of tzkt failing to update the metadata, or FxHash never signing the token). If it's the former, we want to
-// fallback to an alternative provider in case there might be usable metadata elsewhere.
-func IsFxHashSigned(contract persist.Address, tokenName string) bool {
-	return !IsFxHash(contract) || tokenName != "[WAITING TO BE SIGNED]"
 }
 
 // ContainsTezosKeywords returns true if the token's metadata has at least one non-empty Tezos keyword.

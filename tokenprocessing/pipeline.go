@@ -15,12 +15,14 @@ import (
 	"google.golang.org/api/googleapi"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -66,11 +68,18 @@ type tokenProcessingJob struct {
 	defaultMetadata persist.TokenMetadata
 	// isSpamJob indicates that the job is processing a spam token. It's currently used to exclude events from Sentry.
 	isSpamJob bool
+	// isFxhash indicates that the job is processing a fxhash token.
+	isFxhash bool
 	// requireImage indicates that the pipeline should return an error if an image URL is present but an image wasn't cached.
 	requireImage bool
 	// requireFxHashSigned indicates that the pipeline should return an error if the token is FxHash but it isn't signed yet.
 	requireFxHashSigned bool
-	fxHashIsSignedF     func(persist.TokenMetadata) bool
+	//fxHashIsSignedF is called to determine if a token is signed by Fxhash. It's currently used to determine if the token should be retried at a later time if it is not signed yet.
+	fxHashIsSignedF func(persist.TokenMetadata) bool
+	// imgKeywords are fields in the token's metadata that the pipeline should treat as images. If imgKeywords is empty, the chain's default keywords are used instead.
+	imgKeywords []string
+	// animKeywords are fields in the token's metadata that the pipeline should treat as animations. If animKeywords is empty, the chain's default keywords are used instead.
+	animKeywords []string
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -111,18 +120,31 @@ func (pOpts) WithRequireImage() PipelineOption {
 
 func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		if isProhibition(c) {
+		if platform.IsProhibition(c.Chain, c.Address) {
 			j.requireImage = true
 		}
 	}
 }
 
+func (pOpts) WithIsFxhash(isFxhash bool) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.isFxhash = isFxhash
+	}
+}
+
 func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		if isFxHash(td, c) {
+		if td.IsFxhash {
+			j.isFxhash = true
 			j.requireFxHashSigned = true
-			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return isFxHashSigned(td, c, m) }
+			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return platform.IsFxhashSigned(td, c, m) }
 		}
+	}
+}
+
+func (pOpts) WithKeywords(td db.TokenDefinition) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.imgKeywords, j.animKeywords = platform.KeywordsFor(td)
 	}
 }
 
@@ -164,6 +186,16 @@ func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persis
 		opt(job)
 	}
 
+	if len(job.imgKeywords) == 0 {
+		k, _ := token.Chain.BaseKeywords()
+		job.imgKeywords = k
+	}
+
+	if len(job.animKeywords) == 0 {
+		_, k := token.Chain.BaseKeywords()
+		job.animKeywords = k
+	}
+
 	startTime := time.Now()
 	media, err := job.Run(ctx)
 	recordPipelineEndState(ctx, tp.mr, job.token.Chain, media, err, time.Since(startTime), cause)
@@ -195,12 +227,6 @@ func (tpj *tokenProcessingJob) Run(ctx context.Context) (db.TokenMedia, error) {
 	return saved, mediaErr
 }
 
-func findURLsToDownloadFrom(ctx context.Context, tpj *tokenProcessingJob, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
-	pfpURL = findProfileImageURL(metadata, tpj.profileImageKey)
-	imgURL, animURL, err = findImageAndAnimationURLs(ctx, tpj.token.ContractAddress, tpj.token.Chain, metadata, tpj.pipelineMetadata)
-	return imgURL, pfpURL, animURL, err
-}
-
 func wrapWithBadTokenErr(err error) error {
 	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorIs[errInvalidMedia](err) || util.ErrorIs[errNoDataFromReader](err) || errors.Is(err, ErrRequiredSignedToken) {
 		err = ErrBadToken{Err: err}
@@ -224,13 +250,22 @@ func (tpj *tokenProcessingJob) createErrFromResults(animResult cacheResult, imgR
 	return wrapWithBadTokenErr(animResult.err)
 }
 
+func (tpj *tokenProcessingJob) urlsToDownload(ctx context.Context, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
+	pfpURL = findProfileImageURL(metadata, tpj.profileImageKey)
+	imgURL, animURL, err = findImageAndAnimationURLs(ctx, metadata, tpj.imgKeywords, tpj.animKeywords, tpj.pipelineMetadata)
+	imgURL = media.ImageURL(rpc.RewriteURIToHTTP(string(imgURL), tpj.isFxhash))
+	pfpURL = media.ImageURL(rpc.RewriteURIToHTTP(string(pfpURL), tpj.isFxhash))
+	animURL = media.AnimationURL(rpc.RewriteURIToHTTP(string(animURL), tpj.isFxhash))
+	return imgURL, pfpURL, animURL, err
+}
+
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist.Media, persist.TokenMetadata, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 
 	metadata := tpj.retrieveMetadata(ctx)
 
-	imgURL, pfpURL, animURL, err := findURLsToDownloadFrom(ctx, tpj, metadata)
+	imgURL, pfpURL, animURL, err := tpj.urlsToDownload(ctx, metadata)
 	if err != nil {
 		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, wrapWithBadTokenErr(err)
 	}
