@@ -12,6 +12,7 @@ import (
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
@@ -416,7 +417,7 @@ func newMultichainSet(
 
 func tezosTokenEvalFunc() func(multichain.ChainAgnosticToken) bool {
 	return func(t multichain.ChainAgnosticToken) bool {
-		return tezos.IsFxHashSigned(t.ContractAddress, t.Descriptors.Name) && tezos.ContainsTezosKeywords(t)
+		return platform.IsFxhashSignedTezos(persist.ChainTezos, t.ContractAddress, t.Descriptors.Name) && tezos.ContainsTezosKeywords(t)
 	}
 }
 

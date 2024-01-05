@@ -22,6 +22,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	op "github.com/mikeydub/go-gallery/service/multichain/operation"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -1338,12 +1339,11 @@ metadatas:
 
 			for _, fieldRequest := range requestedFields {
 				if !fieldRequest.MatchesFilter(metadata.Metadata) {
-					logger.For(ctx).Infof("metadata %+v does not match field request %+v", metadata, fieldRequest)
+					logger.For(ctx).Infof("metadata does not match field request %+v", fieldRequest)
 					prioritiesEncountered = append(prioritiesEncountered, metadata.Priority)
 					continue metadatas
 				}
 			}
-			logger.For(ctx).Infof("got metadata %+v", metadata)
 			if lowestIntNotInList(prioritiesEncountered, len(metadataFetchers)) == metadata.Priority {
 				// short circuit if we've found the highest priority metadata
 				return metadata.Metadata, nil
@@ -1701,17 +1701,17 @@ func chainTokensToUpsertableTokenDefinitions(ctx context.Context, chainTokens []
 	definitions := make(map[persist.TokenIdentifiers]db.TokenDefinition)
 
 	// Create a lookup of contracts to their IDs
-	contractLookup := make(map[persist.ContractIdentifiers]persist.DBID)
+	contractLookup := make(map[persist.ContractIdentifiers]db.Contract)
 	for _, contract := range existingContracts {
 		contractIdentifiers := persist.NewContractIdentifiers(contract.Address, contract.Chain)
-		contractLookup[contractIdentifiers] = contract.ID
+		contractLookup[contractIdentifiers] = contract
 	}
 
 	for _, chainToken := range chainTokens {
 		for _, token := range chainToken.tokens {
 			tokenIdentifiers := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 			contractIdentifiers := persist.NewContractIdentifiers(token.ContractAddress, chainToken.chain)
-			contractID, ok := contractLookup[contractIdentifiers]
+			contract, ok := contractLookup[contractIdentifiers]
 			if !ok {
 				panic(fmt.Sprintf("contract %+v should have already been upserted", contractIdentifiers))
 			}
@@ -1727,8 +1727,9 @@ func chainTokensToUpsertableTokenDefinitions(ctx context.Context, chainTokens []
 					Metadata:        token.TokenMetadata,
 					FallbackMedia:   token.FallbackMedia,
 					ContractAddress: token.ContractAddress,
-					ContractID:      contractID,
+					ContractID:      contract.ID,
 					TokenMediaID:    "", // Upsert will handle this in the db if the definition already exists
+					IsFxhash:        platform.IsFxhash(contractLookup[contractIdentifiers]),
 				}
 			} else {
 				// Merge the token definition with the existing one. The fields that aren't merged below use the data of the first write.
@@ -1737,12 +1738,14 @@ func chainTokensToUpsertableTokenDefinitions(ctx context.Context, chainTokens []
 				externalURL := util.FirstNonEmptyString(definition.ExternalUrl.String, token.ExternalURL)
 				fallbackMedia, _ := util.FindFirst([]persist.FallbackMedia{definition.FallbackMedia, token.FallbackMedia}, func(m persist.FallbackMedia) bool { return m.IsServable() })
 				metadata, _ := util.FindFirst([]persist.TokenMetadata{definition.Metadata, token.TokenMetadata}, func(m persist.TokenMetadata) bool { return len(m) > 0 })
+				isFxhash := definition.IsFxhash || platform.IsFxhash(contractLookup[contractIdentifiers])
 
 				definition.Name = util.ToNullString(name, true)
 				definition.Description = util.ToNullString(description, true)
 				definition.ExternalUrl = util.ToNullString(externalURL, true)
 				definition.FallbackMedia = fallbackMedia
 				definition.Metadata = metadata
+				definition.IsFxhash = isFxhash
 				definitions[tokenIdentifiers] = definition
 			}
 		}

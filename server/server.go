@@ -35,6 +35,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -92,7 +93,7 @@ func ClientInit(ctx context.Context) *Clients {
 		HTTPClient:      &http.Client{Timeout: 0},
 		EthClient:       rpc.NewEthClient(),
 		IPFSClient:      ipfs.NewShell(),
-		ArweaveClient:   rpc.NewArweaveClient(),
+		ArweaveClient:   arweave.NewClient(),
 		StorageClient:   rpc.NewStorageClient(ctx),
 		TaskClient:      task.NewClient(ctx),
 		SecretClient:    newSecretsClient(),

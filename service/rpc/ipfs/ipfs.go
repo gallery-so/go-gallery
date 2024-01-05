@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -175,9 +176,22 @@ func defaultHTTPClient() *http.Client {
 
 // BestGatewayNodeFrom rewrites an IPFS URL to a gateway URL using the appropriate gateway
 func BestGatewayNodeFrom(ipfsURL string, isFxHash bool) string {
+	if !IsIpfsURL(ipfsURL) {
+		return ipfsURL
+	}
+	// Use fxhash's specific node
 	if isFxHash {
 		return PathGatewayFrom(nodeFxHash(nil, nil).Host, ipfsURL)
 	}
+	// Re-write to a more reliable one while Infura node is down
+	if strings.HasPrefix(ipfsURL, "https://gallery.infura-ipfs.io") {
+		return DefaultGatewayFrom(ipfsURL)
+	}
+	// Keep the original gateway otherwise
+	if IsIpfsGatewayURL(ipfsURL) {
+		return ipfsURL
+	}
+	// Map ipfs:// to the default gateway
 	return DefaultGatewayFrom(ipfsURL)
 }
 
@@ -188,7 +202,26 @@ func DefaultGatewayFrom(ipfsURL string) string {
 
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
 func PathGatewayFrom(gatewayHost, ipfsURL string) string {
-	return pathURL(gatewayHost, util.GetURIPath(ipfsURL, false))
+	return pathURL(gatewayHost, uriFrom(ipfsURL))
+}
+
+func IsIpfsURL(ipfsURL string) bool {
+	return IsIpfsProtoURL(ipfsURL) || IsIpfsGatewayURL(ipfsURL)
+}
+
+func IsIpfsProtoURL(ipfsURL string) bool {
+	return strings.HasPrefix(ipfsURL, "ipfs://")
+}
+
+func IsIpfsGatewayURL(ipfsURL string) bool {
+	u, err := url.Parse(ipfsURL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "https" {
+		return false
+	}
+	return strings.HasPrefix(u.Path, "/ipfs")
 }
 
 // authTransport decorates each request with a basic auth header.
@@ -201,6 +234,17 @@ type authTransport struct {
 func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.SetBasicAuth(t.ProjectID, t.ProjectSecret)
 	return t.RoundTripper.RoundTrip(r)
+}
+
+func uriFrom(u string) string {
+	u = strings.TrimSpace(u)
+	u = strings.TrimPrefix(u, "ipfs://")
+	u = strings.TrimPrefix(u, "https://")
+	pathIdx := strings.Index(u, "/ipfs/")
+	if pathIdx != -1 {
+		u = u[pathIdx+6:] // len("/ipfs/") == 6
+	}
+	return u
 }
 
 // pathURL returns the gateway URL in path resolution sytle
