@@ -421,28 +421,6 @@ func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, err
 
 }
 
-func remapPaths(mediaURL string) string {
-	switch persist.TokenURI(mediaURL).Type() {
-	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), mediaURL)
-	case persist.URITypeArweave:
-		path := util.GetURIPath(mediaURL, false)
-		return fmt.Sprintf("https://arweave.net/%s", path)
-	default:
-		return mediaURL
-	}
-
-}
-
-func remapMedia(media persist.Media) persist.Media {
-	media.MediaURL = persist.NullString(remapPaths(strings.TrimSpace(media.MediaURL.String())))
-	media.ThumbnailURL = persist.NullString(remapPaths(strings.TrimSpace(media.ThumbnailURL.String())))
-	if !persist.TokenURI(media.ThumbnailURL).IsRenderable() {
-		media.ThumbnailURL = persist.NullString("")
-	}
-	return media
-}
-
 func findImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords, animKeywords []string, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()

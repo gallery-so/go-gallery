@@ -22,6 +22,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
+	"github.com/mikeydub/go-gallery/service/rpc/onchfs"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -67,6 +70,8 @@ type tokenProcessingJob struct {
 	defaultMetadata persist.TokenMetadata
 	// isSpamJob indicates that the job is processing a spam token. It's currently used to exclude events from Sentry.
 	isSpamJob bool
+	// isFxhash indicates that the job is processing a fxhash token.
+	isFxhash bool
 	// requireImage indicates that the pipeline should return an error if an image URL is present but an image wasn't cached.
 	requireImage bool
 	// requireFxHashSigned indicates that the pipeline should return an error if the token is FxHash but it isn't signed yet.
@@ -126,6 +131,7 @@ func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
 func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		if platform.IsFxhash(td, c) {
+			j.isFxhash = true
 			j.requireFxHashSigned = true
 			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return platform.IsFxhashSigned(td, c, m) }
 		}
@@ -133,7 +139,9 @@ func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) Pipel
 }
 
 func (pOpts) WithKeywords(td db.TokenDefinition, c db.Contract) PipelineOption {
-	return func(j *tokenProcessingJob) { j.imgKeywords, j.animKeywords = platform.KeywordsFor(td, c) }
+	return func(j *tokenProcessingJob) {
+		j.imgKeywords, j.animKeywords = platform.KeywordsFor(td, c)
+	}
 }
 
 type ErrImageResultRequired struct{ Err error }
@@ -215,12 +223,6 @@ func (tpj *tokenProcessingJob) Run(ctx context.Context) (db.TokenMedia, error) {
 	return saved, mediaErr
 }
 
-func findURLsToDownloadFrom(ctx context.Context, tpj *tokenProcessingJob, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
-	pfpURL = findProfileImageURL(metadata, tpj.profileImageKey)
-	imgURL, animURL, err = findImageAndAnimationURLs(ctx, metadata, tpj.imgKeywords, tpj.animKeywords, tpj.pipelineMetadata)
-	return imgURL, pfpURL, animURL, err
-}
-
 func wrapWithBadTokenErr(err error) error {
 	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorIs[errInvalidMedia](err) || util.ErrorIs[errNoDataFromReader](err) || errors.Is(err, ErrRequiredSignedToken) {
 		err = ErrBadToken{Err: err}
@@ -244,13 +246,35 @@ func (tpj *tokenProcessingJob) createErrFromResults(animResult cacheResult, imgR
 	return wrapWithBadTokenErr(animResult.err)
 }
 
+func rewriteURLs(u string, isFxhash bool) string {
+	if ipfs.IsIpfsURL(u) {
+		return ipfs.BestGatewayNodeFrom(u, isFxhash)
+	}
+	if arweave.IsArweave(u) {
+		return arweave.BestGatewayNodeFrom(u)
+	}
+	if onchfs.IsOnchfs(u) {
+		return onchfs.BestGatewayNodeFrom(u)
+	}
+	return u
+}
+
+func (tpj *tokenProcessingJob) urlsToDownload(ctx context.Context, metadata persist.TokenMetadata) (imgURL media.ImageURL, pfpURL media.ImageURL, animURL media.AnimationURL, err error) {
+	pfpURL = findProfileImageURL(metadata, tpj.profileImageKey)
+	imgURL, animURL, err = findImageAndAnimationURLs(ctx, metadata, tpj.imgKeywords, tpj.animKeywords, tpj.pipelineMetadata)
+	imgURL = media.ImageURL(rewriteURLs(string(imgURL), tpj.isFxhash))
+	pfpURL = media.ImageURL(rewriteURLs(string(pfpURL), tpj.isFxhash))
+	animURL = media.AnimationURL(rewriteURLs(string(animURL), tpj.isFxhash))
+	return imgURL, pfpURL, animURL, err
+}
+
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist.Media, persist.TokenMetadata, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 
 	metadata := tpj.retrieveMetadata(ctx)
 
-	imgURL, pfpURL, animURL, err := findURLsToDownloadFrom(ctx, tpj, metadata)
+	imgURL, pfpURL, animURL, err := tpj.urlsToDownload(ctx, metadata)
 	if err != nil {
 		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, wrapWithBadTokenErr(err)
 	}
