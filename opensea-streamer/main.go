@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/bits-and-blooms/bloom/v3"
@@ -23,6 +21,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -33,6 +32,7 @@ const (
 	falsePositiveRate        = 0.01
 )
 
+// https://docs.opensea.io/reference/supported-chains#mainnets
 var enabledChains = map[string]bool{
 	"base": true,
 	"zora": true,
@@ -60,6 +60,10 @@ func main() {
 		panic(err)
 	}
 
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"approximate_bloom_zize": bf.ApproximatedSize(),
+	})
+
 	// Health endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
@@ -78,7 +82,7 @@ func main() {
 		// check hourly if the bloom filter needs to be updated
 		for {
 			time.Sleep(time.Hour)
-			logger.For(nil).Info("checking if bloom filter needs to be updated...")
+			logger.For(ctx).Info("checking if bloom filter needs to be updated...")
 			curWalletCountBs, _ := bloomCache.Get(ctx, walletCountKey)
 			if curWalletCountBs == nil {
 				curWalletCountBs = []byte("0")
@@ -86,13 +90,13 @@ func main() {
 			var curWalletCount int64
 			err = json.Unmarshal(curWalletCountBs, &curWalletCount)
 			if err != nil {
-				logger.For(nil).Error(err)
+				logger.For(ctx).Error(err)
 				continue
 			}
 
 			dbWalletCount, err := queries.CountActiveWallets(ctx)
 			if err != nil {
-				logger.For(nil).Error(err)
+				logger.For(ctx).Error(err)
 				continue
 			}
 
@@ -102,25 +106,24 @@ func main() {
 
 			bf, err = resetBloomFilter(ctx, queries, bloomCache)
 			if err != nil {
-				logger.For(nil).Error(err)
+				panic(err)
 			}
 		}
 	}()
 
-	go streamOpenseaTranfsers(bf)
+	go streamOpenseaTranfsers(ctx, bf)
 
 	router.Run(":3000")
 }
 
-func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
+func streamOpenseaTranfsers(ctx context.Context, bf *bloom.BloomFilter) {
 
 	apiKey := env.GetString("OPENSEA_API_KEY")
 	// Set up WebSocket connection
 	var dialer *websocket.Dialer
 	conn, _, err := dialer.Dial("wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
 	if err != nil {
-		log.Fatal("Error connecting to WebSocket:", err)
-		return
+		panic(err)
 	}
 	defer conn.Close()
 
@@ -133,19 +136,14 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 	}
 	conn.WriteJSON(subscribeMessage)
 
-	logger.For(nil).Info("subscribed to opensea events")
-
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	logger.For(ctx).Info("subscribed to opensea events")
 
 	go func() {
-		defer wg.Done()
 		// Listen for messages
 		for {
-
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				logger.For(nil).Error(err)
+				logger.For(ctx).Error(err)
 				break
 			}
 
@@ -168,14 +166,14 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 			// check if the wallet is in the bloom filter
 			chainAddress, err := persist.NewL1ChainAddress(persist.Address(win.Payload.ToAccount.Address.String()), win.Payload.Item.NFTID.Chain).MarshalJSON()
 			if err != nil {
-				logger.For(nil).Error(err)
+				logger.For(ctx).Error(err)
 				continue
 			}
 			if !bf.Test(chainAddress) {
 				continue
 			}
 
-			logger.For(nil).Infof("received user item transfer event for wallet %s on chain %d", win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
+			logger.For(ctx).Infof("received user item transfer event for wallet %s on chain %d", win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
 
 			// send to token processing service
 			func() {
@@ -183,24 +181,24 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 				defer cancel()
 				payloadJSON, err := json.Marshal(win)
 				if err != nil {
-					logger.For(nil).Error(err)
+					logger.For(ctx).Error(err)
 					return
 				}
 				req, err := http.NewRequestWithContext(ctx, http.MethodPost, env.GetString("TOKEN_PROCESSING_URL")+"/owners/process/opensea", bytes.NewBuffer(payloadJSON))
 				if err != nil {
-					logger.For(nil).Error(err)
+					logger.For(ctx).Error(err)
 					return
 				}
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", env.GetString("WEBHOOK_TOKEN"))
 				resp, err := http.DefaultClient.Do(req)
 				if err != nil {
-					logger.For(nil).Error(err)
+					logger.For(ctx).Error(err)
 					return
 				}
 
 				if resp.StatusCode != http.StatusOK {
-					logger.For(nil).Errorf("non-200 response from token processing service: %d", resp.StatusCode)
+					logger.For(ctx).Errorf("non-200 response from token processing service: %d", resp.StatusCode)
 					return
 				}
 			}()
@@ -208,26 +206,21 @@ func streamOpenseaTranfsers(bf *bloom.BloomFilter) {
 		}
 	}()
 
-	go func() {
-		defer wg.Done()
-		// Heartbeat
-		ticker := time.NewTicker(30 * time.Second)
-		for {
-			select {
-			case <-ticker.C:
-				heartbeat := map[string]interface{}{
-					"topic":   "phoenix",
-					"event":   "heartbeat",
-					"payload": map[string]interface{}{},
-					"ref":     0,
-				}
-				conn.WriteJSON(heartbeat)
-				logger.For(nil).Debug("Sent heartbeat")
+	// Heartbeat
+	ticker := time.NewTicker(30 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			heartbeat := map[string]interface{}{
+				"topic":   "phoenix",
+				"event":   "heartbeat",
+				"payload": map[string]interface{}{},
+				"ref":     0,
 			}
+			conn.WriteJSON(heartbeat)
+			logger.For(ctx).Debug("Sent heartbeat")
 		}
-	}()
-
-	wg.Wait()
+	}
 }
 
 func resetBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cache) (*bloom.BloomFilter, error) {
@@ -343,7 +336,7 @@ func setDefaults() {
 	}
 }
 
-func InitSentry() {
+func initSentry() {
 	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
