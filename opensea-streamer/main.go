@@ -53,10 +53,9 @@ func main() {
 	queries := coredb.New(pgx)
 	bloomCache := redis.NewCache(redis.WalletsBloomFilterCache)
 
-	initCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
+	ctx := context.Background()
 
-	bf, err := initializeBloomFilter(initCtx, queries, bloomCache)
+	bf, err := initializeBloomFilter(ctx, queries, bloomCache)
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +79,7 @@ func main() {
 		for {
 			time.Sleep(time.Hour)
 			logger.For(nil).Info("checking if bloom filter needs to be updated...")
-			curWalletCountBs, _ := bloomCache.Get(initCtx, walletCountKey)
+			curWalletCountBs, _ := bloomCache.Get(ctx, walletCountKey)
 			if curWalletCountBs == nil {
 				curWalletCountBs = []byte("0")
 			}
@@ -91,7 +90,7 @@ func main() {
 				continue
 			}
 
-			dbWalletCount, err := queries.CountActiveWallets(initCtx)
+			dbWalletCount, err := queries.CountActiveWallets(ctx)
 			if err != nil {
 				logger.For(nil).Error(err)
 				continue
@@ -101,7 +100,7 @@ func main() {
 				continue
 			}
 
-			bf, err = resetBloomFilter(initCtx, queries, bloomCache)
+			bf, err = resetBloomFilter(ctx, queries, bloomCache)
 			if err != nil {
 				logger.For(nil).Error(err)
 			}
@@ -263,6 +262,8 @@ func resetBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cache) (*
 }
 
 func initializeBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cache) (*bloom.BloomFilter, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
 	cur, err := r.Get(ctx, bloomFilterKey)
 	if err == nil && cur != nil && len(cur) > 0 {
 		curWalletCountBs, err := r.Get(ctx, walletCountKey)
