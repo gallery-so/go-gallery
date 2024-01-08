@@ -109,6 +109,43 @@ const (
 	MaxChainValue = ChainBase
 )
 
+var chainToID = map[Chain]int{
+	ChainETH:      0,
+	ChainArbitrum: 42161,
+	ChainPolygon:  137,
+	ChainOptimism: 10,
+	ChainZora:     7777777,
+	ChainBase:     84531,
+}
+
+func MustChainToChainID(c Chain) int {
+	id, ok := chainToID[c]
+	if !ok {
+		panic(fmt.Sprintf("%d is not mapped to a blockchain ID", c))
+	}
+	return id
+}
+
+func MustTokenID(s string) TokenID {
+	return TokenID(MustHexString(s))
+}
+
+func MustHexString(s string) HexString {
+	base := 10
+
+	if strings.HasPrefix(s, "0x") {
+		s = strings.TrimPrefix(s, "0x")
+		base = 16
+	}
+
+	v, ok := new(big.Int).SetString(s, base)
+	if !ok {
+		panic(fmt.Sprintf("failed to convert %s to a number", s))
+	}
+
+	return HexString(v.Text(16))
+}
+
 var L1Chains = map[Chain]L1Chain{
 	ChainPOAP:     L1Chain(ChainETH),
 	ChainOptimism: L1Chain(ChainETH),
@@ -427,13 +464,11 @@ func (c Chain) NormalizeAddress(addr Address) string {
 
 // BaseKeywords are the keywords that are default for discovering media for a given chain
 func (c Chain) BaseKeywords() (image []string, anim []string) {
-	defaultImageKeyWords := []string{"image_url", "image"}
-	defaultAnimKeyWords := []string{"animation_url", "animation", "video"}
+	defaultImageKeyWords := []string{"image_url", "image", "imageOriginal"}
+	defaultAnimKeyWords := []string{"animation_url", "animation", "video", "mediaOriginal"}
 	switch c {
 	case ChainTezos:
 		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}
-	case ChainBase:
-		return append(defaultImageKeyWords, "imageOriginal"), append(defaultAnimKeyWords, "mediaOriginal")
 	default:
 		return defaultImageKeyWords, defaultAnimKeyWords
 	}

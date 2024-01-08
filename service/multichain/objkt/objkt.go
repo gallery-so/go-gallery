@@ -1,4 +1,4 @@
-package tezos
+package objkt
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -36,7 +36,7 @@ type contract struct {
 	Description     string
 	Creator_Address persist.Address
 	Level           int
-	Type            tokenStandard
+	Type            tezos.TokenStandard
 	Collection_ID   string
 	Logo            string
 }
@@ -51,7 +51,7 @@ type token struct {
 	Name              string
 	Symbol            string
 	Thumbnail_URI     string
-	Token_ID          tokenID
+	Token_ID          tezos.TokenStandard
 	Level             int
 	Is_Boolean_Amount bool
 	Attributes        []struct {
@@ -87,76 +87,25 @@ type tokensByContractQuery struct {
 type tokensByIdentifiersQuery struct {
 	Token []token `graphql:"token(where: {fa: {type: {_eq: fa2}}, fa_contract: {_eq: $contractAddress}, token_id: {_eq: $tokenID}, holders: {quantity: {_gt: 0}, holder: {address: {_eq: $ownerAddress}}}})"`
 }
-
-/*
-tokens by creator
- token_creator(
-    where: {creator_address: {_eq: "tz1hghbrDGx33HendcHRAdKUDtdFoFP24uaE"}, token: {fa_contract: {_nin: ["KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi", "KT1GtbuswcNMGhHF2TSuH1Yfaqn16do8Qtva","KT1EfsNuqwLAWDd3o4pvfUx1CAh5GMdTrRvr"]}}}
-    order_by: {token_pk: desc_nulls_last}
-  ) {
-    token {
-      pk
-       description
-      decimals
-      extra
-      level
-      ophash
-      metadata
-      tags {
-         tag {
-          id
-          name
-          token_count
-        }
-      }
-      tzip16_key
-      name
-      token_id
-      supply
-      symbol
-      holders {
-        quantity
-      }
-      fa_contract
-      fa {
-        name
-      }
-    }
-  }
-
-  collections by creator
-  fa(where: {creator: {address: {_eq: "tz1hghbrDGx33HendcHRAdKUDtdFoFP24uaE"}}}) {
-	... fa fields
-  }
-*/
-
-// Objkt's API has pretty strict usage limits (120 requests/minute, and 500 results per page)
-// so its best used as a fallback.
-type TezosObjktProvider struct {
-	gql            *graphql.Client
-	ipfsGatewayURL string
+type Provider struct {
+	gql *graphql.Client
 }
 
-func NewObjktProvider() *TezosObjktProvider {
-	return &TezosObjktProvider{
-		gql:            graphql.NewClient(objktEndpoint, http.DefaultClient),
-		ipfsGatewayURL: env.GetString("IPFS_URL"),
+func NewProvider() *Provider {
+	return &Provider{
+		gql: graphql.NewClient(objktEndpoint, http.DefaultClient),
 	}
 }
 
-func (p *TezosObjktProvider) GetBlockchainInfo() multichain.BlockchainInfo {
-	return multichain.BlockchainInfo{
+func (p *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
 		Chain:      persist.ChainTezos,
 		ChainID:    0,
 		ProviderID: "objkt",
 	}
 }
 
-func (p *TezosObjktProvider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
-	return nil
-}
-
-func (p *TezosObjktProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	t, _, err := p.GetTokensByTokenIdentifiers(ctx, ti)
 	if err != nil {
 		return persist.TokenMetadata{}, err
@@ -169,9 +118,9 @@ func (p *TezosObjktProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Cont
 	return t[0].TokenMetadata, nil
 }
 
-func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"ownerAddress": ownerAddress})
-	tzOwnerAddress, err := toTzAddress(ownerAddress)
+	tzOwnerAddress, err := tezos.ToAddress(ownerAddress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -215,7 +164,7 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 
 	for _, node := range tokens {
 
-		if node.Token.Fa.Type == tokenStandardFa12 {
+		if node.Token.Fa.Type == tezos.TokenStandardFa12 {
 			continue
 		}
 
@@ -237,7 +186,7 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 			returnContracts = append(returnContracts, dedupeContracts[node.Token.Fa.Contract])
 		}
 
-		tokenID := persist.TokenID(node.Token.Token_ID.toBase16String())
+		tokenID := persist.MustTokenID(string(node.Token.Token_ID))
 
 		agnosticToken := multichain.ChainAgnosticToken{
 			TokenType: persist.TokenTypeERC1155,
@@ -258,14 +207,14 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 	return returnTokens, returnContracts
 }
 
-func (p *TezosObjktProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errChan := make(chan error)
 	go func() {
 		defer close(rec)
 
 		ctx = logger.NewContextWithFields(ctx, logrus.Fields{"ownerAddress": ownerAddress})
-		tzOwnerAddress, err := toTzAddress(ownerAddress)
+		tzOwnerAddress, err := tezos.ToAddress(ownerAddress)
 		if err != nil {
 			errChan <- err
 			return
@@ -305,14 +254,14 @@ func (p *TezosObjktProvider) GetTokensIncrementallyByWalletAddress(ctx context.C
 	return rec, errChan
 }
 
-func (p *TezosObjktProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"contractAddress": tokenIdentifiers.ContractAddress,
 		"tokenID":         tokenIdentifiers.TokenID,
 		"ownerAddress":    ownerAddress,
 	})
 
-	tzOwnerAddress, err := toTzAddress(ownerAddress)
+	tzOwnerAddress, err := tezos.ToAddress(ownerAddress)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -333,7 +282,7 @@ func (p *TezosObjktProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Cont
 	}
 
 	if len(query.Token) < 1 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrNoTokensFoundByIdentifiers{tokenIdentifiers}
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
 	}
 
 	token := query.Token[0]
@@ -352,7 +301,7 @@ func (p *TezosObjktProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Cont
 		LatestBlock: persist.BlockNumber(token.Fa.Level),
 	}
 
-	tokenID := persist.TokenID(token.Token_ID.toBase16String())
+	tokenID := persist.MustTokenID(string(token.Token_ID))
 
 	agnosticToken := multichain.ChainAgnosticToken{
 		TokenType: persist.TokenTypeERC1155,
@@ -371,7 +320,7 @@ func (p *TezosObjktProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Cont
 	return agnosticToken, agnosticContract, nil
 }
 
-func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"contractAddress": tokenIdentifiers.ContractAddress,
 		"tokenID":         tokenIdentifiers.TokenID,
@@ -392,7 +341,7 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 	}
 
 	if len(query.Token) < 1 {
-		return nil, multichain.ChainAgnosticContract{}, ErrNoTokensFoundByIdentifiers{tokenIdentifiers}
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
 	}
 
 	firstToken := query.Token[0]
@@ -412,7 +361,7 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 	return objktHolderTokensToChainAgnostic(query.Token), agnosticContract, nil
 }
 
-func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"contractAddress": contractAddress})
 
 	pageSize := maxPageSize
@@ -471,70 +420,10 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 	return objktHolderTokensToChainAgnostic(tokens), agnosticContract, nil
 }
 
-func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"contractAddress": contractAddress, "owner": owner})
-
-	pageSize := maxPageSize
-	if maxLimit > 0 && maxLimit < maxPageSize {
-		pageSize = maxLimit
-	}
-
-	// Paginate results
-	var query tokensByContractQuery
-	tokens := make([]token, 0, maxLimit)
-	for {
-		if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
-			"contractAddress": graphql.String(contractAddress),
-			"ownerAddress":    graphql.String(owner),
-			"limit":           graphql.Int(pageSize),
-			"offset":          graphql.Int(offset),
-		}); err != nil {
-			return nil, multichain.ChainAgnosticContract{}, err
-		}
-
-		// No more results
-		if len(query.Fa) < 1 || len(query.Fa[0].Tokens) < 1 {
-			break
-		}
-
-		// Exceeded fetch size
-		tokens = append(tokens, query.Fa[0].Tokens...)
-		if maxLimit > 0 && len(tokens) >= maxLimit {
-			break
-		}
-
-		offset += len(query.Fa[0].Tokens)
-	}
-
-	// No matching query results
-	if len(tokens) < 1 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for contract")
-	}
-
-	// Truncate tokens if there is a max limit
-	if maxLimit > 0 && len(tokens) > maxLimit {
-		tokens = tokens[:maxLimit]
-	}
-
-	agnosticContract := multichain.ChainAgnosticContract{
-		Address: tokens[0].Fa.Contract,
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:       tokens[0].Symbol,
-			Name:         tokens[0].Fa.Name,
-			Description:  tokens[0].Fa.Description,
-			OwnerAddress: tokens[0].Fa.Creator_Address,
-		},
-
-		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
-	}
-
-	return objktHolderTokensToChainAgnostic(tokens), agnosticContract, nil
-}
-
 func objktHolderTokensToChainAgnostic(tokens []token) []multichain.ChainAgnosticToken {
 	result := make([]multichain.ChainAgnosticToken, 0, len(tokens))
 	for _, token := range tokens {
-		tokenID := persist.TokenID(token.Token_ID.toBase16String())
+		tokenID := persist.MustTokenID(string(token.Token_ID))
 		metadata := createMetadata(token)
 
 		firstValidThumbnail, _ := util.FindFirst([]string{token.Thumbnail_URI, token.Display_URI, token.Artifact_URI}, func(s string) bool {

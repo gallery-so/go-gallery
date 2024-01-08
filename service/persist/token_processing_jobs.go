@@ -103,7 +103,6 @@ type PipelineMetadata struct {
 	MediaURLsRetrieval                             PipelineStepStatus `json:"media_urls_retrieval,omitempty"`
 	AnimationContentHeaderValueRetrieval           PipelineStepStatus `json:"animation_content_header_value_retrieval,omitempty"`
 	AnimationReaderRetrieval                       PipelineStepStatus `json:"animation_reader_retrieval,omitempty"`
-	AnimationOpenseaFallback                       PipelineStepStatus `json:"animation_opensea_fallback,omitempty"`
 	AnimationDetermineMediaTypeWithReader          PipelineStepStatus `json:"animation_determine_media_type_with_reader,omitempty"`
 	AnimationAnimationGzip                         PipelineStepStatus `json:"animation_animation_gzip,omitempty"`
 	AnimationSVGRasterize                          PipelineStepStatus `json:"animation_svg_rasterize,omitempty"`
@@ -112,7 +111,6 @@ type PipelineMetadata struct {
 	AnimationLiveRenderGCP                         PipelineStepStatus `json:"animation_live_render_gcp,omitempty"`
 	ImageContentHeaderValueRetrieval               PipelineStepStatus `json:"image_content_header_value_retrieval,omitempty"`
 	ImageReaderRetrieval                           PipelineStepStatus `json:"image_reader_retrieval,omitempty"`
-	ImageOpenseaFallback                           PipelineStepStatus `json:"image_opensea_fallback,omitempty"`
 	ImageDetermineMediaTypeWithReader              PipelineStepStatus `json:"image_determine_media_type_with_reader,omitempty"`
 	ImageAnimationGzip                             PipelineStepStatus `json:"image_animation_gzip,omitempty"`
 	ImageSVGRasterize                              PipelineStepStatus `json:"image_svg_rasterize,omitempty"`
@@ -137,7 +135,6 @@ type PipelineMetadata struct {
 	AlternateImageLiveRenderGCP                    PipelineStepStatus `json:"alternate_image_live_render_gcp,omitempty"`
 	ProfileImageContentHeaderValueRetrieval        PipelineStepStatus `json:"pfp_content_header_value_retrieval,omitempty"`
 	ProfileImageReaderRetrieval                    PipelineStepStatus `json:"pfp_reader_retrieval,omitempty"`
-	ProfileImageOpenseaFallback                    PipelineStepStatus `json:"pfp_opensea_fallback,omitempty"`
 	ProfileImageDetermineMediaTypeWithReader       PipelineStepStatus `json:"pfp_determine_media_type_with_reader,omitempty"`
 	ProfileImageAnimationGzip                      PipelineStepStatus `json:"pfp_animation_gzip,omitempty"`
 	ProfileImageSVGRasterize                       PipelineStepStatus `json:"pfp_svg_rasterize,omitempty"`

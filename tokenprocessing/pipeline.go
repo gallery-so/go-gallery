@@ -20,7 +20,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -80,6 +79,8 @@ type tokenProcessingJob struct {
 	imgKeywords []string
 	// animKeywords are fields in the token's metadata that the pipeline should treat as animations. If animKeywords is empty, the chain's default keywords are used instead.
 	animKeywords []string
+	// placeHolderImageURL is an image URL that is downloaded from if processing from metadata fails
+	placeHolderImageURL string
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -145,6 +146,12 @@ func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) Pipel
 func (pOpts) WithKeywords(td db.TokenDefinition) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.imgKeywords, j.animKeywords = platform.KeywordsFor(td)
+	}
+}
+
+func (pOpts) WithPlaceholderImageURL(u string) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.placeHolderImageURL = u
 	}
 }
 
@@ -308,7 +315,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	}
 
 	if err != nil {
-		logger.For(ctx).Warnf("error getting metadata from chain: %s", err)
+		logger.For(ctx).Warnf("failed to get metadata: %s", err)
 	}
 
 	// Return the original metadata if we can't get new metadata
@@ -350,7 +357,6 @@ func (tpj *tokenProcessingJob) cacheMediaFromOriginalURLs(ctx context.Context, i
 	imgRunMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &tpj.pipelineMetadata.ImageContentHeaderValueRetrieval,
 		ReaderRetrieval:              &tpj.pipelineMetadata.ImageReaderRetrieval,
-		OpenseaFallback:              &tpj.pipelineMetadata.ImageOpenseaFallback,
 		DetermineMediaTypeWithReader: &tpj.pipelineMetadata.ImageDetermineMediaTypeWithReader,
 		AnimationGzip:                &tpj.pipelineMetadata.ImageAnimationGzip,
 		SVGRasterize:                 &tpj.pipelineMetadata.ImageSVGRasterize,
@@ -361,7 +367,6 @@ func (tpj *tokenProcessingJob) cacheMediaFromOriginalURLs(ctx context.Context, i
 	pfpRunMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &tpj.pipelineMetadata.ProfileImageContentHeaderValueRetrieval,
 		ReaderRetrieval:              &tpj.pipelineMetadata.ProfileImageReaderRetrieval,
-		OpenseaFallback:              &tpj.pipelineMetadata.ProfileImageOpenseaFallback,
 		DetermineMediaTypeWithReader: &tpj.pipelineMetadata.ProfileImageDetermineMediaTypeWithReader,
 		AnimationGzip:                &tpj.pipelineMetadata.ProfileImageAnimationGzip,
 		SVGRasterize:                 &tpj.pipelineMetadata.ProfileImageSVGRasterize,
@@ -372,7 +377,6 @@ func (tpj *tokenProcessingJob) cacheMediaFromOriginalURLs(ctx context.Context, i
 	animRunMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &tpj.pipelineMetadata.AnimationContentHeaderValueRetrieval,
 		ReaderRetrieval:              &tpj.pipelineMetadata.AnimationReaderRetrieval,
-		OpenseaFallback:              &tpj.pipelineMetadata.AnimationOpenseaFallback,
 		DetermineMediaTypeWithReader: &tpj.pipelineMetadata.AnimationDetermineMediaTypeWithReader,
 		AnimationGzip:                &tpj.pipelineMetadata.AnimationAnimationGzip,
 		SVGRasterize:                 &tpj.pipelineMetadata.AnimationSVGRasterize,
@@ -383,13 +387,11 @@ func (tpj *tokenProcessingJob) cacheMediaFromOriginalURLs(ctx context.Context, i
 	return tpj.cacheMediaSources(ctx, imgURL, pfpURL, animURL, imgRunMetadata, pfpRunMetadata, animRunMetadata)
 }
 
-func (tpj *tokenProcessingJob) cacheMediaFromOpenSeaAssetURLs(ctx context.Context) (imgResult, animResult cacheResult) {
-	tID := persist.NewTokenIdentifiers(tpj.token.ContractAddress, tpj.token.TokenID, tpj.token.Chain)
-	assets, err := opensea.FetchAssetsForTokenIdentifiers(ctx, tpj.token.Chain, tID.ContractAddress, tID.TokenID)
-	if err != nil || len(assets) == 0 {
-		result := cacheResult{err: errNoDataFromOpensea{err}}
-		return result, result
+func (tpj *tokenProcessingJob) cacheMediaFromPlaceholder(ctx context.Context) (imgResult, animResult cacheResult) {
+	if tpj.placeHolderImageURL == "" {
+		return cacheResult{}, cacheResult{}
 	}
+
 	imgRunMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &tpj.pipelineMetadata.AlternateImageContentHeaderValueRetrieval,
 		ReaderRetrieval:              &tpj.pipelineMetadata.AlternateImageReaderRetrieval,
@@ -400,22 +402,8 @@ func (tpj *tokenProcessingJob) cacheMediaFromOpenSeaAssetURLs(ctx context.Contex
 		ThumbnailGCP:                 &tpj.pipelineMetadata.AlternateImageThumbnailGCP,
 		LiveRenderGCP:                &tpj.pipelineMetadata.AlternateImageLiveRenderGCP,
 	}
-	animRunMetadata := &cachePipelineMetadata{
-		ContentHeaderValueRetrieval:  &tpj.pipelineMetadata.AlternateAnimationContentHeaderValueRetrieval,
-		ReaderRetrieval:              &tpj.pipelineMetadata.AlternateAnimationReaderRetrieval,
-		DetermineMediaTypeWithReader: &tpj.pipelineMetadata.AlternateAnimationDetermineMediaTypeWithReader,
-		AnimationGzip:                &tpj.pipelineMetadata.AlternateAnimationAnimationGzip,
-		SVGRasterize:                 &tpj.pipelineMetadata.AlternateAnimationSVGRasterize,
-		StoreGCP:                     &tpj.pipelineMetadata.AlternateAnimationStoreGCP,
-		ThumbnailGCP:                 &tpj.pipelineMetadata.AlternateAnimationThumbnailGCP,
-		LiveRenderGCP:                &tpj.pipelineMetadata.AlternateAnimationLiveRenderGCP,
-	}
-	for _, asset := range assets {
-		imgResult, _, animResult = tpj.cacheMediaSources(ctx, media.ImageURL(asset.ImageURL), "", media.AnimationURL(asset.AnimationURL), imgRunMetadata, nil, animRunMetadata)
-		if animResult.IsSuccess() || imgResult.IsSuccess() {
-			return imgResult, animResult
-		}
-	}
+
+	imgResult, _, animResult = tpj.cacheMediaSources(ctx, media.ImageURL(tpj.placeHolderImageURL), "", "", imgRunMetadata, nil, nil)
 	return imgResult, animResult
 }
 
@@ -472,19 +460,15 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
-	// Our OpenSea provider only supports Ethereum currently. If we do use OpenSea, we prioritize our results over theirs.
-	// If OpenSea also fails, then we keep our results so we can report on the original error.
-	if tpj.token.Chain == persist.ChainETH {
-		osImgResult, osAnimResult := tpj.cacheMediaFromOpenSeaAssetURLs(ctx)
-		if !imgResult.IsSuccess() && osImgResult.IsSuccess() {
-			imgResult = osImgResult
-		}
-		if !animResult.IsSuccess() && osAnimResult.IsSuccess() {
-			animResult = osAnimResult
-		}
+	// If there is a placeholder URL available, use that instead.
+	placeHolderImgResult, placeHolderAnimResult := tpj.cacheMediaFromPlaceholder(ctx)
+	if !imgResult.IsSuccess() && placeHolderImgResult.IsSuccess() {
+		imgResult = placeHolderImgResult
+	}
+	if !animResult.IsSuccess() && placeHolderAnimResult.IsSuccess() {
+		animResult = placeHolderAnimResult
 	}
 
-	// Now check if we got any result from OpenSea
 	if animResult.IsSuccess() || imgResult.IsSuccess() {
 		err = tpj.createErrFromResults(animResult, imgResult, metadata, requireImg, requireSigned)
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err

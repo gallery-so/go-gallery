@@ -111,10 +111,6 @@ func (r *getNFTsForOwnerResponse) GetNextPageKey() string {
 
 const baseURL = "https://nft.api.infura.io/networks/1"
 
-const (
-	pageSize = 100
-)
-
 type Provider struct {
 	apiKey     string
 	apiSecret  string

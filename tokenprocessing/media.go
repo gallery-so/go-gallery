@@ -43,10 +43,6 @@ type errNoDataFromReader struct {
 	url string
 }
 
-type errNoDataFromOpensea struct {
-	err error
-}
-
 type errNotCacheable struct {
 	URL       string
 	MediaType persist.MediaType
@@ -83,18 +79,6 @@ func (e errInvalidMedia) Unwrap() error {
 	return e.err
 }
 
-func (e errNoDataFromOpensea) Error() string {
-	msg := "no data from opensea"
-	if e.err != nil {
-		msg += ": " + e.err.Error()
-	}
-	return msg
-}
-
-func (e errNoDataFromOpensea) Unwrap() error {
-	return e.err
-}
-
 func (e errStoreObjectFailed) Error() string {
 	return fmt.Sprintf("failed to write object to key: %s/%s: %s", e.bucket, e.object.fileName(), e.err)
 }
@@ -106,7 +90,6 @@ func (e errStoreObjectFailed) Unwrap() error {
 type cachePipelineMetadata struct {
 	ContentHeaderValueRetrieval  *persist.PipelineStepStatus
 	ReaderRetrieval              *persist.PipelineStepStatus
-	OpenseaFallback              *persist.PipelineStepStatus
 	DetermineMediaTypeWithReader *persist.PipelineStepStatus
 	AnimationGzip                *persist.PipelineStepStatus
 	SVGRasterize                 *persist.PipelineStepStatus
@@ -489,7 +472,7 @@ func persistToStorage(ctx context.Context, client *storage.Client, reader io.Rea
 		if object.ContentLength != nil {
 			logger.For(ctx).Errorf("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
 		} else {
-			logger.For(ctx).Errorf("wrote %d out of an unknown number of bytes before error: %s", written, err)
+			logger.For(ctx).Errorf("wrote %d bytes before error: %s", written, err)
 		}
 		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
@@ -629,7 +612,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 		if object.ContentLength != nil {
 			logger.For(ctx).Errorf("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
 		} else {
-			logger.For(ctx).Errorf("wrote %d out of an unknown number of bytes before error: %s", written, err)
+			logger.For(ctx).Errorf("wrote %d bytes before error: %s", written, err)
 		}
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}

@@ -3,9 +3,6 @@ package graphql_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/pushnotifications"
-	"github.com/mikeydub/go-gallery/pushnotifications/expo"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -18,8 +15,12 @@ import (
 	"github.com/mikeydub/go-gallery/autosocial"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dummymetadata"
+	"github.com/mikeydub/go-gallery/pushnotifications"
+	"github.com/mikeydub/go-gallery/pushnotifications/expo"
 	"github.com/mikeydub/go-gallery/server"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
@@ -225,7 +226,8 @@ func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 	t.Helper()
 	user := newUserFixture(t)
 	ctx := context.Background()
-	h := handlerWithProviders(t, submitUserTokensNoop, defaultStubProvider(user.Wallet.Address))
+	providers := multichain.ProviderLookup{persist.ChainETH: defaultStubProvider(user.Wallet.Address)}
+	h := handlerWithProviders(t, submitUserTokensNoop, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, user.ID))
 	tokenIDs := syncTokens(t, ctx, c, user.ID)
 	return userWithTokensFixture{user, tokenIDs}

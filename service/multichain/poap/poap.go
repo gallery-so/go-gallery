@@ -94,39 +94,6 @@ type poapEvent struct {
 	Description string `json:"description"`
 }
 
-/*
-{
-  "limit": 10,
-  "offset": 0,
-  "total": 0,
-  "tokens": [
-    {
-      "created": "string",
-      "id": "string",
-      "owner": {
-        "id": "string",
-        "tokensOwned": 0,
-        "ens": "string"
-      },
-      "transferCount": "string"
-    }
-  ]
-}
-*/
-
-type eventPoaps struct {
-	Limit  int `json:"limit"`
-	Offset int `json:"offset"`
-	Total  int `json:"total"`
-	Tokens []struct {
-		ID    string `json:"id"`
-		Owner struct {
-			ID  string `json:"id"`
-			ENS string `json:"ens"`
-		} `json:"owner"`
-	}
-}
-
 // Provider is an the struct for retrieving data from the Tezos blockchain
 type Provider struct {
 	apiURL     string
@@ -145,9 +112,8 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-// GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
-	return multichain.BlockchainInfo{
+func (d *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
 		Chain:      persist.ChainPOAP,
 		ChainID:    0,
 		ProviderID: "poap",
@@ -200,11 +166,6 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Poap Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
-}
-
-// GetTokensByContractAddressAndOwner retrieves tokens for a contract address with owner on the Poap Blockchain
-func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
 }
 
@@ -314,10 +275,6 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 		return multichain.ChainAgnosticContract{}, err
 	}
 	return d.eventToContract(event), nil
-}
-
-func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
-	return addr.String()
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {

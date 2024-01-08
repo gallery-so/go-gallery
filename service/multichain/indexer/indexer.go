@@ -1,4 +1,4 @@
-package eth
+package indexer
 
 import (
 	"bytes"
@@ -6,17 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/task"
 	"net/http"
 	"strings"
 	"time"
 
-	ens "github.com/benny-conn/go-ens"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer"
@@ -34,24 +33,21 @@ type Provider struct {
 	indexerBaseURL string
 	httpClient     *http.Client
 	ethClient      *ethclient.Client
-	taskClient     *task.Client
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(httpClient *http.Client, ec *ethclient.Client, tc *task.Client) *Provider {
+func NewProvider(httpClient *http.Client, ec *ethclient.Client) *Provider {
 	return &Provider{
 		indexerBaseURL: env.GetString("INDEXER_HOST"),
 		httpClient:     httpClient,
 		ethClient:      ec,
-		taskClient:     tc,
 	}
 }
 
-// GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
-	return multichain.BlockchainInfo{
+func (d *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
 		Chain:      persist.ChainETH,
-		ChainID:    0,
+		ChainID:    persist.MustChainToChainID(persist.ChainETH),
 		ProviderID: "eth",
 	}
 }
@@ -155,31 +151,6 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	}
 
 	return out, nil
-}
-
-func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
-
-	resultChan := make(chan string)
-	errChan := make(chan error)
-	go func() {
-		// no context? who do these guys think they are!? I had to add a goroutine to make sure this doesn't block forever
-		domain, err := ens.ReverseResolve(d.ethClient, persist.EthereumAddress(addr).Address())
-		if err != nil {
-			errChan <- err
-			return
-		}
-		resultChan <- domain
-	}()
-	select {
-	case result := <-resultChan:
-		return result
-	case err := <-errChan:
-		logger.For(ctx).Errorf("error resolving ens domain: %s", err.Error())
-		return addr.String()
-	case <-ctx.Done():
-		logger.For(ctx).Errorf("error resolving ens domain: %s", ctx.Err().Error())
-		return addr.String()
-	}
 }
 
 // RefreshContract refreshes the metadata for a contract

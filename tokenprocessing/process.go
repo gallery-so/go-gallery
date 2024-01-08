@@ -965,6 +965,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
 	runOpts = append(runOpts, PipelineOpts.WithIsFxhash(td.IsFxhash))
 	runOpts = append(runOpts, PipelineOpts.WithRefreshMetadata())
+	runOpts = append(runOpts, PipelineOpts.WithPlaceholderImageURL(td.FallbackMedia.ImageURL.String()))
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessTokenPipeline(ctx, tID, cID, cause, runOpts...)
 	defer closing(err)

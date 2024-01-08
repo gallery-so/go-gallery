@@ -2,49 +2,73 @@ package reservoir
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
-	"strings"
+	"net/url"
 
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 func init() {
 	env.RegisterValidation("RESERVOIR_API_KEY", "required")
 }
 
-type TokenID string
+var (
+	ethMainnetBaseURL = "https://api.reservoir.tools"
+	optimismBaseURL   = "https://api-optimism.reservoir.tools"
+	polygonBaseURL    = "https://api-polygon.reservoir.tools"
+	arbitrumBaseURL   = "https://api-arbitrum.reservoir.tools"
+	zoraBaseURL       = "https://api-zora.reservoir.tools"
+	baseBaseURL       = "https://api-base.reservoir.tools"
+)
 
-func (t TokenID) String() string {
-	return string(t)
+var (
+	userTokensEndpointTemplate  = "%s/users/%s/tokens/v7"
+	tokensEndpointTemplate      = "%s/tokens/v7"
+	collectionsEndpointTemplate = "%s/collections/v7"
+)
+
+var chainToBaseURL = map[persist.Chain]string{
+	persist.ChainETH:      ethMainnetBaseURL,
+	persist.ChainOptimism: optimismBaseURL,
+	persist.ChainPolygon:  polygonBaseURL,
+	persist.ChainArbitrum: arbitrumBaseURL,
+	persist.ChainZora:     zoraBaseURL,
+	persist.ChainBase:     baseBaseURL,
 }
 
-func (t TokenID) ToTokenID() persist.TokenID {
-
-	if strings.HasPrefix(t.String(), "0x") {
-		big, ok := new(big.Int).SetString(strings.TrimPrefix(t.String(), "0x"), 16)
-		if !ok {
-			return ""
-		}
-		return persist.TokenID(big.Text(16))
+func checkURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
 	}
-	big, ok := new(big.Int).SetString(t.String(), 10)
-	if !ok {
-		return ""
-	}
-	return persist.TokenID(big.Text(16))
+	return u
+}
 
+func mustUserTokensEndpoint(baseURL string, address persist.Address) *url.URL {
+	s := fmt.Sprintf(userTokensEndpointTemplate, baseURL, address)
+	return checkURL(s)
+}
+
+func mustTokensEndpoint(baseURL string) *url.URL {
+	s := fmt.Sprintf(tokensEndpointTemplate, baseURL)
+	return checkURL(s)
+}
+
+func mustCollectionsEndpoint(baseURL string) *url.URL {
+	s := fmt.Sprintf(collectionsEndpointTemplate, baseURL)
+	return checkURL(s)
 }
 
 type ErrTokenNotFoundByIdentifiers struct {
 	ContractAddress persist.Address
-	TokenID         TokenID
+	TokenID         persist.TokenID
 	OwnerAddress    persist.Address
 }
 
@@ -60,41 +84,9 @@ func (e ErrCollectionNotFoundByAddress) Error() string {
 	return fmt.Sprintf("collection not found for address %s", e.Address)
 }
 
-/*
- {
-      "token": {
-        "contract": "string",
-        "tokenId": "string",
-        "kind": "string",
-        "name": "string",
-        "image": "string",
-        "imageSmall": "string",
-        "imageLarge": "string",
-        "metadata": {},
-        "supply": 0,
-        "remainingSupply": 0,
-        "rarityScore": 0,
-        "rarityRank": 0,
-        "media": "string",
-        "collection": {
-          "id": "string",
-          "name": "string",
-          "imageUrl": "string",
-          "openseaVerificationStatus": "string",
-        }
-      },
-      "ownership": {
-        "tokenCount": "string",
-        "acquiredAt": "string"
-      }
-    }
-  ],
-  "continuation": "string"
-*/
-
 type Token struct {
 	Contract    persist.Address       `json:"contract"`
-	TokenID     TokenID               `json:"tokenId"`
+	TokenID     string                `json:"tokenId"`
 	Kind        string                `json:"kind"`
 	Name        string                `json:"name"`
 	Description string                `json:"description"`
@@ -104,15 +96,18 @@ type Token struct {
 	ImageSmall  string                `json:"imageSmall"`
 	ImageLarge  string                `json:"imageLarge"`
 	Collection  Collection            `json:"collection"`
+	Owner       persist.Address       `json:"owner"`
+	IsSpam      bool                  `json:"isSpam"`
 }
 
 type Collection struct {
-	ID                        string          `json:"id"`
-	Name                      string          `json:"name"`
-	Description               string          `json:"description"`
-	ImageURL                  string          `json:"imageUrl"`
-	Creator                   persist.Address `json:"creator"`
-	OpenseaVerificationStatus string          `json:"openseaVerificationStatus"`
+	ID              persist.Address `json:"id"`
+	Name            string          `json:"name"`
+	Description     string          `json:"description"`
+	ImageURL        string          `json:"imageUrl"`
+	Creator         persist.Address `json:"creator"`
+	Symbol          string          `json:"symbol"`
+	PrimaryContract persist.Address `json:"primaryContract"`
 }
 
 type Ownership struct {
@@ -125,14 +120,9 @@ type TokenWithOwnership struct {
 	Ownership Ownership `json:"ownership"`
 }
 
-type TokensResponse struct {
-	Tokens       []TokenWithOwnership `json:"tokens"`
-	Continuation string               `json:"continuation"`
-}
-
-type CollectionsResponse struct {
-	Collections  []Collection `json:"collections"`
-	Continuation string       `json:"continuation"`
+type pageResult struct {
+	Tokens []TokenWithOwnership
+	Err    error
 }
 
 // Provider is an the struct for retrieving data from the Ethereum blockchain
@@ -144,28 +134,16 @@ type Provider struct {
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
-	var apiURL string
-	switch chain {
-	case persist.ChainETH:
-		apiURL = "https://api.reservoir.tools"
-	case persist.ChainOptimism:
-		apiURL = "https://api-optimism.reservoir.tools"
-	case persist.ChainPolygon:
-		apiURL = "https://api-polygon.reservoir.tools"
-	case persist.ChainArbitrum:
-		apiURL = "https://api-arbitrum-nova.reservoir.tools"
-	case persist.ChainZora:
-		apiURL = "https://api-zora.reservoir.tools"
-	case persist.ChainBase:
-		apiURL = "https://api-base.reservoir.tools"
-	}
-
+func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
+	apiURL := chainToBaseURL[chain]
 	if apiURL == "" {
 		panic(fmt.Sprintf("no reservoir api url set for chain %d", chain))
 	}
 
 	apiKey := env.GetString("RESERVOIR_API_KEY")
+	if apiKey == "" {
+		panic("no reservoir api key set")
+	}
 
 	return &Provider{
 		apiURL:     apiURL,
@@ -175,352 +153,300 @@ func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
 	}
 }
 
-// GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
-	chainID := 0
-	switch d.chain {
-	case persist.ChainOptimism:
-		chainID = 10
-	case persist.ChainPolygon:
-		chainID = 137
-	case persist.ChainArbitrum:
-		chainID = 42161
-	case persist.ChainZora:
-		chainID = 7777777
-	case persist.ChainBase:
-		chainID = 84531
-	}
-	return multichain.BlockchainInfo{
-		Chain:      d.chain,
-		ChainID:    chainID,
+func (p *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
+		Chain:      p.chain,
+		ChainID:    persist.MustChainToChainID(p.chain),
 		ProviderID: "reservoir",
 	}
 }
 
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	return d.getTokensByWalletAddressPaginate(ctx, addr, "", nil)
-}
-
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
-	errChan := make(chan error)
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	outCh := make(chan pageResult)
 	go func() {
-		defer close(rec)
-		_, _, err := d.getTokensByWalletAddressPaginate(ctx, addr, "", rec)
-		if err != nil {
-			errChan <- err
-			return
-		}
+		defer close(outCh)
+		p.streamAssetsForWallet(ctx, ownerAddress, outCh)
 	}()
-	return rec, errChan
+	return assetsToTokens(ownerAddress, outCh)
 }
 
-func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, pageKey string, rec chan<- multichain.ChainAgnosticTokensAndContracts) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	u := fmt.Sprintf("%s/users/%s/tokens/v7", d.apiURL, addr)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	req.Header.Add("x-api-key", d.apiKey)
-	q := req.URL.Query()
-	q.Add("limit", fmt.Sprintf("%d", 200))
-	q.Add("sort_by", "acquiredAt")
-	if pageKey != "" {
-		q.Add("continuation", pageKey)
-	}
-	req.URL.RawQuery = q.Encode()
-
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var result TokensResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, nil, err
-	}
-
-	tokens, contracts := d.tokensWithOwnershipToAgnosticTokens(ctx, result.Tokens, addr)
-
-	if rec != nil {
-		rec <- multichain.ChainAgnosticTokensAndContracts{
-			Tokens:    tokens,
-			Contracts: contracts,
-		}
-	}
-
-	if len(tokens) == 200 && result.Continuation != "" {
-		nextPageTokens, nextPageContracts, err := d.getTokensByWalletAddressPaginate(ctx, addr, result.Continuation, rec)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		tokens = append(tokens, nextPageTokens...)
-		contracts = append(contracts, nextPageContracts...)
-	}
-
-	return tokens, contracts, nil
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errCh := make(chan error)
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForWallet(ctx, ownerAddress, outCh)
+	}()
+	go func() {
+		defer close(recCh)
+		defer close(errCh)
+		streamAssetsToTokens(ownerAddress, outCh, recCh, errCh)
+	}()
+	return recCh, errCh
 }
-func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	u := fmt.Sprintf("%s/users/%s/tokens/v7", d.apiURL, ownerAddress)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForContract(ctx, contractAddress, outCh)
+	}()
+
+	tokens, contracts, err := assetsToTokens("", outCh)
 	if err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	req.Header.Add("x-api-key", d.apiKey)
-	q := req.URL.Query()
-	q.Add("limit", fmt.Sprintf("%d", 1))
-	q.Add("tokens", fmt.Sprintf("%s:%s", tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID.Base10String()))
+	if len(contracts) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
+	}
 
-	req.URL.RawQuery = q.Encode()
+	return tokens, contracts[0], nil
+}
 
-	resp, err := d.httpClient.Do(req)
+// GetTokensIncrementallyByWalletAddress returns a list of tokens for a contract address
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errCh := make(chan error)
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForContract(ctx, address, outCh)
+	}()
+	go func() {
+		defer close(recCh)
+		streamAssetsToTokens(address, outCh, recCh, errCh)
+	}()
+	return recCh, errCh
+}
+
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForTokenIdentifiersAndOwner(ctx, ownerAddress, ti.ContractAddress, ti.TokenID, outCh)
+	}()
+
+	tokens, contracts, err := assetsToTokens(ownerAddress, outCh)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
 
-	var result TokensResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	if len(tokens) == 0 {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 
-	if len(result.Tokens) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: TokenID(tokenIdentifiers.TokenID.Base10String()), OwnerAddress: ownerAddress}
+	if len(contracts) == 0 {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: ti.ContractAddress}
 	}
 
-	t, c := d.tokensWithOwnershipToAgnosticTokens(ctx, result.Tokens, ownerAddress)
-	if len(t) == 0 || len(c) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: TokenID(tokenIdentifiers.TokenID.Base10String()), OwnerAddress: ownerAddress}
-	}
-	return t[0], c[0], nil
+	return tokens[0], contracts[0], nil
 }
 
-/*
-{
-  "animation_url": null,
-  "external_app_url": "https://l2marathon.com/",
-  "id": "1",
-  "image_url": "https://l2marathon.com/nft/ultra-runner.jpg",
-  "is_unique": true,
-  "metadata": {
-    "description": "Complete the Layer2 Ultra Marathon by bridging Ultra Runner ONFTs with LayerZero.",
-    "external_url": "https://l2marathon.com/",
-    "image": "https://l2marathon.com/nft/ultra-runner.jpg",
-    "name": "Ultra Runner #1"
-  },
-  "owner": {
-    "hash": "0x5137eEDb91A5f2cC68e86DcA15AD5C2b541654F8",
-    "implementation_name": null,
-    "is_contract": true,
-    "is_verified": null,
-    "name": null,
-    "private_tags": [],
-    "public_tags": [],
-    "watchlist_names": []
-  },
-  "token": {
-    "address": "0x5137eEDb91A5f2cC68e86DcA15AD5C2b541654F8",
-    "circulating_market_cap": null,
-    "decimals": null,
-    "exchange_rate": null,
-    "holders": "610",
-    "icon_url": null,
-    "name": "UltraMarathon",
-    "symbol": "UltraRunner",
-    "total_supply": null,
-    "type": "ERC-721"
-  }
-}
-*/
+func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForToken(ctx, ti.ContractAddress, ti.TokenID, outCh)
+	}()
 
-type BlockScoutTokenResponse struct {
-	AnimationURL   string                `json:"animation_url"`
-	ExternalAppURL string                `json:"external_app_url"`
-	ID             string                `json:"id"`
-	ImageURL       string                `json:"image_url"`
-	IsUnique       bool                  `json:"is_unique"`
-	Metadata       persist.TokenMetadata `json:"metadata"`
-}
-
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	meta, err := d.fetchReservoirMetadata(ctx, ti, true)
-	if err == nil {
-		return meta, nil
-	}
-	logger.For(ctx).Infof("reservoir metadata error: %s", err)
-	meta, err = d.fetchBlockScoutMetadata(ctx, ti)
-	if err != nil {
-		logger.For(ctx).Infof("blockscout metadata error: %s", err)
-		return nil, err
-	}
-
-	return meta, nil
-}
-
-func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
-	token, err := d.fetchToken(ctx, ti)
+	// ownerAddress is omitted, but its not required in this context
+	tokens, contracts, err := assetsToTokens("", outCh)
 	if err != nil {
 		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
 	}
-	c, err := d.fetchCollection(ctx, token.Contract, true)
 
-	return multichain.ChainAgnosticTokenDescriptors{
-			Name:        token.Name,
-			Description: token.Description,
-		}, multichain.ChainAgnosticContractDescriptors{
-			Name:            c.Name,
-			ProfileImageURL: c.ImageURL,
-			Description:     c.Description,
-			OwnerAddress:    c.Creator,
-		}, nil
+	if len(tokens) == 0 {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+	}
 
+	if len(contracts) == 0 {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, ErrCollectionNotFoundByAddress{Address: ti.ContractAddress}
+	}
+
+	return tokens[0].Descriptors, contracts[0].Descriptors, nil
 }
 
-func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, refresh bool) (persist.TokenMetadata, error) {
-	rtid := fmt.Sprintf("%s:%s", ti.ContractAddress, ti.TokenID.Base10String())
-	if refresh {
-		ru := fmt.Sprintf("%s/tokens/refresh/v1", d.apiURL)
-		body := map[string]interface{}{
-			"token": rtid,
-		}
-		b, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForToken(ctx, ti.ContractAddress, ti.TokenID, outCh)
+	}()
 
-		rreq, err := http.NewRequestWithContext(ctx, http.MethodPost, ru, strings.NewReader(string(b)))
-		if err != nil {
-			return nil, err
-		}
-
-		rreq.Header.Add("x-api-key", d.apiKey)
-
-		_, err = d.httpClient.Do(rreq)
-		if err != nil {
-			return nil, err
-		}
+	// ownerAddress is omitted, but its not required in this context
+	tokens, _, err := assetsToTokens("", outCh)
+	if err != nil && p.chain == persist.ChainBase {
+		return p.fetchBlockScoutMetadata(ctx, ti)
 	}
-
-	token, err := d.fetchToken(ctx, ti)
 	if err != nil {
-		return nil, err
+		return persist.TokenMetadata{}, err
 	}
 
-	meta := make(persist.TokenMetadata, len(token.Metadata))
-	for k, v := range token.Metadata {
-		meta[k] = v
+	if len(tokens) == 0 {
+		return persist.TokenMetadata{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 
-	if _, ok := util.FindFirstFieldFromMap(meta, "image", "image_url", "imageURL").(string); !ok {
-		meta["image_url"] = token.Image
-	}
-	return meta, nil
+	return tokens[0].TokenMetadata, nil
 }
 
-func (d *Provider) fetchToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (Token, error) {
-	rtid := fmt.Sprintf("%s:%s", ti.ContractAddress, ti.TokenID.Base10String())
-	u := fmt.Sprintf("%s/tokens/v6", d.apiURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForContractAndOwner(ctx, ownerAddress, contractAddress, outCh)
+	}()
+
+	tokens, contracts, err := assetsToTokens("", outCh)
 	if err != nil {
-		return Token{}, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	req.Header.Add("x-api-key", d.apiKey)
-	q := req.URL.Query()
-	q.Add("tokens", rtid)
-
-	req.URL.RawQuery = q.Encode()
-
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return Token{}, err
+	if len(contracts) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
 	}
 
-	var res TokensResponse
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return Token{}, err
-	}
-
-	if len(res.Tokens) == 0 {
-		logger.For(ctx).Infof("token not found for %s (%s)", rtid, req.URL.String())
-		return Token{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
-	}
-	return res.Tokens[0].Token, nil
+	return tokens, contracts[0], nil
 }
 
-func (d *Provider) fetchCollection(ctx context.Context, address persist.Address, refresh bool) (Collection, error) {
-	if refresh {
-		ru := fmt.Sprintf("%s/collections/refresh/v2", d.apiURL)
-		body := map[string]interface{}{
-			"collection":    address,
-			"refreshTokens": true,
-		}
-		b, err := json.Marshal(body)
-		if err != nil {
-			return Collection{}, err
-		}
-		rreq, err := http.NewRequestWithContext(ctx, http.MethodPost, ru, strings.NewReader(string(b)))
-		if err != nil {
-			return Collection{}, err
-		}
-
-		rreq.Header.Add("x-api-key", d.apiKey)
-
-		_, err = d.httpClient.Do(rreq)
-		if err != nil {
-			return Collection{}, err
-		}
+func (p Provider) GetContractByAddress(ctx context.Context, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
+	c, err := p.fetchCollectionByAddress(ctx, contractAddress)
+	if err != nil {
+		return multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
 	}
+	return collectionToAgnosticContract(c, contractAddress), nil
+}
 
-	u := fmt.Sprintf("%s/collections/v6", d.apiURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+func paginateTokens(ctx context.Context, client *http.Client, req *http.Request, outCh chan<- pageResult) {
+	for {
+		resp, err := retry.RetryRequest(client, req)
+		if err != nil {
+			outCh <- pageResult{Err: err}
+			return
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			outCh <- pageResult{Err: errors.New("API key expired")}
+			return
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			outCh <- pageResult{Err: util.BodyAsError(resp)}
+			return
+		}
+
+		page := struct {
+			Tokens       []TokenWithOwnership `json:"tokens"`
+			Continuation string               `json:"continuation"`
+		}{}
+
+		if err := util.UnmarshallBody(&page, resp.Body); err != nil {
+			outCh <- pageResult{Err: err}
+			return
+		}
+
+		outCh <- pageResult{Tokens: page.Tokens}
+
+		if page.Continuation == "" {
+			return
+		}
+
+		setNext(req.URL, page.Continuation)
+	}
+}
+
+func (p *Provider) streamAssetsForToken(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, outCh chan<- pageResult) {
+	endpoint := mustTokensEndpoint(p.apiURL)
+	setToken(endpoint, contractAddress, tokenID)
+	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+}
+
+func (p *Provider) streamAssetsForWallet(ctx context.Context, addr persist.Address, outCh chan<- pageResult) {
+	endpoint := mustUserTokensEndpoint(p.apiURL, addr)
+	setPagingParams(endpoint, "acquiredAt")
+	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+}
+
+func (p *Provider) streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, tokenID persist.TokenID, outCh chan<- pageResult) {
+	endpoint := mustUserTokensEndpoint(p.apiURL, ownerAddress)
+	setLimit(endpoint, 1)
+	setToken(endpoint, contractAddress, tokenID)
+	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+}
+
+func (p *Provider) streamAssetsForContract(ctx context.Context, contractAddress persist.Address, outCh chan<- pageResult) {
+	endpoint := mustTokensEndpoint(p.apiURL)
+	setCollection(endpoint, contractAddress)
+	setPagingParams(endpoint, "tokenId")
+	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+}
+
+func (p *Provider) streamAssetsForContractAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, outCh chan<- pageResult) {
+	endpoint := mustUserTokensEndpoint(p.apiURL, ownerAddress)
+	setContract(endpoint, contractAddress)
+	setPagingParams(endpoint, "acquiredAt")
+	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+}
+
+func (p *Provider) fetchCollectionByAddress(ctx context.Context, contractAddress persist.Address) (Collection, error) {
+	endpoint := mustCollectionsEndpoint(p.apiURL)
+	setLimit(endpoint, 1)
+	setCollectionID(endpoint, contractAddress)
+
+	resp, err := p.httpClient.Do(mustAuthRequest(ctx, endpoint, p.apiKey))
 	if err != nil {
 		return Collection{}, err
 	}
 
-	req.Header.Add("x-api-key", d.apiKey)
-	q := req.URL.Query()
-	q.Add("id", fmt.Sprintf("%s", address))
-	q.Add("limit", "1")
+	defer resp.Body.Close()
 
-	req.URL.RawQuery = q.Encode()
+	res := struct {
+		Collections []Collection `json:"collections"`
+	}{}
 
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return Collection{}, err
-	}
-
-	var res CollectionsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+	if err := util.UnmarshallBody(&res, resp.Body); err != nil {
 		return Collection{}, err
 	}
 
 	if len(res.Collections) == 0 {
-		return Collection{}, ErrCollectionNotFoundByAddress{Address: address}
+		return Collection{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
 	}
+
 	return res.Collections[0], nil
 }
 
-func (d *Provider) fetchBlockScoutMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p *Provider) fetchBlockScoutMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	u := fmt.Sprintf("https://base.blockscout.com/api/v2/tokens/%s/instances/%s", ti.ContractAddress, ti.TokenID.Base10String())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := d.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var res BlockScoutTokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+	defer resp.Body.Close()
+
+	res := struct {
+		AnimationURL   string                `json:"animation_url"`
+		ExternalAppURL string                `json:"external_app_url"`
+		ID             string                `json:"id"`
+		ImageURL       string                `json:"image_url"`
+		IsUnique       bool                  `json:"is_unique"`
+		Metadata       persist.TokenMetadata `json:"metadata"`
+	}{}
+
+	if err := util.UnmarshallBody(&res, resp.Body); err != nil {
 		return nil, err
 	}
 
 	if len(res.Metadata) == 0 {
-		return nil, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
+		return nil, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 
 	if _, ok := util.FindFirstFieldFromMap(res.Metadata, "image", "image_url", "imageURL").(string); !ok {
@@ -534,60 +460,151 @@ func (d *Provider) fetchBlockScoutMetadata(ctx context.Context, ti multichain.Ch
 	return res.Metadata, nil
 }
 
-func (d *Provider) tokensWithOwnershipToAgnosticTokens(ctx context.Context, tokens []TokenWithOwnership, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
-	ts := []multichain.ChainAgnosticToken{}
-	cs := []multichain.ChainAgnosticContract{}
-	for _, t := range tokens {
-		var tokenType persist.TokenType
-		switch t.Token.Kind {
-		case "erc721":
-			tokenType = persist.TokenTypeERC721
-		case "erc1155":
-			tokenType = persist.TokenTypeERC1155
-		case "erc20":
-			tokenType = persist.TokenTypeERC20
+func assetsToTokens(ownerAddress persist.Address, outCh <-chan pageResult) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	resultTokens := make([]multichain.ChainAgnosticToken, 0, len(outCh))
+	resultContracts := make([]multichain.ChainAgnosticContract, 0, len(outCh))
+	seenContracts := make(map[persist.Address]bool)
+	for page := range outCh {
+		if page.Err != nil {
+			return nil, nil, page.Err
 		}
-		var tokenQuantity persist.HexString
-		b, ok := new(big.Int).SetString(t.Ownership.TokenCount, 10)
-		if !ok {
-			b, ok = new(big.Int).SetString(t.Ownership.TokenCount, 16)
-			if !ok {
-				tokenQuantity = persist.HexString("1")
-			} else {
-				tokenQuantity = persist.HexString(b.Text(16))
+		for _, t := range page.Tokens {
+			resultTokens = append(resultTokens, assetToAgnosticToken(t, ownerAddress))
+			if !seenContracts[t.Token.Contract] {
+				resultContracts = append(resultContracts, collectionToAgnosticContract(t.Token.Collection, t.Token.Contract))
 			}
+		}
+	}
+	return resultTokens, resultContracts, nil
+}
+
+func streamAssetsToTokens(ownerAddress persist.Address, outCh <-chan pageResult, recCh chan<- multichain.ChainAgnosticTokensAndContracts, errCh chan<- error) {
+	for page := range outCh {
+		if page.Err != nil {
+			errCh <- page.Err
+		}
+		resultTokens := make([]multichain.ChainAgnosticToken, 0, len(page.Tokens))
+		resultContracts := make([]multichain.ChainAgnosticContract, 0, len(page.Tokens))
+		for _, t := range page.Tokens {
+			resultTokens = append(resultTokens, assetToAgnosticToken(t, ownerAddress))
+			resultContracts = append(resultContracts, collectionToAgnosticContract(t.Token.Collection, t.Token.Contract))
+
+		}
+		recCh <- multichain.ChainAgnosticTokensAndContracts{
+			Tokens:    resultTokens,
+			Contracts: resultContracts,
+		}
+	}
+}
+
+func assetToAgnosticToken(t TokenWithOwnership, ownerAddress persist.Address) multichain.ChainAgnosticToken {
+	var tokenType persist.TokenType
+
+	switch t.Token.Kind {
+	case "erc721":
+		tokenType = persist.TokenTypeERC721
+	case "erc1155":
+		tokenType = persist.TokenTypeERC1155
+	case "erc20":
+		tokenType = persist.TokenTypeERC20
+	}
+
+	var tokenQuantity persist.HexString
+	b, ok := new(big.Int).SetString(t.Ownership.TokenCount, 10)
+	if !ok {
+		b, ok = new(big.Int).SetString(t.Ownership.TokenCount, 16)
+		if !ok {
+			tokenQuantity = persist.HexString("1")
 		} else {
 			tokenQuantity = persist.HexString(b.Text(16))
 		}
-		description, _ := t.Token.Metadata["description"].(string)
-		ts = append(ts, multichain.ChainAgnosticToken{
-			ContractAddress: t.Token.Contract,
-			Descriptors: multichain.ChainAgnosticTokenDescriptors{
-				Name:        t.Token.Name,
-				Description: description,
-			},
-			TokenType:     tokenType,
-			TokenID:       t.Token.TokenID.ToTokenID(),
-			Quantity:      tokenQuantity,
-			OwnerAddress:  ownerAddress,
-			TokenMetadata: t.Token.Metadata,
-			FallbackMedia: persist.FallbackMedia{
-				ImageURL: persist.NullString(t.Token.Image),
-			},
-		})
-		if strings.EqualFold(t.Token.Collection.Name, t.Token.Contract.String()) || t.Token.Collection.Name == "" {
-			c, err := d.fetchCollection(ctx, t.Token.Contract, true)
-			if err == nil {
-				t.Token.Collection = c
-			}
-		}
-		cs = append(cs, multichain.ChainAgnosticContract{
-			Address: t.Token.Contract,
-			Descriptors: multichain.ChainAgnosticContractDescriptors{
-				Name:            t.Token.Collection.Name,
-				ProfileImageURL: t.Token.Collection.ImageURL,
-			},
-		})
+	} else {
+		tokenQuantity = persist.HexString(b.Text(16))
 	}
-	return ts, cs
+
+	descriptors := multichain.ChainAgnosticTokenDescriptors{
+		Name:        t.Token.Name,
+		Description: t.Token.Description,
+	}
+
+	if ownerAddress == "" {
+		ownerAddress = t.Token.Owner
+	}
+
+	return multichain.ChainAgnosticToken{
+		ContractAddress: t.Token.Contract,
+		Descriptors:     descriptors,
+		TokenType:       tokenType,
+		TokenID:         persist.MustTokenID(t.Token.TokenID),
+		Quantity:        tokenQuantity,
+		OwnerAddress:    ownerAddress,
+		TokenMetadata:   t.Token.Metadata,
+		FallbackMedia:   persist.FallbackMedia{ImageURL: persist.NullString(t.Token.Image)},
+		IsSpam:          util.ToPointer(t.Token.IsSpam),
+	}
+}
+
+func collectionToAgnosticContract(c Collection, contractAddress persist.Address) multichain.ChainAgnosticContract {
+	return multichain.ChainAgnosticContract{
+		Address: contractAddress,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:          c.Symbol,
+			Name:            c.Name,
+			Description:     c.Description,
+			ProfileImageURL: c.ImageURL,
+			OwnerAddress:    c.Creator,
+		},
+	}
+}
+
+func setPagingParams(url *url.URL, sortBy string) {
+	query := url.Query()
+	query.Set("limit", "100")
+	query.Set("sort_by", sortBy)
+	url.RawQuery = query.Encode()
+}
+
+func setNext(url *url.URL, next string) {
+	query := url.Query()
+	query.Set("continuation", next)
+	url.RawQuery = query.Encode()
+}
+
+func setLimit(url *url.URL, limit int) {
+	query := url.Query()
+	query.Set("limit", fmt.Sprintf("%d", limit))
+	url.RawQuery = query.Encode()
+}
+
+func setToken(url *url.URL, contractAddress persist.Address, tokenID persist.TokenID) {
+	query := url.Query()
+	query.Set("tokens", fmt.Sprintf("%s:%s", contractAddress, tokenID.Base10String()))
+	url.RawQuery = query.Encode()
+}
+
+func setCollectionID(url *url.URL, contractAddress persist.Address) {
+	query := url.Query()
+	query.Set("id", contractAddress.String())
+	url.RawQuery = query.Encode()
+}
+
+func setCollection(url *url.URL, contractAddress persist.Address) {
+	query := url.Query()
+	query.Set("collection", contractAddress.String())
+	url.RawQuery = query.Encode()
+}
+
+func setContract(url *url.URL, contractAddress persist.Address) {
+	query := url.Query()
+	query.Set("contract", contractAddress.String())
+	url.RawQuery = query.Encode()
+}
+
+func mustAuthRequest(ctx context.Context, url *url.URL, apiKey string) *http.Request {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Add("x-api-key", apiKey)
+	return req
 }
