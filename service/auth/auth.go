@@ -702,6 +702,7 @@ func setCookie(c *gin.Context, cookieName string, value string) {
 	mode := http.SameSiteStrictMode
 	domain := ".gallery.so"
 	httpOnly := true
+	secure := true
 
 	clientIsLocalhost := c.Request.Header.Get("Origin") == "http://localhost:3000"
 
@@ -711,12 +712,18 @@ func setCookie(c *gin.Context, cookieName string, value string) {
 		httpOnly = false
 	}
 
+	// Safari won't set a secure cookie unless the request uses HTTPS, but local development doesn't
+	// use HTTPS, so we need to disable secure cookies for local environments.
+	if env.GetString("ENV") == "local" {
+		secure = false
+	}
+
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     cookieName,
 		Value:    value,
 		MaxAge:   cookieMaxAge,
 		Path:     "/",
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: httpOnly,
 		SameSite: mode,
 		Domain:   domain,
