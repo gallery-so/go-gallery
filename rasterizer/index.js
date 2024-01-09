@@ -70,6 +70,7 @@ const args = [
     }
   });
 
+  // this function defines what is run when you call cluster.execute
   await cluster.task(async ({ page, data: url }) => {
     await page.goto(url);
     return await createAnimation(page);
@@ -103,7 +104,9 @@ const args = [
   });
 })();
 
+// total screenshots
 const totalFrames = 10;
+// ideal delay between screenshots in ms
 const idealDelay = 30;
 
 process.on('unhandledRejection', (reason, p) => {
@@ -135,6 +138,7 @@ async function createAnimation(page) {
       throw new Error('SVG found but no viewBox or baseVal for width/height available');
     }
 
+    // Scale the SVG to a fixed height
     const fixedHeight = 500;
     const aspectRatio = width / height;
     const scaledWidth = fixedHeight * aspectRatio;
@@ -144,6 +148,8 @@ async function createAnimation(page) {
       height: fixedHeight,
     };
   });
+
+  console.log(`SVG dimensions for ${page.url()}: ${JSON.stringify(svgDimensions)}`);
 
   await page.setViewport({
     width: Math.ceil(svgDimensions.width),
@@ -159,6 +165,7 @@ async function createAnimation(page) {
   let previousTimestamp = Date.now();
   let accumulatedDelay = 0;
 
+  // Take a screenshot of each frame and try to take evenly spaced screenshots by comparing times before and after screenshotting
   for (let i = 0; i < totalFrames; i++) {
     const frame = await svgElement.screenshot();
     const img = PNG.sync.read(frame);
@@ -186,6 +193,8 @@ async function createAnimation(page) {
   let isStatic = true;
   const img1 = frames[0];
 
+  // compare each frame to the first frame
+  // if there is any difference ever, it is animated
   for (let i = 1; i < frames.length; i++) {
     const img2 = frames[i];
     const diff = new PNG({ width: img1.width, height: img1.height });
@@ -202,11 +211,13 @@ async function createAnimation(page) {
 
   const pngBuffer = PNG.sync.write(frames[0]);
 
+  // uncomment this line if you'd like to see the result of the first frame
   // fs.writeFileSync('test.png', pngBuffer);
 
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
   if (!isStatic) {
+    console.log('Animated SVG detected for ' + page.url());
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
     const stream = encoder.createReadStream();
     let gifBuffer = Buffer.alloc(0);
@@ -228,5 +239,6 @@ async function createAnimation(page) {
     });
   }
 
+  // result is an array of base64 encoded strings, min length 1, max length 2, first element is always the png, second is the gif if it exists
   return result;
 }

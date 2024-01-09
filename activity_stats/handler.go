@@ -87,7 +87,7 @@ func calculateTopActivityBadges(c context.Context, q *coredb.Queries, stg *stora
 		return r.ActorID != "" && r.Score > 0
 	}, false)
 
-	logger.For(c).Debugf("top: %d %+v", len(top), top)
+	logger.For(c).Infof("top active users: %d %+v", len(top), top)
 
 	userIDs := util.MapWithoutError(top, func(r coredb.GetMostActiveUsersRow) persist.DBID {
 		return r.ActorID

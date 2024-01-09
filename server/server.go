@@ -232,9 +232,9 @@ func SetDefaults() {
 	viper.SetDefault("NEYNAR_API_KEY", "")
 	viper.SetDefault("EMAILS_QUEUE", "projects/gallery-local/locations/here/queues/email")
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
-	viper.SetDefault("AUTOSOCIAL_URL", "")
-	viper.SetDefault("AUTOSOCIAL_QUEUE", "")
-	viper.SetDefault("AUTOSOCIAL_POLL_QUEUE", "")
+	viper.SetDefault("AUTOSOCIAL_URL", "http://localhost:6700")
+	viper.SetDefault("AUTOSOCIAL_QUEUE", "projects/gallery-local/locations/here/queues/autosocial")
+	viper.SetDefault("AUTOSOCIAL_POLL_QUEUE", "projects/gallery-local/locations/here/queues/autosocial-poll")
 	viper.SetDefault("ACTIVITY_QUEUE", "projects/gallery-local/locations/here/queues/activity")
 
 	viper.SetDefault("FARCASTER_MNEMONIC", "")

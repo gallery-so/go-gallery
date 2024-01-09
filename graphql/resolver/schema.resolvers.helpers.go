@@ -573,7 +573,7 @@ func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
 			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
-			// UnsubscribedFromDigest:        user.EmailUnsubscriptions.Digest.Bool(), // TODO -DIGEST
+			UnsubscribedFromDigest:        user.EmailUnsubscriptions.Digest.Bool(),
 		},
 	}
 
