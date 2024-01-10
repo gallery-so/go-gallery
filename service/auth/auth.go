@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -712,10 +713,24 @@ func setCookie(c *gin.Context, cookieName string, value string) {
 		httpOnly = false
 	}
 
-	// Safari won't set a secure cookie unless the request uses HTTPS, but local development doesn't
-	// use HTTPS, so we need to disable secure cookies for local environments.
 	if env.GetString("ENV") == "local" {
-		secure = false
+		userAgent := c.GetHeader("User-Agent")
+
+		// WebKit-based clients (e.g. Safari and our mobile app) won't set a secure cookie unless the
+		// request uses HTTPS, but local development doesn't use HTTPS, so we need to disable secure
+		// cookies for local environments when receiving requests from these platforms.
+
+		// Mobile app
+		if strings.Contains(userAgent, "GalleryLabs") && strings.Contains(userAgent, "Darwin") {
+			secure = false
+			logger.For(c).Info("Request is from mobile app, setting local auth cookie with secure=false")
+		}
+
+		// Safari mentions "Safari" in its User-Agent string, but it doesn't mention Chrome or Chromium.
+		if strings.Contains(userAgent, "Safari") && !strings.Contains(userAgent, "Chrome") && !strings.Contains(userAgent, "Chromium") {
+			secure = false
+			logger.For(c).Info("Request is from Safari, setting local auth cookie with secure=false")
+		}
 	}
 
 	http.SetCookie(c.Writer, &http.Cookie{
