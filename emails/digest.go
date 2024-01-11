@@ -335,6 +335,9 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 func selectWithOverrides(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
 	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
 	for _, post := range overrides {
+		if len(selectedResults) <= post.Position {
+			selectedResults = append(selectedResults, make([]Selected, post.Position-len(selectedResults)+1)...)
+		}
 		selectedResults[post.Position] = overrideFetcher(post)
 	}
 outer:
