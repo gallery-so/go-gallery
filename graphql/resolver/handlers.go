@@ -436,6 +436,13 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 	}
 }
 
+func ErrorLogger(ctx context.Context, e error) *gqlerror.Error {
+	err := gqlgen.DefaultErrorPresenter(ctx, e)
+	logger.For(ctx).WithError(err).Warnf("GraphQL error: %s", err.Error())
+
+	return err
+}
+
 // Sentry will drop events if they contain too much data. It's convenient to attach our GraphQL
 // requests and responses to Sentry events, but we don't want to risk dropping events, so we limit
 // the size to something small (like 8kB). Larger payloads should still be logged and available
