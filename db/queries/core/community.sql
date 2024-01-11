@@ -306,27 +306,10 @@ select count(distinct u.id) from users u, community_tokens t
 
 -- name: PaginateTokensByCommunityID :batchmany
 with community_data as (
-    select community_type, contract_id
+    select id as community_id, community_type, contract_id
     from communities
     where communities.id = @community_id and not deleted
-),
-
-contract_memberships as (
-    select tokens.id
-    from community_data, tokens
-    where community_data.community_type = 0
-      and tokens.contract_id = community_data.contract_id
-      and not tokens.deleted
-),
-
-token_memberships as (
-    select tokens.id
-    from community_data, tokens
-        join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
-            and token_community_memberships.community_id = @community_id
-            and not token_community_memberships.deleted
-    where community_data.community_type != 0
-        and not tokens.deleted
+    limit 1
 )
 
 -- At present, a community is either entirely token-based or contract-based, so only
@@ -336,12 +319,13 @@ token_memberships as (
 -- select + join on the results of that union, but that prevented the query planner from
 -- using indexes correctly (since the referenced tables might be indexed, but the union
 -- of results is not). The current method is verbose and brittle, but it's fast!
-(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from contract_memberships ct
-    join tokens t on t.id = ct.id
+(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_data cd
+    join tokens t on t.contract_id = cd.contract_id
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
-    where t.displayable
+where cd.community_type = 0
+    and t.displayable
     and t.deleted = false
     and c.deleted = false
     and td.deleted = false
@@ -349,18 +333,21 @@ token_memberships as (
     and u.universal = false
     and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id)
     and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id)
-    order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
-             case when not @paging_forward::bool then (t.created_at,t.id) end desc
-    limit sqlc.arg('limit'))
+order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
+         case when not @paging_forward::bool then (t.created_at,t.id) end desc
+limit sqlc.arg('limit'))
 
 union all
 
-(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from token_memberships ct
-    join tokens t on t.id = ct.id
-    join token_definitions td on t.token_definition_id = td.id
+(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_data cd, token_community_memberships tcm
+    join tokens t on t.token_definition_id = tcm.token_definition_id
+    join token_definitions td on td.id = t.token_definition_id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
-    where t.displayable
+where cd.community_type != 0
+    and tcm.community_id = cd.community_id
+    and t.displayable
+    and tcm.deleted = false
     and t.deleted = false
     and c.deleted = false
     and td.deleted = false
@@ -368,44 +355,49 @@ union all
     and u.universal = false
     and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id)
     and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id)
-    order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
-             case when not @paging_forward::bool then (t.created_at,t.id) end desc
-    limit sqlc.arg('limit'));
+order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
+         case when not @paging_forward::bool then (t.created_at,t.id) end desc
+limit sqlc.arg('limit'));
 
 -- name: CountTokensByCommunityID :one
 with community_data as (
-    select community_type, contract_id
+    select id as community_id, community_type, contract_id
     from communities
     where communities.id = @community_id and not deleted
-),
+    limit 1
+)
 
-community_tokens as (
-    select tokens.*
-    from community_data, tokens
-    where community_data.community_type = 0
-        and tokens.contract_id = community_data.contract_id
-        and not tokens.deleted
+select sum(u.count) from (
+    (select count(t.*) from community_data cd
+        join tokens t on t.contract_id = cd.contract_id
+        join token_definitions td on t.token_definition_id = td.id
+        join users u on u.id = t.owner_user_id
+        join contracts c on t.contract_id = c.id
+    where cd.community_type = 0
+        and t.displayable
+        and t.deleted = false
+        and c.deleted = false
+        and td.deleted = false
+        and u.deleted = false
+        and u.universal = false)
 
     union all
 
-    select tokens.*
-    from community_data, tokens
-        join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
-            and token_community_memberships.community_id = @community_id
-            and not token_community_memberships.deleted
-    where community_data.community_type != 0
-        and not tokens.deleted
-)
-
-select count(t.*) from community_tokens t
-    join token_definitions td on t.token_definition_id = td.id
-    join users u on u.id = t.owner_user_id
-    join contracts c on t.contract_id = c.id
-    where t.displayable
-    and t.deleted = false
-    and c.deleted = false
-    and td.deleted = false
-    and u.universal = false;
+    (select count(t.*) from community_data cd, token_community_memberships tcm
+        join tokens t on t.token_definition_id = tcm.token_definition_id
+        join token_definitions td on td.id = t.token_definition_id
+        join users u on u.id = t.owner_user_id
+        join contracts c on t.contract_id = c.id
+    where cd.community_type != 0
+        and tcm.community_id = cd.community_id
+        and t.displayable
+        and tcm.deleted = false
+        and t.deleted = false
+        and c.deleted = false
+        and td.deleted = false
+        and u.deleted = false
+        and u.universal = false)
+) u;
 
 -- name: UpsertCommunityCreators :many
 with entries as (
