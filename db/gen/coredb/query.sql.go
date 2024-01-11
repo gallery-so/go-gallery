@@ -3440,6 +3440,44 @@ func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg G
 	return items, nil
 }
 
+const getProfileImageById = `-- name: GetProfileImageById :one
+select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain from profile_images pfp
+where pfp.id = $1
+	and not deleted
+	and case
+		when pfp.source_type = $2
+		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
+		when pfp.source_type = $3
+		then exists(select 1 from tokens t where t.id = pfp.token_id and not t.deleted)
+		else
+		0 = 1
+	end
+`
+
+type GetProfileImageByIdParams struct {
+	ID              persist.DBID               `db:"id" json:"id"`
+	EnsSourceType   persist.ProfileImageSource `db:"ens_source_type" json:"ens_source_type"`
+	TokenSourceType persist.ProfileImageSource `db:"token_source_type" json:"token_source_type"`
+}
+
+func (q *Queries) GetProfileImageById(ctx context.Context, arg GetProfileImageByIdParams) (ProfileImage, error) {
+	row := q.db.QueryRow(ctx, getProfileImageById, arg.ID, arg.EnsSourceType, arg.TokenSourceType)
+	var i ProfileImage
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenID,
+		&i.SourceType,
+		&i.Deleted,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.WalletID,
+		&i.EnsAvatarUri,
+		&i.EnsDomain,
+	)
+	return i, err
+}
+
 const getPushTokenByPushToken = `-- name: GetPushTokenByPushToken :one
 select id, user_id, push_token, created_at, deleted from push_notification_tokens where push_token = $1 and deleted = false
 `
