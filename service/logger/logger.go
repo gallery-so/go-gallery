@@ -144,7 +144,7 @@ func GinFormatter() gin.LogFormatter {
 	// cloud logs (which will handle JSON logs gracefully)
 	wrapWithLogrus := true
 	if viper.GetString("ENV") == "local" {
-		//wrapWithLogrus = false
+		wrapWithLogrus = false
 	}
 
 	return func(param gin.LogFormatterParams) string {
