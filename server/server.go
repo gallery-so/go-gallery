@@ -116,7 +116,8 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.LoggerWithFormatter(logger.GinFormatter()), gin.Recovery())
 	router.Use(middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
