@@ -6038,19 +6038,35 @@ func (b *PaginateRepliesByCommentIDBatchBatchResults) Close() error {
 
 const paginateTokensByCommunityID = `-- name: PaginateTokensByCommunityID :batchmany
 with community_data as (
-    select id as community_id, community_type, contract_id
+    select community_type, contract_id
     from communities
     where communities.id = $1 and not deleted
-    limit 1
+),
+
+contract_memberships as (
+    select tokens.id
+    from community_data, tokens
+    where community_data.community_type = 0
+      and tokens.contract_id = community_data.contract_id
+      and not tokens.deleted
+),
+
+token_memberships as (
+    select tokens.id
+    from community_data, tokens
+        join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
+            and token_community_memberships.community_id = $1
+            and not token_community_memberships.deleted
+    where community_data.community_type != 0
+        and not tokens.deleted
 )
 
-(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd
-    join tokens t on t.contract_id = cd.contract_id
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from contract_memberships ct
+    join tokens t on t.id = ct.id
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
-where cd.community_type = 0
-    and t.displayable
+    where t.displayable
     and t.deleted = false
     and c.deleted = false
     and td.deleted = false
@@ -6058,21 +6074,18 @@ where cd.community_type = 0
     and u.universal = false
     and (t.created_at,t.id) < ($2::timestamptz, $3)
     and (t.created_at,t.id) > ($4::timestamptz, $5)
-order by case when $6::bool then (t.created_at,t.id) end asc,
-         case when not $6::bool then (t.created_at,t.id) end desc
-limit $7)
+    order by case when $6::bool then (t.created_at,t.id) end asc,
+             case when not $6::bool then (t.created_at,t.id) end desc
+    limit $7)
 
 union all
 
-(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd, token_community_memberships tcm
-    join tokens t on t.token_definition_id = tcm.token_definition_id
-    join token_definitions td on td.id = t.token_definition_id
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from token_memberships ct
+    join tokens t on t.id = ct.id
+    join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
-where cd.community_type != 0
-    and tcm.community_id = cd.community_id
-    and t.displayable
-    and tcm.deleted = false
+    where t.displayable
     and t.deleted = false
     and c.deleted = false
     and td.deleted = false
@@ -6080,9 +6093,9 @@ where cd.community_type != 0
     and u.universal = false
     and (t.created_at,t.id) < ($2::timestamptz, $3)
     and (t.created_at,t.id) > ($4::timestamptz, $5)
-order by case when $6::bool then (t.created_at,t.id) end asc,
-         case when not $6::bool then (t.created_at,t.id) end desc
-limit $7)
+    order by case when $6::bool then (t.created_at,t.id) end asc,
+             case when not $6::bool then (t.created_at,t.id) end desc
+    limit $7)
 `
 
 type PaginateTokensByCommunityIDBatchResults struct {

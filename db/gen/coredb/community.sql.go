@@ -92,50 +92,45 @@ func (q *Queries) CountPostsByCommunityID(ctx context.Context, communityID persi
 
 const countTokensByCommunityID = `-- name: CountTokensByCommunityID :one
 with community_data as (
-    select id as community_id, community_type, contract_id
+    select community_type, contract_id
     from communities
     where communities.id = $1 and not deleted
-    limit 1
-)
+),
 
-select sum(u.count) from (
-    (select count(t.*) from community_data cd
-        join tokens t on t.contract_id = cd.contract_id
-        join token_definitions td on t.token_definition_id = td.id
-        join users u on u.id = t.owner_user_id
-        join contracts c on t.contract_id = c.id
-    where cd.community_type = 0
-        and t.displayable
-        and t.deleted = false
-        and c.deleted = false
-        and td.deleted = false
-        and u.deleted = false
-        and u.universal = false)
+community_tokens as (
+    select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable
+    from community_data, tokens
+    where community_data.community_type = 0
+        and tokens.contract_id = community_data.contract_id
+        and not tokens.deleted
 
     union all
 
-    (select count(t.*) from community_data cd, token_community_memberships tcm
-        join tokens t on t.token_definition_id = tcm.token_definition_id
-        join token_definitions td on td.id = t.token_definition_id
-        join users u on u.id = t.owner_user_id
-        join contracts c on t.contract_id = c.id
-    where cd.community_type != 0
-        and tcm.community_id = cd.community_id
-        and t.displayable
-        and tcm.deleted = false
-        and t.deleted = false
-        and c.deleted = false
-        and td.deleted = false
-        and u.deleted = false
-        and u.universal = false)
-) u
+    select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable
+    from community_data, tokens
+        join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
+            and token_community_memberships.community_id = $1
+            and not token_community_memberships.deleted
+    where community_data.community_type != 0
+        and not tokens.deleted
+)
+
+select count(t.*) from community_tokens t
+    join token_definitions td on t.token_definition_id = td.id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+    where t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.universal = false
 `
 
 func (q *Queries) CountTokensByCommunityID(ctx context.Context, communityID persist.DBID) (int64, error) {
 	row := q.db.QueryRow(ctx, countTokensByCommunityID, communityID)
-	var sum int64
-	err := row.Scan(&sum)
-	return sum, err
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getCommunitiesByKeys = `-- name: GetCommunitiesByKeys :many
