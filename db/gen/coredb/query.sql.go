@@ -184,17 +184,6 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
-const countActiveWallets = `-- name: CountActiveWallets :one
-select count(w.*) from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal
-`
-
-func (q *Queries) CountActiveWallets(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveWallets)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countAllUsers = `-- name: CountAllUsers :one
 SELECT count(*) FROM users WHERE deleted = false and universal = false
 `

@@ -1938,8 +1938,5 @@ select communities.* from communities
         and not token_community_memberships.deleted;
 
 
--- name: CountActiveWallets :one
-select count(w.*) from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal;
-
 -- name: GetActiveWallets :many
 select w.* from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal;

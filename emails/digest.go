@@ -127,14 +127,14 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 	}
 
 	postCount := defaultPostCount
-	collectionCount := defaultCommunityCount
+	communityCount := defaultCommunityCount
 
 	if overrides.PostCount != 0 {
 		postCount = overrides.PostCount
 	}
 
 	if overrides.CommunityCount != 0 {
-		collectionCount = overrides.CommunityCount
+		communityCount = overrides.CommunityCount
 	}
 
 	trendingFeed, _, err := f.TrendingFeed(c, nil, nil, util.ToPointer(10), nil)
@@ -191,7 +191,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Entity:   contractToUserFacing(c, q, loaders, co, true),
 			Position: &s.Position,
 		}
-	}, collectionCount, onlyPositioned)
+	}, communityCount, onlyPositioned)
 
 	includePosts := defaultIncludeTopPosts
 	includeCommunities := defaultIncludeTopCommunities
@@ -202,10 +202,11 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 		includeCommunities = *overrides.IncludeTopCommunities
 	}
 
-	topPostCount, _ := util.FindFirst([]int{overrides.FirstPostCount, defaultFirstPostCount, 5}, func(i int) bool {
+	topFirstPostCount, _ := util.FindFirst([]int{overrides.FirstPostCount, defaultFirstPostCount, 5}, func(i int) bool {
 		return i >= 0
 	})
-	topCommunityCount, _ := util.FindFirst([]int{overrides.CommunityCount, defaultCommunityCount, 5}, func(i int) bool {
+
+	galleryCount, _ := util.FindFirst([]int{overrides.GalleryCount, defaultGalleryCount, 5}, func(i int) bool {
 		return i >= 0
 	})
 
@@ -218,20 +219,23 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Selected: selectedCollections,
 			Include:  includeCommunities,
 		},
-		FirstPostCount: topPostCount,
-		CommunityCount: topCommunityCount,
+		FirstPostCount: topFirstPostCount,
+		CommunityCount: communityCount,
+		PostCount:      postCount,
+		GalleryCount:   galleryCount,
 	}
 	return result, nil
 }
 
 func getOverrides(c context.Context, stg *storage.Client) (DigestValueOverrides, error) {
-	_, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).Attrs(c)
+	obj := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile)
+	_, err := obj.Attrs(c)
 	if err != nil && err != storage.ErrObjectNotExist {
 		return DigestValueOverrides{}, fmt.Errorf("error getting overrides attrs: %v", err)
 	}
 
 	if err == storage.ErrObjectNotExist {
-		w := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewWriter(c)
+		w := obj.NewWriter(c)
 		err = json.NewEncoder(w).Encode(DigestValueOverrides{})
 		if err != nil {
 			return DigestValueOverrides{}, fmt.Errorf("error encoding overrides: %v", err)
@@ -242,7 +246,7 @@ func getOverrides(c context.Context, stg *storage.Client) (DigestValueOverrides,
 		}
 	}
 
-	reader, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewReader(c)
+	reader, err := obj.NewReader(c)
 	if err != nil {
 		return DigestValueOverrides{}, fmt.Errorf("error getting overrides: %v", err)
 	}
@@ -414,6 +418,14 @@ func mergeOverrides(first, second DigestValueOverrides) DigestValueOverrides {
 	}
 	for _, p := range second.TopCommunities {
 		seenCommunityPositions[p.Position] = true
+	}
+
+	for _, p := range second.TopGalleries {
+		seenGalleryPositions[p.Position] = true
+	}
+
+	for _, p := range second.TopFirstPosts {
+		seenFirstPostPositions[p.Position] = true
 	}
 
 	for _, p := range first.TopPosts {

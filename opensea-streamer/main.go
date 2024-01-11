@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/bits-and-blooms/bloom/v3"
@@ -18,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -26,8 +26,6 @@ import (
 )
 
 const (
-	bloomFilterKey           = "walletsBloomFilter"
-	walletCountKey           = "walletCount"
 	itemTransferredEventType = "item_transferred"
 	falsePositiveRate        = 0.01
 )
@@ -43,6 +41,8 @@ type openseaEvent struct {
 	Payload tokenprocessing.OpenSeaWebhookInput `json:"payload"`
 }
 
+var bf atomic.Pointer[bloom.BloomFilter]
+
 func main() {
 	setDefaults()
 	router := gin.Default()
@@ -51,30 +51,28 @@ func main() {
 
 	pgx := postgres.NewPgxClient()
 	queries := coredb.New(pgx)
-	bloomCache := redis.NewCache(redis.WalletsBloomFilterCache)
 
 	ctx := context.Background()
 
-	bf, err := initializeBloomFilter(ctx, queries, bloomCache)
+	err := generateBloomFilter(ctx, queries)
 	if err != nil {
 		panic(err)
 	}
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
-		"approximate_bloom_zize": bf.ApproximatedSize(),
+		"approximate_bloom_size": bf.Load().ApproximatedSize(),
 	})
 
 	// Health endpoint
-	router.GET("/health", func(c *gin.Context) {
-		c.String(http.StatusOK, "OK")
-	})
+	router.GET("/health", util.HealthCheckHandler())
 
 	router.GET("/updateBloomFilter", func(c *gin.Context) {
-		bf, err = resetBloomFilter(c, queries, bloomCache)
+		err := generateBloomFilter(c, queries)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+
 		c.String(http.StatusOK, "OK")
 	})
 
@@ -83,40 +81,20 @@ func main() {
 		for {
 			time.Sleep(time.Hour)
 			logger.For(ctx).Info("checking if bloom filter needs to be updated...")
-			curWalletCountBs, _ := bloomCache.Get(ctx, walletCountKey)
-			if curWalletCountBs == nil {
-				curWalletCountBs = []byte("0")
-			}
-			var curWalletCount int64
-			err = json.Unmarshal(curWalletCountBs, &curWalletCount)
-			if err != nil {
-				logger.For(ctx).Error(err)
-				continue
-			}
 
-			dbWalletCount, err := queries.CountActiveWallets(ctx)
-			if err != nil {
-				logger.For(ctx).Error(err)
-				continue
-			}
-
-			if dbWalletCount == curWalletCount {
-				continue
-			}
-
-			bf, err = resetBloomFilter(ctx, queries, bloomCache)
+			err := generateBloomFilter(ctx, queries)
 			if err != nil {
 				panic(err)
 			}
 		}
 	}()
 
-	go streamOpenseaTranfsers(ctx, bf)
+	go streamOpenseaTransfers(ctx, false)
 
 	router.Run(":3000")
 }
 
-func streamOpenseaTranfsers(ctx context.Context, bf *bloom.BloomFilter) {
+func streamOpenseaTransfers(ctx context.Context, recursed bool) {
 
 	apiKey := env.GetString("OPENSEA_API_KEY")
 	// Set up WebSocket connection
@@ -138,12 +116,14 @@ func streamOpenseaTranfsers(ctx context.Context, bf *bloom.BloomFilter) {
 
 	logger.For(ctx).Info("subscribed to opensea events")
 
+	errChan := make(chan error)
+
 	go func() {
 		// Listen for messages
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				logger.For(ctx).Error(err)
+				errChan <- err
 				break
 			}
 
@@ -169,7 +149,7 @@ func streamOpenseaTranfsers(ctx context.Context, bf *bloom.BloomFilter) {
 				logger.For(ctx).Error(err)
 				continue
 			}
-			if !bf.Test(chainAddress) {
+			if !bf.Load().Test(chainAddress) {
 				continue
 			}
 
@@ -219,88 +199,46 @@ func streamOpenseaTranfsers(ctx context.Context, bf *bloom.BloomFilter) {
 			}
 			conn.WriteJSON(heartbeat)
 			logger.For(ctx).Debug("Sent heartbeat")
+		case err := <-errChan:
+			if err != nil {
+				if recursed {
+					panic(err)
+				} else {
+					logger.For(ctx).Error(err)
+					logger.For(ctx).Info("reconnecting to opensea...")
+					streamOpenseaTransfers(ctx, true)
+				}
+			}
 		}
 	}
 }
 
-func resetBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cache) (*bloom.BloomFilter, error) {
+func generateBloomFilter(ctx context.Context, q *coredb.Queries) error {
 	wallets, err := q.GetActiveWallets(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	logger.For(nil).Infof("resetting bloom filter with %d wallets", len(wallets))
 
-	bf := bloom.NewWithEstimates(uint(len(wallets)), falsePositiveRate)
+	bfp := bloom.NewWithEstimates(uint(len(wallets)), falsePositiveRate)
 	for _, w := range wallets {
 		chainAddress, err := persist.NewL1ChainAddress(w.Address, w.Chain).MarshalJSON()
 		if err != nil {
-			return nil, err
+			return err
 		}
-		bf.Add(chainAddress)
+		bfp.Add(chainAddress)
 	}
 
 	buf := &bytes.Buffer{}
-	_, err = bf.WriteTo(buf)
+	_, err = bfp.WriteTo(buf)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = r.Set(ctx, bloomFilterKey, buf.Bytes(), time.Hour*24*7)
-	if err != nil {
-		return nil, err
-	}
+	bf.Store(bfp)
 
-	walletCountJSON, err := json.Marshal(len(wallets))
-	if err != nil {
-		return nil, err
-	}
-
-	err = r.Set(ctx, walletCountKey, walletCountJSON, time.Hour*24*7)
-	if err != nil {
-		return nil, err
-	}
-
-	return bf, nil
-}
-
-func initializeBloomFilter(ctx context.Context, q *coredb.Queries, r *redis.Cache) (*bloom.BloomFilter, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	cur, err := r.Get(ctx, bloomFilterKey)
-	if err == nil && cur != nil && len(cur) > 0 {
-		curWalletCountBs, err := r.Get(ctx, walletCountKey)
-		if err != nil {
-			return nil, err
-		}
-
-		var curWalletCount int64
-		err = json.Unmarshal(curWalletCountBs, &curWalletCount)
-		if err != nil {
-			return nil, err
-		}
-
-		dbWalletCount, err := q.CountActiveWallets(ctx)
-		if err != nil {
-			return nil, err
-		}
-		logger.For(nil).Infof("loaded bloom filter from cache, %d db wallets and %d cached wallets", dbWalletCount, curWalletCount)
-
-		if dbWalletCount == curWalletCount {
-			// convert cur from bytes to uint64 array
-			buf := bytes.NewBuffer(cur)
-			var bf bloom.BloomFilter
-			_, err = bf.ReadFrom(buf)
-			if err != nil {
-				return nil, err
-			}
-			return &bf, nil
-		}
-	}
-
-	logger.For(nil).Info("bloom filter not found in cache or wallet count discrepency, resetting...")
-
-	return resetBloomFilter(ctx, q, r)
+	return nil
 }
 
 func setDefaults() {
