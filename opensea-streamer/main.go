@@ -30,6 +30,7 @@ const (
 	falsePositiveRate        = 0.01
 )
 
+// TODO add more chains here
 // https://docs.opensea.io/reference/supported-chains#mainnets
 var enabledChains = map[string]bool{
 	"base": true,

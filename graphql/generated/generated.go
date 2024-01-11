@@ -10319,13 +10319,13 @@ type UserEmail {
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO -DIGEST make this non-nullable
+  unsubscribedFromDigest: Boolean # TODO make this non-nullable
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -12468,7 +12468,7 @@ type Mutation {
   ): FollowAllSocialConnectionsPayloadOrError @authRequired
   followAllOnboardingRecommendations(
     """
-    A cursor returned from ` + "`" + `onboardingUserRecommendations` + "`" + ` can be provided to follow all users from when the
+    A cursor returned from ` + "`" + `Viewer.suggestedUsers` + "`" + ` can be provided to follow all users from when the
     cursor was generated. Otherwise, all users from the current recommendation set will be followed instead.
     """
     cursor: String

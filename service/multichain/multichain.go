@@ -847,8 +847,12 @@ outer:
 			errs = append(errs, err)
 		}
 	}
-	if len(errs) > 0 && totalTokensReceived == 0 {
-		return nil, nil, errs[0]
+
+	if len(errs) > 0 {
+		logger.For(ctx).Warnf("errors occured by providers in incremental sync for user %s: %+v", user.ID, errs)
+		if totalTokensReceived == 0 {
+			return nil, nil, errs[0]
+		}
 	}
 
 	return currentTokens, currentContracts, nil

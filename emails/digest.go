@@ -106,7 +106,7 @@ const overrideFile = "email_digest_overrides.json"
 func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storage.Client, f *publicapi.FeedAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		// mimic backend auth
+		// mimic backend auth because the getDigest function uses the feed api which requires these values set on the context despite not using them
 		c.Set("auth.user_id", persist.DBID(""))
 		c.Set("auth.auth_error", nil)
 
@@ -332,6 +332,11 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 	}, nil
 }
 
+// selectResults takes an initial list of entities and a list of selected ids and returns a positioned list of selected entities
+// so that any overrides are in the correct position and any entities that are not overridden are in the correct position.
+// selectedCount determines how many entities will actually be positioned and how many will have their position as nil.
+// overrideFetcher is a function that takes a SelectedID and returns a Selected entity
+// this is so that we can fetch the entity from the database if it is not already in the initial list.
 func selectWithOverrides(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
 	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
 	for _, post := range overrides {
@@ -344,7 +349,7 @@ outer:
 	for i, it := range initial {
 		ic := i
 		if selectedResults[i].Position != nil && i < selectedCount {
-			// add to the next available position while keeping the order, if we exceed 5, append to the end still without a position
+			// add to the next available position while keeping the order, if we exceed selectedCount, append to the end still without a position
 			// also ensure that i is updated so that we don't overwrite the same position in the next loop
 			for j := i; j < selectedCount; j++ {
 				j := j

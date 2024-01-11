@@ -56,8 +56,8 @@ func setDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
-	viper.SetDefault("AUTOSOCIAL_URL", "")
-	viper.SetDefault("AUTOSOCIAL_QUEUE", "")
+	viper.SetDefault("AUTOSOCIAL_URL", "http://localhost:6700")
+	viper.SetDefault("AUTOSOCIAL_QUEUE", "projects/gallery-local/locations/here/queues/autosocial")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
 
 	viper.AutomaticEnv()

@@ -1230,6 +1230,7 @@ func insertAndPublishAnnouncementNotifs(ctx context.Context, notif db.Notificati
 	return nil
 }
 
+// this function only sends push notifications, could probaby be renamed
 func sendNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *task.Client, limiter *pushLimiter, ps *pubsub.Client) error {
 	err := sendPushNotifications(ctx, newNotif, queries, taskClient, limiter)
 	if err != nil {

@@ -167,6 +167,7 @@ func sendAnnouncementNotification(q *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
+		// kick off an event that will have notification handlers that will fan out the notification to all users
 		err = event.Dispatch(c, coredb.Event{
 			ID:             persist.GenerateID(),
 			ResourceTypeID: persist.ResourceTypeAllUsers,
@@ -337,6 +338,7 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 
 func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client) error {
 
+	logger.For(c).Infof("sending digest emails to all users with values: %+v", v)
 	emailsSent := new(atomic.Uint64)
 	defer func() {
 		logger.For(c).Infof("sent %d emails", emailsSent.Load())
@@ -407,13 +409,17 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 	errGroup := new(errgroup.Group)
 	var lastID persist.DBID
 	var lastCreatedAt time.Time
+	// end time seemingly ensures that we don't send emails to users who signed up after the last time we ran this function, but assumes this function could take a day to run.
+	// This could probably just be set to time.Now() and it would be fine but if it ain't broke don't fix it
 	var endTime time.Time = time.Now().Add(24 * time.Hour)
 	requiredStatus := persist.EmailVerificationStatusVerified
 	if isDevEnv() {
+		// if we are not in production, the only users returned will be those with email status admin verified
 		requiredStatus = persist.EmailVerificationStatusAdmin
 	}
 
 	for {
+		// paginate emailsAtATime users at a time, running fn on each asynchronously
 		users, err := queries.GetUsersWithEmailNotificationsOnForEmailType(ctx, coredb.GetUsersWithEmailNotificationsOnForEmailTypeParams{
 			Limit:               emailsAtATime,
 			CurAfterTime:        lastCreatedAt,
@@ -430,11 +436,7 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 		for _, user := range users {
 			u := user
 			errGroup.Go(func() error {
-				err = fn(u)
-				if err != nil {
-					return err
-				}
-				return nil
+				return fn(u)
 			})
 		}
 
