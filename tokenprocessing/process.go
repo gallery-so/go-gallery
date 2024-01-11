@@ -530,71 +530,166 @@ func isValidAlchemySignatureForStringBody(
 	return digest == signature
 }
 
-type GoldskyWebhookInput struct {
-	Op   string `json:"op"`
-	Data struct {
-		Old GoldskyToken1155Holder `json:"old"` // in an update this will be what it was before, empty on insert
-		New GoldskyToken1155Holder `json:"new"` // this is what we care about
-	} `json:"data"`
+/*
+item transferred payload:
+
+ {
+  event_type: 'item_transferred',
+  payload: {
+    chain: 'zora',
+    collection: { slug: 'shadeart' },
+    event_timestamp: '2024-01-03T20:27:01.000000+00:00',
+    from_account: { address: '0x0000000000000000000000000000000000000000' },
+    item: {
+      chain: [Object],
+      metadata: [Object],
+      nft_id: 'zora/0x189d1b324600b134d2929e331d1ee275297505c9/1',
+      permalink: 'https://opensea.io/assets/zora/0x189d1b324600b134d2929e331d1ee275297505c9/1'
+    },
+    quantity: 1,
+    to_account: { address: '0x8fbbb256bb8bac4ed70a95d054f4007786a69e2b' },
+    transaction: {
+      hash: '0x50e764e97fee1683b1070b29ddfcccf0bcce7fe2d2aaf95997a2c5bea067ed92',
+      timestamp: '2024-01-03T20:27:01.000000+00:00'
+    }
+  },
+  sent_at: '2024-01-03T20:27:05.820128+00:00'
+}
+*/
+
+type OpenseaNFTID struct {
+	Chain           persist.Chain
+	ContractAddress persist.Address
+	TokenID         persist.TokenID
 }
 
-type GoldskyToken1155Holder struct {
-	ID               string `json:"id"`                 // ID in this format "0x{user address}-0x{address}-{token_id}"
-	User             string `json:"user"`               // address in format "\\x{address}"
-	TokenAndContract string `json:"token_and_contract"` //  format "0x{address}-{token_id}"
-	Balance          string `json:"balance"`            //  base10 string, generated from javascript's BigInt
+func (o OpenseaNFTID) String() string {
+	cstring := "ethereum"
+	switch o.Chain {
+	case persist.ChainPolygon:
+		cstring = "matic"
+	case persist.ChainArbitrum:
+		cstring = "arbitrum"
+	case persist.ChainOptimism:
+		cstring = "optimism"
+	case persist.ChainZora:
+		cstring = "zora"
+	case persist.ChainBase:
+		cstring = "base"
 
+	}
+	return fmt.Sprintf("%s/%s/%s", cstring, o.ContractAddress, o.TokenID.Base10String())
 }
 
-func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
+func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	split := strings.Split(s, "/")
+	if len(split) != 3 {
+		return fmt.Errorf("invalid opensea nft id: %s", s)
+	}
+
+	var chain persist.Chain
+	switch split[0] {
+	case "ethereum":
+		chain = persist.ChainETH
+	case "matic":
+		chain = persist.ChainPolygon
+	case "arbitrum":
+		chain = persist.ChainArbitrum
+	case "optimism":
+		chain = persist.ChainOptimism
+	case "zora":
+		chain = persist.ChainZora
+	case "base":
+		chain = persist.ChainBase
+
+	default:
+		return fmt.Errorf("invalid opensea chain: %s", split[0])
+	}
+
+	o.Chain = chain
+	o.ContractAddress = persist.Address(strings.ToLower(split[1]))
+	asBig, ok := big.NewInt(0).SetString(split[2], 10)
+	if !ok {
+		asBig, ok = big.NewInt(0).SetString(split[2], 16)
+		if !ok {
+			return fmt.Errorf("invalid opensea token id: %s", split[2])
+		}
+	}
+	o.TokenID = persist.TokenID(asBig.Text(16))
+
+	return nil
+}
+
+func (o OpenseaNFTID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
+type OpenSeaWebhookInput struct {
+	EventType string `json:"event_type"`
+	Payload   struct {
+		Chain      string `json:"chain"`
+		Collection struct {
+			Slug string `json:"slug"`
+		} `json:"collection"`
+		EventTimestamp string `json:"event_timestamp"`
+		FromAccount    struct {
+			Address persist.EthereumAddress `json:"address"`
+		} `json:"from_account"`
+		Item struct {
+			Chain struct {
+				Name string `json:"name"`
+			} `json:"chain"`
+			Metadata  persist.TokenMetadata `json:"metadata"`
+			NFTID     OpenseaNFTID          `json:"nft_id"`
+			Permalink string                `json:"permalink"`
+		} `json:"item"`
+		Quantity  int `json:"quantity"`
+		ToAccount struct {
+			Address persist.EthereumAddress `json:"address"`
+		} `json:"to_account"`
+	} `json:"payload"`
+}
+
+func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		var in GoldskyWebhookInput
+		var in OpenSeaWebhookInput
 		if err := c.ShouldBindJSON(&in); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		logger.For(c).WithFields(logrus.Fields{"user_address": in.Data.New.User, "token_id": in.Data.New.ID, "token_and_contract": in.Data.New.TokenAndContract, "balance": in.Data.New.Balance}).Infof("GOLDSKY: %s - Processing Goldsky User Tokens Refresh", in.Data.New.User)
+		incomingToken := in.Payload
 
-		signature := c.GetHeader("goldsky-webhook-secret")
-		if signature != env.GetString("GOLDSKY_WEBHOOK_SECRET") {
-			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid goldsky signature"))
+		logger.For(c).WithFields(logrus.Fields{"to_address": incomingToken.ToAccount.Address, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "amount": incomingToken.Quantity}).Infof("OPENSEA: %s - Processing Opensea User Tokens Refresh", incomingToken.ToAccount.Address)
+
+		auth := c.GetHeader("authorization")
+		if auth != env.GetString("OPENSEA_WEBHOOK_SECRET") {
+			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid opensea signature"))
 			return
 		}
 
-		fullIDs := strings.Split(in.Data.New.ID, "-")
-		if len(fullIDs) != 3 {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid id: %s", in.Data.New.ID))
-			return
-		}
-
-		userAddress := persist.Address(strings.ToLower(fullIDs[0]))
 		user, _ := queries.GetUserByAddressAndL1(c, db.GetUserByAddressAndL1Params{
-			Address: userAddress,
-			L1Chain: persist.ChainZora.L1Chain(),
+			Address: persist.Address(incomingToken.ToAccount.Address.String()),
+			L1Chain: incomingToken.Item.NFTID.Chain.L1Chain(),
 		})
 		if user.ID == "" {
-			logger.For(c).Warnf("user not found for address: %s", userAddress)
+			logger.For(c).Warnf("user not found for address: %s", incomingToken.ToAccount.Address)
 			// it is a valid response to not find a user, not every transfer exists on gallery
-			c.String(http.StatusOK, fmt.Sprintf("user not found for address: %s", userAddress))
+			c.String(http.StatusOK, fmt.Sprintf("user not found for address: %s", incomingToken.ToAccount.Address))
 			return
 		}
-
-		contractAddress := persist.Address(strings.ToLower(fullIDs[1]))
-		bigTokenID, ok := big.NewInt(0).SetString(fullIDs[2], 10)
-		if !ok {
-			logger.For(c).Errorf("invalid token and contract: %s", in.Data.New.TokenAndContract)
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid token and contract: %s", in.Data.New.TokenAndContract))
-			return
-		}
-		tokenID := persist.TokenID(bigTokenID.Text(16))
 
 		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(c, db.GetTokenByUserTokenIdentifiersParams{
 			OwnerID:         user.ID,
-			TokenID:         tokenID,
-			Chain:           persist.ChainZora,
-			ContractAddress: contractAddress,
+			TokenID:         incomingToken.Item.NFTID.TokenID,
+			Chain:           incomingToken.Item.NFTID.Chain,
+			ContractAddress: incomingToken.Item.NFTID.ContractAddress,
 		})
 
 		beforeBalance := persist.HexString("0")
@@ -602,13 +697,13 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *db.Queries)
 			beforeBalance = beforeToken.Token.Quantity
 		}
 
-		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": tokenID, "contract_address": contractAddress, "user_address": userAddress})
-		l.Infof("Processing: %s - Processing Goldsky Zora User Tokens Refresh", user.ID)
+		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "user_address": incomingToken.ToAccount.Address})
+		l.Infof("Processing: %s - Processing Opensea User Tokens Refresh", user.ID)
 		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, user.ID, []persist.TokenUniqueIdentifiers{{
-			Chain:           persist.ChainZora,
-			ContractAddress: contractAddress,
-			TokenID:         tokenID,
-			OwnerAddress:    userAddress,
+			Chain:           incomingToken.Item.NFTID.Chain,
+			ContractAddress: incomingToken.Item.NFTID.ContractAddress,
+			TokenID:         incomingToken.Item.NFTID.TokenID,
+			OwnerAddress:    persist.Address(incomingToken.ToAccount.Address.String()),
 		}})
 		if err != nil {
 			l.Errorf("error syncing tokens: %s", err)

@@ -1675,6 +1675,40 @@ func (q *Queries) DeleteWalletByID(ctx context.Context, id persist.DBID) error {
 	return err
 }
 
+const getActiveWallets = `-- name: GetActiveWallets :many
+select w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal
+`
+
+func (q *Queries) GetActiveWallets(ctx context.Context) ([]Wallet, error) {
+	rows, err := q.db.Query(ctx, getActiveWallets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Wallet
+	for rows.Next() {
+		var i Wallet
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.Address,
+			&i.WalletType,
+			&i.Chain,
+			&i.L1Chain,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getActorForGroup = `-- name: GetActorForGroup :one
 select actor_id from events where group_id = $1 and deleted = false order by(created_at, id) asc limit 1
 `

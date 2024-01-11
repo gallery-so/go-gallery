@@ -33,6 +33,10 @@ type DigestValues struct {
 	TopCommunities IncludedSelected `json:"communities"`
 	TopGalleries   IncludedSelected `json:"galleries"`
 	TopFirstPosts  IncludedSelected `json:"first_posts"`
+	PostCount      int              `json:"post_count"`
+	CommunityCount int              `json:"community_count"`
+	GalleryCount   int              `json:"gallery_count"`
+	FirstPostCount int              `json:"first_post_count"`
 }
 
 type IncludedSelected struct {
@@ -65,6 +69,7 @@ type UserFacingToken struct {
 	Name            string       `json:"name"`
 	Description     string       `json:"description"`
 	PreviewImageURL string       `json:"preview_image_url"`
+	Override        bool         `json:"override"`
 }
 type UserFacingPost struct {
 	PostID          persist.DBID      `json:"post_id"`
@@ -72,6 +77,7 @@ type UserFacingPost struct {
 	Author          string            `json:"author"`
 	Tokens          []UserFacingToken `json:"tokens"`
 	PreviewImageURL string            `json:"preview_image_url"`
+	Override        bool              `json:"override"`
 }
 
 type UserFacingContract struct {
@@ -81,6 +87,7 @@ type UserFacingContract struct {
 	Name            string          `json:"name"`
 	Description     string          `json:"description"`
 	PreviewImageURL string          `json:"preview_image_url"`
+	Override        bool            `json:"override"`
 }
 
 const (
@@ -103,7 +110,7 @@ func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storag
 		c.Set("auth.user_id", persist.DBID(""))
 		c.Set("auth.auth_error", nil)
 
-		result, err := getDigest(c, stg, f, q, loaders)
+		result, err := getDigest(c, stg, f, q, loaders, false)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -112,45 +119,22 @@ func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storag
 	}
 }
 
-func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders) (DigestValues, error) {
+func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders, onlyPositioned bool) (DigestValues, error) {
 	// TODO top galleries and top first posts
-	_, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).Attrs(c)
-	if err != nil && err != storage.ErrObjectNotExist {
-		return DigestValues{}, fmt.Errorf("error getting overrides attrs: %v", err)
-	}
-
-	if err == storage.ErrObjectNotExist {
-		w := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewWriter(c)
-		err = json.NewEncoder(w).Encode(DigestValueOverrides{})
-		if err != nil {
-			return DigestValues{}, fmt.Errorf("error encoding overrides: %v", err)
-		}
-		err = w.Close()
-		if err != nil {
-			return DigestValues{}, fmt.Errorf("error closing writer: %v", err)
-		}
-	}
-
-	reader, err := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewReader(c)
+	overrides, err := getOverrides(c, stg)
 	if err != nil {
 		return DigestValues{}, fmt.Errorf("error getting overrides: %v", err)
 	}
 
-	var overrides DigestValueOverrides
-	err = json.NewDecoder(reader).Decode(&overrides)
-	if err != nil {
-		return DigestValues{}, fmt.Errorf("error decoding overrides: %v", err)
-	}
-
 	postCount := defaultPostCount
-	collectionCount := defaultCommunityCount
+	communityCount := defaultCommunityCount
 
 	if overrides.PostCount != 0 {
 		postCount = overrides.PostCount
 	}
 
 	if overrides.CommunityCount != 0 {
-		collectionCount = overrides.CommunityCount
+		communityCount = overrides.CommunityCount
 	}
 
 	trendingFeed, _, err := f.TrendingFeed(c, nil, nil, util.ToPointer(10), nil)
@@ -160,7 +144,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 
 	topPosts := util.Filter(util.MapWithoutError(trendingFeed, func(a any) any {
 		if post, ok := a.(coredb.Post); ok {
-			up, err := postToUserFacing(c, q, post, loaders)
+			up, err := postToUserFacing(c, q, post, loaders, false)
 			if err != nil {
 				logger.For(c).Errorf("error converting post to user facing: %s", err)
 				return nil
@@ -172,13 +156,13 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 		return p.(UserFacingPost).PostID != ""
 	}, false)
 
-	selectedPosts := selectResults(topPosts, overrides.TopPosts, func(s SelectedID) Selected {
+	selectedPosts := selectWithOverrides(topPosts, overrides.TopPosts, func(s SelectedID) Selected {
 		p, err := q.GetPostByID(c, s.ID)
 		if err != nil {
 			logger.For(c).Errorf("error getting post by id: %s", err)
 			return Selected{}
 		}
-		up, err := postToUserFacing(c, q, p, loaders)
+		up, err := postToUserFacing(c, q, p, loaders, true)
 		if err != nil {
 			logger.For(c).Errorf("error converting post to user facing: %s", err)
 			return Selected{}
@@ -187,7 +171,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Entity:   up,
 			Position: &s.Position,
 		}
-	}, postCount)
+	}, postCount, onlyPositioned)
 
 	topCollectionsDB, err := q.GetTopCommunitiesByPosts(c, 10)
 	if err != nil {
@@ -195,19 +179,19 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 	}
 
 	topCollectionsUserFacing := util.MapWithoutError(topCollectionsDB, func(co coredb.GetTopCommunitiesByPostsRow) any {
-		return contractToUserFacing(c, q, loaders, co.Contract)
+		return contractToUserFacing(c, q, loaders, co.Contract, false)
 	})
 
-	selectedCollections := selectResults(topCollectionsUserFacing, overrides.TopCommunities, func(s SelectedID) Selected {
+	selectedCollections := selectWithOverrides(topCollectionsUserFacing, overrides.TopCommunities, func(s SelectedID) Selected {
 		co, err := q.GetContractByID(c, s.ID)
 		if err != nil {
 			return Selected{}
 		}
 		return Selected{
-			Entity:   contractToUserFacing(c, q, loaders, co),
+			Entity:   contractToUserFacing(c, q, loaders, co, true),
 			Position: &s.Position,
 		}
-	}, collectionCount)
+	}, communityCount, onlyPositioned)
 
 	includePosts := defaultIncludeTopPosts
 	includeCommunities := defaultIncludeTopCommunities
@@ -218,6 +202,14 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 		includeCommunities = *overrides.IncludeTopCommunities
 	}
 
+	topFirstPostCount, _ := util.FindFirst([]int{overrides.FirstPostCount, defaultFirstPostCount, 5}, func(i int) bool {
+		return i >= 0
+	})
+
+	galleryCount, _ := util.FindFirst([]int{overrides.GalleryCount, defaultGalleryCount, 5}, func(i int) bool {
+		return i >= 0
+	})
+
 	result := DigestValues{
 		TopPosts: IncludedSelected{
 			Selected: selectedPosts,
@@ -227,11 +219,47 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Selected: selectedCollections,
 			Include:  includeCommunities,
 		},
+		FirstPostCount: topFirstPostCount,
+		CommunityCount: communityCount,
+		PostCount:      postCount,
+		GalleryCount:   galleryCount,
 	}
 	return result, nil
 }
 
-func contractToUserFacing(ctx context.Context, q *coredb.Queries, l *dataloader.Loaders, collection coredb.Contract) UserFacingContract {
+func getOverrides(c context.Context, stg *storage.Client) (DigestValueOverrides, error) {
+	obj := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile)
+	_, err := obj.Attrs(c)
+	if err != nil && err != storage.ErrObjectNotExist {
+		return DigestValueOverrides{}, fmt.Errorf("error getting overrides attrs: %v", err)
+	}
+
+	if err == storage.ErrObjectNotExist {
+		w := obj.NewWriter(c)
+		err = json.NewEncoder(w).Encode(DigestValueOverrides{})
+		if err != nil {
+			return DigestValueOverrides{}, fmt.Errorf("error encoding overrides: %v", err)
+		}
+		err = w.Close()
+		if err != nil {
+			return DigestValueOverrides{}, fmt.Errorf("error closing writer: %v", err)
+		}
+	}
+
+	reader, err := obj.NewReader(c)
+	if err != nil {
+		return DigestValueOverrides{}, fmt.Errorf("error getting overrides: %v", err)
+	}
+
+	var overrides DigestValueOverrides
+	err = json.NewDecoder(reader).Decode(&overrides)
+	if err != nil {
+		return DigestValueOverrides{}, fmt.Errorf("error decoding overrides: %v", err)
+	}
+	return overrides, nil
+}
+
+func contractToUserFacing(ctx context.Context, q *coredb.Queries, l *dataloader.Loaders, collection coredb.Contract, override bool) UserFacingContract {
 	if collection.ProfileImageUrl.String == "" {
 		tokens, err := q.GetTokensByContractIdPaginate(ctx, coredb.GetTokensByContractIdPaginateParams{
 			ID:               collection.ID,
@@ -253,10 +281,11 @@ func contractToUserFacing(ctx context.Context, q *coredb.Queries, l *dataloader.
 		PreviewImageURL: collection.ProfileImageUrl.String,
 		ContractAddress: collection.Address,
 		Chain:           collection.Chain,
+		Override:        override,
 	}
 }
 
-func tokenToUserFacing(c context.Context, tokenID persist.DBID, q *coredb.Queries, loaders *dataloader.Loaders) (UserFacingToken, error) {
+func tokenToUserFacing(c context.Context, tokenID persist.DBID, q *coredb.Queries, loaders *dataloader.Loaders, override bool) (UserFacingToken, error) {
 	token, err := q.GetTokenById(c, tokenID)
 	if err != nil {
 		return UserFacingToken{}, fmt.Errorf("error getting token by id: %s", err)
@@ -270,17 +299,18 @@ func tokenToUserFacing(c context.Context, tokenID persist.DBID, q *coredb.Querie
 		Name:            token.TokenDefinition.Name.String,
 		Description:     token.TokenDefinition.Description.String,
 		PreviewImageURL: util.FirstNonEmptyString(media.Media.ThumbnailURL.String(), media.Media.MediaURL.String()),
+		Override:        override,
 	}, nil
 }
 
-func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, loaders *dataloader.Loaders) (UserFacingPost, error) {
+func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, loaders *dataloader.Loaders, override bool) (UserFacingPost, error) {
 	user, err := q.GetUserById(c, post.ActorID)
 	if err != nil {
 		return UserFacingPost{}, fmt.Errorf("error getting user by id: %s", err)
 	}
 	var tokens []UserFacingToken
 	for _, t := range post.TokenIds {
-		ut, err := tokenToUserFacing(c, t, q, loaders)
+		ut, err := tokenToUserFacing(c, t, q, loaders, override)
 		if err != nil {
 			return UserFacingPost{}, fmt.Errorf("error getting token by id: %s", err)
 		}
@@ -298,12 +328,16 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 		Author:          user.Username.String,
 		Tokens:          tokens,
 		PreviewImageURL: previewURL,
+		Override:        override,
 	}, nil
 }
 
-func selectResults(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int) []Selected {
+func selectWithOverrides(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
 	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
 	for _, post := range overrides {
+		if len(selectedResults) <= post.Position {
+			selectedResults = append(selectedResults, make([]Selected, post.Position-len(selectedResults)+1)...)
+		}
 		selectedResults[post.Position] = overrideFetcher(post)
 	}
 outer:
@@ -336,6 +370,12 @@ outer:
 			}
 		}
 	}
+
+	if onlyPositioned {
+		selectedResults = util.Filter(selectedResults, func(s Selected) bool {
+			return s.Position != nil
+		}, false)
+	}
 	return selectedResults
 }
 
@@ -348,8 +388,16 @@ func updateDigestValues(stg *storage.Client) gin.HandlerFunc {
 			return
 		}
 
+		currentOverrides, err := getOverrides(c, stg)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error getting overrides: %v", err))
+			return
+		}
+
+		merged := mergeOverrides(currentOverrides, input)
+
 		w := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewWriter(c)
-		err := json.NewEncoder(w).Encode(&input)
+		err = json.NewEncoder(w).Encode(&merged)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error encoding overrides: %v", err))
 			return
@@ -360,4 +408,68 @@ func updateDigestValues(stg *storage.Client) gin.HandlerFunc {
 			return
 		}
 	}
+}
+
+// mergeOverrides takes two overrides and merges them with the second taking precendence. For each of the arrays, if a position overlaps, the second one is taken
+func mergeOverrides(first, second DigestValueOverrides) DigestValueOverrides {
+	seenPostPositions := make(map[int]bool)
+	seenCommunityPositions := make(map[int]bool)
+	seenGalleryPositions := make(map[int]bool)
+	seenFirstPostPositions := make(map[int]bool)
+	for _, p := range second.TopPosts {
+		seenPostPositions[p.Position] = true
+	}
+	for _, p := range second.TopCommunities {
+		seenCommunityPositions[p.Position] = true
+	}
+
+	for _, p := range second.TopGalleries {
+		seenGalleryPositions[p.Position] = true
+	}
+
+	for _, p := range second.TopFirstPosts {
+		seenFirstPostPositions[p.Position] = true
+	}
+
+	for _, p := range first.TopPosts {
+		if _, ok := seenPostPositions[p.Position]; !ok {
+			second.TopPosts = append(second.TopPosts, p)
+		}
+	}
+
+	for _, p := range first.TopCommunities {
+		if _, ok := seenCommunityPositions[p.Position]; !ok {
+			second.TopCommunities = append(second.TopCommunities, p)
+		}
+	}
+
+	for _, p := range first.TopGalleries {
+		if _, ok := seenGalleryPositions[p.Position]; !ok {
+			second.TopGalleries = append(second.TopGalleries, p)
+		}
+	}
+
+	for _, p := range first.TopFirstPosts {
+		if _, ok := seenFirstPostPositions[p.Position]; !ok {
+			second.TopFirstPosts = append(second.TopFirstPosts, p)
+		}
+	}
+
+	if second.PostCount == 0 {
+		second.PostCount = first.PostCount
+	}
+
+	if second.CommunityCount == 0 {
+		second.CommunityCount = first.CommunityCount
+	}
+
+	if second.GalleryCount == 0 {
+		second.GalleryCount = first.GalleryCount
+	}
+
+	if second.FirstPostCount == 0 {
+		second.FirstPostCount = first.FirstPostCount
+	}
+
+	return second
 }

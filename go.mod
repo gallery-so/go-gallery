@@ -62,6 +62,7 @@ require (
 	buf.build/gen/go/sqlc/sqlc/protocolbuffers/go v1.30.0-20230621221448-196413f69ab3.1
 	cloud.google.com/go/compute/metadata v0.2.3
 	cloud.google.com/go/storage v1.30.1
+	github.com/bits-and-blooms/bloom/v3 v3.6.0
 	github.com/ertan/go-farcaster v1.0.0-beta
 	github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277
 	github.com/golang-jwt/jwt/v5 v5.0.0
@@ -103,6 +104,7 @@ require (
 	github.com/aws/aws-sdk-go v1.43.43 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
+	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
