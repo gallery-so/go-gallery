@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"runtime"
 	"time"
 
@@ -135,4 +136,81 @@ func (e LoggedError) Error() string {
 	}
 
 	return msg
+}
+
+// GinFormatter returns a gin.LogFormatter that includes additional context via logrus
+func GinFormatter() gin.LogFormatter {
+	// Wrapping gin logs with logrus is noisy in a local development console, so only do it for
+	// cloud logs (which will handle JSON logs gracefully)
+	wrapWithLogrus := true
+	if viper.GetString("ENV") == "local" {
+		wrapWithLogrus = false
+	}
+
+	return func(param gin.LogFormatterParams) string {
+		// Gin's default logger, copy/pasted from gin/logger.go
+		defaultLogFormatter := func(param gin.LogFormatterParams) string {
+			var statusColor, methodColor, resetColor string
+			if param.IsOutputColor() {
+				statusColor = param.StatusCodeColor()
+				methodColor = param.MethodColor()
+				resetColor = param.ResetColor()
+			}
+
+			if param.Latency > time.Minute {
+				param.Latency = param.Latency.Truncate(time.Second)
+			}
+			return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
+				param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+				statusColor, param.StatusCode, resetColor,
+				param.Latency,
+				param.ClientIP,
+				methodColor, param.Method, resetColor,
+				param.Path,
+				param.ErrorMessage,
+			)
+		}
+
+		// Custom handling to output gin's log statements with extra context via logrus
+		str := defaultLogFormatter(param)
+		if wrapWithLogrus && param.Request.Context() != nil {
+			logEntry := For(param.Request.Context())
+
+			// Fill in known httpRequest fields for GCP.
+			// See: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+			logEntry = logEntry.WithFields(logrus.Fields{
+				"httpRequest": map[string]interface{}{
+					"requestMethod": param.Method,
+					"requestUrl":    param.Request.URL,
+					"status":        param.StatusCode,
+					"responseSize":  param.BodySize,
+					"latency":       param.Latency,
+					"remoteIp":      param.ClientIP,
+					"userAgent":     param.Request.UserAgent(),
+					"protocol":      param.Request.Proto,
+					"referer":       param.Request.Referer(),
+				},
+			})
+
+			if logEntry.Time.IsZero() {
+				logEntry.Time = time.Now()
+			}
+
+			if param.StatusCode >= http.StatusOK && param.StatusCode < http.StatusMultipleChoices {
+				logEntry.Level = logrus.InfoLevel
+			} else {
+				logEntry.Level = logrus.WarnLevel
+			}
+
+			logEntry.Message = str
+
+			// Use the logrus logEntry to format the output, and then return the string back to gin
+			// so it can write the message
+			if output, err := logEntry.String(); err == nil {
+				return output
+			}
+		}
+
+		return str
+	}
 }

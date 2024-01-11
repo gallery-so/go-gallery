@@ -116,6 +116,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, httpClien
 	h.AroundOperations(graphql.RequestReporter(schema.Schema(), enableLogging, true))
 	h.AroundResponses(graphql.ResponseReporter(enableLogging, true))
 	h.AroundFields(graphql.FieldReporter(true))
+	h.SetErrorPresenter(graphql.ErrorLogger)
 
 	// Should happen after FieldReporter, so Sentry trace context is set up prior to error reporting
 	h.AroundFields(graphql.RemapAndReportErrors)

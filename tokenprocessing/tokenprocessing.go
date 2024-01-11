@@ -110,7 +110,7 @@ func setDefaults() {
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ARBITRUM", "")
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ETH", "")
-	viper.SetDefault("GOLDSKY_WEBHOOK_SECRET", "")
+	viper.SetDefault("OPENSEA_WEBHOOK_SECRET", "")
 
 	viper.AutomaticEnv()
 

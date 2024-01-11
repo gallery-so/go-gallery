@@ -16,6 +16,7 @@ with token_definitions_insert as (
     , contract_address
     , contract_id
     , metadata
+    , is_fxhash
   ) (
     select unnest(@definition_dbid::varchar[]) as id
       , now()
@@ -31,6 +32,7 @@ with token_definitions_insert as (
       , unnest(@definition_contract_address::varchar[]) as contract_address
       , unnest(@definition_contract_id::varchar[]) as contract_id
       , unnest(@definition_metadata::jsonb[]) as metadata
+      , unnest(@definition_is_fxhash::boolean[]) as is_fxhash
   )
   on conflict (chain, contract_id, token_id) where deleted = false
   do update set
@@ -42,6 +44,7 @@ with token_definitions_insert as (
     , fallback_media = excluded.fallback_media
     , contract_address = excluded.contract_address
     , metadata = excluded.metadata
+    , is_fxhash = excluded.is_fxhash
   returning *
 )
 , tokens_insert as (

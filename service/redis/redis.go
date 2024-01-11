@@ -60,6 +60,7 @@ var (
 	SearchCache                       = CacheConfig{keyPrefix: "search", displayName: "search"}
 	UserPrefCache                     = CacheConfig{keyPrefix: "userpref", displayName: "userPref"}
 	TokenManageCache                  = CacheConfig{keyPrefix: "tokenmanage", displayName: "tokenManage"}
+	WalletsBloomFilterCache           = CacheConfig{database: tokenProcessing, keyPrefix: "wallets-bloom", displayName: "wallets-bloom"}
 )
 
 func newClient(db redisDB, traceName string) *redis.Client {

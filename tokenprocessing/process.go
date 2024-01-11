@@ -21,10 +21,9 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -69,7 +68,7 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 					return err
 				}
 
-				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td, c))
+				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td))
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
 				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0,
@@ -89,91 +88,91 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 }
 
 func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
 		var input ProcessMediaForTokenInput
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
+		if err := ctx.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(ctx, http.StatusBadRequest, err)
 			return
 		}
 
-		td, err := queries.GetTokenDefinitionByTokenIdentifiers(c, db.GetTokenDefinitionByTokenIdentifiersParams{
+		td, err := queries.GetTokenDefinitionByTokenIdentifiers(ctx, db.GetTokenDefinitionByTokenIdentifiersParams{
 			Chain:           input.Chain,
 			ContractAddress: input.ContractAddress,
 			TokenID:         input.TokenID,
 		})
 		if err == pgx.ErrNoRows {
-			util.ErrResponse(c, http.StatusNotFound, err)
+			util.ErrResponse(ctx, http.StatusNotFound, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		contract, err := queries.GetContractByID(c, td.ContractID)
+		c, err := queries.GetContractByID(ctx, td.ContractID)
 		if err == pgx.ErrNoRows {
-			util.ErrResponse(c, http.StatusNotFound, err)
+			util.ErrResponse(ctx, http.StatusNotFound, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		_, err = runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(contract))
+		_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(c))
 
 		if err != nil {
 			if util.ErrorIs[ErrBadToken](err) {
-				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
+				util.ErrResponse(ctx, http.StatusUnprocessableEntity, err)
 				return
 			}
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
 // processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
 func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
 		var input task.TokenProcessingTokenMessage
 
 		// Remove from queue if bad message
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
+		if err := ctx.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 
-		td, err := queries.GetTokenDefinitionById(c, input.TokenDefinitionID)
+		td, err := queries.GetTokenDefinitionById(ctx, input.TokenDefinitionID)
 		if err == pgx.ErrNoRows {
 			// Remove from queue if not found
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		contract, err := queries.GetContractByID(c, td.ContractID)
+		c, err := queries.GetContractByID(ctx, td.ContractID)
 		if err == pgx.ErrNoRows {
 			// Remove from queue if not found
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
 
-		tm := tokenmanage.NewWithRetries(c, taskClient, cache, numRetriesF(td, contract))
+		tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
 
-		runManagedPipeline(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
+		runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(c))
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -531,70 +530,166 @@ func isValidAlchemySignatureForStringBody(
 	return digest == signature
 }
 
-type GoldskyWebhookInput struct {
-	Op   string `json:"op"`
-	Data struct {
-		Old GoldskyToken1155Holder `json:"old"` // in an update this will be what it was before, empty on insert
-		New GoldskyToken1155Holder `json:"new"` // this is what we care about
-	} `json:"data"`
-}
-type GoldskyToken1155Holder struct {
-	ID               string `json:"id"`                 // ID in this format "0x{user address}-0x{address}-{token_id}"
-	User             string `json:"user"`               // address in format "\\x{address}"
-	TokenAndContract string `json:"token_and_contract"` //  format "0x{address}-{token_id}"
-	Balance          string `json:"balance"`            //  base10 string, generated from javascript's BigInt
+/*
+item transferred payload:
 
+ {
+  event_type: 'item_transferred',
+  payload: {
+    chain: 'zora',
+    collection: { slug: 'shadeart' },
+    event_timestamp: '2024-01-03T20:27:01.000000+00:00',
+    from_account: { address: '0x0000000000000000000000000000000000000000' },
+    item: {
+      chain: [Object],
+      metadata: [Object],
+      nft_id: 'zora/0x189d1b324600b134d2929e331d1ee275297505c9/1',
+      permalink: 'https://opensea.io/assets/zora/0x189d1b324600b134d2929e331d1ee275297505c9/1'
+    },
+    quantity: 1,
+    to_account: { address: '0x8fbbb256bb8bac4ed70a95d054f4007786a69e2b' },
+    transaction: {
+      hash: '0x50e764e97fee1683b1070b29ddfcccf0bcce7fe2d2aaf95997a2c5bea067ed92',
+      timestamp: '2024-01-03T20:27:01.000000+00:00'
+    }
+  },
+  sent_at: '2024-01-03T20:27:05.820128+00:00'
+}
+*/
+
+type OpenseaNFTID struct {
+	Chain           persist.Chain
+	ContractAddress persist.Address
+	TokenID         persist.TokenID
 }
 
-func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
+func (o OpenseaNFTID) String() string {
+	cstring := "ethereum"
+	switch o.Chain {
+	case persist.ChainPolygon:
+		cstring = "matic"
+	case persist.ChainArbitrum:
+		cstring = "arbitrum"
+	case persist.ChainOptimism:
+		cstring = "optimism"
+	case persist.ChainZora:
+		cstring = "zora"
+	case persist.ChainBase:
+		cstring = "base"
+
+	}
+	return fmt.Sprintf("%s/%s/%s", cstring, o.ContractAddress, o.TokenID.Base10String())
+}
+
+func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	split := strings.Split(s, "/")
+	if len(split) != 3 {
+		return fmt.Errorf("invalid opensea nft id: %s", s)
+	}
+
+	var chain persist.Chain
+	switch split[0] {
+	case "ethereum":
+		chain = persist.ChainETH
+	case "matic":
+		chain = persist.ChainPolygon
+	case "arbitrum":
+		chain = persist.ChainArbitrum
+	case "optimism":
+		chain = persist.ChainOptimism
+	case "zora":
+		chain = persist.ChainZora
+	case "base":
+		chain = persist.ChainBase
+
+	default:
+		return fmt.Errorf("invalid opensea chain: %s", split[0])
+	}
+
+	o.Chain = chain
+	o.ContractAddress = persist.Address(strings.ToLower(split[1]))
+	asBig, ok := big.NewInt(0).SetString(split[2], 10)
+	if !ok {
+		asBig, ok = big.NewInt(0).SetString(split[2], 16)
+		if !ok {
+			return fmt.Errorf("invalid opensea token id: %s", split[2])
+		}
+	}
+	o.TokenID = persist.TokenID(asBig.Text(16))
+
+	return nil
+}
+
+func (o OpenseaNFTID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
+type OpenSeaWebhookInput struct {
+	EventType string `json:"event_type"`
+	Payload   struct {
+		Chain      string `json:"chain"`
+		Collection struct {
+			Slug string `json:"slug"`
+		} `json:"collection"`
+		EventTimestamp string `json:"event_timestamp"`
+		FromAccount    struct {
+			Address persist.EthereumAddress `json:"address"`
+		} `json:"from_account"`
+		Item struct {
+			Chain struct {
+				Name string `json:"name"`
+			} `json:"chain"`
+			Metadata  persist.TokenMetadata `json:"metadata"`
+			NFTID     OpenseaNFTID          `json:"nft_id"`
+			Permalink string                `json:"permalink"`
+		} `json:"item"`
+		Quantity  int `json:"quantity"`
+		ToAccount struct {
+			Address persist.EthereumAddress `json:"address"`
+		} `json:"to_account"`
+	} `json:"payload"`
+}
+
+func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		var in GoldskyWebhookInput
+		var in OpenSeaWebhookInput
 		if err := c.ShouldBindJSON(&in); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		logger.For(c).WithFields(logrus.Fields{"user_address": in.Data.New.User, "token_id": in.Data.New.ID, "token_and_contract": in.Data.New.TokenAndContract, "balance": in.Data.New.Balance}).Infof("GOLDSKY: %s - Processing Goldsky User Tokens Refresh", in.Data.New.User)
+		incomingToken := in.Payload
 
-		signature := c.GetHeader("goldsky-webhook-secret")
-		if signature != env.GetString("GOLDSKY_WEBHOOK_SECRET") {
-			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid goldsky signature"))
+		logger.For(c).WithFields(logrus.Fields{"to_address": incomingToken.ToAccount.Address, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "amount": incomingToken.Quantity}).Infof("OPENSEA: %s - Processing Opensea User Tokens Refresh", incomingToken.ToAccount.Address)
+
+		auth := c.GetHeader("authorization")
+		if auth != env.GetString("OPENSEA_WEBHOOK_SECRET") {
+			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid opensea signature"))
 			return
 		}
 
-		fullIDs := strings.Split(in.Data.New.ID, "-")
-		if len(fullIDs) != 3 {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid id: %s", in.Data.New.ID))
-			return
-		}
-
-		userAddress := persist.Address(strings.ToLower(fullIDs[0]))
 		user, _ := queries.GetUserByAddressAndL1(c, db.GetUserByAddressAndL1Params{
-			Address: userAddress,
-			L1Chain: persist.ChainZora.L1Chain(),
+			Address: persist.Address(incomingToken.ToAccount.Address.String()),
+			L1Chain: incomingToken.Item.NFTID.Chain.L1Chain(),
 		})
 		if user.ID == "" {
-			logger.For(c).Warnf("user not found for address: %s", userAddress)
+			logger.For(c).Warnf("user not found for address: %s", incomingToken.ToAccount.Address)
 			// it is a valid response to not find a user, not every transfer exists on gallery
-			c.String(http.StatusOK, fmt.Sprintf("user not found for address: %s", userAddress))
+			c.String(http.StatusOK, fmt.Sprintf("user not found for address: %s", incomingToken.ToAccount.Address))
 			return
 		}
-
-		contractAddress := persist.Address(strings.ToLower(fullIDs[1]))
-		bigTokenID, ok := big.NewInt(0).SetString(fullIDs[2], 10)
-		if !ok {
-			logger.For(c).Errorf("invalid token and contract: %s", in.Data.New.TokenAndContract)
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid token and contract: %s", in.Data.New.TokenAndContract))
-			return
-		}
-		tokenID := persist.TokenID(bigTokenID.Text(16))
 
 		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(c, db.GetTokenByUserTokenIdentifiersParams{
 			OwnerID:         user.ID,
-			TokenID:         tokenID,
-			Chain:           persist.ChainZora,
-			ContractAddress: contractAddress,
+			TokenID:         incomingToken.Item.NFTID.TokenID,
+			Chain:           incomingToken.Item.NFTID.Chain,
+			ContractAddress: incomingToken.Item.NFTID.ContractAddress,
 		})
 
 		beforeBalance := persist.HexString("0")
@@ -602,13 +697,13 @@ func processOwnersForGoldskyTokens(mc *multichain.Provider, queries *db.Queries)
 			beforeBalance = beforeToken.Token.Quantity
 		}
 
-		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": tokenID, "contract_address": contractAddress, "user_address": userAddress})
-		l.Infof("Processing: %s - Processing Goldsky Zora User Tokens Refresh", user.ID)
+		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "user_address": incomingToken.ToAccount.Address})
+		l.Infof("Processing: %s - Processing Opensea User Tokens Refresh", user.ID)
 		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, user.ID, []persist.TokenUniqueIdentifiers{{
-			Chain:           persist.ChainZora,
-			ContractAddress: contractAddress,
-			TokenID:         tokenID,
-			OwnerAddress:    userAddress,
+			Chain:           incomingToken.Item.NFTID.Chain,
+			ContractAddress: incomingToken.Item.NFTID.ContractAddress,
+			TokenID:         incomingToken.Item.NFTID.TokenID,
+			OwnerAddress:    persist.Address(incomingToken.ToAccount.Address.String()),
 		}})
 		if err != nil {
 			l.Errorf("error syncing tokens: %s", err)
@@ -777,74 +872,74 @@ func processWalletRemoval(queries *db.Queries) gin.HandlerFunc {
 }
 
 func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo *postgres.UserRepository, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
 		var input task.PostPreflightMessage
 
-		if err := c.ShouldBindJSON(&input); err != nil {
+		if err := ctx.ShouldBindJSON(&input); err != nil {
 			// Remove from queue if bad message
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 
-		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiersIgnoringStatus(c, db.GetMediaByTokenIdentifiersIgnoringStatusParams{
+		existingMedia, err := mc.Queries.GetMediaByTokenIdentifiersIgnoringStatus(ctx, db.GetMediaByTokenIdentifiersIgnoringStatusParams{
 			Chain:           input.Token.Chain,
 			ContractAddress: input.Token.ContractAddress,
 			TokenID:         input.Token.TokenID,
 		})
 		if err != nil && err != pgx.ErrNoRows {
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(ctx, http.StatusOK, err)
 			return
 		}
 
 		// Process media for the token
 		if !existingMedia.Active {
-			td, err := mc.TokenExists(c, input.Token, retry.DefaultRetry)
+			td, err := mc.TokenExists(ctx, input.Token, retry.DefaultRetry)
 			if err != nil {
 				// Keep retrying until we get the token or reach max retries
-				util.ErrResponse(c, http.StatusInternalServerError, err)
+				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
 
-			contract, err := mc.Queries.GetContractByID(c, td.ContractID)
+			c, err := mc.Queries.GetContractByID(ctx, td.ContractID)
 			if err == pgx.ErrNoRows {
 				// Remove from queue if not found
-				util.ErrResponse(c, http.StatusOK, err)
+				util.ErrResponse(ctx, http.StatusOK, err)
 				return
 			}
 			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
+				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
 
-			tm := tokenmanage.NewWithRetries(c, taskClient, cache, numRetriesF(td, contract))
+			tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
 
-			runManagedPipeline(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
-				addIsSpamJobOption(contract),
-				PipelineOpts.WithRequireImage(),                    // Require an image if token is Prohibition token
-				PipelineOpts.WithRequireFxHashSigned(td, contract), // Require token to be signed if it is an FxHash token
+			runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
+				addIsSpamJobOption(c),
+				PipelineOpts.WithRequireImage(),             // Require an image if token is Prohibition token
+				PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
 			)
 		}
 
 		// Try to sync the user's token if a user is provided
 		if input.UserID != "" {
-			user, err := userRepo.GetByID(c, input.UserID)
+			user, err := userRepo.GetByID(ctx, input.UserID)
 			if err != nil {
 				// If the user doesn't exist, remove the message from the queue
-				util.ErrResponse(c, http.StatusOK, err)
+				util.ErrResponse(ctx, http.StatusOK, err)
 				return
 			}
 			// Try to sync the user's tokens by searching for the token in each of the user's wallets
 			// SyncTokenByUserWalletsAndTokenIdentifiersRetry processes media for the token if it is found
 			// so we don't need to run the pipeline again here
-			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(c, user, input.Token, retry.DefaultRetry)
+			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, input.Token, retry.DefaultRetry)
 			if err != nil {
 				// Keep retrying until we get the token or reach max retries
-				util.ErrResponse(c, http.StatusInternalServerError, err)
+				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
 		}
 
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -864,26 +959,21 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	if err != nil {
 		return db.TokenMedia{}, err
 	}
+	// Runtime options that should be applied to every run
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
-	runOpts = append(runOpts, addContextRunOptions(cause)...)
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
+	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
+	runOpts = append(runOpts, PipelineOpts.WithIsFxhash(td.IsFxhash))
+	runOpts = append(runOpts, PipelineOpts.WithRefreshMetadata())
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessTokenPipeline(ctx, tID, cID, cause, runOpts...)
 	defer closing(err)
 	return media, err
 }
 
-// addContextRunOptions adds pipeline options for specific types of runs
-func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption) {
-	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry || cause == persist.ProcessingCausePostPreflight {
-		opts = append(opts, PipelineOpts.WithRefreshMetadata())
-	}
-	return opts
-}
-
 // addContractRunOptions adds pipeline options for specific contracts
 func addContractRunOptions(contract persist.ContractIdentifiers) (opts []PipelineOption) {
-	if contract == ensContract {
+	if platform.IsEns(contract.Chain, contract.ContractAddress) {
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
@@ -893,53 +983,12 @@ func addIsSpamJobOption(c db.Contract) PipelineOption {
 	return PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam)
 }
 
-var (
-	defaultSyncMaxRetries = 4
-	prohibitionContract   = persist.NewContractIdentifiers("0x47a91457a3a1f700097199fd63c039c4784384ab", persist.ChainArbitrum)
-	ensContract           = persist.NewContractIdentifiers(eth.EnsAddress, persist.ChainETH)
-)
-
 // numRetriesF returns a function that when called, returns the number of retries allotted for a token and contract
-func numRetriesF(td db.TokenDefinition, c db.Contract) tokenmanage.NumRetryF {
+func numRetriesF(td db.TokenDefinition) tokenmanage.NumRetryF {
 	return func() int {
-		if isProhibition(c) || isFxHash(td, c) {
+		if platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash {
 			return 24
 		}
-		return defaultSyncMaxRetries
+		return 4
 	}
-}
-
-func isProhibition(c db.Contract) bool {
-	return persist.NewContractIdentifiers(c.Address, c.Chain) == prohibitionContract
-}
-
-func isFxHash(td db.TokenDefinition, c db.Contract) bool {
-	if td.Chain == persist.ChainTezos && tezos.IsFxHash(c.Address) {
-		return true
-	}
-	if td.Chain == persist.ChainETH {
-		if strings.ToLower(c.Symbol.String) == "fxgen" {
-			return true
-		}
-		if u, ok := td.Metadata["external_url"].(string); ok {
-			parsed, _ := url.Parse(u)
-			if td.Chain == persist.ChainETH && strings.HasPrefix(parsed.Hostname(), "fxhash") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func isFxHashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadata) bool {
-	if !isFxHash(td, c) {
-		return true
-	}
-	if td.Chain == persist.ChainTezos {
-		return tezos.IsFxHashSigned(c.Address, td.Name.String)
-	}
-	if td.Chain == persist.ChainETH {
-		return m["authenticityHash"] != "" && m["authenticityHash"] != nil
-	}
-	return true
 }

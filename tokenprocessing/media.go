@@ -31,7 +31,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -360,7 +359,6 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 			}
 		}
 	}
-	res = remapMedia(res)
 
 	dimensions, err := getHTMLDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
@@ -421,33 +419,11 @@ func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, err
 
 }
 
-func remapPaths(mediaURL string) string {
-	switch persist.TokenURI(mediaURL).Type() {
-	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), mediaURL)
-	case persist.URITypeArweave:
-		path := util.GetURIPath(mediaURL, false)
-		return fmt.Sprintf("https://arweave.net/%s", path)
-	default:
-		return mediaURL
-	}
-
-}
-
-func remapMedia(media persist.Media) persist.Media {
-	media.MediaURL = persist.NullString(remapPaths(strings.TrimSpace(media.MediaURL.String())))
-	media.ThumbnailURL = persist.NullString(remapPaths(strings.TrimSpace(media.ThumbnailURL.String())))
-	if !persist.TokenURI(media.ThumbnailURL).IsRenderable() {
-		media.ThumbnailURL = persist.NullString("")
-	}
-	return media
-}
-
-func findImageAndAnimationURLs(ctx context.Context, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
+func findImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords, animKeywords []string, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
 
-	imgURL, vURL, err := media.FindImageAndAnimationURLs(ctx, chain, contractAddress, metadata)
+	imgURL, vURL, err := media.FindImageAndAnimationURLs(ctx, metadata, imgKeywords, animKeywords)
 	if err != nil {
 		persist.FailStep(&pMeta.MediaURLsRetrieval)
 	}
