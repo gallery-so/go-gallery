@@ -1671,6 +1671,19 @@ where pfp.id = @id
 		0 = 1
 	end;
 
+-- name: GetProfileImageById :one
+select * from profile_images pfp
+where pfp.id = @id
+	and not deleted
+	and case
+		when pfp.source_type = @ens_source_type
+		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
+		when pfp.source_type = @token_source_type
+		then exists(select 1 from tokens t where t.id = pfp.token_id and not t.deleted)
+		else
+		0 = 1
+	end;
+
 -- name: GetPotentialENSProfileImageByUserId :one
 select sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(wallets)
 from token_definitions, tokens, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)

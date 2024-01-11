@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
@@ -13,7 +14,9 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -37,6 +40,8 @@ type DigestValues struct {
 	CommunityCount int              `json:"community_count"`
 	GalleryCount   int              `json:"gallery_count"`
 	FirstPostCount int              `json:"first_post_count"`
+	Date           string           `json:"date"`
+	IntroText      *string          `json:"intro_text"`
 }
 
 type IncludedSelected struct {
@@ -62,6 +67,7 @@ type DigestValueOverrides struct {
 	IncludeTopCommunities *bool        `json:"include_top_communities,omitempty"`
 	IncludeTopGalleries   *bool        `json:"include_top_galleries,omitempty"`
 	IncludeTopFirstPosts  *bool        `json:"include_top_first,omitempty"`
+	IntroText             *string      `json:"override_intro_text,omitempty"`
 }
 
 type UserFacingToken struct {
@@ -72,12 +78,13 @@ type UserFacingToken struct {
 	Override        bool         `json:"override"`
 }
 type UserFacingPost struct {
-	PostID          persist.DBID      `json:"post_id"`
-	Caption         string            `json:"caption"`
-	Author          string            `json:"author"`
-	Tokens          []UserFacingToken `json:"tokens"`
-	PreviewImageURL string            `json:"preview_image_url"`
-	Override        bool              `json:"override"`
+	PostID         persist.DBID      `json:"post_id"`
+	Caption        string            `json:"caption"`
+	AuthorUsername string            `json:"author_username"`
+	AuthorPFPURL   string            `json:"author_pfp_url"`
+	Tokens         []UserFacingToken `json:"tokens"`
+	TokenImageURL  string            `json:"token_image_url"`
+	Override       bool              `json:"override"`
 }
 
 type UserFacingContract struct {
@@ -222,6 +229,8 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 		CommunityCount: communityCount,
 		PostCount:      postCount,
 		GalleryCount:   galleryCount,
+		Date:           time.Now().Format("2 January 2006"),
+		IntroText:      overrides.IntroText,
 	}
 	return result, nil
 }
@@ -325,13 +334,59 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 		previewURL = tokens[0].PreviewImageURL
 	}
 
+	pfp, err := q.GetProfileImageById(c, coredb.GetProfileImageByIdParams{
+		ID:              user.ProfileImageID,
+		EnsSourceType:   persist.ProfileImageSourceENS,
+		TokenSourceType: persist.ProfileImageSourceToken,
+	})
+	if err != nil {
+		return UserFacingPost{}, fmt.Errorf("error getting profile image by id: %s", err)
+	}
+
+	var profileImageURL string
+	switch pfp.SourceType {
+	case persist.ProfileImageSourceToken:
+		token, err := q.GetTokenById(c, pfp.TokenID)
+		if err != nil {
+			return UserFacingPost{}, fmt.Errorf("error getting token by id: %s", err)
+		}
+		ut, err := loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(token.TokenDefinition.TokenMediaID)
+		if err != nil {
+			return UserFacingPost{}, err
+		}
+		mm := mediamapper.For(c)
+		profileImageURL = mm.GetThumbnailImageUrl(util.FirstNonEmptyString(ut.Media.MediaURL.String(), ut.Media.ProfileImageURL.String(), ut.Media.ThumbnailURL.String()))
+	case persist.ProfileImageSourceENS:
+		tokenID, err := eth.DeriveTokenID(pfp.EnsDomain.String)
+		if err != nil {
+			return UserFacingPost{}, err
+		}
+		enstoken, err := loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.Load(coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams{
+			OwnerID:         post.ActorID,
+			TokenID:         tokenID,
+			ContractAddress: eth.EnsAddress,
+			Chain:           persist.ChainETH,
+		})
+		if err != nil {
+			return UserFacingPost{}, err
+		}
+
+		ut, err := loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(enstoken.TokenDefinition.TokenMediaID)
+		if err != nil {
+			return UserFacingPost{}, err
+		}
+		mm := mediamapper.For(c)
+		profileImageURL = mm.GetThumbnailImageUrl(util.FirstNonEmptyString(ut.Media.ProfileImageURL.String(), ut.Media.MediaURL.String()))
+
+	}
 	return UserFacingPost{
-		PostID:          post.ID,
-		Caption:         post.Caption.String,
-		Author:          user.Username.String,
-		Tokens:          tokens,
-		PreviewImageURL: previewURL,
-		Override:        override,
+		PostID:         post.ID,
+		Caption:        post.Caption.String,
+		AuthorUsername: user.Username.String,
+		AuthorPFPURL:   profileImageURL,
+		Tokens:         tokens,
+		TokenImageURL:  previewURL,
+		Override:       override,
 	}, nil
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -52,7 +53,10 @@ func coreInitServer() *gin.Engine {
 
 	router := gin.Default()
 
-	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger(), func(c *gin.Context) {
+		mediamapper.AddTo(c)
+		c.Next()
+	})
 
 	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -102,6 +106,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_PUSH_NOTIFICATIONS_QUEUE", "projects/gallery-local/locations/here/queues/push-notifications")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
 	viper.SetDefault("PUSH_NOTIFICATIONS_URL", "http://localhost:8000")
+	viper.SetDefault("IMGIX_SECRET", "")
 
 	viper.AutomaticEnv()
 
