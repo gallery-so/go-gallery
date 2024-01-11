@@ -339,8 +339,8 @@ limit sqlc.arg('limit'))
 
 union all
 
-(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_data cd, token_community_memberships tcm
-    join tokens t on t.token_definition_id = tcm.token_definition_id
+(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_data cd, tokens t
+    join token_community_memberships tcm on t.token_definition_id = tcm.token_definition_id
     join token_definitions td on td.id = t.token_definition_id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
