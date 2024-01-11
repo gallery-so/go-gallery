@@ -241,6 +241,12 @@ func Tracing() gin.HandlerFunc {
 			sentry.ContinueFromRequest(c.Request),
 		)
 
+		ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+			// Call it "trace" so GCP logging will recognize it as the trace ID
+			// See: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry
+			"trace": span.TraceID,
+		})
+
 		if c.Request.Method == "OPTIONS" {
 			// Don't sample OPTIONS requests; there's nothing to trace and they eat up our Sentry quota.
 			// Using a sampling decision here (instead of simply omitting the span) ensures that any
