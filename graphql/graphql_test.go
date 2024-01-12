@@ -96,9 +96,7 @@ func testTokenSyncs(t *testing.T) {
 		{title: "should submit new tokens to tokenprocessing", run: testSyncOnlySubmitsNewTokens},
 		{title: "should not submit old tokens to tokenprocessing", run: testSyncSkipsSubmittingOldTokens},
 		{title: "should not delete old tokens", run: testSyncNotDeletesOldTokens},
-		{title: "should combine all tokens from providers", run: testSyncShouldCombineProviders},
 		{title: "should merge duplicates within provider", run: testSyncShouldMergeDuplicatesInProvider},
-		{title: "should merge duplicates across providers", run: testSyncShouldMergeDuplicatesAcrossProviders},
 		{title: "should process media", run: testSyncShouldProcessMedia},
 	}
 	for _, test := range tests {
@@ -850,10 +848,11 @@ func testSendNotifications(t *testing.T) {
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
+	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	ctx := context.Background()
 
 	t.Run("should sync new tokens", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -864,7 +863,7 @@ func testSyncNewTokens(t *testing.T) {
 	})
 
 	t.Run("should not duplicate tokens from repeat syncs", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -877,7 +876,8 @@ func testSyncNewTokens(t *testing.T) {
 	t.Run("should not delete tokens if provider fails", func(t *testing.T) {
 		userF := newUserWithTokensFixture(t)
 		require.Greater(t, len(userF.TokenIDs), 0)
-		h := handlerWithProviders(t, submitUserTokensNoop, newStubProvider(withReturnError(fmt.Errorf("can't get tokens"))))
+		providers := multichain.ProviderLookup{persist.ChainETH: newStubProvider(withReturnError(fmt.Errorf("can't get tokens")))}
+		h := handlerWithProviders(t, submitUserTokensNoop, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		// Sync tokens with a failing provider
@@ -896,11 +896,12 @@ func testSyncNewTokens(t *testing.T) {
 func testSyncNewTokensIncrementally(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
+	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	ctx := context.Background()
 
 	tr := util.ToPointer(true)
 	t.Run("should sync new tokens incrementally", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)
@@ -911,7 +912,7 @@ func testSyncNewTokensIncrementally(t *testing.T) {
 	})
 
 	t.Run("should not duplicate tokens from repeat incremental syncs", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)
@@ -927,11 +928,9 @@ func testSyncNewTokensMultichain(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
 	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
-	secondProvider := newStubProvider(
-		withDummyTokenN(contract, userF.Wallet.Address, 10),
-		withBlockchainInfo(multichain.BlockchainInfo{ProviderID: persist.GenerateID().String()}),
-	)
-	h := handlerWithProviders(t, submitUserTokensNoop, provider, secondProvider)
+	secondProvider := newStubProvider(withDummyTokenN(contract, userF.Wallet.Address, 10))
+	providers := multichain.ProviderLookup{persist.ChainETH: provider, persist.ChainOptimism: secondProvider}
+	h := handlerWithProviders(t, submitUserTokensNoop, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	ctx := context.Background()
 
@@ -946,8 +945,9 @@ func testSyncNewTokensMultichain(t *testing.T) {
 func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
+	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	tokenRecorder := sendTokensRecorder{}
-	h := handlerWithProviders(t, tokenRecorder.Send, provider)
+	h := handlerWithProviders(t, tokenRecorder.Send, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	// Ideally this compares against expected values, but mocks seems to behave weirdly with slices
 	tokenRecorder.On("Send", mock.Anything, mock.Anything).Times(1).Return(nil)
@@ -963,7 +963,9 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	ctx := context.Background()
 	dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, "0xffff")
-	h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/image", dummyTokenOpt)
+	provider := newStubProvider(dummyTokenOpt)
+	providers := multichain.ProviderLookup{persist.ChainETH: provider}
+	h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/image", dummyTokenOpt)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	// Sync tokens
 	_, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -971,7 +973,7 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 
 	// Then sync again, with a provider that returns the same tokens
 	tokenRecorder := sendTokensRecorder{}
-	h = handlerWithProviders(t, tokenRecorder.Send, newStubProvider(dummyTokenOpt))
+	h = handlerWithProviders(t, tokenRecorder.Send, providers)
 	c = customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	_, err = syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -982,25 +984,14 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 func testSyncNotDeletesOldTokens(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, 4))
-	h := handlerWithProviders(t, submitUserTokensNoop, provider)
+	providers := multichain.ProviderLookup{persist.ChainETH: provider}
+	h := handlerWithProviders(t, submitUserTokensNoop, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	require.NoError(t, err)
 	assertSyncedTokens(t, response, err, 4+len(userF.TokenIDs))
-}
-
-func testSyncShouldCombineProviders(t *testing.T) {
-	userF := newUserFixture(t)
-	providerA := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, 4))
-	providerB := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1234"}, userF.Wallet.Address, 2))
-	h := handlerWithProviders(t, submitUserTokensNoop, providerA, providerB)
-	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
-
-	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
-
-	assertSyncedTokens(t, response, err, 4)
 }
 
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
@@ -1013,21 +1004,8 @@ func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 		withContracts([]multichain.ChainAgnosticContract{contract}),
 		withTokens([]multichain.ChainAgnosticToken{token, token}),
 	)
-	h := handlerWithProviders(t, submitUserTokensNoop, provider)
-	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
-
-	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
-
-	assertSyncedTokens(t, response, err, 1)
-}
-
-func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
-	userF := newUserFixture(t)
-	token := dummyToken(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress}
-	providerA := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
-	providerB := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
-	h := handlerWithProviders(t, submitUserTokensNoop, providerA, providerB)
+	providers := multichain.ProviderLookup{persist.ChainETH: provider}
+	h := handlerWithProviders(t, submitUserTokensNoop, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
@@ -1036,15 +1014,16 @@ func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 }
 
 // newDummyMetadataProviderFixture creates a new handler configured with a stubbed provider that reads from a fixed dummy metadata server endpoint
-func newDummyMetadataProviderFixture(t *testing.T, ctx context.Context, ownerAddress persist.Address, dummyEndpointToHit string, opts ...providerOpt) http.Handler {
+func newDummyMetadataProviderFixture(t *testing.T, ctx context.Context, chain persist.Chain, ownerAddress persist.Address, dummyEndpointToHit string, opts ...providerOpt) http.Handler {
 	metadataServerF := newMetadataServerFixture(t)
 	metadataFetchF := fetchFromDummyEndpoint(metadataServerF.URL, dummyEndpointToHit)
 	pOpts := append([]providerOpt{withFetchMetadata(metadataFetchF)}, opts...)
 	provider := newStubProvider(pOpts...)
+	providers := multichain.ProviderLookup{chain: provider}
 	c := server.ClientInit(ctx)
-	mc := newMultichainProvider(c, submitUserTokensNoop, []any{provider})
+	mc := newMultichainProvider(c, submitUserTokensNoop, providers)
 	t.Cleanup(func() { c.Close() })
-	return handlerWithProviders(t, sendTokensToTokenProcessing(ctx, c, &mc), provider)
+	return handlerWithProviders(t, sendTokensToTokenProcessing(ctx, c, &mc), providers)
 }
 
 func testSyncShouldProcessMedia(t *testing.T) {
@@ -1053,7 +1032,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x0"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/image", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/image", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1068,7 +1047,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x1"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/video", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/video", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1083,7 +1062,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x2"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/iframe", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/iframe", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1098,7 +1077,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x3"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/gif", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/gif", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1113,7 +1092,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x4"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/bad", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/bad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1127,7 +1106,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x5"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/notfound", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/notfound", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1141,7 +1120,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x6"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/media/bad", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/bad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1155,7 +1134,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x7"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/media/notfound", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/notfound", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1169,7 +1148,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x8"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/svg", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/svg", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1184,7 +1163,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x9"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/base64svg", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/base64svg", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1199,7 +1178,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xa"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/base64", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/base64", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1214,7 +1193,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xb"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/media/ipfs", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/ipfs", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1229,7 +1208,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xc"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/media/dnsbad", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/dnsbad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1243,7 +1222,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xd"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/differentkeyword", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/differentkeyword", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1258,7 +1237,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xe"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/wrongkeyword", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/wrongkeyword", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1273,7 +1252,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xf"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/animation", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/animation", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1288,7 +1267,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x10"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/pdf", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/pdf", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1303,7 +1282,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x11"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/text", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/text", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1318,7 +1297,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x12"))
-		h := newDummyMetadataProviderFixture(t, ctx, userF.Wallet.Address, "/metadata/badimage", dummyTokenOpt)
+		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/badimage", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -1642,29 +1621,20 @@ func defaultHandler(t *testing.T) http.Handler {
 }
 
 // handlerWithProviders returns a GraphQL http.Handler
-func handlerWithProviders(t *testing.T, submitF multichain.SubmitTokensF, providers ...any) http.Handler {
+func handlerWithProviders(t *testing.T, submitF multichain.SubmitTokensF, p multichain.ProviderLookup) http.Handler {
 	ctx := context.Background()
 	c := server.ClientInit(context.Background())
-	provider := newMultichainProvider(c, submitF, providers)
-	recommender := newStubRecommender(t, []persist.DBID{})
-	p := newStubPersonaliztion(t)
+	provider := newMultichainProvider(c, submitF, p)
 	t.Cleanup(c.Close)
-	return server.CoreInit(ctx, c, &provider, recommender, p)
+	return server.CoreInit(ctx, c, &provider, newStubRecommender(t, []persist.DBID{}), newStubPersonaliztion(t))
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers
-func newMultichainProvider(c *server.Clients, submitF multichain.SubmitTokensF, providers []any) multichain.Provider {
-	chains := map[persist.Chain][]any{}
-	if len(providers) > 1 {
-		chains[persist.ChainETH] = providers[:1]
-		chains[persist.ChainOptimism] = providers[1:]
-	} else {
-		chains[persist.ChainETH] = providers
-	}
+func newMultichainProvider(c *server.Clients, submitF multichain.SubmitTokensF, p multichain.ProviderLookup) multichain.Provider {
 	return multichain.Provider{
 		Repos:        c.Repos,
 		Queries:      c.Queries,
-		Chains:       chains,
+		Chains:       p,
 		SubmitTokens: submitF,
 	}
 }

@@ -28,12 +28,7 @@ type stubProvider struct {
 	Contracts     []multichain.ChainAgnosticContract
 	Tokens        []multichain.ChainAgnosticToken
 	FetchMetadata func() (persist.TokenMetadata, error)
-	Info          multichain.BlockchainInfo
 	RetErr        error
-}
-
-func (p stubProvider) GetBlockchainInfo() multichain.BlockchainInfo {
-	return p.Info
 }
 
 func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -77,13 +72,6 @@ func newStubProvider(opts ...providerOpt) stubProvider {
 		opt(&provider)
 	}
 	return provider
-}
-
-// withBlockchainInfo configures the stubProvider's blockchain info
-func withBlockchainInfo(i multichain.BlockchainInfo) providerOpt {
-	return func(p *stubProvider) {
-		p.Info = i
-	}
 }
 
 // withContracts configures the stubProvider to return a canned set of contracts

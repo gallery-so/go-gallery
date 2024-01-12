@@ -23,7 +23,6 @@ var goldskyURL = "https://api.goldsky.com/api/public/project_clhk16b61ay9t49vm6n
 
 // Provider is an the struct for retrieving data from the zora blockchain
 type Provider struct {
-	zoraAPIKey string
 	httpClient *http.Client
 	ggql       *graphql.Client
 }
@@ -88,12 +87,6 @@ type zoraBalanceToken struct {
 	Token   zoraToken `json:"token"`
 }
 
-type getContractCreatorResponse struct {
-	ZoraCreateContracts []struct {
-		Creator string `json:"creator"`
-	} `json:"zoraCreateContracts"`
-}
-
 type getZoraCreateContractsResponse struct {
 	ZoraCreateContracts []struct {
 		Address string `json:"address"`
@@ -140,11 +133,10 @@ func NewProvider(httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
-
-	return multichain.BlockchainInfo{
+func (d *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
 		Chain:      persist.ChainZora,
-		ChainID:    7777777,
+		ChainID:    persist.MustChainToChainID(persist.ChainZora),
 		ProviderID: "zora",
 	}
 }
@@ -258,29 +250,6 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 		}
 	}()
 	return rec, errChan
-}
-
-func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	tokens, contracts, err := d.GetTokensByWalletAddress(ctx, ownerAddress)
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
-
-	// filter for contract and tokens
-	filteredTokens := []multichain.ChainAgnosticToken{}
-	for _, token := range tokens {
-		if strings.EqualFold(token.ContractAddress.String(), contractAddress.String()) {
-			filteredTokens = append(filteredTokens, token)
-		}
-	}
-	foundContract := multichain.ChainAgnosticContract{}
-	for _, contract := range contracts {
-		if strings.EqualFold(contract.Address.String(), contractAddress.String()) {
-			foundContract = contract
-		}
-	}
-
-	return filteredTokens, foundContract, nil
 }
 
 // GetContractByAddress retrieves an zora contract by address

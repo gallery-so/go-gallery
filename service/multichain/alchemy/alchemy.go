@@ -195,18 +195,10 @@ func NewProvider(chain persist.Chain, httpClient *http.Client, cache *redis.Cach
 	}
 }
 
-// GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
-	chainID := 0
-	switch d.chain {
-	case persist.ChainOptimism:
-		chainID = 10
-	case persist.ChainPolygon:
-		chainID = 137
-	}
-	return multichain.BlockchainInfo{
+func (d *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
 		Chain:      d.chain,
-		ChainID:    chainID,
+		ChainID:    persist.MustChainToChainID(d.chain),
 		ProviderID: "alchemy",
 	}
 }
@@ -569,27 +561,6 @@ func (d *Provider) alchemyContractTokensToChainAgnosticTokens(ctx context.Contex
 	return cTokens, cContracts, nil
 }
 
-func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/getNFTs?contractAddresses[]=%s&owner=%s&withMetadata=true&tokenUriTimeoutInMs=20000", d.alchemyAPIURL, contractAddress, ownerAddress)
-	tokens, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, offset, "", d.httpClient, nil, &getNFTsResponse{})
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
-
-	if len(tokens) == 0 {
-		return []multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, nil
-	}
-
-	cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(ownerAddress), tokens)
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
-	if len(cContracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for contract address %s", contractAddress)
-	}
-	return cTokens, cContracts[0], nil
-}
-
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, true, 0)
 	if err != nil {
@@ -777,21 +748,6 @@ func (d *Provider) cacheMetadatasForTokens(ctx context.Context, tokens ...multic
 		}
 	}
 	return nil
-}
-func (d *Provider) fetchMetadataFromCache(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	var metadata persist.TokenMetadata
-	bs, err := d.cache.Get(ctx, fmt.Sprintf("%s-%d", ti, d.chain))
-	if err != nil {
-		return nil, err
-	}
-	if len(bs) == 0 || bs == nil {
-		return nil, fmt.Errorf("no metadata cached for token %s", ti)
-	}
-	err = json.Unmarshal(bs, &metadata)
-	if err != nil {
-		return nil, err
-	}
-	return metadata, nil
 }
 
 func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract) {

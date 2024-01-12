@@ -19,7 +19,7 @@ func BestGatewayNodeFrom(u string) string {
 }
 
 func DefaultGatewayFrom(u string) string {
-	return fmt.Sprintf("%s/%s", FxhashGateway, uriFrom(u))
+	return pathURL(FxhashGateway, uriFrom(u))
 }
 
 func uriFrom(u string) string {

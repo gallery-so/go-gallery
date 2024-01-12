@@ -111,10 +111,6 @@ func (r *getNFTsForOwnerResponse) GetNextPageKey() string {
 
 const baseURL = "https://nft.api.infura.io/networks/1"
 
-const (
-	pageSize = 100
-)
-
 type Provider struct {
 	apiKey     string
 	apiSecret  string
@@ -129,11 +125,10 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-// GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
-	return multichain.BlockchainInfo{
+func (p *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
 		Chain:      persist.ChainETH,
-		ChainID:    0,
+		ChainID:    persist.MustChainToChainID(persist.ChainETH),
 		ProviderID: "infura",
 	}
 }
