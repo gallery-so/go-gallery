@@ -124,6 +124,7 @@ func tezosProviderSet(serverEnvInit envInit, client *http.Client) *multichain.Te
 func tezosProvidersConfig(tezosProvider *tezos.Provider, tzktProvider *tzkt.Provider) *multichain.TezosProvider {
 	multichainTezosProvider := &multichain.TezosProvider{
 		ContractsOwnerFetcher:            tzktProvider,
+		TokenDescriptorsFetcher:          tzktProvider,
 		TokenMetadataFetcher:             tzktProvider,
 		TokensContractFetcher:            tzktProvider,
 		TokensIncrementalContractFetcher: tzktProvider,
@@ -148,11 +149,11 @@ var (
 
 func optimismProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.OptimismProvider {
 	optimismProvider := &multichain.OptimismProvider{
-		TokensOwnerFetcher:            reservoirProvider,
-		TokensIncrementalOwnerFetcher: reservoirProvider,
-		TokensContractFetcher:         reservoirProvider,
-		TokenMetadataFetcher:          openseaProvider,
 		TokenDescriptorsFetcher:       openseaProvider,
+		TokenMetadataFetcher:          openseaProvider,
+		TokensContractFetcher:         reservoirProvider,
+		TokensIncrementalOwnerFetcher: reservoirProvider,
+		TokensOwnerFetcher:            reservoirProvider,
 	}
 	return optimismProvider
 }

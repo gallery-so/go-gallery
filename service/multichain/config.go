@@ -33,6 +33,7 @@ type EthereumProvider struct {
 
 type TezosProvider struct {
 	ContractsOwnerFetcher
+	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensContractFetcher
 	TokensIncrementalContractFetcher

@@ -160,6 +160,7 @@ func tezosProvidersConfig(tezosProvider *tezos.Provider, tzktProvider *tzkt.Prov
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(tzktProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(tzktProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(tzktProvider)),
 	)
 	return nil
 }
