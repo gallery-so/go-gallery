@@ -1084,7 +1084,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia)
-		assert.Equal(t, string(persist.MediaTypeGIF), *media.MediaType)
+		// GIFs get converted to Video media
+		assert.Equal(t, string(persist.MediaTypeVideo), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
 
