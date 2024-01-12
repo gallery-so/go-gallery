@@ -2421,6 +2421,9 @@ func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, op
 
 	preview := remapLargeImageUrls(url)
 
+	// Previews can use auto-formatting to pick an output format
+	options = append(options, mediamapper.WithFormatAuto())
+
 	// Add timestamp to options
 	options = append(options, mediamapper.WithTimestamp(tokenMedia.LastUpdated))
 
@@ -2472,19 +2475,28 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 	}
 }
 
-func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.GIFMedia {
+// getGIFMedia returns VideoMedia because we convert GIFs to videos
+func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.VideoMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
 	options := []mediamapper.Option{}
 	if highDef {
 		options = append(options, mediamapper.WithQuality(100))
 	}
-	return model.GIFMedia{
-		PreviewURLs:       previewURLsFromTokenMedia(ctx, tokenMedia, options...),
-		StaticPreviewURLs: previewURLsFromTokenMedia(ctx, tokenMedia, mediamapper.WithStaticImage()),
+
+	mm := mediamapper.For(ctx)
+	videoUrls := model.VideoURLSet{
+		Raw:    util.ToPointer(mm.GetLargeImageUrl(url, mediamapper.WithFormatVideo())),
+		Small:  util.ToPointer(mm.GetSmallImageUrl(url, mediamapper.WithFormatVideo())),
+		Medium: util.ToPointer(mm.GetMediumImageUrl(url, mediamapper.WithFormatVideo())),
+		Large:  util.ToPointer(mm.GetLargeImageUrl(url, mediamapper.WithFormatVideo())),
+	}
+
+	return model.VideoMedia{
+		PreviewURLs:       previewURLsFromTokenMedia(ctx, tokenMedia, mediamapper.WithStaticImage()),
 		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:         (*string)(&tokenMedia.Media.MediaType),
-		ContentRenderURL:  &url,
+		ContentRenderURLs: &videoUrls,
 		Dimensions:        mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:     fallbackMedia,
 	}
