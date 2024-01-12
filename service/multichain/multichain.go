@@ -295,7 +295,7 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 		return nil
 	}
 
-	result := make(chan chainTokensAndContracts)
+	result := make(chan chainTokensAndContracts, len(chains)*len(chainsToAddresses)*8)
 
 	walletWg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -360,7 +360,7 @@ func (p *Provider) SyncCreatedTokensForNewContractsIncrementally(ctx context.Con
 		return nil
 	}
 
-	result := make(chan chainTokensAndContracts)
+	result := make(chan chainTokensAndContracts, len(chains)*len(chainsToAddresses)*8)
 
 	walletWg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -650,7 +650,7 @@ func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.
 		logger.For(ctx).Warnf("error occured by a provider: %s; continuing since others succeeded", err)
 	}
 
-	dbContracts, _, err := p.processContracts(ctx, contractsFromProviders, nil, false)
+	_, persistedContracts, err := p.processContracts(ctx, contractsFromProviders, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -660,7 +660,7 @@ func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.
 		return nil, err
 	}
 
-	_, newTokens, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, dbContracts, currentTokens)
+	_, newTokens, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, currentTokens)
 	return newTokens, err
 }
 

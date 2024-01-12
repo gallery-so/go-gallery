@@ -42,11 +42,11 @@ type TezosProvider struct {
 }
 
 type OptimismProvider struct {
-	TokensOwnerFetcher
-	TokensIncrementalOwnerFetcher
-	TokensContractFetcher
-	TokenMetadataFetcher
 	TokenDescriptorsFetcher
+	TokenMetadataFetcher
+	TokensContractFetcher
+	TokensIncrementalOwnerFetcher
+	TokensOwnerFetcher
 }
 
 type ArbitrumProvider struct {

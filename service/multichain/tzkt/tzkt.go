@@ -17,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/objkt"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 )
@@ -466,8 +465,7 @@ func (p *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 		return multichain.ChainAgnosticContract{}, err
 	}
 
-	return p.tzContractToContract(ctx, tzktContract), nil
-
+	return tzContractToContract(tzktContract), nil
 }
 
 type tzktOrigination struct {
@@ -491,9 +489,8 @@ type tzktOrigination struct {
 	} `json:"originatedContract"`
 }
 
-// GetContractsByOwnerAddress retrieves ethereum contracts by their owner address
+// GetContractsByOwnerAddress retrieves tezos contracts by their owner address
 func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
-
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/operations/originations?sender=%s", p.apiURL, addr.String()), nil)
 	if err != nil {
 		return nil, err
@@ -639,8 +636,8 @@ func (p *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				BlockNumber:     persist.BlockNumber(tzToken.LastLevel),
 			}
 
-			// Try objkt if token isn't signed yet
-			if !platform.IsFxhashSignedTezos(persist.ChainTezos, token.ContractAddress, token.Descriptors.Name) {
+			// Try objkt if token isn't signed yet or has no metadata
+			if !platform.IsFxhashSignedTezos(persist.ChainTezos, token.ContractAddress, token.Descriptors.Name) || !containsTezosKeywords(token.TokenMetadata) {
 				tIDs := multichain.ChainAgnosticIdentifiers{ContractAddress: tzToken.Token.Contract.Address, TokenID: persist.MustTokenID(tzToken.Token.TokenID)}
 				objktToken, objktContract, err := p.objktProvider.GetTokenByTokenIdentifiersAndOwner(ctx, tIDs, tzToken.Account.Address)
 				if err == nil {
@@ -650,8 +647,7 @@ func (p *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 					contractChan <- objktContract
 					contractsLock.Unlock()
 				} else {
-					logger.For(ctx).Errorf("could not fetch %s from objkt: %s", tIDs, err)
-					sentryutil.ReportError(ctx, err)
+					logger.For(ctx).Warnf("could not fetch from objkt: %s", err)
 				}
 			}
 
@@ -711,7 +707,7 @@ func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {
 	return result
 }
 
-func (p *Provider) tzContractToContract(ctx context.Context, tzContract tzktContract) multichain.ChainAgnosticContract {
+func tzContractToContract(tzContract tzktContract) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(tzContract.Address),
 
@@ -721,4 +717,21 @@ func (p *Provider) tzContractToContract(ctx context.Context, tzContract tzktCont
 			OwnerAddress: persist.Address(tzContract.Creator.Address),
 		},
 	}
+}
+
+func containsTezosKeywords(m persist.TokenMetadata) bool {
+	imageKeywords, animationKeywords := persist.ChainTezos.BaseKeywords()
+	for field, val := range m {
+		for _, keyword := range imageKeywords {
+			if field == keyword && (val != nil && val != "") {
+				return true
+			}
+		}
+		for _, keyword := range animationKeywords {
+			if field == keyword && (val != nil && val != "") {
+				return true
+			}
+		}
+	}
+	return false
 }
