@@ -71,7 +71,7 @@ community_posts as (
     (
         select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url
             from community_data, posts
-                join tokens on posts.token_ids @> array[tokens.id] and not tokens.deleted
+                join tokens on tokens.id = any(posts.token_ids) and not tokens.deleted
                 join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
                     and token_community_memberships.community_id = $1
                     and not token_community_memberships.deleted

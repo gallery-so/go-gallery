@@ -161,7 +161,7 @@ union all
 (
 select posts.*
     from community_data, posts
-        join tokens on posts.token_ids @> array[tokens.id] and not tokens.deleted
+        join tokens on tokens.id = any(posts.token_ids) and not tokens.deleted
         join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
             and token_community_memberships.community_id = @community_id
             and not token_community_memberships.deleted
@@ -196,7 +196,7 @@ community_posts as (
     (
         select posts.*
             from community_data, posts
-                join tokens on posts.token_ids @> array[tokens.id] and not tokens.deleted
+                join tokens on tokens.id = any(posts.token_ids) and not tokens.deleted
                 join token_community_memberships on tokens.token_definition_id = token_community_memberships.token_definition_id
                     and token_community_memberships.community_id = @community_id
                     and not token_community_memberships.deleted
