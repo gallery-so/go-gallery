@@ -125,11 +125,10 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-// GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
-	return multichain.BlockchainInfo{
+func (p *Provider) ProviderInfo() multichain.ProviderInfo {
+	return multichain.ProviderInfo{
 		Chain:      persist.ChainETH,
-		ChainID:    0,
+		ChainID:    persist.MustChainToChainID(persist.ChainETH),
 		ProviderID: "infura",
 	}
 }

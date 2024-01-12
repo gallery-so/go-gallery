@@ -65,7 +65,7 @@ func coreInitServer() *gin.Engine {
 	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
 	psub := gcp.NewClient(context.Background())
 	t := task.NewClient(context.Background())
-	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, t, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil, nil)
+	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, t, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil, nil, nil)
 
 	return handlersInitServer(router, loaders, queries, sendgridClient, r, stg, p, psub, t, lock)
 }
