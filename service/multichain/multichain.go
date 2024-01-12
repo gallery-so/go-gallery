@@ -1314,7 +1314,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 
 	fetcher, ok := p.Chains[ti.Chain].(TokenDescriptorsFetcher)
 	if !ok {
-		return db.TokenDefinition{}, fmt.Errorf("no token fetchers for chain %d", ti.Chain)
+		return db.TokenDefinition{}, fmt.Errorf("no token descriptor fetchers for chain %d", ti.Chain)
 	}
 
 	tokenExists := false
