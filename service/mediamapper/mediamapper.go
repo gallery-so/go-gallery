@@ -98,7 +98,7 @@ func setGoogleWidthParams(sourceUrl string, width int) string {
 
 func getDefaultParams() []imgix.IxParam {
 	return []imgix.IxParam{
-		imgix.Param("auto", "format", "compress"),
+		imgix.Param("auto", "compress"),
 		imgix.Param("fit", "max"),
 	}
 }
@@ -157,6 +157,18 @@ func WithTimestamp(t time.Time) Option {
 func WithQuality(q int) Option {
 	return func(params *[]imgix.IxParam) {
 		*params = append(*params, imgix.Param("q", strconv.Itoa(q)))
+	}
+}
+
+func WithFormatVideo() Option {
+	return func(params *[]imgix.IxParam) {
+		*params = append(*params, imgix.Param("fm", "mp4"))
+	}
+}
+
+func WithFormatAuto() Option {
+	return func(params *[]imgix.IxParam) {
+		*params = append(*params, imgix.Param("auto", "format"))
 	}
 }
 
