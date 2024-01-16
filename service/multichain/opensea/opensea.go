@@ -145,6 +145,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	}()
 	go func() {
 		defer close(recCh)
+		defer close(errCh)
 		p.streamAssetsToTokens(ctx, address, assetsCh, recCh, errCh)
 	}()
 	return recCh, errCh
@@ -158,24 +159,6 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		streamAssetsForContract(ctx, p.httpClient, p.Chain, contractAddress, outCh)
 	}()
 	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh)
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
-	var contract multichain.ChainAgnosticContract
-	if len(contracts) > 0 {
-		contract = contracts[0]
-	}
-	return tokens, contract, nil
-}
-
-// GetTokensByContractAddressAndOwner returns a list of tokens for a contract address and owner
-func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	outCh := make(chan assetsReceived)
-	go func() {
-		defer close(outCh)
-		streamAssetsForContractAddressAndOwner(ctx, p.httpClient, p.Chain, ownerAddress, contractAddress, outCh)
-	}()
-	tokens, contracts, err := p.assetsToTokens(ctx, ownerAddress, outCh)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -584,18 +567,6 @@ func streamAssetsForContract(ctx context.Context, client *http.Client, chain per
 	paginateAssets(ctx, client, mustAuthRequest(ctx, endpoint), outCh)
 }
 
-func streamAssetsForContractAddressAndOwner(ctx context.Context, client *http.Client, chain persist.Chain, ownerAddress, contractAddress persist.Address, outCh chan assetsReceived) {
-	contract, err := fetchContractByAddress(ctx, client, chain, contractAddress)
-	if err != nil {
-		outCh <- assetsReceived{Err: err}
-		return
-	}
-	endpoint := mustNftsByWalletEndpoint(chain, ownerAddress)
-	setCollection(endpoint, contract.Collection)
-	setPagingParams(endpoint)
-	paginateAssets(ctx, client, mustAuthRequest(ctx, endpoint), outCh)
-}
-
 func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, client *http.Client, chain persist.Chain, ownerAddress, contractAddress persist.Address, tokenID persist.TokenID, outCh chan assetsReceived) {
 	endpoint := mustNftsByWalletEndpoint(chain, ownerAddress)
 	setPagingParams(endpoint)
@@ -758,12 +729,6 @@ func setNext(url *url.URL, next string) {
 func setPagingParams(url *url.URL) {
 	query := url.Query()
 	query.Set("limit", "200")
-	url.RawQuery = query.Encode()
-}
-
-func setCollection(url *url.URL, slug string) {
-	query := url.Query()
-	query.Set("collection", slug)
 	url.RawQuery = query.Encode()
 }
 

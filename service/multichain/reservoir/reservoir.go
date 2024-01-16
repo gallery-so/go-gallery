@@ -205,7 +205,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	return tokens, contracts[0], nil
 }
 
-// GetTokensIncrementallyByWalletAddress returns a list of tokens for a contract address
+// GetTokensIncrementallyByContractAddress returns tokens for a contract address
 func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
@@ -216,6 +216,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	}()
 	go func() {
 		defer close(recCh)
+		defer close(errCh)
 		streamAssetsToTokens(address, outCh, recCh, errCh)
 	}()
 	return recCh, errCh
@@ -291,25 +292,6 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return tokens[0].TokenMetadata, nil
 }
 
-func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	outCh := make(chan pageResult)
-	go func() {
-		defer close(outCh)
-		p.streamAssetsForContractAndOwner(ctx, ownerAddress, contractAddress, outCh)
-	}()
-
-	tokens, contracts, err := assetsToTokens("", outCh)
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
-
-	if len(contracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
-	}
-
-	return tokens, contracts[0], nil
-}
-
 func (p Provider) GetContractByAddress(ctx context.Context, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
 	c, err := p.fetchCollectionByAddress(ctx, contractAddress)
 	if err != nil {
@@ -381,13 +363,6 @@ func (p *Provider) streamAssetsForContract(ctx context.Context, contractAddress 
 	endpoint := mustTokensEndpoint(p.apiURL)
 	setCollection(endpoint, contractAddress)
 	setPagingParams(endpoint, "tokenId")
-	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
-}
-
-func (p *Provider) streamAssetsForContractAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, outCh chan<- pageResult) {
-	endpoint := mustUserTokensEndpoint(p.apiURL, ownerAddress)
-	setContract(endpoint, contractAddress)
-	setPagingParams(endpoint, "acquiredAt")
 	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
 }
 
@@ -482,14 +457,18 @@ func streamAssetsToTokens(ownerAddress persist.Address, outCh <-chan pageResult,
 	for page := range outCh {
 		if page.Err != nil {
 			errCh <- page.Err
+			continue
 		}
+
 		resultTokens := make([]multichain.ChainAgnosticToken, 0, len(page.Tokens))
 		resultContracts := make([]multichain.ChainAgnosticContract, 0, len(page.Tokens))
+
 		for _, t := range page.Tokens {
 			resultTokens = append(resultTokens, assetToAgnosticToken(t, ownerAddress))
 			resultContracts = append(resultContracts, collectionToAgnosticContract(t.Token.Collection, t.Token.Contract))
 
 		}
+
 		recCh <- multichain.ChainAgnosticTokensAndContracts{
 			Tokens:    resultTokens,
 			Contracts: resultContracts,
@@ -591,12 +570,6 @@ func setCollectionID(url *url.URL, contractAddress persist.Address) {
 func setCollection(url *url.URL, contractAddress persist.Address) {
 	query := url.Query()
 	query.Set("collection", contractAddress.String())
-	url.RawQuery = query.Encode()
-}
-
-func setContract(url *url.URL, contractAddress persist.Address) {
-	query := url.Query()
-	query.Set("contract", contractAddress.String())
 	url.RawQuery = query.Encode()
 }
 

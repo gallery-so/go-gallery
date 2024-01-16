@@ -333,13 +333,8 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		return "", err
 	}
 
-	user, err := api.repos.UserRepository.GetByID(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-
 	r, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
-		OwnerID:         user.ID,
+		OwnerID:         userID,
 		TokenID:         t.TokenID,
 		ContractAddress: t.ContractAddress,
 		Chain:           t.Chain,
@@ -359,7 +354,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		return "", err
 	} else {
 		// The token is not synced, so we need to find it
-		synced, err := api.multichainProvider.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, t, retry.Retry{
+		synced, err := api.multichainProvider.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, userID, t, retry.Retry{
 			Base:  2,
 			Cap:   4,
 			Tries: 4,
@@ -377,7 +372,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		ID:          persist.GenerateID(),
 		TokenIds:    []persist.DBID{tokenID},
 		ContractIds: []persist.DBID{contractID},
-		ActorID:     user.ID,
+		ActorID:     userID,
 		Caption:     util.ToSQLNullString(caption),
 		UserMintUrl: util.ToSQLNullString(mintURL),
 	})
@@ -403,10 +398,10 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	}
 
 	err = event.Dispatch(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(user.ID),
+		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionUserPosted,
 		ResourceTypeID: persist.ResourceTypePost,
-		UserID:         user.ID,
+		UserID:         userID,
 		SubjectID:      postID,
 		PostID:         postID,
 	})
@@ -414,17 +409,17 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 		logger.For(ctx).Errorf("error dispatching event: %v", err)
 	}
-	count, err := api.queries.CountPostsByUserID(ctx, user.ID)
+	count, err := api.queries.CountPostsByUserID(ctx, userID)
 	if err != nil {
 		return "", err
 	}
 
 	if count == 1 {
 		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(user.ID),
+			ActorID:        persist.DBIDToNullStr(userID),
 			Action:         persist.ActionUserPostedFirstPost,
 			ResourceTypeID: persist.ResourceTypePost,
-			UserID:         user.ID,
+			UserID:         userID,
 			SubjectID:      postID,
 			PostID:         postID,
 		})

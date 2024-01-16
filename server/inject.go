@@ -39,7 +39,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	wire.Build(
 		setEnv,
 		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
-		newCommunitiesCache,
+		newCommunitiesCache,                  // Doesn't matter which cache is used
 		postgres.NewRepositories,
 		dbConnSet,
 		wire.Struct(new(multichain.ChainProvider), "*"),
@@ -131,7 +131,6 @@ func ethProvidersConfig(
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensContractAddressAndOwnerFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(indexerProvider)),

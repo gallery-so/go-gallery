@@ -1783,7 +1783,7 @@ func uriFromEnsTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.E
 	}
 
 	// Fetch the metadata and return the appropriate profile image source
-	metadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddr, tokenID, chain, imageMetadataRequest(chain))
+	metadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddr, tokenID, chain)
 	if err != nil {
 		return "", err
 	}
@@ -1799,11 +1799,6 @@ func uriFromEnsTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.E
 	}
 
 	return standardizeURI(string(imageURL)), nil
-}
-
-func imageMetadataRequest(chain persist.Chain) []multichain.FieldRequest[string] {
-	imageKeywords, _ := chain.BaseKeywords()
-	return []multichain.FieldRequest[string]{{FieldNames: imageKeywords, Level: multichain.FieldRequirementLevelOneRequired}}
 }
 
 func standardizeURI(u string) string {
