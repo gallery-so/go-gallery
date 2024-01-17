@@ -763,6 +763,7 @@ func (p *Provider) receiveProviderData(ctx context.Context, user persist.User, r
 				return
 			}
 		case <-ctx.Done():
+			err = ctx.Err()
 			return
 		case err, ok := <-errCh:
 			if ok {

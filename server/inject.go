@@ -39,7 +39,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	wire.Build(
 		setEnv,
 		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
-		newCommunitiesCache,                  // Doesn't matter which cache is used
+		newCommunitiesCache,
 		postgres.NewRepositories,
 		dbConnSet,
 		wire.Struct(new(multichain.ChainProvider), "*"),
