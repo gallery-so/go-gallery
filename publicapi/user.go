@@ -487,7 +487,7 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 
 	return api.queries.AddSocialToUser(ctx, db.AddSocialToUserParams{
 		UserID: userID,
-		Socials: persist.Socials{
+		PiiSocials: persist.Socials{
 			res.Provider: persist.SocialUserIdentifiers{
 				Provider: res.Provider,
 				ID:       res.ID,
@@ -1154,6 +1154,16 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 		return nil, err
 	}
 
+	user, err := api.loaders.GetUserByIdBatch.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Omit socials if user didn't opt in
+	if user.HideSocials {
+		return nil, nil
+	}
+
 	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -1291,8 +1301,8 @@ func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType per
 	socials[socialType] = social
 
 	return api.queries.UpdateUserSocials(ctx, db.UpdateUserSocialsParams{
-		Socials: socials,
-		UserID:  userID,
+		PiiSocials: socials,
+		UserID:     userID,
 	})
 }
 

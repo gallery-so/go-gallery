@@ -1829,7 +1829,7 @@ func (b *GetEventByIdBatchBatchResults) Close() error {
 }
 
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.hide_socials FROM follows f
     INNER JOIN users u ON f.follower = u.id
     WHERE f.followee = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -1890,6 +1890,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.HideSocials,
 				); err != nil {
 					return err
 				}
@@ -1909,7 +1910,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Close() error {
 }
 
 const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.hide_socials FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -1970,6 +1971,7 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.HideSocials,
 				); err != nil {
 					return err
 				}
@@ -2649,8 +2651,8 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 }
 
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from (
-    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, tokens t, contracts c
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.hide_socials from (
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.hide_socials from users u, tokens t, contracts c
         where t.owner_user_id = u.id
         and t.displayable
         and t.contract_id = c.id and (c.id = $1 or c.parent_id = $1)
@@ -2746,6 +2748,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.HideSocials,
 				); err != nil {
 					return err
 				}
@@ -3130,7 +3133,7 @@ func (b *GetSharedCommunitiesBatchPaginateBatchResults) Close() error {
 }
 
 const getSharedFollowersBatchPaginate = `-- name: GetSharedFollowersBatchPaginate :batchmany
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, a.created_at followed_on
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.hide_socials, a.created_at followed_on
 from users, follows a, follows b
 where a.follower = $1
 	and a.followee = b.follower
@@ -3224,6 +3227,7 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Query(f func(int, []GetSha
 					&i.User.PrimaryWalletID,
 					&i.User.UserExperiences,
 					&i.User.ProfileImageID,
+					&i.User.HideSocials,
 					&i.FollowedOn,
 				); err != nil {
 					return err
@@ -4079,7 +4083,7 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 }
 
 const getUserByAddressAndL1Batch = `-- name: GetUserByAddressAndL1Batch :batchone
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.hide_socials
 from users, wallets
 where wallets.address = $1
 	and wallets.l1_chain = $2
@@ -4142,6 +4146,7 @@ func (b *GetUserByAddressAndL1BatchBatchResults) QueryRow(f func(int, User, erro
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.HideSocials,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4155,7 +4160,7 @@ func (b *GetUserByAddressAndL1BatchBatchResults) Close() error {
 }
 
 const getUserByIdBatch = `-- name: GetUserByIdBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, hide_socials FROM users WHERE id = $1 AND deleted = false
 `
 
 type GetUserByIdBatchBatchResults struct {
@@ -4206,6 +4211,7 @@ func (b *GetUserByIdBatchBatchResults) QueryRow(f func(int, User, error)) {
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.HideSocials,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4219,7 +4225,7 @@ func (b *GetUserByIdBatchBatchResults) Close() error {
 }
 
 const getUserByUsernameBatch = `-- name: GetUserByUsernameBatch :batchone
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id from users where username_idempotent = lower($1) and deleted = false and universal = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, hide_socials from users where username_idempotent = lower($1) and deleted = false and universal = false
 `
 
 type GetUserByUsernameBatchBatchResults struct {
@@ -4270,6 +4276,7 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.HideSocials,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4381,7 +4388,7 @@ func (b *GetUserNotificationsBatchBatchResults) Close() error {
 }
 
 const getUsersByPositionPaginateBatch = `-- name: GetUsersByPositionPaginateBatch :batchmany
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.hide_socials
 from users u
 join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
 where not u.deleted and not u.universal and t.pos > $2::int and t.pos < $3::int
@@ -4451,6 +4458,7 @@ func (b *GetUsersByPositionPaginateBatchBatchResults) Query(f func(int, []User, 
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.HideSocials,
 				); err != nil {
 					return err
 				}
@@ -4470,7 +4478,7 @@ func (b *GetUsersByPositionPaginateBatchBatchResults) Close() error {
 }
 
 const getUsersByPositionPersonalizedBatch = `-- name: GetUsersByPositionPersonalizedBatch :batchmany
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.hide_socials
 from users u
 join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
 left join follows on follows.follower = $2 and follows.followee = u.id
@@ -4540,6 +4548,7 @@ func (b *GetUsersByPositionPersonalizedBatchBatchResults) Query(f func(int, []Us
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.HideSocials,
 				); err != nil {
 					return err
 				}
@@ -4559,7 +4568,7 @@ func (b *GetUsersByPositionPersonalizedBatchBatchResults) Close() error {
 }
 
 const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, hide_socials FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 type GetUsersWithTraitBatchBatchResults struct {
@@ -4617,6 +4626,7 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.HideSocials,
 				); err != nil {
 					return err
 				}
@@ -5410,8 +5420,8 @@ community_tokens as (
         and not tokens.deleted
 )
 
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from (
-    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, community_tokens t
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.hide_socials from (
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.hide_socials from users u, community_tokens t
         where t.owner_user_id = u.id
         and t.displayable
         and u.universal = false
@@ -5500,6 +5510,7 @@ func (b *PaginateHoldersByCommunityIDBatchResults) Query(f func(int, []User, err
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.HideSocials,
 				); err != nil {
 					return err
 				}

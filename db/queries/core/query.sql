@@ -1260,7 +1260,7 @@ select * from pii.socials_auth where user_id = $1 and provider = $2 and deleted 
 insert into pii.socials_auth (id, user_id, provider, access_token, refresh_token) values (@id, @user_id, @provider, @access_token, @refresh_token) on conflict (user_id, provider) where deleted = false do update set access_token = @access_token, refresh_token = @refresh_token, last_updated = now();
 
 -- name: AddSocialToUser :exec
-insert into pii.for_users (user_id, pii_socials) values (@user_id, @socials) on conflict (user_id) where deleted = false do update set pii_socials = for_users.pii_socials || @socials;
+insert into pii.for_users (user_id, pii_socials) values (@user_id, @pii_socials) on conflict (user_id) where deleted = false do update set pii_socials = for_users.pii_socials || @pii_socials;
 
 -- name: RemoveSocialFromUser :exec
 update pii.for_users set pii_socials = pii_socials - @social::varchar where user_id = @user_id;
@@ -1269,7 +1269,7 @@ update pii.for_users set pii_socials = pii_socials - @social::varchar where user
 select pii_socials from pii.user_view where id = $1;
 
 -- name: UpdateUserSocials :exec
-update pii.for_users set pii_socials = @socials where user_id = @user_id;
+update pii.for_users set pii_socials = @pii_socials where user_id = @user_id;
 
 -- name: UpdateEventCaptionByGroup :exec
 update events set caption = @caption where group_id = @group_id and deleted = false;
