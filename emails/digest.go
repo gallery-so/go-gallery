@@ -99,27 +99,26 @@ const (
 	defaultIncludeTopGaleries    = false
 	defaultIncludeTopCommunities = true
 	defaultIncludeTopFirstPosts  = false
+	overrideFile                 = "email_digest_overrides.json"
 )
-
-const overrideFile = "email_digest_overrides.json"
 
 func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storage.Client, f *publicapi.FeedAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		// mimic backend auth because the getDigest function uses the feed api which requires these values set on the context despite not using them
 		c.Set("auth.user_id", persist.DBID(""))
 		c.Set("auth.auth_error", nil)
 
-		result, err := getDigest(c, stg, f, q, loaders, false)
+		result, err := getDigest(c, stg, f, q, loaders)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+
 		c.JSON(http.StatusOK, result)
 	}
 }
 
-func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders, onlyPositioned bool) (DigestValues, error) {
+func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders) (DigestValues, error) {
 	// TODO top galleries and top first posts
 	overrides, err := getOverrides(c, stg)
 	if err != nil {
@@ -171,7 +170,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Entity:   up,
 			Position: &s.Position,
 		}
-	}, postCount, onlyPositioned)
+	}, postCount)
 
 	topCollectionsDB, err := q.GetTopCommunitiesByPosts(c, 10)
 	if err != nil {
@@ -191,7 +190,7 @@ func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *
 			Entity:   contractToUserFacing(c, q, loaders, co, true),
 			Position: &s.Position,
 		}
-	}, communityCount, onlyPositioned)
+	}, communityCount)
 
 	includePosts := defaultIncludeTopPosts
 	includeCommunities := defaultIncludeTopCommunities
@@ -308,7 +307,9 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 	if err != nil {
 		return UserFacingPost{}, fmt.Errorf("error getting user by id: %s", err)
 	}
+
 	var tokens []UserFacingToken
+
 	for _, t := range post.TokenIds {
 		ut, err := tokenToUserFacing(c, t, q, loaders, override)
 		if err != nil {
@@ -317,7 +318,9 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 
 		tokens = append(tokens, ut)
 	}
+
 	var previewURL string
+
 	if len(tokens) > 0 {
 		previewURL = tokens[0].PreviewImageURL
 	}
@@ -337,7 +340,7 @@ func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, lo
 // selectedCount determines how many entities will actually be positioned and how many will have their position as nil.
 // overrideFetcher is a function that takes a SelectedID and returns a Selected entity
 // this is so that we can fetch the entity from the database if it is not already in the initial list.
-func selectWithOverrides(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
+func selectWithOverrides(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int) []Selected {
 	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
 	for _, post := range overrides {
 		if len(selectedResults) <= post.Position {
@@ -376,11 +379,6 @@ outer:
 		}
 	}
 
-	if onlyPositioned {
-		selectedResults = util.Filter(selectedResults, func(s Selected) bool {
-			return s.Position != nil
-		}, false)
-	}
 	return selectedResults
 }
 
