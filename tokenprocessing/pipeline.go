@@ -297,19 +297,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	i, a := tpj.contract.Chain.BaseKeywords()
-	fieldRequests := []multichain.FieldRequest[string]{
-		{
-			FieldNames: append(i, a...),
-			Level:      multichain.FieldRequirementLevelOneRequired,
-		},
-		{
-			FieldNames: []string{"name", "description"},
-			Level:      multichain.FieldRequirementLevelAllOptional,
-		},
-	}
-
-	newMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain, fieldRequests)
+	newMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain)
 	if err == nil && len(newMetadata) > 0 {
 		return newMetadata
 	}

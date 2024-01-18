@@ -95,7 +95,7 @@ func testTokenSyncs(t *testing.T) {
 		{title: "should sync new tokens multichain", run: testSyncNewTokensMultichain},
 		{title: "should submit new tokens to tokenprocessing", run: testSyncOnlySubmitsNewTokens},
 		{title: "should not submit old tokens to tokenprocessing", run: testSyncSkipsSubmittingOldTokens},
-		{title: "should not delete old tokens", run: testSyncNotDeletesOldTokens},
+		{title: "should replace old tokens", run: testSyncReplacesOldTokens},
 		{title: "should merge duplicates within provider", run: testSyncShouldMergeDuplicatesInProvider},
 		{title: "should process media", run: testSyncShouldProcessMedia},
 	}
@@ -981,7 +981,7 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 	tokenRecorder.AssertNotCalled(t, "Send")
 }
 
-func testSyncNotDeletesOldTokens(t *testing.T) {
+func testSyncReplacesOldTokens(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, 4))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
@@ -991,7 +991,7 @@ func testSyncNotDeletesOldTokens(t *testing.T) {
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	require.NoError(t, err)
-	assertSyncedTokens(t, response, err, 4+len(userF.TokenIDs))
+	assertSyncedTokens(t, response, err, 4)
 }
 
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {

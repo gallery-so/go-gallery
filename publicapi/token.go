@@ -261,21 +261,9 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, 
 }
 
 func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain, userID persist.DBID) error {
-	chains, closing, err := syncableChains(ctx, userID, chains, api.throttler)
-	if err != nil {
-		return err
-	}
-	defer closing()
-
-	if len(chains) == 0 {
-		return nil
-	}
-
 	if err := api.multichainProvider.SyncTokensByUserID(ctx, userID, chains); err != nil {
-		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-
 	return nil
 }
 
@@ -285,30 +273,12 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain, incr
 		return err
 	}
 
-	chains, closing, err := syncableChains(ctx, userID, chains, api.throttler)
+	err = api.multichainProvider.SyncTokensByUserID(ctx, userID, chains)
 	if err != nil {
-		return err
-	}
-	defer closing()
-
-	if len(chains) == 0 {
-		return nil
+		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 
-	if incrementally {
-		err := api.multichainProvider.SyncTokensIncrementallyByUserID(ctx, userID, chains)
-		if err != nil {
-			return ErrTokenRefreshFailed{Message: err.Error()}
-		}
-	} else {
-		err = api.multichainProvider.SyncTokensByUserID(ctx, userID, chains)
-		if err != nil {
-			// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
-			return ErrTokenRefreshFailed{Message: err.Error()}
-		}
-	}
-
-	return nil
+	return err
 }
 
 func (api TokenAPI) SyncCreatedTokensAdmin(ctx context.Context, includeChains []persist.Chain, userID persist.DBID) error {
@@ -319,7 +289,7 @@ func (api TokenAPI) SyncCreatedTokensAdmin(ctx context.Context, includeChains []
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	return api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
+	return api.multichainProvider.SyncTokensByUserID(ctx, userID, includeChains)
 }
 
 func (api TokenAPI) SyncCreatedTokensForNewContracts(ctx context.Context, includeChains []persist.Chain, incrementally bool) error {
@@ -335,19 +305,12 @@ func (api TokenAPI) SyncCreatedTokensForNewContracts(ctx context.Context, includ
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	if incrementally {
-		err := api.multichainProvider.SyncCreatedTokensForNewContractsIncrementally(ctx, userID, includeChains)
-		if err != nil {
-			return ErrTokenRefreshFailed{Message: err.Error()}
-		}
-	} else {
-		err := api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
-		if err != nil {
-			return ErrTokenRefreshFailed{Message: err.Error()}
-		}
+	err = api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
+	if err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-	return nil
 
+	return err
 }
 
 func (api TokenAPI) SyncCreatedTokensForExistingContract(ctx context.Context, contractID persist.DBID) error {
@@ -625,31 +588,4 @@ func (api TokenAPI) GetCommunitiesByTokenDefinitionID(ctx context.Context, token
 		return nil, err
 	}
 	return api.loaders.GetCommunitiesByTokenDefinitionID.Load(tokenDefinitionID)
-}
-
-// syncableChains returns a list of chains that the user is allowed to sync, and a callback to release the locks for those chains.
-func syncableChains(ctx context.Context, userID persist.DBID, chains []persist.Chain, throttler *throttle.Locker) ([]persist.Chain, func(), error) {
-	chainsToSync := make([]persist.Chain, 0, len(chains))
-	acquiredLocks := make([]string, 0, len(chains))
-
-	for _, chain := range chains {
-		k := fmt.Sprintf("sync:owned:%d:%s", chain, userID)
-		err := throttler.Lock(ctx, k)
-		if err != nil && util.ErrorIs[throttle.ErrThrottleLocked](err) {
-			continue
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		chainsToSync = append(chainsToSync, chain)
-		acquiredLocks = append(acquiredLocks, k)
-	}
-
-	callback := func() {
-		for _, lock := range acquiredLocks {
-			throttler.Unlock(ctx, lock)
-		}
-	}
-
-	return chainsToSync, callback, nil
 }
