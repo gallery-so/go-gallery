@@ -5,27 +5,28 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/Khan/genqlient/graphql"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/store"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sendgrid/sendgrid-go"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 // InitServer initializes the mediaprocessing server
@@ -49,14 +50,10 @@ func coreInitServer() *gin.Engine {
 	sendgridClient := sendgrid.NewSendClient(env.GetString("SENDGRID_API_KEY"))
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
-	stg := rpc.NewStorageClient(context.Background())
 
 	router := gin.Default()
 
-	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger(), func(c *gin.Context) {
-		mediamapper.AddTo(c)
-		c.Next()
-	})
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
 	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -69,9 +66,10 @@ func coreInitServer() *gin.Engine {
 	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
 	psub := gcp.NewClient(context.Background())
 	t := task.NewClient(context.Background())
-	p := publicapi.New(context.Background(), false, postgres.NewRepositories(postgres.MustCreateClient(), pgxClient), queries, http.DefaultClient, nil, nil, nil, stg, nil, t, nil, nil, nil, redis.NewCache(redis.FeedCache), nil, nil, nil, nil, nil)
+	b := store.NewBucketStorer(rpc.NewStorageClient(context.Background()), env.GetString("CONFIGURATION_BUCKET"))
+	gql := graphql.NewClient(env.GetString("GALLERY_API"), http.DefaultClient)
 
-	return handlersInitServer(router, loaders, queries, sendgridClient, r, stg, p, psub, t, lock)
+	return handlersInitServer(router, loaders, queries, sendgridClient, r, &b, psub, t, lock, &gql)
 }
 
 func setDefaults() {
@@ -106,7 +104,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_PUSH_NOTIFICATIONS_QUEUE", "projects/gallery-local/locations/here/queues/push-notifications")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
 	viper.SetDefault("PUSH_NOTIFICATIONS_URL", "http://localhost:8000")
-	viper.SetDefault("IMGIX_SECRET", "")
+	viper.SetDefault("GALLERY_API", "http://localhost:4000")
 
 	viper.AutomaticEnv()
 

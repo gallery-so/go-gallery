@@ -3440,44 +3440,6 @@ func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg G
 	return items, nil
 }
 
-const getProfileImageById = `-- name: GetProfileImageById :one
-select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain from profile_images pfp
-where pfp.id = $1
-	and not deleted
-	and case
-		when pfp.source_type = $2
-		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
-		when pfp.source_type = $3
-		then exists(select 1 from tokens t where t.id = pfp.token_id and not t.deleted)
-		else
-		0 = 1
-	end
-`
-
-type GetProfileImageByIdParams struct {
-	ID              persist.DBID               `db:"id" json:"id"`
-	EnsSourceType   persist.ProfileImageSource `db:"ens_source_type" json:"ens_source_type"`
-	TokenSourceType persist.ProfileImageSource `db:"token_source_type" json:"token_source_type"`
-}
-
-func (q *Queries) GetProfileImageById(ctx context.Context, arg GetProfileImageByIdParams) (ProfileImage, error) {
-	row := q.db.QueryRow(ctx, getProfileImageById, arg.ID, arg.EnsSourceType, arg.TokenSourceType)
-	var i ProfileImage
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.TokenID,
-		&i.SourceType,
-		&i.Deleted,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.WalletID,
-		&i.EnsAvatarUri,
-		&i.EnsDomain,
-	)
-	return i, err
-}
-
 const getPushTokenByPushToken = `-- name: GetPushTokenByPushToken :one
 select id, user_id, push_token, created_at, deleted from push_notification_tokens where push_token = $1 and deleted = false
 `
@@ -4631,56 +4593,78 @@ func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopC
 }
 
 const getTopCommunitiesByPosts = `-- name: GetTopCommunitiesByPosts :many
-SELECT contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain, COUNT(*) as frequency
-FROM posts
-JOIN LATERAL UNNEST(posts.contract_ids) as contract_id ON true
-JOIN contracts ON contracts.id = contract_id
-WHERE posts.created_at >= NOW() - INTERVAL '7 days'
-GROUP BY contracts.id
-ORDER BY frequency DESC
-LIMIT $1
+with post_report as (
+    select posts.id post_id, unnest(token_ids) token_id
+    from posts
+    where posts.created_at >= $1 and not posts.deleted
+)
+select coalesce(token_community.id, contract_community.id) id
+from post_report
+    join tokens on post_report.token_id = tokens.id
+    join token_definitions on tokens.token_definition_id = token_definitions.id
+    left join token_community_memberships on token_definitions.id = token_community_memberships.token_definition_id
+    left join communities token_community on token_community_memberships.community_id = token_community.id
+    left join communities contract_community on token_definitions.contract_id = contract_community.contract_id
+    left join admires on post_report.post_id = admires.post_id
+    left join comments on comments.post_id = post_report.post_id
+where not admires.deleted and not comments.deleted and not tokens.deleted
+group by coalesce(token_community.id, contract_community.id)
+order by count(distinct admires.id) + count(distinct comments.id) desc
 `
 
-type GetTopCommunitiesByPostsRow struct {
-	Contract  Contract `db:"contract" json:"contract"`
-	Frequency int64    `db:"frequency" json:"frequency"`
-}
-
-// posts has an array, contract_ids that maps to the contracts table. Find the top 10 contracts by post count in the last 7 days
-func (q *Queries) GetTopCommunitiesByPosts(ctx context.Context, limit int32) ([]GetTopCommunitiesByPostsRow, error) {
-	rows, err := q.db.Query(ctx, getTopCommunitiesByPosts, limit)
+func (q *Queries) GetTopCommunitiesByPosts(ctx context.Context, windowEnd time.Time) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTopCommunitiesByPosts, windowEnd)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetTopCommunitiesByPostsRow
+	var items []persist.DBID
 	for rows.Next() {
-		var i GetTopCommunitiesByPostsRow
-		if err := rows.Scan(
-			&i.Contract.ID,
-			&i.Contract.Deleted,
-			&i.Contract.Version,
-			&i.Contract.CreatedAt,
-			&i.Contract.LastUpdated,
-			&i.Contract.Name,
-			&i.Contract.Symbol,
-			&i.Contract.Address,
-			&i.Contract.CreatorAddress,
-			&i.Contract.Chain,
-			&i.Contract.ProfileBannerUrl,
-			&i.Contract.ProfileImageUrl,
-			&i.Contract.BadgeUrl,
-			&i.Contract.Description,
-			&i.Contract.OwnerAddress,
-			&i.Contract.IsProviderMarkedSpam,
-			&i.Contract.ParentID,
-			&i.Contract.OverrideCreatorUserID,
-			&i.Contract.L1Chain,
-			&i.Frequency,
-		); err != nil {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTopGalleriesByViews = `-- name: GetTopGalleriesByViews :many
+with viewed_galleries as (
+  select gallery_id id, count(id) views
+  from events
+  where action = 'ViewedGallery' and events.created_at > $1
+  group by gallery_id
+),
+updated_galleries as (
+    select galleries.id
+    from events
+    join galleries on events.collection_id = any(galleries.collections)
+    where events.created_at > $1 and action = 'TokensAddedToCollection' and not galleries.deleted
+    group by galleries.id
+)
+select viewed_galleries.id
+from viewed_galleries
+join updated_galleries using(id)
+order by viewed_galleries.views desc
+`
+
+func (q *Queries) GetTopGalleriesByViews(ctx context.Context, windowEnd time.Time) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTopGalleriesByViews, windowEnd)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

@@ -5,28 +5,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/emails"
-	"github.com/mikeydub/go-gallery/service/notifications"
-	"github.com/mikeydub/go-gallery/service/redis"
-
-	"cloud.google.com/go/storage"
+	"github.com/Khan/genqlient/graphql"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/rest"
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/store"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 func init() {
@@ -304,17 +305,13 @@ outer:
 }
 
 type digestEmailDynamicTemplateData struct {
-	DigestValues     DigestValues `json:"digestValues"`
+	DigestValues     DigestValues `json:"digest_values"`
 	Username         string       `json:"username"`
-	UnsubscribeToken string       `json:"unsubscribeToken"`
+	UnsubscribeToken string       `json:"unsubscribe_token"`
 }
 
-func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *sendgrid.Client, r *redis.Cache, stg *storage.Client, fapi *publicapi.FeedAPI) gin.HandlerFunc {
+func sendDigestEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache, b *store.BucketStorer, gql *graphql.Client) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		// mimic backend auth
-		ctx.Set("auth.user_id", persist.DBID(""))
-		ctx.Set("auth.auth_error", nil)
-
 		if env.GetString("ENV") == "production" {
 			l, _ := r.Get(ctx, "send-digest-emails")
 			if len(l) > 0 {
@@ -323,16 +320,99 @@ func sendDigestEmails(queries *coredb.Queries, loaders *dataloader.Loaders, s *s
 			}
 			r.Set(ctx, "send-digest-emails", []byte("sending"), 1*time.Hour)
 		}
-		vals, err := getDigest(ctx, stg, fapi, queries, loaders, true)
+
+		vals, err := buildDigestTemplate(ctx, b, queries, gql)
 		if err != nil {
 			logger.For(ctx).Errorf("error getting digest values: %s", err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
+
 		err = sendDigestEmailsToAllUsers(ctx, vals, queries, s)
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
+
+		// wipe the overrides so that the overrides can only be used once
+		byt, _ := json.Marshal(DigestValueOverrides{})
+
+		_, err = b.Write(ctx, overrideFile, byt)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusInternalServerError, fmt.Errorf("failed to clear overrides: %s", err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+// sendDigestTestEmail sends a digest email to an admin user's email address.
+func sendDigestTestEmail(q *coredb.Queries, s *sendgrid.Client, b *store.BucketStorer, gql *graphql.Client) gin.HandlerFunc {
+	// Ideally this is handled via OAuth in Retool
+	return func(ctx *gin.Context) {
+		var input struct {
+			Email string `json:"email" binding:"required"`
+		}
+
+		if err := ctx.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(ctx, http.StatusBadRequest, err)
+			return
+		}
+
+		if !strings.HasSuffix(input.Email, "gallery.so") {
+			util.ErrResponse(ctx, http.StatusBadRequest, fmt.Errorf("must be a gallery.so email"))
+			return
+		}
+
+		user, err := q.GetUserByVerifiedEmailAddress(ctx, input.Email)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusNotFound, err)
+			return
+		}
+
+		roles, err := auth.RolesByUserID(ctx, q, user.ID)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
+			return
+		}
+
+		_, isAdmin := util.FindFirst(roles, func(r persist.Role) bool { return r == persist.RoleAdmin })
+		if !isAdmin {
+			util.ErrResponse(ctx, http.StatusUnauthorized, fmt.Errorf("%s is not an admin", user.Username.String))
+			return
+		}
+
+		userWithPII, err := q.GetUserWithPIIByID(ctx, user.ID)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusBadRequest, err)
+			return
+		}
+
+		if input.Email != userWithPII.PiiEmailAddress.String() {
+			util.ErrResponse(ctx, http.StatusBadRequest, errEmailMismatch{userID: user.ID})
+			return
+		}
+
+		template, err := buildDigestTemplate(ctx, b, q, gql)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
+			return
+		}
+
+		r, err := sendDigestEmailToUser(ctx, userWithPII, userWithPII.PiiEmailAddress, template, s)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
+			return
+		}
+
+		if r.StatusCode != http.StatusAccepted {
+			util.ErrResponse(ctx, http.StatusInternalServerError, fmt.Errorf("failed to send email: %s; statusCode: %d", r.Body, r.StatusCode))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -362,7 +442,6 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 }
 
 func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, digestValues DigestValues, s *sendgrid.Client) (*rest.Response, error) {
-
 	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
@@ -372,6 +451,10 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 		DigestValues:     digestValues,
 		Username:         u.Username.String,
 		UnsubscribeToken: j,
+	}
+
+	if data.DigestValues.IntroText == nil || *data.DigestValues.IntroText == "" {
+		data.DigestValues.IntroText = util.ToPointer(defaultIntroText(u.Username.String))
 	}
 
 	asJSON, err := json.Marshal(data)
@@ -402,7 +485,6 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 		return nil, err
 	}
 	return response, nil
-
 }
 
 func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.PiiUserView) error) error {
