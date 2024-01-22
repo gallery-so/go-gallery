@@ -34,4 +34,5 @@ select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media
     order by collection_ids.ord, token_ids.ord limit $2;
 
 -- name: GalleryRepoDelete :exec
-update galleries set deleted = true where galleries.id = @gallery_id and (select count(*) from galleries g where g.owner_user_id = @owner_user_id and g.deleted = false and not g.id = @gallery_id) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = @owner_user_id), '') = @gallery_id;
+-- update galleries set deleted = true where galleries.id = @gallery_id and (select count(*) from galleries g where g.owner_user_id = @owner_user_id and g.deleted = false and not g.id = @gallery_id) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = @owner_user_id), '') = @gallery_id;
+update galleries set deleted = true where galleries.id = @gallery_id and (select count(*) from galleries g where g.owner_user_id = @owner_user_id and g.deleted = false and not g.id = @gallery_id) > 0;

@@ -56,6 +56,7 @@ const (
 	ChainPoap     Chain = "POAP"
 	ChainZora     Chain = "Zora"
 	ChainBase     Chain = "Base"
+	ChainWlta     Chain = "WLTA"
 )
 
 type ChainAddressInput struct {

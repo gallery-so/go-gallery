@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
+	"github.com/mikeydub/go-gallery/service/multichain/wlta"
 	"github.com/mikeydub/go-gallery/service/multichain/zora"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -53,6 +54,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		baseProviderSet,
 		polygonProviderSet,
 		arbitrumProviderSet,
+		wltaProviderSet,
 	)
 	return nil, nil
 }
@@ -104,6 +106,7 @@ func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
 		persist.ChainZora:     p.Zora,
 		persist.ChainBase:     p.Base,
 		persist.ChainPolygon:  p.Polygon,
+		persist.ChainWlta:     p.Wlta,
 	}
 }
 
@@ -269,6 +272,22 @@ func baseProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider 
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
+	)
+	return nil
+}
+
+func wltaProviderSet(*http.Client) *multichain.WltaProvider {
+	wire.Build(
+		wltaProvidersConfig,
+		wlta.NewProvider,
+	)
+	return nil
+}
+
+func wltaProvidersConfig(wltaProvider *wlta.Provider) *multichain.WltaProvider {
+	wire.Build(
+		wire.Struct(new(multichain.WltaProvider), "*"),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(wltaProvider)),
 	)
 	return nil
 }

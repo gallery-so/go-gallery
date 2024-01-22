@@ -103,10 +103,12 @@ const (
 	ChainZora
 	// ChainBase represents the base chain
 	ChainBase
+	// ChainWlta
+	ChainWlta = 1337
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to
 	// point to the most recently added chain type.
-	MaxChainValue = ChainBase
+	MaxChainValue = ChainWlta
 )
 
 var chainToID = map[Chain]int{
@@ -155,6 +157,7 @@ var L1Chains = map[Chain]L1Chain{
 	ChainBase:     L1Chain(ChainETH),
 	ChainETH:      L1Chain(ChainETH),
 	ChainTezos:    L1Chain(ChainTezos),
+	ChainWlta:     L1Chain(ChainETH),
 }
 
 var L1ChainGroups = map[L1Chain][]Chain{
@@ -515,6 +518,8 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 			*c = ChainZora
 		case "base":
 			*c = ChainBase
+		case "wlta":
+			*c = ChainWlta
 		}
 		return nil
 	}
@@ -546,6 +551,8 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 		*c = ChainZora
 	case "base":
 		*c = ChainBase
+	case "wlta":
+		*c = ChainWlta
 	}
 	return nil
 }
@@ -569,6 +576,8 @@ func (c Chain) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"Zora"`))
 	case ChainBase:
 		w.Write([]byte(`"Base"`))
+	case ChainWlta:
+		w.Write([]byte(`"WLTA"`))
 	}
 }
 

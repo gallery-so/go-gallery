@@ -34,6 +34,35 @@ type GalleryAPI struct {
 	ethClient *ethclient.Client
 }
 
+func (api GalleryAPI) CreateGalleryWlta(ctx context.Context, name, description *string, position string) (db.Gallery, error) {
+
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"name":        validate.WithTag(name, "max=200"),
+		"description": validate.WithTag(description, "max=1200"),
+		"position":    validate.WithTag(position, "required"),
+	}); err != nil {
+		return db.Gallery{}, err
+	}
+
+	user, err := For(ctx).User.GetUserByUsername(ctx, "welovetheart")
+	if err != nil {
+		panic(err)
+	}
+
+	gallery, err := api.repos.GalleryRepository.Create(ctx, db.GalleryRepoCreateParams{
+		GalleryID:   persist.GenerateID(),
+		Name:        util.FromPointer(name),
+		Description: util.FromPointer(description),
+		Position:    position,
+		OwnerUserID: user.ID,
+	})
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	return gallery, nil
+}
+
 func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *string, position string) (db.Gallery, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

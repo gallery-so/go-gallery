@@ -127,6 +127,18 @@ func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
 	return userID, nil
 }
 
+func GetAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
+	gc := util.MustGetGinContext(ctx)
+	authError := auth.GetAuthErrorFromCtx(gc)
+
+	if authError != nil {
+		return "", authError
+	}
+
+	userID := auth.GetUserIDFromCtx(gc)
+	return userID, nil
+}
+
 func getUserRoles(ctx context.Context) []persist.Role {
 	gc := util.MustGetGinContext(ctx)
 	return auth.GetRolesFromCtx(gc)

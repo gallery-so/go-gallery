@@ -105,7 +105,7 @@ func (q *Queries) GalleryRepoCreate(ctx context.Context, arg GalleryRepoCreatePa
 }
 
 const galleryRepoDelete = `-- name: GalleryRepoDelete :exec
-update galleries set deleted = true where galleries.id = $1 and (select count(*) from galleries g where g.owner_user_id = $2 and g.deleted = false and not g.id = $1) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = $2), '') = $1
+update galleries set deleted = true where galleries.id = $1 and (select count(*) from galleries g where g.owner_user_id = $2 and g.deleted = false and not g.id = $1) > 0
 `
 
 type GalleryRepoDeleteParams struct {
@@ -113,6 +113,7 @@ type GalleryRepoDeleteParams struct {
 	OwnerUserID persist.DBID `db:"owner_user_id" json:"owner_user_id"`
 }
 
+// update galleries set deleted = true where galleries.id = @gallery_id and (select count(*) from galleries g where g.owner_user_id = @owner_user_id and g.deleted = false and not g.id = @gallery_id) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = @owner_user_id), ”) = @gallery_id;
 func (q *Queries) GalleryRepoDelete(ctx context.Context, arg GalleryRepoDeleteParams) error {
 	_, err := q.db.Exec(ctx, galleryRepoDelete, arg.GalleryID, arg.OwnerUserID)
 	return err

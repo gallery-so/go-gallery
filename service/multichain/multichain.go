@@ -78,6 +78,8 @@ type ChainAgnosticContract struct {
 type ChainAgnosticTokensAndContracts struct {
 	Tokens    []ChainAgnosticToken    `json:"tokens"`
 	Contracts []ChainAgnosticContract `json:"contracts"`
+	// super hacky way to get the actual chain of the token
+	ActualChain persist.Chain
 }
 
 // ChainAgnosticTokenDescriptors are the fields that describe a token but cannot be used to uniquely identify it
@@ -218,6 +220,10 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 		return err
 	}
 
+	for _, w := range user.Wallets {
+		fmt.Println(w)
+	}
+
 	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
 	if len(chainsToAddresses) == 0 {
 		return nil
@@ -247,10 +253,19 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 						if !ok {
 							return
 						}
-						recCh <- chainTokensAndContracts{
-							tokens:    chainTokens{chain: chain, tokens: page.Tokens},
-							contracts: chainContracts{chain: chain, contracts: page.Contracts},
+
+						// hack to get the chain
+						chainOverride := chain
+
+						if page.ActualChain != 0 {
+							chainOverride = page.ActualChain
 						}
+
+						recCh <- chainTokensAndContracts{
+							tokens:    chainTokens{chain: chainOverride, tokens: page.Tokens},
+							contracts: chainContracts{chain: chainOverride, contracts: page.Contracts},
+						}
+
 					case err, ok := <-pageErrCh:
 						if !ok {
 							return

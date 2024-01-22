@@ -252,6 +252,29 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 	return tokens[0], contracts[0], nil
 }
 
+func (p *Provider) GetTokenByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	outCh := make(chan pageResult)
+	go func() {
+		defer close(outCh)
+		p.streamAssetsForToken(ctx, ti.ContractAddress, ti.TokenID, outCh)
+	}()
+
+	tokens, contracts, err := assetsToTokens(ctx, p.osP, "", outCh)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	if len(tokens) == 0 {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+	}
+
+	if len(contracts) == 0 {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: ti.ContractAddress}
+	}
+
+	return tokens[0], contracts[0], nil
+}
+
 func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
 	outCh := make(chan pageResult)
 	go func() {
@@ -338,6 +361,7 @@ func paginateTokens(ctx context.Context, client *http.Client, req *http.Request,
 		}
 
 		outCh <- pageResult{Tokens: page.Tokens}
+		return
 
 		if page.Continuation == "" {
 			return

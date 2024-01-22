@@ -223,6 +223,11 @@ func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti
 	return token.Descriptors, contract.Descriptors, nil
 }
 
+func (d *Provider) GetTokenByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	return d.getToken(ctx, "", url)
+}
+
 // GetTokensByContractAddress retrieves tokens for a contract address on the zora Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/tokens/ZORA-MAINNET/%s?&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, contractAddress.String())
@@ -231,8 +236,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	if len(contracts) == 0 {
-		logger.For(ctx).Warnf("invalid number of contracts returned from zora: %d", len(contracts))
-		return nil, multichain.ChainAgnosticContract{}, nil
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found with address: %s", contractAddress)
 	}
 	return tokens, contracts[0], nil
 
@@ -314,7 +318,6 @@ func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multi
 	allContracts := []multichain.ChainAgnosticContract{}
 	for ; ; offset += limit {
 		urlWithPagination := fmt.Sprintf("%s&offset=%d&limit=%d", url, offset, limit)
-		logger.For(ctx).Infof("getting zora tokens from %s", urlWithPagination)
 		req, err := http.NewRequestWithContext(ctx, "GET", urlWithPagination, nil)
 		if err != nil {
 			return nil, nil, err
@@ -335,8 +338,6 @@ func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multi
 				return nil, nil, err
 			}
 
-			logger.For(ctx).Infof("zora raw tokens retrieved: %d", len(result.Tokens))
-
 			tokens, contracts = d.balanceTokensToChainAgnostic(ctx, result.Tokens)
 			if len(result.Tokens) < limit || !result.HasNextPage {
 				willBreak = true
@@ -348,8 +349,6 @@ func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multi
 			if err != nil {
 				return nil, nil, err
 			}
-
-			logger.For(ctx).Infof("zora raw tokens retrieved: %d", len(result.Tokens))
 
 			tokens, contracts = d.tokensToChainAgnostic(ctx, result.Tokens)
 			if len(result.Tokens) < limit || !result.HasNextPage {
@@ -376,8 +375,6 @@ func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multi
 		}
 
 	}
-
-	logger.For(ctx).Infof("zora tokens retrieved: %d", len(allTokens))
 
 	return allTokens, allContracts, nil
 }
@@ -441,8 +438,6 @@ func (d *Provider) balanceTokensToChainAgnostic(ctx context.Context, tokens []zo
 
 	contractResults := util.MapValues(contracts)
 
-	logger.For(ctx).Infof("zora tokens converted: %d (%d)", len(result), len(contractResults))
-
 	return result, contractResults
 
 }
@@ -463,8 +458,6 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraToken
 	}
 
 	contractResults := util.MapValues(contracts)
-
-	logger.For(ctx).Infof("zora tokens converted: %d (%d)", len(result), len(contractResults))
 
 	return result, contractResults
 

@@ -15,6 +15,7 @@ type ChainProvider struct {
 	Zora     *ZoraProvider
 	Base     *BaseProvider
 	Polygon  *PolygonProvider
+	Wlta     *WltaProvider
 }
 
 type EthereumProvider struct {
@@ -90,4 +91,8 @@ type PolygonProvider struct {
 	TokensContractFetcher
 	TokensIncrementalOwnerFetcher
 	TokensOwnerFetcher
+}
+
+type WltaProvider struct {
+	TokensIncrementalOwnerFetcher
 }

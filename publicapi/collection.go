@@ -244,17 +244,18 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	feedEvent, err := event.DispatchCaptioned(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		Action:         persist.ActionCollectionCreated,
-		ResourceTypeID: persist.ResourceTypeCollection,
-		CollectionID:   collectionID,
-		GalleryID:      galleryID,
-		SubjectID:      collectionID,
-		Data:           persist.EventData{CollectionTokenIDs: createdCollection.Nfts, CollectionCollectorsNote: collectorsNote},
-	}, caption)
-
-	return &createdCollection, feedEvent, err
+	// feedEvent, err := event.DispatchCaptioned(ctx, db.Event{
+	// 	ActorID:        persist.DBIDToNullStr(userID),
+	// 	Action:         persist.ActionCollectionCreated,
+	// 	ResourceTypeID: persist.ResourceTypeCollection,
+	// 	CollectionID:   collectionID,
+	// 	GalleryID:      galleryID,
+	// 	SubjectID:      collectionID,
+	// 	Data:           persist.EventData{CollectionTokenIDs: createdCollection.Nfts, CollectionCollectorsNote: collectorsNote},
+	// }, caption)
+	// 
+	// return &createdCollection, feedEvent, err
+	return &createdCollection, nil, err
 }
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {

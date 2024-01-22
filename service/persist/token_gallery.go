@@ -27,6 +27,10 @@ type ContractIdentifiers struct {
 	Chain           Chain   `json:"chain"`
 }
 
+func (c ContractIdentifiers) String() string {
+	return fmt.Sprintf("%s+%d", c.Chain.NormalizeAddress(c.ContractAddress), c.Chain)
+}
+
 // NewTokenIdentifiers creates a new token identifiers
 func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pChain Chain) TokenIdentifiers {
 	return TokenIdentifiers{

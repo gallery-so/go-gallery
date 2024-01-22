@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
+	"github.com/mikeydub/go-gallery/service/multichain/wlta"
 	"github.com/mikeydub/go-gallery/service/multichain/zora"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -48,6 +49,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	zoraProvider := zoraProviderSet(serverEnvInit, client)
 	baseProvider := baseProviderSet(client)
 	polygonProvider := polygonProviderSet(client)
+	wltaProvider := wltaProviderSet(client)
 	chainProvider := &multichain.ChainProvider{
 		Ethereum: ethereumProvider,
 		Tezos:    tezosProvider,
@@ -57,6 +59,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		Zora:     zoraProvider,
 		Base:     baseProvider,
 		Polygon:  polygonProvider,
+		Wlta:     wltaProvider,
 	}
 	provider := multichainProviderSet(ctx, repositories, queries, cache, chainProvider)
 	return provider, func() {
@@ -240,6 +243,19 @@ func baseProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider 
 	return baseProvider
 }
 
+func wltaProviderSet(client *http.Client) *multichain.WltaProvider {
+	provider := wlta.NewProvider()
+	wltaProvider := wltaProvidersConfig(provider)
+	return wltaProvider
+}
+
+func wltaProvidersConfig(wltaProvider *wlta.Provider) *multichain.WltaProvider {
+	multichainWltaProvider := &multichain.WltaProvider{
+		TokensIncrementalOwnerFetcher: wltaProvider,
+	}
+	return multichainWltaProvider
+}
+
 func polygonProviderSet(client *http.Client) *multichain.PolygonProvider {
 	chain := _wireChainValue4
 	provider := reservoir.NewProvider(client, chain)
@@ -297,7 +313,7 @@ func newQueries(p *pgxpool.Pool) *coredb.Queries {
 }
 
 func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
-	return multichain.ProviderLookup{persist.ChainETH: p.Ethereum, persist.ChainTezos: p.Tezos, persist.ChainOptimism: p.Optimism, persist.ChainArbitrum: p.Arbitrum, persist.ChainPOAP: p.Poap, persist.ChainZora: p.Zora, persist.ChainBase: p.Base, persist.ChainPolygon: p.Polygon}
+	return multichain.ProviderLookup{persist.ChainETH: p.Ethereum, persist.ChainTezos: p.Tezos, persist.ChainOptimism: p.Optimism, persist.ChainArbitrum: p.Arbitrum, persist.ChainPOAP: p.Poap, persist.ChainZora: p.Zora, persist.ChainBase: p.Base, persist.ChainPolygon: p.Polygon, persist.ChainWlta: p.Wlta}
 }
 
 func newCommunitiesCache() *redis.Cache {

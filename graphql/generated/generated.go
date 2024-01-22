@@ -9904,6 +9904,7 @@ enum Chain {
   POAP
   Zora
   Base
+  WLTA
 }
 
 enum TokenOwnershipType {
