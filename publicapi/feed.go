@@ -169,8 +169,8 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenIDs": validate.WithTag(tokenIDs, "required"),
-		// caption can be null but less than 600 chars
-		"caption": validate.WithTag(caption, "max=600"),
+		// caption can be null but less than 2000 chars
+		"caption": validate.WithTag(caption, "max=2000"),
 		"mintURL": validate.WithTag(mintURL, "omitempty,http"),
 	}); err != nil {
 		return "", err
@@ -321,8 +321,8 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"token": validate.WithTag(t, "required"),
-		// caption can be null but less than 600 chars
-		"caption": validate.WithTag(caption, "max=600"),
+		// caption can be null but less than 2000 chars
+		"caption": validate.WithTag(caption, "max=2000"),
 		"mintURL": validate.WithTag(mintURL, "omitempty,http"),
 	}); err != nil {
 		return "", err
