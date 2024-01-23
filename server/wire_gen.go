@@ -99,17 +99,16 @@ var (
 
 func ethProvidersConfig(indexerProvider *indexer.Provider, reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
-		ContractRefresher:                    indexerProvider,
-		ContractsFetcher:                     reservoirProvider,
-		ContractsOwnerFetcher:                indexerProvider,
-		TokenDescriptorsFetcher:              openseaProvider,
-		TokenMetadataFetcher:                 openseaProvider,
-		TokensContractAddressAndOwnerFetcher: reservoirProvider,
-		TokensContractFetcher:                reservoirProvider,
-		TokensIncrementalContractFetcher:     reservoirProvider,
-		TokensIncrementalOwnerFetcher:        reservoirProvider,
-		TokensOwnerFetcher:                   reservoirProvider,
-		Verifier:                             indexerProvider,
+		ContractRefresher:                indexerProvider,
+		ContractsFetcher:                 reservoirProvider,
+		ContractsOwnerFetcher:            indexerProvider,
+		TokenDescriptorsFetcher:          openseaProvider,
+		TokenMetadataFetcher:             openseaProvider,
+		TokensContractFetcher:            reservoirProvider,
+		TokensIncrementalContractFetcher: reservoirProvider,
+		TokensIncrementalOwnerFetcher:    reservoirProvider,
+		TokensOwnerFetcher:               reservoirProvider,
+		Verifier:                         indexerProvider,
 	}
 	return ethereumProvider
 }

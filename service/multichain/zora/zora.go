@@ -158,17 +158,19 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 }
 
 func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
-	errChan := make(chan error)
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errCh := make(chan error)
 	url := fmt.Sprintf("%s/user/%s/tokens?chain_names=ZORA-MAINNET&sort_direction=DESC", zoraRESTURL, addr.String())
 	go func() {
-		_, _, err := d.getTokens(ctx, url, rec, true)
+		defer close(recCh)
+		defer close(errCh)
+		_, _, err := d.getTokens(ctx, url, recCh, true)
 		if err != nil {
-			errChan <- err
+			errCh <- err
 			return
 		}
 	}()
-	return rec, errChan
+	return recCh, errCh
 }
 
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
@@ -193,7 +195,6 @@ func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 	}
 
 	if resultToken.TokenID == "" || resultContract.Address == "" {
-		logger.For(ctx).Errorf("no token found for identifiers %+v (%+v | %+v) [%+v]", ti, resultToken, resultContract, tokens)
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for identifiers %+v", ti)
 	}
 
@@ -238,18 +239,19 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
-	errChan := make(chan error)
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errCh := make(chan error)
 	url := fmt.Sprintf("%s/tokens/ZORA-MAINNET/%s?&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, addr.String())
 	go func() {
-		defer close(rec)
-		_, _, err := d.getTokens(ctx, url, rec, false)
+		defer close(recCh)
+		defer close(errCh)
+		_, _, err := d.getTokens(ctx, url, recCh, false)
 		if err != nil {
-			errChan <- err
+			errCh <- err
 			return
 		}
 	}()
-	return rec, errChan
+	return recCh, errCh
 }
 
 // GetContractByAddress retrieves an zora contract by address
@@ -305,7 +307,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 
 const maxLimit = 1000
 
-func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := 50
 	allTokens := []multichain.ChainAgnosticToken{}
@@ -363,8 +365,8 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 			allTokens = allTokens[:maxLimit]
 		}
 
-		if rec != nil {
-			rec <- multichain.ChainAgnosticTokensAndContracts{
+		if recCh != nil {
+			recCh <- multichain.ChainAgnosticTokensAndContracts{
 				Tokens:    tokens,
 				Contracts: contracts,
 			}

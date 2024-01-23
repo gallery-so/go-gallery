@@ -11,9 +11,7 @@ from (
 		'KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE',
 		'KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi',
 		'KT1EfsNuqwLAWDd3o4pvfUx1CAh5GMdTrRvr',
-		'KT1GtbuswcNMGhHF2TSuH1Yfaqn16do8Qtva',
-		'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton',
-		'KT19xbD2xn6A81an18S35oKtnkFNr9CVwY5m'
+		'KT1GtbuswcNMGhHF2TSuH1Yfaqn16do8Qtva'
 	))
 	or
 	-- eth fxhash contracts

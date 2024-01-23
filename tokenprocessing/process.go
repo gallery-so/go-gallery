@@ -931,7 +931,7 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 			// Try to sync the user's tokens by searching for the token in each of the user's wallets
 			// SyncTokenByUserWalletsAndTokenIdentifiersRetry processes media for the token if it is found
 			// so we don't need to run the pipeline again here
-			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, input.Token, retry.DefaultRetry)
+			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user.ID, input.Token, retry.DefaultRetry)
 			if err != nil {
 				// Keep retrying until we get the token or reach max retries
 				util.ErrResponse(ctx, http.StatusInternalServerError, err)
