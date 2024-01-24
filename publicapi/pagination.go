@@ -32,6 +32,9 @@ var (
 	defaultCursorBeforePosition = math.MaxInt32 - 1
 	// Some position that comes before any other position
 	defaultCursorAfterPosition = -1
+
+	defaultCursorBeforeFloat = math.MaxFloat64
+	defaultCursorAfterFloat  = -math.MaxFloat64
 )
 
 type PageInfo struct {
@@ -271,6 +274,74 @@ func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *i
 	paginator := keysetPaginator[Node, *timeIDCursor]{
 		QueryFunc:  queryFunc,
 		Cursorable: newTimeIDCursor(p.CursorFunc),
+		CountFunc:  p.CountFunc,
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
+// floatIDPaginator paginates results using a cursor with a float and a persist.DBID.
+// By using the combination of a float and a unique DBID for our ORDER BY clause,
+// we can achieve fast keyset pagination results while avoiding edge cases when multiple
+// rows have the same float value.
+type floatIDPaginator[Node any] struct {
+	// QueryFunc returns paginated results for the given paging parameters
+	QueryFunc func(params floatIDPagingParams) ([]Node, error)
+
+	// CursorFunc returns a float and DBID that will be encoded into a cursor string
+	CursorFunc func(node Node) (float64, persist.DBID, error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
+}
+
+// floatIDPagingParams are the parameters used to paginate with a float+DBID cursor
+type floatIDPagingParams struct {
+	Limit             int32
+	CursorBeforeFloat float64
+	CursorBeforeID    persist.DBID
+	CursorAfterFloat  float64
+	CursorAfterID     persist.DBID
+	PagingForward     bool
+}
+
+func (p *floatIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
+		beforeCur := cursors.NewFloatIDCursor()
+		beforeCur.Float = defaultCursorBeforeFloat
+		beforeCur.ID = defaultCursorBeforeID
+		afterCur := cursors.NewFloatIDCursor()
+		afterCur.Float = defaultCursorAfterFloat
+		afterCur.ID = defaultCursorAfterID
+
+		if before != nil {
+			if err := beforeCur.Unpack(*before); err != nil {
+				return nil, err
+			}
+		}
+
+		if after != nil {
+			if err := afterCur.Unpack(*after); err != nil {
+				return nil, err
+			}
+		}
+
+		queryParams := floatIDPagingParams{
+			Limit:             limit,
+			CursorBeforeFloat: beforeCur.Float,
+			CursorBeforeID:    beforeCur.ID,
+			CursorAfterFloat:  afterCur.Float,
+			CursorAfterID:     afterCur.ID,
+			PagingForward:     pagingForward,
+		}
+
+		return p.QueryFunc(queryParams)
+	}
+
+	paginator := keysetPaginator[Node, *floatIDCursor]{
+		QueryFunc:  queryFunc,
+		Cursorable: newFloatIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
@@ -723,6 +794,12 @@ func (e *cursorEncoder) appendInt64(i int64) {
 	e.buffer = append(e.buffer, buf[:bytesWritten]...)
 }
 
+// appendFloat64 appends a float64 to the underlying buffer
+func (e *cursorEncoder) appendFloat64(f float64) {
+	bits := math.Float64bits(f)
+	e.appendUInt64(bits)
+}
+
 func (e *cursorEncoder) appendFeedEntityType(i persist.FeedEntityType) {
 	e.appendInt64(int64(i))
 }
@@ -828,6 +905,16 @@ func (d *cursorDecoder) readInt64() (int64, error) {
 	return binary.ReadVarint(d.reader)
 }
 
+// readFloat64 reads a float64 from the underlying reader and advances the stream
+func (d *cursorDecoder) readFloat64() (float64, error) {
+	bits, err := d.readUInt64()
+	if err != nil {
+		return 0, err
+	}
+
+	return math.Float64frombits(bits), nil
+}
+
 // readFeedEntityType reads FeedEntityType from the underlying reader and advances the stream
 func (d *cursorDecoder) readFeedEntityType() (persist.FeedEntityType, error) {
 	i, err := binary.ReadVarint(d.reader)
@@ -919,6 +1006,14 @@ func newFeedPositionCursor[Node any](f func(Node) (int64, []persist.FeedEntityTy
 		c = cursors.NewFeedPositionCursor()
 		c.CurrentPosition, c.EntityTypes, c.EntityIDs, err = f(node)
 		c.Positions = sliceToMapIndex(c.EntityIDs)
+		return c, err
+	}
+}
+
+func newFloatIDCursor[Node any](f func(Node) (float64, persist.DBID, error)) cursorable[Node, *floatIDCursor] {
+	return func(node Node) (c *floatIDCursor, err error) {
+		c = cursors.NewFloatIDCursor()
+		c.Float, c.ID, err = f(node)
 		return c, err
 	}
 }
@@ -1043,6 +1138,20 @@ func (f *positionCursor) Unpack(s string) error {
 func (cursorN) NewPositionCursor() *positionCursor {
 	c := positionCursor{baseCursor: &baseCursor{}, Positions: make(map[persist.DBID]int64)}
 	initCursor(c.baseCursor, &c.CurrentPosition, &c.IDs)
+	return &c
+}
+
+//------------------------------------------------------------------------------
+
+type floatIDCursor struct {
+	*baseCursor
+	Float float64
+	ID    persist.DBID
+}
+
+func (cursorN) NewFloatIDCursor() *floatIDCursor {
+	c := floatIDCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.Float, &c.ID)
 	return &c
 }
 
