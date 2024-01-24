@@ -1,4 +1,4 @@
-create materialized view gallery_previews as (
+create materialized view community_galleries as (
     with community_tokens as (
         select c.id as community_id, t.id as token_id, t.token_definition_id, t.owner_user_id as owner_user_id
             from communities c, tokens t
@@ -67,7 +67,7 @@ create materialized view gallery_previews as (
     from
         (select user_id, gallery_id, token_id, token_definition_id, token_media, position from gallery_tokens
             group by user_id, gallery_id, token_id, token_definition_id, token_media, position) as x
-    group by user_id, gallery_id
+    group by x.user_id, x.gallery_id
 
     union all
 
@@ -81,7 +81,7 @@ create materialized view gallery_previews as (
     group by user_id, community_id, gallery_id
 );
 
-create index gallery_previews_gallery_id_idx on gallery_previews(gallery_id);
-create unique index gallery_previews_community_id_gallery_id_idx on gallery_previews(community_id, gallery_id);
+create index gallery_previews_gallery_id_idx on community_galleries (gallery_id);
+create unique index gallery_previews_community_id_gallery_id_idx on community_galleries (community_id, gallery_id);
 
-select cron.schedule('refresh-gallery-previews', '45 */3 * * *', 'refresh materialized view concurrently gallery_previews with data');
+select cron.schedule('refresh-gallery-previews', '45 */3 * * *', 'refresh materialized view concurrently community_galleries with data');
