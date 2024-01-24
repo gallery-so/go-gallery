@@ -155,7 +155,7 @@ func buildDigestTemplate(ctx context.Context, b *store.BucketStorer, q *db.Queri
 	}
 
 	galleryCount := overrides.GalleryCount
-	if communityCount == 0 || galleryCount > defaultGalleryCount {
+	if galleryCount == 0 || galleryCount > defaultGalleryCount {
 		galleryCount = defaultGalleryCount
 	}
 
