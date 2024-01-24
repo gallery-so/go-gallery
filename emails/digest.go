@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/gin-gonic/gin"
+	"github.com/sourcegraph/conc"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -159,19 +161,33 @@ func buildDigestTemplate(ctx context.Context, b *store.BucketStorer, q *db.Queri
 		galleryCount = defaultGalleryCount
 	}
 
-	posts, err := getSpotlightPosts(ctx, q, gql, postCount, overrides.Posts)
-	if err != nil {
-		return DigestValues{}, fmt.Errorf("error getting spotlight posts: %s", err)
-	}
+	posts := make([]PostDigestEntity, 0, postCount)
+	communities := make([]CommunityDigestEntity, 0, communityCount)
+	galleries := make([]GalleryDigestEntity, 0, galleryCount)
+	var postErr error
+	var communityErr error
+	var galleryErr error
 
-	communities, err := getSpotlightCommunities(ctx, q, gql, communityCount, overrides.Communities)
-	if err != nil {
-		return DigestValues{}, fmt.Errorf("error getting spotlight communities: %s", err)
-	}
+	var wg conc.WaitGroup
+	wg.Go(func() {
+		posts, postErr = getSpotlightPosts(ctx, q, gql, postCount, overrides.Posts)
+	})
+	wg.Go(func() {
+		communities, communityErr = getSpotlightCommunities(ctx, q, gql, communityCount, overrides.Communities)
+	})
+	wg.Go(func() {
+		galleries, galleryErr = getSpotlightGalleries(ctx, q, gql, galleryCount, overrides.Galleries)
+	})
+	wg.Wait()
 
-	galleries, err := getSpotlightGalleries(ctx, q, gql, galleryCount, overrides.Galleries)
-	if err != nil {
-		return DigestValues{}, fmt.Errorf("error getting spotlight galleries: %s", err)
+	if postErr != nil {
+		return DigestValues{}, fmt.Errorf("error getting spotlight posts: %s", postErr)
+	}
+	if communityErr != nil {
+		return DigestValues{}, fmt.Errorf("error getting spotlight communities: %s", communityErr)
+	}
+	if galleryErr != nil {
+		return DigestValues{}, fmt.Errorf("error getting spotlight galleries: %s", galleryErr)
 	}
 
 	includePosts := util.GetOptionalValue(overrides.IncludeTopPosts, defaultIncludeTopPosts)
@@ -279,17 +295,38 @@ func addGalleries(
 	entityIDs []persist.DBID,
 	editorialized bool,
 ) {
-	for i := 0; len(*spotlightGalleries) < n && i < len(entityIDs)-1; i++ {
-		if added[entityIDs[i]] {
-			continue
+	var mu sync.Mutex
+	batch := make([]persist.DBID, 0, 4)
+	var i int
+	var wg conc.WaitGroup
+
+	for len(*spotlightGalleries) < n && i < len(entityIDs)-1 {
+		// fill the batch not exceeding the number of entities needed
+		for j := 0; j < 4 && (len(batch)+len(*spotlightGalleries)) < n; j++ {
+			batch = append(batch, entityIDs[i])
+			i++
 		}
-		entity, err := galleryToEntity(ctx, gql, entityIDs[i], editorialized)
-		if err != nil {
-			logger.For(ctx).Error(err)
-			continue
+
+		// run the batch
+		for i := 0; i < len(batch); i++ {
+			i := i
+			wg.Go(func() {
+				entity, err := galleryToEntity(ctx, *gql, batch[i], editorialized)
+				if err != nil {
+					logger.For(ctx).Error(err)
+					return
+				}
+				mu.Lock()
+				*spotlightGalleries = append(*spotlightGalleries, entity)
+				added[batch[i]] = true
+				mu.Unlock()
+			})
 		}
-		*spotlightGalleries = append(*spotlightGalleries, entity)
-		added[entityIDs[i]] = true
+
+		wg.Wait()
+
+		// clear the batch
+		batch = batch[:0]
 	}
 }
 
@@ -302,17 +339,38 @@ func addCommunities(
 	entityIDs []persist.DBID,
 	editorialized bool,
 ) {
-	for i := 0; len(*spotlightCommunities) < n && i < len(entityIDs)-1; i++ {
-		if added[entityIDs[i]] {
-			continue
+	var mu sync.Mutex
+	batch := make([]persist.DBID, 0, 4)
+	var i int
+	var wg conc.WaitGroup
+
+	for len(*spotlightCommunities) < n && i < len(entityIDs)-1 {
+		// fill the batch not exceeding the number of entities needed
+		for j := 0; j < 4 && (len(batch)+len(*spotlightCommunities)) < n; j++ {
+			batch = append(batch, entityIDs[i])
+			i++
 		}
-		entity, err := communityToEntity(ctx, *gql, entityIDs[i], editorialized)
-		if err != nil {
-			logger.For(ctx).Error(err)
-			continue
+
+		// run the batch
+		for i := 0; i < len(batch); i++ {
+			i := i
+			wg.Go(func() {
+				entity, err := communityToEntity(ctx, *gql, batch[i], editorialized)
+				if err != nil {
+					logger.For(ctx).Error(err)
+					return
+				}
+				mu.Lock()
+				*spotlightCommunities = append(*spotlightCommunities, entity)
+				added[batch[i]] = true
+				mu.Unlock()
+			})
 		}
-		*spotlightCommunities = append(*spotlightCommunities, entity)
-		added[entityIDs[i]] = true
+
+		wg.Wait()
+
+		// clear the batch
+		batch = batch[:0]
 	}
 }
 
@@ -322,20 +380,41 @@ func addPosts(
 	spotlightPosts *[]PostDigestEntity,
 	added map[persist.DBID]bool,
 	n int,
-	postIDs []persist.DBID,
+	entityIDs []persist.DBID,
 	editorialized bool,
 ) {
-	for i := 0; len(*spotlightPosts) < n && i < len(postIDs)-1; i++ {
-		if added[postIDs[i]] {
-			continue
+	var mu sync.Mutex
+	batch := make([]persist.DBID, 0, 4)
+	var i int
+	var wg conc.WaitGroup
+
+	for len(*spotlightPosts) < n && i < len(entityIDs)-1 {
+		// fill the batch not exceeding the number of entities needed
+		for j := 0; j < 4 && (len(batch)+len(*spotlightPosts)) < n; j++ {
+			batch = append(batch, entityIDs[i])
+			i++
 		}
-		entity, err := postToEntity(ctx, *gql, postIDs[i], editorialized)
-		if err != nil {
-			logger.For(ctx).Error(err)
-			continue
+
+		// run the batch
+		for i := 0; i < len(batch); i++ {
+			i := i
+			wg.Go(func() {
+				entity, err := postToEntity(ctx, *gql, batch[i], editorialized)
+				if err != nil {
+					logger.For(ctx).Error(err)
+					return
+				}
+				mu.Lock()
+				*spotlightPosts = append(*spotlightPosts, entity)
+				added[batch[i]] = true
+				mu.Unlock()
+			})
 		}
-		*spotlightPosts = append(*spotlightPosts, entity)
-		added[postIDs[i]] = true
+
+		wg.Wait()
+
+		// clear the batch
+		batch = batch[:0]
 	}
 }
 
@@ -362,8 +441,8 @@ func getOverrides(ctx context.Context, b *store.BucketStorer) (DigestValueOverri
 	return o, err
 }
 
-func galleryToEntity(ctx context.Context, gql *graphql.Client, galleryID persist.DBID, editorialized bool) (GalleryDigestEntity, error) {
-	r, err := galleryDigestEntityQuery(ctx, *gql, galleryID)
+func galleryToEntity(ctx context.Context, gql graphql.Client, galleryID persist.DBID, editorialized bool) (GalleryDigestEntity, error) {
+	r, err := galleryDigestEntityQuery(ctx, gql, galleryID)
 	if err != nil {
 		return GalleryDigestEntity{}, err
 	}

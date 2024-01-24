@@ -254,21 +254,21 @@ $(DEPLOY)-$(DEV)-opensea-streamer      : SERVICE        := opensea-streamer
 $(DEPLOY)-$(PROD)-opensea-streamer     : SERVICE        := opensea-streamer
 
 # Cloud Scheduler Jobs
-$(DEPLOY)-%-alchemy-spam               : CRON_PREFIX    := alchemy-spam
-$(DEPLOY)-%-alchemy-spam               : CRON_LOCATION  := $(DEPLOY_REGION)
-$(DEPLOY)-%-alchemy-spam               : CRON_SCHEDULE  := '0 0 * * *'
-$(DEPLOY)-%-alchemy-spam               : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/contracts/detect-spam
-$(DEPLOY)-%-alchemy-spam               : CRON_METHOD    := POST
-$(DEPLOY)-$(DEV)-alchemy-spam          : URI_NAME       := tokenprocessing-dev
-$(DEPLOY)-$(PROD)-alchemy-spam         : URI_NAME       := tokenprocessing-v3
-$(DEPLOY)-%-check-push-tickets         : CRON_PREFIX    := check-push-tickets
-$(DEPLOY)-%-check-push-tickets         : CRON_LOCATION  := $(DEPLOY_REGION)
-$(DEPLOY)-%-check-push-tickets         : CRON_SCHEDULE  := '*/5 * * * *'
-$(DEPLOY)-%-check-push-tickets         : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/jobs/check-push-tickets
-$(DEPLOY)-%-check-push-tickets         : CRON_METHOD    := POST
-$(DEPLOY)-%-check-push-tickets         : CRON_FLAGS     = --headers='Authorization=Basic $(shell printf ":$(PUSH_NOTIFICATIONS_SECRET)" | base64)' --attempt-deadline=10m
-$(DEPLOY)-$(DEV)-check-push-tickets    : URI_NAME       := pushnotifications-dev
-$(DEPLOY)-$(PROD)-check-push-tickets   : URI_NAME       := pushnotifications
+$(DEPLOY)-%-alchemy-spam                     : CRON_PREFIX    := alchemy-spam
+$(DEPLOY)-%-alchemy-spam                     : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-alchemy-spam                     : CRON_SCHEDULE  := '0 0 * * *'
+$(DEPLOY)-%-alchemy-spam                     : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/contracts/detect-spam
+$(DEPLOY)-%-alchemy-spam                     : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-alchemy-spam                : URI_NAME       := tokenprocessing-dev
+$(DEPLOY)-$(PROD)-alchemy-spam               : URI_NAME       := tokenprocessing-v3
+$(DEPLOY)-%-check-push-tickets               : CRON_PREFIX    := check-push-tickets
+$(DEPLOY)-%-check-push-tickets               : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-check-push-tickets               : CRON_SCHEDULE  := '*/5 * * * *'
+$(DEPLOY)-%-check-push-tickets               : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/jobs/check-push-tickets
+$(DEPLOY)-%-check-push-tickets               : CRON_METHOD    := POST
+$(DEPLOY)-%-check-push-tickets               : CRON_FLAGS     = --headers='Authorization=Basic $(shell printf ":$(PUSH_NOTIFICATIONS_SECRET)" | base64)' --attempt-deadline=10m
+$(DEPLOY)-$(DEV)-check-push-tickets          : URI_NAME       := pushnotifications-dev
+$(DEPLOY)-$(PROD)-check-push-tickets         : URI_NAME       := pushnotifications
 $(DEPLOY)-%-autosocial-process-users         : CRON_PREFIX    := autosocial-process-users
 $(DEPLOY)-%-autosocial-process-users         : CRON_LOCATION  := $(DEPLOY_REGION)
 $(DEPLOY)-%-autosocial-process-users         : CRON_SCHEDULE  := '0 0 * * *'
@@ -277,15 +277,14 @@ $(DEPLOY)-%-autosocial-process-users         : CRON_FLAGS     = --oidc-service-a
 $(DEPLOY)-%-autosocial-process-users         : CRON_METHOD    := POST
 $(DEPLOY)-$(DEV)-autosocial-process-users    : URI_NAME       := autosocial-orchestrator
 $(DEPLOY)-$(PROD)-autosocial-process-users   : URI_NAME       := autosocial-orchestrator
-$(DEPLOY)-%-activity-stats-top           : CRON_PREFIX    := activitystats_top
-$(DEPLOY)-%-activity-stats-top           : CRON_LOCATION  := $(DEPLOY_REGION)
-$(DEPLOY)-%-activity-stats-top           : CRON_SCHEDULE  := '0 14 * * 1'
-$(DEPLOY)-%-activity-stats-top           : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/calculate_activity_badges
-$(DEPLOY)-%-activity-stats-top           : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
-$(DEPLOY)-%-activity-stats-top           : CRON_METHOD    := POST
-$(DEPLOY)-$(DEV)-activity-stats-top      : URI_NAME       := activitystats 
-$(DEPLOY)-$(PROD)-activity-stats-top     : URI_NAME       := activitystats
-
+$(DEPLOY)-%-activity-stats-top               : CRON_PREFIX    := activitystats_top
+$(DEPLOY)-%-activity-stats-top               : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-activity-stats-top               : CRON_SCHEDULE  := '0 14 * * 1'
+$(DEPLOY)-%-activity-stats-top               : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/calculate_activity_badges
+$(DEPLOY)-%-activity-stats-top               : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
+$(DEPLOY)-%-activity-stats-top               : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-activity-stats-top          : URI_NAME       := activitystats 
+$(DEPLOY)-$(PROD)-activity-stats-top         : URI_NAME       := activitystats
 $(DEPLOY)-%-emails-notifications             : CRON_PREFIX    := emails_notifications
 $(DEPLOY)-%-emails-notifications             : CRON_LOCATION  := $(DEPLOY_REGION)
 $(DEPLOY)-%-emails-notifications             : CRON_SCHEDULE  := '0 14 * * 5'
@@ -294,15 +293,14 @@ $(DEPLOY)-%-emails-notifications             : CRON_FLAGS     = --oidc-service-a
 $(DEPLOY)-%-emails-notifications             : CRON_METHOD    := POST
 $(DEPLOY)-$(DEV)-emails-notifications        : URI_NAME       := emails-dev
 $(DEPLOY)-$(PROD)-emails-notifications       : URI_NAME       := emails-v2
-
-$(DEPLOY)-%-emails-digest             : CRON_PREFIX    := emails_digest
-$(DEPLOY)-%-emails-digest             : CRON_LOCATION  := $(DEPLOY_REGION)
-$(DEPLOY)-%-emails-digest             : CRON_SCHEDULE  := '0 16 * * 1'
-$(DEPLOY)-%-emails-digest             : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/digest/send
-$(DEPLOY)-%-emails-digest             : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
-$(DEPLOY)-%-emails-digest             : CRON_METHOD    := POST
-$(DEPLOY)-$(DEV)-emails-digest        : URI_NAME       := emails-dev
-$(DEPLOY)-$(PROD)-emails-digest       : URI_NAME       := emails-v2
+$(DEPLOY)-%-emails-digest                    : CRON_PREFIX    := emails_digest
+$(DEPLOY)-%-emails-digest                    : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-emails-digest                    : CRON_SCHEDULE  := '0 16 * * 1'
+$(DEPLOY)-%-emails-digest                    : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/digest/send
+$(DEPLOY)-%-emails-digest                    : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
+$(DEPLOY)-%-emails-digest                    : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-emails-digest               : URI_NAME       := emails-dev
+$(DEPLOY)-$(PROD)-emails-digest              : URI_NAME       := emails-v2
 
 # Cloud Jobs
 $(DEPLOY)-%-userpref-upload            : JOB_NAME       := userpref-upload
