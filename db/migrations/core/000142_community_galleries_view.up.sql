@@ -25,12 +25,15 @@ create materialized view community_galleries as (
         select
             users.id as user_id,
             galleries.id as gallery_id,
+            gallery_relevance.score as gallery_relevance,
             ct.community_id,
             ct.token_id,
             ct.token_definition_id,
             tm.media as token_media,
             (galleries.position, array_position(galleries.collections, collections.id), array_position(collections.nfts, ct.token_id)) as position
-        from users, galleries, collections, community_tokens ct
+        from users, galleries
+            join gallery_relevance on gallery_relevance.id = galleries.id,
+            collections, community_tokens ct
             join token_definitions td on td.id = ct.token_definition_id
             -- This is an inner join, which means a token without a preview won't show up.
             -- We may want to reconsider this in the future!
@@ -54,6 +57,7 @@ create materialized view community_galleries as (
             ct.token_id,
             ct.token_definition_id,
             tm.media,
+            gallery_relevance.score,
             (galleries.id, array_position(galleries.collections, collections.id), array_position(collections.nfts, ct.token_id))
     )
 
@@ -61,13 +65,14 @@ create materialized view community_galleries as (
     select x.user_id,
         null as community_id,
         x.gallery_id,
+        x.gallery_relevance,
         array_agg(x.token_id order by x.position) as token_ids,
         array_agg(x.token_definition_id order by x.position) as token_definition_ids,
         array_agg(x.token_media order by x.position) as token_medias
     from
-        (select user_id, gallery_id, token_id, token_definition_id, token_media, position from gallery_tokens
-            group by user_id, gallery_id, token_id, token_definition_id, token_media, position) as x
-    group by x.user_id, x.gallery_id
+        (select user_id, gallery_id, token_id, token_definition_id, token_media, position, gallery_relevance from gallery_tokens
+            group by user_id, gallery_id, token_id, token_definition_id, token_media, position, gallery_relevance) as x
+    group by x.user_id, x.gallery_id, x.gallery_relevance
 
     union all
 
@@ -75,13 +80,15 @@ create materialized view community_galleries as (
     select user_id,
         community_id,
         gallery_id,
+        gallery_relevance,
         array_agg(token_id order by position) as token_ids,
         array_agg(token_definition_id order by position) as token_definition_ids,
         array_agg(token_media order by position) as token_medias from gallery_tokens
-    group by user_id, community_id, gallery_id
+    group by user_id, community_id, gallery_id, gallery_relevance
 );
 
-create index gallery_previews_gallery_id_idx on community_galleries (gallery_id);
-create unique index gallery_previews_community_id_gallery_id_idx on community_galleries (community_id, gallery_id);
+create index community_galleries_gallery_id_idx on community_galleries (gallery_id);
+create unique index community_galleries_community_id_gallery_id_idx on community_galleries (community_id, gallery_id);
+create index community_galleries_community_id_gallery_relevance_idx on community_galleries (community_id, gallery_relevance, gallery_id);
 
-select cron.schedule('refresh-gallery-previews', '45 */3 * * *', 'refresh materialized view concurrently community_galleries with data');
+select cron.schedule('refresh-community-galleries', '45 */3 * * *', 'refresh materialized view concurrently community_galleries with data');
