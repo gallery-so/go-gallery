@@ -20,7 +20,7 @@ DEPLOY_VERSION       := $(CURRENT_BRANCH)-$(CURRENT_COMMIT_HASH)
 SET_GCP_PROJECT      = gcloud config set project $(GCP_PROJECT)
 CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(DEPLOY_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
 CLOUD_JOB_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run jobs update $(JOB_NAME) --image $(IMAGE_TAG) --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) $(JOB_OPTIONS) --env-vars-file {} --quiet'
-SCHEDULER_DEPLOY     = gcloud scheduler jobs create http $(CRON_NAME) --location $(CRON_LOCATION) --schedule $(CRON_SCHEDULE) --uri $(CRON_URI) --http-method $(CRON_METHOD) --time-zone "America/New_York" 
+SCHEDULER_DEPLOY     = gcloud scheduler jobs create http $(CRON_NAME) --location $(CRON_LOCATION) --schedule $(CRON_SCHEDULE) --uri $(CRON_URI) --http-method $(CRON_METHOD)
 CRON_NAME            = $(CRON_PREFIX)-$(DEPLOY_VERSION)
 BASE_DEPLOY_FLAGS    = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
 DEPLOY_FLAGS         = $(BASE_DEPLOY_FLAGS) --cpu-throttling
@@ -297,7 +297,7 @@ $(DEPLOY)-$(PROD)-emails-notifications       : URI_NAME       := emails-v2
 
 $(DEPLOY)-%-emails-digest             : CRON_PREFIX    := emails_digest
 $(DEPLOY)-%-emails-digest             : CRON_LOCATION  := $(DEPLOY_REGION)
-$(DEPLOY)-%-emails-digest             : CRON_SCHEDULE  := '0 14 * * 3'
+$(DEPLOY)-%-emails-digest             : CRON_SCHEDULE  := '0 16 * * 1'
 $(DEPLOY)-%-emails-digest             : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/digest/send
 $(DEPLOY)-%-emails-digest             : CRON_FLAGS     = --oidc-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com --oidc-token-audience $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')
 $(DEPLOY)-%-emails-digest             : CRON_METHOD    := POST
