@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"strconv"
 	"strings"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -17,6 +18,11 @@ var (
 	FxHashArticlesContract = persist.NewContractIdentifiers("KT1GtbuswcNMGhHF2TSuH1Yfaqn16do8Qtva", persist.ChainTezos)
 	HicEtNuncContract      = persist.NewContractIdentifiers("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton", persist.ChainTezos)
 	ObjktContract          = persist.NewContractIdentifiers("KT19xbD2xn6A81an18S35oKtnkFNr9CVwY5m", persist.ChainTezos)
+	GrailsSeasonOne        = persist.NewContractIdentifiers("0xb6329bd2741c4e5e91e26c4e653db643e74b2b19", persist.ChainETH)
+	GrailsSeasonTwo        = persist.NewContractIdentifiers("0xd78afb925a21f87fa0e35abae2aead3f70ced96b", persist.ChainETH)
+	GrailsSeasonThree      = persist.NewContractIdentifiers("0x503a3039e9ce236e9a12e4008aecbb1fd8b384a3", persist.ChainETH)
+	GrailsSeasonFour       = persist.NewContractIdentifiers("0x069eeda3395242bd0d382e3ec5738704569b8885", persist.ChainETH)
+	GrailsSeasonFive       = persist.NewContractIdentifiers("0x92a50fe6ede411bd26e171b97472e24d245349b8", persist.ChainETH)
 )
 
 var FxHashContracts = []persist.ContractIdentifiers{
@@ -29,6 +35,14 @@ var FxHashContracts = []persist.ContractIdentifiers{
 var HicEtNuncContracts = []persist.ContractIdentifiers{
 	HicEtNuncContract,
 	ObjktContract,
+}
+
+var GrailsContracts = []persist.ContractIdentifiers{
+	GrailsSeasonOne,
+	GrailsSeasonTwo,
+	GrailsSeasonThree,
+	GrailsSeasonFour,
+	GrailsSeasonFive,
 }
 
 func IsEns(chain persist.Chain, address persist.Address) bool {
@@ -80,6 +94,28 @@ func IsFxhashSigned(td db.TokenDefinition, c db.Contract, m persist.TokenMetadat
 		return IsFxhashSignedEth(td.Chain, td.ContractAddress, c.Symbol.String, m)
 	}
 	return true
+}
+
+func IsGrails(chain persist.Chain, address persist.Address, symbol string) bool {
+	// already deployed Grails contracts
+	if util.Contains(GrailsContracts, persist.NewContractIdentifiers(address, chain)) {
+		return true
+	}
+	// starting with season four, contract symbols are GRAILS<season-number>
+	if !strings.HasPrefix(symbol, "GRAILS") {
+		return false
+	}
+	// parse season number, if there are leading zeros it's probably not a Grails contract
+	seasonNum := strings.TrimPrefix(symbol, "GRAILS")
+	if seasonNum != strings.TrimPrefix(seasonNum, "0") {
+		return false
+	}
+	_, err := strconv.Atoi(seasonNum)
+	if err != nil {
+		return false
+	}
+	// valid season number and only deployed on ethereum mainnet
+	return chain == persist.ChainETH
 }
 
 // KeywordsFor returns the fields in a token's metadata that should be used to download assets from
