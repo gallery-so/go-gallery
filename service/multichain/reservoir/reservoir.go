@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -555,6 +556,10 @@ func assetToAgnosticToken(t TokenWithOwnership, ownerAddress persist.Address) mu
 func collectionToAgnosticContract(ctx context.Context, osP *opensea.Provider, c Collection, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
 	// reservoir doesn't keep parent contract data
 	if isSharedContract(c.ID) {
+		return osP.GetContractByAddress(ctx, contractAddress)
+	}
+	// Grails doesn't follow the shared contract format
+	if platform.IsGrails(osP.Chain, contractAddress, c.Symbol) {
 		return osP.GetContractByAddress(ctx, contractAddress)
 	}
 	return multichain.ChainAgnosticContract{
