@@ -588,26 +588,7 @@ func (c Chain) L1ChainGroup() []Chain {
 	return cg
 }
 
-// URL turns a token's URI into a URL
-func (uri TokenURI) URL() (*url.URL, error) {
-	return url.Parse(uri.String())
-}
-
-// IsPathPrefixed returns whether the URI is prefixed with a path to be parsed by a browser or decentralized storage service
-func (uri TokenURI) IsPathPrefixed() bool {
-	return strings.HasPrefix(uri.String(), "http") || strings.HasPrefix(uri.String(), "ipfs://") || strings.HasPrefix(uri.String(), "arweave") || strings.HasPrefix(uri.String(), "ar://")
-}
-
-func (uri TokenURI) String() string {
-	asString := string(uri)
-	if strings.HasPrefix(asString, "http") || strings.HasPrefix(asString, "ipfs") || strings.HasPrefix(asString, "ar") {
-		url, err := url.QueryUnescape(string(uri))
-		if err == nil && url != string(uri) {
-			return url
-		}
-	}
-	return asString
-}
+func (uri TokenURI) String() string { return string(uri) }
 
 // Value implements the driver.Valuer interface for token URIs
 func (uri TokenURI) Value() (driver.Value, error) {

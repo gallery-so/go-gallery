@@ -857,7 +857,6 @@ func readerFromURL(ctx context.Context, mediaURL string, mediaType persist.Media
 }
 
 func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
-
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
 	mediaType, contentType, contentLength := func() (persist.MediaType, string, *int64) {
