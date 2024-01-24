@@ -1,480 +1,587 @@
+//go:generate go get github.com/Khan/genqlient/generate
+//go:generate go run github.com/Khan/genqlient
 package emails
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"math"
 	"net/http"
+	"sort"
+	"strings"
+	"time"
 
-	"cloud.google.com/go/storage"
+	"github.com/Khan/genqlient/graphql"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/publicapi"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/store"
 	"github.com/mikeydub/go-gallery/util"
 )
 
-type Selected struct {
-	Position *int `json:"position"`
-	Entity   any  `json:"entity"`
-}
+const (
+	defaultPostCount             = 5
+	defaultCommunityCount        = 3
+	defaultGalleryCount          = 3
+	defaultIncludeTopPosts       = true
+	defaultIncludeTopGaleries    = true
+	defaultIncludeTopCommunities = true
+	overrideFile                 = "email_digest_overrides.json"
+)
 
-type GalleryWithUser struct {
-	Gallery coredb.Gallery `json:"gallery"`
-	User    coredb.User    `json:"user"`
-}
+var lookbackWindow time.Duration = time.Duration(7 * 24 * time.Hour)
 
 type DigestValues struct {
-	TopPosts       IncludedSelected `json:"posts"`
-	TopCommunities IncludedSelected `json:"communities"`
-	TopGalleries   IncludedSelected `json:"galleries"`
-	TopFirstPosts  IncludedSelected `json:"first_posts"`
+	Date           string           `json:"date"`
+	IntroText      *string          `json:"intro_text"`
+	Posts          IncludedSelected `json:"posts"`
+	Communities    IncludedSelected `json:"communities"`
+	Galleries      IncludedSelected `json:"galleries"`
 	PostCount      int              `json:"post_count"`
 	CommunityCount int              `json:"community_count"`
 	GalleryCount   int              `json:"gallery_count"`
-	FirstPostCount int              `json:"first_post_count"`
 }
 
 type IncludedSelected struct {
-	Selected []Selected `json:"selected"`
-	Include  bool       `json:"include"`
-}
-
-type SelectedID struct {
-	ID       persist.DBID `json:"id"`
-	Position int          `json:"position"`
+	Selected []any `json:"selected"`
+	Include  bool  `json:"include"`
 }
 
 type DigestValueOverrides struct {
-	TopPosts              []SelectedID `json:"posts"`
-	TopCommunities        []SelectedID `json:"communities"`
-	TopGalleries          []SelectedID `json:"galleries"`
-	TopFirstPosts         []SelectedID `json:"first_posts"`
-	PostCount             int          `json:"post_count"`
-	CommunityCount        int          `json:"community_count"`
-	GalleryCount          int          `json:"gallery_count"`
-	FirstPostCount        int          `json:"first_post_count"`
-	IncludeTopPosts       *bool        `json:"include_top_posts,omitempty"`
-	IncludeTopCommunities *bool        `json:"include_top_communities,omitempty"`
-	IncludeTopGalleries   *bool        `json:"include_top_galleries,omitempty"`
-	IncludeTopFirstPosts  *bool        `json:"include_top_first,omitempty"`
+	Posts                 []persist.DBID `json:"posts"`
+	Communities           []persist.DBID `json:"communities"`
+	Galleries             []persist.DBID `json:"galleries"`
+	PostCount             int            `json:"post_count"`
+	CommunityCount        int            `json:"community_count"`
+	GalleryCount          int            `json:"gallery_count"`
+	IncludeTopPosts       *bool          `json:"include_top_posts,omitempty"`
+	IncludeTopCommunities *bool          `json:"include_top_communities,omitempty"`
+	IncludeTopGalleries   *bool          `json:"include_top_galleries,omitempty"`
+	IntroText             *string        `json:"intro_text,omitempty"`
 }
 
-type UserFacingToken struct {
+type TokenDigestEntity struct {
 	TokenID         persist.DBID `json:"token_id"`
 	Name            string       `json:"name"`
 	Description     string       `json:"description"`
 	PreviewImageURL string       `json:"preview_image_url"`
-	Override        bool         `json:"override"`
-}
-type UserFacingPost struct {
-	PostID          persist.DBID      `json:"post_id"`
-	Caption         string            `json:"caption"`
-	Author          string            `json:"author"`
-	Tokens          []UserFacingToken `json:"tokens"`
-	PreviewImageURL string            `json:"preview_image_url"`
-	Override        bool              `json:"override"`
+	Editorialized   bool         `json:"editorialized"`
 }
 
-type UserFacingContract struct {
-	ContractID      persist.DBID    `json:"contract_id"`
-	ContractAddress persist.Address `json:"contract_address"`
-	Chain           persist.Chain   `json:"chain"`
-	Name            string          `json:"name"`
-	Description     string          `json:"description"`
-	PreviewImageURL string          `json:"preview_image_url"`
-	Override        bool            `json:"override"`
+type PostDigestEntity struct {
+	PostID         persist.DBID        `json:"post_id"`
+	Caption        string              `json:"caption"`
+	AuthorUsername string              `json:"author_username"`
+	AuthorPFPURL   string              `json:"author_pfp_url"`
+	Tokens         []TokenDigestEntity `json:"tokens"`
+	Editorialized  bool                `json:"editorialized"`
 }
 
-const (
-	defaultPostCount             = 5
-	defaultCommunityCount        = 5
-	defaultGalleryCount          = 5
-	defaultFirstPostCount        = 5
-	defaultIncludeTopPosts       = true
-	defaultIncludeTopGaleries    = false
-	defaultIncludeTopCommunities = true
-	defaultIncludeTopFirstPosts  = false
-)
+type CommunityDigestEntity struct {
+	CommunityID            persist.DBID        `json:"community_id"`
+	ContractAddress        persist.Address     `json:"contract_address"`
+	ChainName              string              `json:"chain_name"`
+	Name                   string              `json:"name"`
+	Description            string              `json:"description"`
+	PreviewImageURL        string              `json:"preview_image_url"`
+	CreatorName            string              `json:"creator_name"`
+	CreatorPreviewImageURL string              `json:"creator_preview_image_url"`
+	Tokens                 []TokenDigestEntity `json:"tokens"`
+	Editorialized          bool                `json:"editorialized"`
+}
 
-const overrideFile = "email_digest_overrides.json"
+type GalleryDigestEntity struct {
+	GalleryID       persist.DBID        `json:"gallery_id"`
+	CreatorUsername string              `json:"creator_username"`
+	Name            string              `json:"name"`
+	Description     string              `json:"description"`
+	Tokens          []TokenDigestEntity `json:"tokens"`
+	Editorialized   bool                `json:"editorialized"`
+}
 
-func getDigestValues(q *coredb.Queries, loaders *dataloader.Loaders, stg *storage.Client, f *publicapi.FeedAPI) gin.HandlerFunc {
-	return func(c *gin.Context) {
-
-		// mimic backend auth because the getDigest function uses the feed api which requires these values set on the context despite not using them
-		c.Set("auth.user_id", persist.DBID(""))
-		c.Set("auth.auth_error", nil)
-
-		result, err := getDigest(c, stg, f, q, loaders, false)
+func getDigestValues(q *db.Queries, b *store.BucketStorer, gql *graphql.Client) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		result, err := buildDigestTemplate(ctx, b, q, gql)
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
-		c.JSON(http.StatusOK, result)
+		ctx.JSON(http.StatusOK, result)
 	}
 }
 
-func getDigest(c context.Context, stg *storage.Client, f *publicapi.FeedAPI, q *coredb.Queries, loaders *dataloader.Loaders, onlyPositioned bool) (DigestValues, error) {
-	// TODO top galleries and top first posts
-	overrides, err := getOverrides(c, stg)
+func updateDigestValues(b *store.BucketStorer) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var input DigestValueOverrides
+
+		if err := ctx.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(ctx, http.StatusBadRequest, fmt.Errorf("error reading overrides: %v", err))
+			return
+		}
+
+		byt, err := json.Marshal(input)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusInternalServerError, fmt.Errorf("error encoding overrides: %v", err))
+			return
+		}
+
+		_, err = b.Write(ctx, overrideFile, byt)
+		if err != nil {
+			util.ErrResponse(ctx, http.StatusInternalServerError, fmt.Errorf("failed to write overrides: %s", err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func buildDigestTemplate(ctx context.Context, b *store.BucketStorer, q *db.Queries, gql *graphql.Client) (DigestValues, error) {
+	overrides, err := getOverrides(ctx, b)
 	if err != nil {
-		return DigestValues{}, fmt.Errorf("error getting overrides: %v", err)
+		return DigestValues{}, fmt.Errorf("error getting overrides: %s", err)
 	}
 
 	postCount := defaultPostCount
-	communityCount := defaultCommunityCount
-
 	if overrides.PostCount != 0 {
 		postCount = overrides.PostCount
 	}
 
-	if overrides.CommunityCount != 0 {
-		communityCount = overrides.CommunityCount
+	communityCount := overrides.CommunityCount
+	if communityCount == 0 || communityCount > defaultCommunityCount {
+		communityCount = defaultCommunityCount
 	}
 
-	trendingFeed, _, err := f.TrendingFeed(c, nil, nil, util.ToPointer(10), nil)
+	galleryCount := overrides.GalleryCount
+	if communityCount == 0 || galleryCount > defaultGalleryCount {
+		galleryCount = defaultGalleryCount
+	}
+
+	posts, err := getSpotlightPosts(ctx, q, gql, postCount, overrides.Posts)
 	if err != nil {
-		return DigestValues{}, fmt.Errorf("error getting trending feed: %v", err)
+		return DigestValues{}, fmt.Errorf("error getting spotlight posts: %s", err)
 	}
 
-	topPosts := util.Filter(util.MapWithoutError(trendingFeed, func(a any) any {
-		if post, ok := a.(coredb.Post); ok {
-			up, err := postToUserFacing(c, q, post, loaders, false)
-			if err != nil {
-				logger.For(c).Errorf("error converting post to user facing: %s", err)
-				return nil
-			}
-			return up
-		}
-		return nil
-	}), func(p any) bool {
-		return p.(UserFacingPost).PostID != ""
-	}, false)
-
-	selectedPosts := selectWithOverrides(topPosts, overrides.TopPosts, func(s SelectedID) Selected {
-		p, err := q.GetPostByID(c, s.ID)
-		if err != nil {
-			logger.For(c).Errorf("error getting post by id: %s", err)
-			return Selected{}
-		}
-		up, err := postToUserFacing(c, q, p, loaders, true)
-		if err != nil {
-			logger.For(c).Errorf("error converting post to user facing: %s", err)
-			return Selected{}
-		}
-		return Selected{
-			Entity:   up,
-			Position: &s.Position,
-		}
-	}, postCount, onlyPositioned)
-
-	topCollectionsDB, err := q.GetTopCommunitiesByPosts(c, 10)
+	communities, err := getSpotlightCommunities(ctx, q, gql, communityCount, overrides.Communities)
 	if err != nil {
-		return DigestValues{}, err
+		return DigestValues{}, fmt.Errorf("error getting spotlight communities: %s", err)
 	}
 
-	topCollectionsUserFacing := util.MapWithoutError(topCollectionsDB, func(co coredb.GetTopCommunitiesByPostsRow) any {
-		return contractToUserFacing(c, q, loaders, co.Contract, false)
-	})
-
-	selectedCollections := selectWithOverrides(topCollectionsUserFacing, overrides.TopCommunities, func(s SelectedID) Selected {
-		co, err := q.GetContractByID(c, s.ID)
-		if err != nil {
-			return Selected{}
-		}
-		return Selected{
-			Entity:   contractToUserFacing(c, q, loaders, co, true),
-			Position: &s.Position,
-		}
-	}, communityCount, onlyPositioned)
-
-	includePosts := defaultIncludeTopPosts
-	includeCommunities := defaultIncludeTopCommunities
-	if overrides.IncludeTopPosts != nil {
-		includePosts = *overrides.IncludeTopPosts
-	}
-	if overrides.IncludeTopCommunities != nil {
-		includeCommunities = *overrides.IncludeTopCommunities
+	galleries, err := getSpotlightGalleries(ctx, q, gql, galleryCount, overrides.Galleries)
+	if err != nil {
+		return DigestValues{}, fmt.Errorf("error getting spotlight galleries: %s", err)
 	}
 
-	topFirstPostCount, _ := util.FindFirst([]int{overrides.FirstPostCount, defaultFirstPostCount, 5}, func(i int) bool {
-		return i >= 0
-	})
+	includePosts := util.GetOptionalValue(overrides.IncludeTopPosts, defaultIncludeTopPosts)
+	if includePosts && len(posts) == 0 {
+		return DigestValues{}, fmt.Errorf("no posts to include")
+	}
 
-	galleryCount, _ := util.FindFirst([]int{overrides.GalleryCount, defaultGalleryCount, 5}, func(i int) bool {
-		return i >= 0
-	})
+	includeCommunities := util.GetOptionalValue(overrides.IncludeTopCommunities, defaultIncludeTopCommunities)
+	if includeCommunities && len(communities) == 0 {
+		return DigestValues{}, fmt.Errorf("no communities to include")
+	}
 
-	result := DigestValues{
-		TopPosts: IncludedSelected{
-			Selected: selectedPosts,
+	includeGalleries := util.GetOptionalValue(overrides.IncludeTopGalleries, defaultIncludeTopGaleries)
+	if includeGalleries && len(galleries) == 0 {
+		return DigestValues{}, fmt.Errorf("no galleries to include")
+	}
+
+	return DigestValues{
+		Date:           time.Now().Format("2 January 2006"),
+		IntroText:      overrides.IntroText,
+		PostCount:      postCount,
+		CommunityCount: communityCount,
+		GalleryCount:   galleryCount,
+		Posts: IncludedSelected{
+			Selected: util.MapWithoutError(posts, func(p PostDigestEntity) any { return p }),
 			Include:  includePosts,
 		},
-		TopCommunities: IncludedSelected{
-			Selected: selectedCollections,
+		Communities: IncludedSelected{
+			Selected: util.MapWithoutError(communities, func(c CommunityDigestEntity) any { return c }),
 			Include:  includeCommunities,
 		},
-		FirstPostCount: topFirstPostCount,
-		CommunityCount: communityCount,
-		PostCount:      postCount,
-		GalleryCount:   galleryCount,
-	}
-	return result, nil
+		Galleries: IncludedSelected{
+			Selected: util.MapWithoutError(galleries, func(c GalleryDigestEntity) any { return c }),
+			Include:  includeGalleries,
+		},
+	}, nil
 }
 
-func getOverrides(c context.Context, stg *storage.Client) (DigestValueOverrides, error) {
-	obj := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile)
-	_, err := obj.Attrs(c)
-	if err != nil && err != storage.ErrObjectNotExist {
-		return DigestValueOverrides{}, fmt.Errorf("error getting overrides attrs: %v", err)
+func getSpotlightGalleries(ctx context.Context, q *db.Queries, gql *graphql.Client, n int, editorialGalleries []persist.DBID) ([]GalleryDigestEntity, error) {
+	added := make(map[persist.DBID]bool)
+	entities := make([]GalleryDigestEntity, 0, n)
+
+	addGalleries(ctx, gql, &entities, added, n, editorialGalleries, true)
+	if len(entities) >= n {
+		return entities[:n], nil
 	}
 
-	if err == storage.ErrObjectNotExist {
-		w := obj.NewWriter(c)
-		err = json.NewEncoder(w).Encode(DigestValueOverrides{})
-		if err != nil {
-			return DigestValueOverrides{}, fmt.Errorf("error encoding overrides: %v", err)
-		}
-		err = w.Close()
-		if err != nil {
-			return DigestValueOverrides{}, fmt.Errorf("error closing writer: %v", err)
-		}
-	}
-
-	reader, err := obj.NewReader(c)
+	trendingGalleries, err := q.GetTopGalleriesByViews(ctx, time.Now().Add(-lookbackWindow))
 	if err != nil {
-		return DigestValueOverrides{}, fmt.Errorf("error getting overrides: %v", err)
+		return nil, err
 	}
 
-	var overrides DigestValueOverrides
-	err = json.NewDecoder(reader).Decode(&overrides)
-	if err != nil {
-		return DigestValueOverrides{}, fmt.Errorf("error decoding overrides: %v", err)
-	}
-	return overrides, nil
+	addGalleries(ctx, gql, &entities, added, n, trendingGalleries, false)
+	return entities, nil
 }
 
-func contractToUserFacing(ctx context.Context, q *coredb.Queries, l *dataloader.Loaders, collection coredb.Contract, override bool) UserFacingContract {
-	if collection.ProfileImageUrl.String == "" {
-		tokens, err := q.GetTokensByContractIdPaginate(ctx, coredb.GetTokensByContractIdPaginateParams{
-			ID:               collection.ID,
-			Limit:            1,
-			GalleryUsersOnly: true,
-		})
-		if err == nil && len(tokens) > 0 {
-			media, err := l.GetMediaByMediaIdIgnoringStatusBatch.Load(tokens[0].TokenDefinition.TokenMediaID)
-			if err == nil {
-				collection.ProfileImageUrl.String = util.FirstNonEmptyString(media.Media.ThumbnailURL.String(), media.Media.MediaURL.String())
+func getSpotlightCommunities(ctx context.Context, q *db.Queries, gql *graphql.Client, n int, editorialCommunities []persist.DBID) ([]CommunityDigestEntity, error) {
+	added := make(map[persist.DBID]bool)
+	entities := make([]CommunityDigestEntity, 0, n)
+
+	addCommunities(ctx, gql, &entities, added, n, editorialCommunities, true)
+	if len(entities) >= n {
+		return entities[:n], nil
+	}
+
+	trendingCommunities, err := q.GetTopCommunitiesByPosts(ctx, time.Now().Add(-lookbackWindow))
+	if err != nil {
+		return nil, err
+	}
+
+	addCommunities(ctx, gql, &entities, added, n, trendingCommunities, false)
+	return entities, nil
+}
+
+func getSpotlightPosts(ctx context.Context, q *db.Queries, gql *graphql.Client, n int, editorialPosts []persist.DBID) ([]PostDigestEntity, error) {
+	added := make(map[persist.DBID]bool)
+	entities := make([]PostDigestEntity, 0, n)
+
+	addPosts(ctx, gql, &entities, added, n, editorialPosts, true)
+	if len(entities) >= n {
+		return entities[:n], nil
+	}
+
+	trendingPosts, err := q.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{WindowEnd: time.Now().Add(-lookbackWindow)})
+	if err != nil {
+		return nil, err
+	}
+
+	trendingPosts = util.Filter(trendingPosts, func(p db.GetFeedEntityScoresRow) bool { return !p.IsGalleryPost && !p.Post.Deleted }, true)
+	sort.Slice(trendingPosts, func(i, j int) bool {
+		return trendingPosts[i].FeedEntityScore.Interactions > trendingPosts[j].FeedEntityScore.Interactions
+	})
+
+	trendingIDs := util.MapWithoutError(trendingPosts, func(p db.GetFeedEntityScoresRow) persist.DBID { return p.Post.ID })
+	addPosts(ctx, gql, &entities, added, n, trendingIDs, false)
+	return entities, nil
+}
+
+func addGalleries(
+	ctx context.Context,
+	gql *graphql.Client,
+	spotlightGalleries *[]GalleryDigestEntity,
+	added map[persist.DBID]bool,
+	n int,
+	entityIDs []persist.DBID,
+	editorialized bool,
+) {
+	for i := 0; len(*spotlightGalleries) < n && i < len(entityIDs)-1; i++ {
+		if added[entityIDs[i]] {
+			continue
+		}
+		entity, err := galleryToEntity(ctx, gql, entityIDs[i], editorialized)
+		if err != nil {
+			logger.For(ctx).Error(err)
+			continue
+		}
+		*spotlightGalleries = append(*spotlightGalleries, entity)
+		added[entityIDs[i]] = true
+	}
+}
+
+func addCommunities(
+	ctx context.Context,
+	gql *graphql.Client,
+	spotlightCommunities *[]CommunityDigestEntity,
+	added map[persist.DBID]bool,
+	n int,
+	entityIDs []persist.DBID,
+	editorialized bool,
+) {
+	for i := 0; len(*spotlightCommunities) < n && i < len(entityIDs)-1; i++ {
+		if added[entityIDs[i]] {
+			continue
+		}
+		entity, err := communityToEntity(ctx, *gql, entityIDs[i], editorialized)
+		if err != nil {
+			logger.For(ctx).Error(err)
+			continue
+		}
+		*spotlightCommunities = append(*spotlightCommunities, entity)
+		added[entityIDs[i]] = true
+	}
+}
+
+func addPosts(
+	ctx context.Context,
+	gql *graphql.Client,
+	spotlightPosts *[]PostDigestEntity,
+	added map[persist.DBID]bool,
+	n int,
+	postIDs []persist.DBID,
+	editorialized bool,
+) {
+	for i := 0; len(*spotlightPosts) < n && i < len(postIDs)-1; i++ {
+		if added[postIDs[i]] {
+			continue
+		}
+		entity, err := postToEntity(ctx, *gql, postIDs[i], editorialized)
+		if err != nil {
+			logger.For(ctx).Error(err)
+			continue
+		}
+		*spotlightPosts = append(*spotlightPosts, entity)
+		added[postIDs[i]] = true
+	}
+}
+
+func getOverrides(ctx context.Context, b *store.BucketStorer) (DigestValueOverrides, error) {
+	exists, err := b.Exists(ctx, overrideFile)
+	if err != nil {
+		return DigestValueOverrides{}, err
+	}
+
+	if !exists {
+		return DigestValueOverrides{}, nil
+	}
+
+	r, err := b.NewReader(ctx, overrideFile)
+	if err != nil {
+		return DigestValueOverrides{}, nil
+	}
+
+	defer r.Close()
+
+	var o DigestValueOverrides
+	err = util.UnmarshallBody(&o, r)
+
+	return o, err
+}
+
+func galleryToEntity(ctx context.Context, gql *graphql.Client, galleryID persist.DBID, editorialized bool) (GalleryDigestEntity, error) {
+	r, err := galleryDigestEntityQuery(ctx, *gql, galleryID)
+	if err != nil {
+		return GalleryDigestEntity{}, err
+	}
+
+	switch t := (*r.GalleryById).(type) {
+	case *galleryDigestEntityQueryGalleryByIdGallery:
+		entity := GalleryDigestEntity{
+			GalleryID:     t.Dbid,
+			Name:          util.GetOptionalValue(t.Name, ""),
+			Description:   util.GetOptionalValue(t.Description, ""),
+			Tokens:        make([]TokenDigestEntity, 0, len(t.TokenPreviews)),
+			Editorialized: editorialized,
+		}
+
+		if t.Owner != nil {
+			entity.CreatorUsername = util.GetOptionalValue(t.Owner.Username, "")
+		}
+
+		for _, t := range t.TokenPreviews {
+			if t.Small != nil {
+				entity.Tokens = append(entity.Tokens, TokenDigestEntity{
+					Name:            "",    // not needed by template
+					Description:     "",    // not needed by template
+					Editorialized:   false, // not needed by template
+					PreviewImageURL: util.GetOptionalValue(t.Small, ""),
+				})
 			}
 		}
 
-	}
-	return UserFacingContract{
-		ContractID:      collection.ID,
-		Name:            collection.Name.String,
-		Description:     collection.Description.String,
-		PreviewImageURL: collection.ProfileImageUrl.String,
-		ContractAddress: collection.Address,
-		Chain:           collection.Chain,
-		Override:        override,
-	}
-}
-
-func tokenToUserFacing(c context.Context, tokenID persist.DBID, q *coredb.Queries, loaders *dataloader.Loaders, override bool) (UserFacingToken, error) {
-	token, err := q.GetTokenById(c, tokenID)
-	if err != nil {
-		return UserFacingToken{}, fmt.Errorf("error getting token by id: %s", err)
-	}
-	media, err := loaders.GetMediaByMediaIdIgnoringStatusBatch.Load(token.TokenDefinition.TokenMediaID)
-	if err != nil {
-		return UserFacingToken{}, fmt.Errorf("error getting media by id: %s", err)
-	}
-	return UserFacingToken{
-		TokenID:         tokenID,
-		Name:            token.TokenDefinition.Name.String,
-		Description:     token.TokenDefinition.Description.String,
-		PreviewImageURL: util.FirstNonEmptyString(media.Media.ThumbnailURL.String(), media.Media.MediaURL.String()),
-		Override:        override,
-	}, nil
-}
-
-func postToUserFacing(c context.Context, q *coredb.Queries, post coredb.Post, loaders *dataloader.Loaders, override bool) (UserFacingPost, error) {
-	user, err := q.GetUserById(c, post.ActorID)
-	if err != nil {
-		return UserFacingPost{}, fmt.Errorf("error getting user by id: %s", err)
-	}
-	var tokens []UserFacingToken
-	for _, t := range post.TokenIds {
-		ut, err := tokenToUserFacing(c, t, q, loaders, override)
-		if err != nil {
-			return UserFacingPost{}, fmt.Errorf("error getting token by id: %s", err)
+		if len(entity.Tokens) == 0 {
+			return GalleryDigestEntity{}, errors.New("no token previews found for gallery")
 		}
 
-		tokens = append(tokens, ut)
-	}
-	var previewURL string
-	if len(tokens) > 0 {
-		previewURL = tokens[0].PreviewImageURL
-	}
+		// previews look jank if there are more than two previews
+		if len(entity.Tokens) > 2 {
+			entity.Tokens = entity.Tokens[:2]
+		}
 
-	return UserFacingPost{
-		PostID:          post.ID,
-		Caption:         post.Caption.String,
-		Author:          user.Username.String,
-		Tokens:          tokens,
-		PreviewImageURL: previewURL,
-		Override:        override,
-	}, nil
+		return entity, nil
+	case *galleryDigestEntityQueryGalleryByIdErrGalleryNotFound:
+		return GalleryDigestEntity{}, errors.New(t.Message)
+	default:
+		return GalleryDigestEntity{}, fmt.Errorf("unexpected gallery response %T", t)
+	}
 }
 
-// selectResults takes an initial list of entities and a list of selected ids and returns a positioned list of selected entities
-// so that any overrides are in the correct position and any entities that are not overridden are in the correct position.
-// selectedCount determines how many entities will actually be positioned and how many will have their position as nil.
-// overrideFetcher is a function that takes a SelectedID and returns a Selected entity
-// this is so that we can fetch the entity from the database if it is not already in the initial list.
-func selectWithOverrides(initial []any, overrides []SelectedID, overrideFetcher func(s SelectedID) Selected, selectedCount int, onlyPositioned bool) []Selected {
-	selectedResults := make([]Selected, int(math.Max(float64(len(initial)), float64(len(overrides)))))
-	for _, post := range overrides {
-		if len(selectedResults) <= post.Position {
-			selectedResults = append(selectedResults, make([]Selected, post.Position-len(selectedResults)+1)...)
-		}
-		selectedResults[post.Position] = overrideFetcher(post)
+func communityToEntity(ctx context.Context, gql graphql.Client, communityID persist.DBID, editorialized bool) (CommunityDigestEntity, error) {
+	r, err := communityDigestEntityQuery(ctx, gql, communityID)
+	if err != nil {
+		return CommunityDigestEntity{}, err
 	}
-outer:
-	for i, it := range initial {
-		ic := i
-		if selectedResults[i].Position != nil && i < selectedCount {
-			// add to the next available position while keeping the order, if we exceed selectedCount, append to the end still without a position
-			// also ensure that i is updated so that we don't overwrite the same position in the next loop
-			for j := i; j < selectedCount; j++ {
-				j := j
-				if selectedResults[j].Position == nil {
-					selectedResults[j] = Selected{
-						Entity:   it,
-						Position: &j,
+
+	switch t := (*r.CommunityById).(type) {
+	case *communityDigestEntityQueryCommunityByIdCommunity:
+		entity := CommunityDigestEntity{
+			CommunityID:     t.Dbid,
+			Name:            util.GetOptionalValue(t.Name, ""),
+			Description:     util.GetOptionalValue(t.Description, ""),
+			PreviewImageURL: util.GetOptionalValue(t.ProfileImageURL, ""),
+			Editorialized:   editorialized,
+		}
+		switch c := (*t.Subtype).(type) {
+		case *communityDigestEntityQueryCommunityByIdCommunitySubtypeArtBlocksCommunity:
+			if c.Contract.ContractAddress != nil {
+				entity.ContractAddress = util.GetOptionalValue(c.Contract.ContractAddress.Address, "")
+				entity.ChainName = strings.ToLower(string(util.GetOptionalValue(c.Contract.ContractAddress.Chain, "")))
+			}
+		case *communityDigestEntityQueryCommunityByIdCommunitySubtypeContractCommunity:
+			entity.ContractAddress = util.GetOptionalValue(c.Contract.ContractAddress.Address, "")
+			entity.ChainName = strings.ToLower(string(util.GetOptionalValue(c.Contract.ContractAddress.Chain, "")))
+		}
+		if len(t.Creators) > 0 {
+			switch creator := (*t.Creators[0]).(type) {
+			case *communityDigestEntityQueryCommunityByIdCommunityCreatorsChainAddress:
+				entity.CreatorName = creator.Address.String()
+				entity.CreatorPreviewImageURL = ""
+			case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser:
+				entity.CreatorName = util.GetOptionalValue(creator.Username, "")
+				if creator.ProfileImage != nil {
+					switch pfp := (*creator.ProfileImage).(type) {
+					case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage:
+						entity.CreatorPreviewImageURL = addImagePreview(*pfp.Token.Definition.Media)
+						entity.CreatorPreviewImageURL = ""
+					case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage:
+						if pfp.PfpToken != nil {
+							entity.CreatorPreviewImageURL = addImagePreview(*pfp.PfpToken.Definition.Media)
+						} else if pfp.EnsToken != nil && pfp.EnsToken.PreviewURLs != nil {
+							entity.CreatorPreviewImageURL = util.GetOptionalValue(pfp.EnsToken.PreviewURLs.Small, "")
+						}
 					}
-					i = j
-					continue outer
 				}
 			}
 		}
-		if i < selectedCount {
-			selectedResults[i] = Selected{
-				Entity:   it,
-				Position: &ic,
-			}
-		} else {
-			selectedResults[i] = Selected{
-				Entity:   it,
-				Position: nil,
+
+		if t.Tokens != nil {
+			for _, token := range t.Tokens.Edges {
+				if token.Node != nil {
+					entity.Tokens = append(entity.Tokens, tokenToEntity(token.Node.tokenFrag))
+				}
 			}
 		}
-	}
 
-	if onlyPositioned {
-		selectedResults = util.Filter(selectedResults, func(s Selected) bool {
-			return s.Position != nil
-		}, false)
-	}
-	return selectedResults
-}
-
-func updateDigestValues(stg *storage.Client) gin.HandlerFunc {
-	return func(c *gin.Context) {
-
-		input := DigestValueOverrides{}
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("error binding json: %v", err))
-			return
+		// validate
+		if len(entity.Tokens) == 0 {
+			return entity, errors.New("no tokens found for community")
+		}
+		if entity.ChainName == "" {
+			return entity, errors.New("no chain name found for community")
+		}
+		if entity.ContractAddress == "" {
+			return entity, errors.New("no contract address found for community")
 		}
 
-		currentOverrides, err := getOverrides(c, stg)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error getting overrides: %v", err))
-			return
+		// previews look jank if there are more than two previews
+		if len(entity.Tokens) > 2 {
+			entity.Tokens = entity.Tokens[:2]
 		}
 
-		merged := mergeOverrides(currentOverrides, input)
-
-		w := stg.Bucket(env.GetString("CONFIGURATION_BUCKET")).Object(overrideFile).NewWriter(c)
-		err = json.NewEncoder(w).Encode(&merged)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error encoding overrides: %v", err))
-			return
-		}
-		err = w.Close()
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("error closing writer: %v", err))
-			return
-		}
+		return entity, nil
+	case *communityDigestEntityQueryCommunityByIdErrCommunityNotFound:
+		return CommunityDigestEntity{}, errors.New(t.Message)
+	case *communityDigestEntityQueryCommunityByIdErrInvalidInput:
+		return CommunityDigestEntity{}, errors.New(t.Message)
+	default:
+		return CommunityDigestEntity{}, fmt.Errorf("unexpected response %T", t)
 	}
 }
 
-// mergeOverrides takes two overrides and merges them with the second taking precendence. For each of the arrays, if a position overlaps, the second one is taken
-func mergeOverrides(first, second DigestValueOverrides) DigestValueOverrides {
-	seenPostPositions := make(map[int]bool)
-	seenCommunityPositions := make(map[int]bool)
-	seenGalleryPositions := make(map[int]bool)
-	seenFirstPostPositions := make(map[int]bool)
-	for _, p := range second.TopPosts {
-		seenPostPositions[p.Position] = true
-	}
-	for _, p := range second.TopCommunities {
-		seenCommunityPositions[p.Position] = true
+func postToEntity(ctx context.Context, gql graphql.Client, postID persist.DBID, editorialized bool) (PostDigestEntity, error) {
+	r, err := postDigestEntityQuery(ctx, gql, postID)
+	if err != nil {
+		return PostDigestEntity{}, err
 	}
 
-	for _, p := range second.TopGalleries {
-		seenGalleryPositions[p.Position] = true
-	}
-
-	for _, p := range second.TopFirstPosts {
-		seenFirstPostPositions[p.Position] = true
-	}
-
-	for _, p := range first.TopPosts {
-		if _, ok := seenPostPositions[p.Position]; !ok {
-			second.TopPosts = append(second.TopPosts, p)
+	switch t := (*r.PostById).(type) {
+	case *postDigestEntityQueryPostByIdPost:
+		entity := PostDigestEntity{
+			PostID:        postID,
+			Caption:       util.GetOptionalValue(t.Caption, ""),
+			Editorialized: editorialized,
 		}
-	}
-
-	for _, p := range first.TopCommunities {
-		if _, ok := seenCommunityPositions[p.Position]; !ok {
-			second.TopCommunities = append(second.TopCommunities, p)
+		if t.Author != nil {
+			entity.AuthorUsername = util.GetOptionalValue(t.Author.Username, "")
+			if t.Author.ProfileImage != nil {
+				switch pfp := (*t.Author.ProfileImage).(type) {
+				case *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage:
+					entity.AuthorPFPURL = addImagePreview(*pfp.Token.Definition.Media)
+				case *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage:
+					if pfp.PfpToken != nil {
+						entity.AuthorPFPURL = addImagePreview(*pfp.PfpToken.Definition.Media)
+					} else if pfp.EnsToken != nil && pfp.EnsToken.PreviewURLs != nil {
+						entity.AuthorPFPURL = util.GetOptionalValue(pfp.EnsToken.PreviewURLs.Small, "")
+					}
+				}
+			}
 		}
-	}
-
-	for _, p := range first.TopGalleries {
-		if _, ok := seenGalleryPositions[p.Position]; !ok {
-			second.TopGalleries = append(second.TopGalleries, p)
+		for _, token := range t.Tokens {
+			entity.Tokens = append(entity.Tokens, tokenToEntity(token.tokenFrag))
 		}
-	}
 
-	for _, p := range first.TopFirstPosts {
-		if _, ok := seenFirstPostPositions[p.Position]; !ok {
-			second.TopFirstPosts = append(second.TopFirstPosts, p)
+		// validate
+		if len(entity.Tokens) == 0 {
+			return entity, errors.New("no tokens found for post")
 		}
-	}
 
-	if second.PostCount == 0 {
-		second.PostCount = first.PostCount
+		return entity, nil
+	case *postDigestEntityQueryPostByIdErrPostNotFound:
+		return PostDigestEntity{}, errors.New(t.Message)
+	case *postDigestEntityQueryPostByIdErrInvalidInput:
+		return PostDigestEntity{}, errors.New(t.Message)
+	default:
+		return PostDigestEntity{}, fmt.Errorf("unexpected response %T", t)
 	}
+}
 
-	if second.CommunityCount == 0 {
-		second.CommunityCount = first.CommunityCount
+func tokenToEntity(t tokenFrag) TokenDigestEntity {
+	return TokenDigestEntity{
+		TokenID:         persist.DBID(t.Dbid),
+		Name:            util.GetOptionalValue(t.Definition.Name, ""),
+		Description:     util.GetOptionalValue(t.Definition.Description, ""),
+		PreviewImageURL: addImagePreview(*t.Definition.Media),
+		Editorialized:   false,
 	}
+}
 
-	if second.GalleryCount == 0 {
-		second.GalleryCount = first.GalleryCount
+func addImagePreview(m definitionFragMediaMediaSubtype) string {
+	switch media := (m).(type) {
+	case *definitionFragMediaAudioMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaGIFMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaGltfMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaHtmlMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaImageMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaInvalidMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaJsonMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaPdfMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaSyncingMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaTextMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaUnknownMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+	case *definitionFragMediaVideoMedia:
+		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
 	}
+	return ""
+}
 
-	if second.FirstPostCount == 0 {
-		second.FirstPostCount = first.FirstPostCount
+func defaultIntroText(username string) string {
+	if username == "" {
+		return "This is your weekly digest."
 	}
-
-	return second
+	return fmt.Sprintf("Hey %s, this is your weekly digest.", username)
 }

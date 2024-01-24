@@ -1,0 +1,19 @@
+# Default genqlient config; for full documentation see:
+# https://github.com/Khan/genqlient/blob/main/docs/genqlient.yaml
+schema:
+  - ../graphql/schema/schema.graphql
+  - ../graphql/schema/federation.graphql
+package: emails
+optional: pointer
+bindings:
+  DBID:
+    type: github.com/mikeydub/go-gallery/service/persist.DBID
+  TokenId:
+    type: github.com/mikeydub/go-gallery/service/persist.TokenID
+  Address:
+    type: github.com/mikeydub/go-gallery/service/persist.Address
+  ChainAddressInput:
+    type: github.com/mikeydub/go-gallery/service/persist.ChainAddress
+operations:
+- genqlient/*.graphql
+generated: email.genqlient.go
