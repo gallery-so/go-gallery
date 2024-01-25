@@ -697,8 +697,13 @@ type Community implements Node @goEmbedHelper {
     @goField(forceResolver: true)
     @deprecated(reason: "Use Community.holders")
 
-  galleries(maxPreviews: Int!, before: String, after: String, first: Int, last: Int): CommunityGalleriesConnection
-    @goField(forceResolver: true)
+  galleries(
+    maxPreviews: Int!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunityGalleriesConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {
