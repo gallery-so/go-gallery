@@ -30,6 +30,7 @@ create materialized view community_galleries as (
             ct.token_id,
             ct.token_definition_id,
             tm.media as token_media,
+            tm.last_updated as token_media_last_updated,
             (galleries.position, array_position(galleries.collections, collections.id), array_position(collections.nfts, ct.token_id)) as position
         from users, galleries
             join gallery_relevance on gallery_relevance.id = galleries.id,
@@ -57,6 +58,7 @@ create materialized view community_galleries as (
             ct.token_id,
             ct.token_definition_id,
             tm.media,
+            tm.last_updated,
             gallery_relevance.score,
             (galleries.id, array_position(galleries.collections, collections.id), array_position(collections.nfts, ct.token_id))
     )
@@ -68,10 +70,11 @@ create materialized view community_galleries as (
         x.gallery_relevance,
         array_agg(x.token_id order by x.position) as token_ids,
         array_agg(x.token_definition_id order by x.position) as token_definition_ids,
-        array_agg(x.token_media order by x.position) as token_medias
+        array_agg(x.token_media order by x.position) as token_medias,
+        array_agg(x.token_media_last_updated order by x.position) as token_media_last_updated
     from
-        (select user_id, gallery_id, token_id, token_definition_id, token_media, position, gallery_relevance from gallery_tokens
-            group by user_id, gallery_id, token_id, token_definition_id, token_media, position, gallery_relevance) as x
+        (select user_id, gallery_id, token_id, token_definition_id, token_media, token_media_last_updated, position, gallery_relevance from gallery_tokens
+            group by user_id, gallery_id, token_id, token_definition_id, token_media, token_media_last_updated, position, gallery_relevance) as x
     group by x.user_id, x.gallery_id, x.gallery_relevance
 
     union all
@@ -83,12 +86,16 @@ create materialized view community_galleries as (
         gallery_relevance,
         array_agg(token_id order by position) as token_ids,
         array_agg(token_definition_id order by position) as token_definition_ids,
-        array_agg(token_media order by position) as token_medias from gallery_tokens
+        array_agg(token_media order by position) as token_medias,
+        array_agg(token_media_last_updated order by position)
+    from gallery_tokens
     group by user_id, community_id, gallery_id, gallery_relevance
 );
 
 create index community_galleries_gallery_id_idx on community_galleries (gallery_id);
 create unique index community_galleries_community_id_gallery_id_idx on community_galleries (community_id, gallery_id);
 create index community_galleries_community_id_gallery_relevance_idx on community_galleries (community_id, gallery_relevance, gallery_id);
+
+create unique index galleries_id_idx on galleries (id) where not deleted and not hidden;
 
 select cron.schedule('refresh-community-galleries', '45 */3 * * *', 'refresh materialized view concurrently community_galleries with data');
