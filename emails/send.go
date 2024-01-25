@@ -478,6 +478,7 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 	m.SetTemplateID(env.GetString("SENDGRID_DIGEST_TEMPLATE_ID"))
 	p.DynamicTemplateData = asMap
 	m.AddPersonalizations(p)
+	m.SetCategories([]string{"weekly_digest"})
 	p.AddTos(to)
 
 	response, err := s.Send(m)
