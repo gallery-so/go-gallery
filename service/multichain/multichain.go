@@ -271,7 +271,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 		wg.Wait()
 	}()
 
-	_, _, _, err = p.replaceHolderTokensForUser(ctx, user, chains, recCh, errCh)
+	_, _, _, err = p.addHolderTokensForUser(ctx, user, chains, recCh, errCh)
 	return err
 }
 
