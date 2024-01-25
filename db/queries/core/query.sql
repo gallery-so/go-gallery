@@ -1160,7 +1160,7 @@ where
 	and not tm.deleted
 	and (
 		tm.media->>'thumbnail_url' is not null
-		or (tm.media->>'media_type' = 'image' and tm.media->>'media_url' is not null)
+		or ((tm.media->>'media_type' = 'image' or tm.media->>'media_type' = 'gif') and tm.media->>'media_url' is not null)
 	)
 order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
 limit 4;
