@@ -1907,18 +1907,43 @@ on conflict(user_id, blocked_user_id) where not deleted do update set active = t
 -- name: UnblockUser :exec
 update user_blocklist set active = false, last_updated = now() where user_id = @user_id and blocked_user_id = @blocked_user_id and not deleted;
 
-
--- posts has an array, contract_ids that maps to the contracts table. Find the top 10 contracts by post count in the last 7 days
 -- name: GetTopCommunitiesByPosts :many
-SELECT sqlc.embed(contracts), COUNT(*) as frequency
-FROM posts
-JOIN LATERAL UNNEST(posts.contract_ids) as contract_id ON true
-JOIN contracts ON contracts.id = contract_id
-WHERE posts.created_at >= NOW() - INTERVAL '7 days'
-GROUP BY contracts.id
-ORDER BY frequency DESC
-LIMIT $1;
+with post_report as (
+    select posts.id post_id, unnest(token_ids) token_id
+    from posts
+    where posts.created_at >= @window_end and not posts.deleted
+)
+select coalesce(token_community.id, contract_community.id) id
+from post_report
+    join tokens on post_report.token_id = tokens.id
+    join token_definitions on tokens.token_definition_id = token_definitions.id
+    left join token_community_memberships on token_definitions.id = token_community_memberships.token_definition_id
+    left join communities token_community on token_community_memberships.community_id = token_community.id
+    left join communities contract_community on token_definitions.contract_id = contract_community.contract_id
+    left join admires on post_report.post_id = admires.post_id
+    left join comments on comments.post_id = post_report.post_id
+where not admires.deleted and not comments.deleted and not tokens.deleted
+group by coalesce(token_community.id, contract_community.id)
+order by count(distinct admires.id) + count(distinct comments.id) desc;
 
+-- name: GetTopGalleriesByViews :many
+with viewed_galleries as (
+  select gallery_id id, count(id) views
+  from events
+  where action = 'ViewedGallery' and events.created_at > @window_end
+  group by gallery_id
+),
+updated_galleries as (
+    select galleries.id
+    from events
+    join galleries on events.collection_id = any(galleries.collections)
+    where events.created_at > @window_end and action = 'TokensAddedToCollection' and not galleries.deleted
+    group by galleries.id
+)
+select viewed_galleries.id
+from viewed_galleries
+join updated_galleries using(id)
+order by viewed_galleries.views desc;
 
 -- name: GetCommunitiesByTokenDefinitionID :batchmany
 select communities.* from communities

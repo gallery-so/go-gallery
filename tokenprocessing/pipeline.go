@@ -12,7 +12,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/jackc/pgtype"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/api/googleapi"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/platform"
@@ -175,7 +174,7 @@ func (m ErrBadToken) Error() string { return fmt.Sprintf("issue with token: %s",
 // ErrRequiredSignedToken indicates that the token isn't signed
 var ErrRequiredSignedToken = errors.New("token isn't signed")
 
-func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractIdentifiers, cause persist.ProcessingCause, opts ...PipelineOption) (db.TokenMedia, error) {
+func (tp *tokenProcessor) ProcessToken(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractIdentifiers, cause persist.ProcessingCause, opts ...PipelineOption) (db.TokenMedia, error) {
 	runID := persist.GenerateID()
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"runID": runID})
@@ -313,31 +312,10 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 
 func (tpj *tokenProcessingJob) cacheFromURL(ctx context.Context, tids persist.TokenIdentifiers, defaultObjectType objectType, mediaURL string, subMeta *cachePipelineMetadata) chan cacheResult {
 	resultCh := make(chan cacheResult)
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
-		"tokenURIType":      persist.TokenURI(mediaURL).Type(),
-		"defaultObjectType": defaultObjectType,
-		"mediaURL":          mediaURL,
-	})
-
 	go func() {
 		cachedObjects, err := cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, tpj.tp.httpClient, tpj.tp.ipfsClient, tpj.tp.arweaveClient, tpj.tp.stg, tpj.tp.tokenBucket, subMeta)
-		if err == nil {
-			resultCh <- cacheResult{cachedObjects, err}
-			return
-		}
-		switch caught := err.(type) {
-		case *googleapi.Error:
-			if caught.Code == http.StatusTooManyRequests {
-				logger.For(ctx).Infof("rate limited by google, retrying in 30 seconds")
-				time.Sleep(time.Second * 30)
-				cachedObjects, err = cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, tpj.tp.httpClient, tpj.tp.ipfsClient, tpj.tp.arweaveClient, tpj.tp.stg, tpj.tp.tokenBucket, subMeta)
-			}
-			resultCh <- cacheResult{cachedObjects, err}
-		default:
-			resultCh <- cacheResult{cachedObjects, err}
-		}
+		resultCh <- cacheResult{cachedObjects, err}
 	}()
-
 	return resultCh
 }
 

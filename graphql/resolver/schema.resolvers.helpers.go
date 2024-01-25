@@ -2316,7 +2316,7 @@ func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persis
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
 		return getImageMedia(ctx, tokenMedia, fallbackMedia, highDef)
 	case persist.MediaTypeGIF:
-		return getGIFMedia(ctx, tokenMedia, fallbackMedia, highDef)
+		return getGIFMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeVideo:
 		return getVideoMedia(ctx, tokenMedia, fallbackMedia, highDef)
 	case persist.MediaTypeAudio:
@@ -2480,13 +2480,8 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 }
 
 // getGIFMedia returns VideoMedia because we convert GIFs to videos
-func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.VideoMedia {
+func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.VideoMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
-
-	options := []mediamapper.Option{}
-	if highDef {
-		options = append(options, mediamapper.WithQuality(100))
-	}
 
 	mm := mediamapper.For(ctx)
 	videoUrls := model.VideoURLSet{

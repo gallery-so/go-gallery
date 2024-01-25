@@ -39,15 +39,6 @@ type Address string
 // PubKey represents the public key of a wallet
 type PubKey string
 
-//type ChainAddress struct {
-//	Address Address `json:"address"`
-//	Chain   Chain   `json:"chain"`
-//}
-//
-//func (c ChainAddress) String() string {
-//	return fmt.Sprintf("%d:%s", c.Chain, c.Address)
-//}
-
 type ChainAddress struct {
 	addressSet bool
 	chainSet   bool

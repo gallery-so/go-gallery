@@ -1,0 +1,161 @@
+fragment errorFrag on Error {
+  message
+  __typename
+}
+
+fragment tokenFrag on Token {
+  dbid
+  definition {
+    ...definitionFrag
+  }
+}
+
+fragment definitionFrag on TokenDefinition {
+  name
+  description
+  media {
+     ...on Media {
+      ...mediaFragment
+     }
+  }
+}
+
+fragment mediaFragment on Media {
+  previewURLs {
+    small
+  }
+  fallbackMedia {
+    mediaURL
+  }
+}
+
+query galleryDigestEntityQuery($id: DBID!) {
+  galleryById(id: $id) {
+    ...on Error {
+      ...errorFrag
+    }
+    ...on Gallery {
+      dbid
+      owner {
+        username
+      }
+      name
+      description
+      tokenPreviews {
+        small
+      }
+    }
+  }
+}
+
+query communityDigestEntityQuery($id: DBID!) {
+  communityById(id: $id) {
+    ...on Error {
+      ...errorFrag
+    }
+    ...on Community {
+      dbid
+      subtype {
+        ...on ContractCommunity {
+          contract {
+            contractAddress {
+              address
+              chain
+            }
+            chain
+            profileImageURL
+          }
+        }
+        ...on ArtBlocksCommunity {
+          contract {
+            contractAddress {
+              address
+              chain
+            }
+            chain
+            profileImageURL
+          }
+        }
+      }
+      name
+      description
+      profileImageURL
+      creators {
+        ...on GalleryUser {
+          username
+          profileImage {
+            ...on TokenProfileImage {
+              token {
+                definition {
+                  ...definitionFrag
+                }
+              }
+            }
+            ...on EnsProfileImage {
+              ensToken: profileImage {
+                previewURLs {
+                  small
+                }
+              }
+              pfpToken: token {
+                definition {
+                  ...definitionFrag
+                }
+              }
+            }
+          }
+        }
+        ...on ChainAddress {
+          address
+          chain
+        }
+      }
+      tokens(first: 10) {
+        edges {
+          node {
+            ...tokenFrag
+          }
+        }
+      }
+    }
+  }
+}
+
+query postDigestEntityQuery($id: DBID!) {
+  postById(id: $id) {
+    ...on Error {
+      ...errorFrag
+    }
+    ...on Post {
+      dbid
+      caption
+      author {
+        username
+        profileImage {
+          ...on TokenProfileImage {
+            token {
+              definition {
+                ...definitionFrag
+              }
+            }
+          }
+          ...on EnsProfileImage {
+            ensToken: profileImage {
+              previewURLs {
+                small
+              }
+            }
+            pfpToken: token {
+              definition {
+                ...definitionFrag
+              }
+            }
+          }
+        }
+      }
+      tokens {
+        ...tokenFrag
+      }
+    }
+  }
+}
