@@ -360,6 +360,7 @@ type ComplexityRoot struct {
 		Creators          func(childComplexity int) int
 		Dbid              func(childComplexity int) int
 		Description       func(childComplexity int) int
+		Galleries         func(childComplexity int, maxPreviews int, before *string, after *string, first *int, last *int) int
 		Holders           func(childComplexity int, before *string, after *string, first *int, last *int) int
 		ID                func(childComplexity int) int
 		LastUpdated       func(childComplexity int) int
@@ -374,6 +375,21 @@ type ComplexityRoot struct {
 	}
 
 	CommunityEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	CommunityGalleriesConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	CommunityGallery struct {
+		Gallery       func(childComplexity int) int
+		TokenPreviews func(childComplexity int) int
+	}
+
+	CommunityGalleryEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
 	}
@@ -1866,6 +1882,7 @@ type CommunityResolver interface {
 	Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error)
 	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error)
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
+	Galleries(ctx context.Context, obj *model.Community, maxPreviews int, before *string, after *string, first *int, last *int) (*model.CommunityGalleriesConnection, error)
 }
 type ContractCommunityResolver interface {
 	Contract(ctx context.Context, obj *model.ContractCommunity) (*model.Contract, error)
@@ -3174,6 +3191,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.Description(childComplexity), true
 
+	case "Community.galleries":
+		if e.complexity.Community.Galleries == nil {
+			break
+		}
+
+		args, err := ec.field_Community_galleries_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.Galleries(childComplexity, args["maxPreviews"].(int), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
 	case "Community.holders":
 		if e.complexity.Community.Holders == nil {
 			break
@@ -3289,6 +3318,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CommunityEdge.Node(childComplexity), true
+
+	case "CommunityGalleriesConnection.edges":
+		if e.complexity.CommunityGalleriesConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.CommunityGalleriesConnection.Edges(childComplexity), true
+
+	case "CommunityGalleriesConnection.pageInfo":
+		if e.complexity.CommunityGalleriesConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.CommunityGalleriesConnection.PageInfo(childComplexity), true
+
+	case "CommunityGallery.gallery":
+		if e.complexity.CommunityGallery.Gallery == nil {
+			break
+		}
+
+		return e.complexity.CommunityGallery.Gallery(childComplexity), true
+
+	case "CommunityGallery.tokenPreviews":
+		if e.complexity.CommunityGallery.TokenPreviews == nil {
+			break
+		}
+
+		return e.complexity.CommunityGallery.TokenPreviews(childComplexity), true
+
+	case "CommunityGalleryEdge.cursor":
+		if e.complexity.CommunityGalleryEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.CommunityGalleryEdge.Cursor(childComplexity), true
+
+	case "CommunityGalleryEdge.node":
+		if e.complexity.CommunityGalleryEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.CommunityGalleryEdge.Node(childComplexity), true
 
 	case "CommunitySearchResult.community":
 		if e.complexity.CommunitySearchResult.Community == nil {
@@ -10099,6 +10170,21 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
+type CommunityGallery {
+  gallery: Gallery
+  tokenPreviews: [PreviewURLSet]
+}
+
+type CommunityGalleryEdge {
+  node: CommunityGallery
+  cursor: String
+}
+
+type CommunityGalleriesConnection {
+  edges: [CommunityGalleryEdge]
+  pageInfo: PageInfo!
+}
+
 type ContractCommunity @goEmbedHelper {
   communityKey: ContractCommunityKey
   contract: Contract @goField(forceResolver: true)
@@ -10168,6 +10254,9 @@ type Community implements Node @goEmbedHelper {
   ): TokenHoldersConnection
     @goField(forceResolver: true)
     @deprecated(reason: "Use Community.holders")
+
+  galleries(maxPreviews: Int!, before: String, after: String, first: Int, last: Int): CommunityGalleriesConnection
+    @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -12727,6 +12816,57 @@ func (ec *executionContext) field_Comment_replies_args(ctx context.Context, rawA
 		}
 	}
 	args["last"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_galleries_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 int
+	if tmp, ok := rawArgs["maxPreviews"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPreviews"))
+		arg0, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["maxPreviews"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg4
 	return args, nil
 }
 
@@ -23686,6 +23826,64 @@ func (ec *executionContext) fieldContext_Community_owners(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_galleries(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_galleries(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().Galleries(rctx, obj, fc.Args["maxPreviews"].(int), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CommunityGalleriesConnection)
+	fc.Result = res
+	return ec.marshalOCommunityGalleriesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGalleriesConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_galleries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_CommunityGalleriesConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_CommunityGalleriesConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommunityGalleriesConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Community_galleries_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CommunityEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CommunityEdge_node(ctx, field)
 	if err != nil {
@@ -23762,6 +23960,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -23800,6 +24000,319 @@ func (ec *executionContext) _CommunityEdge_cursor(ctx context.Context, field gra
 func (ec *executionContext) fieldContext_CommunityEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "CommunityEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommunityGalleriesConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.CommunityGalleriesConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityGalleriesConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CommunityGalleryEdge)
+	fc.Result = res
+	return ec.marshalOCommunityGalleryEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGalleryEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunityGalleriesConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunityGalleriesConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_CommunityGalleryEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_CommunityGalleryEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommunityGalleryEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommunityGalleriesConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.CommunityGalleriesConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityGalleriesConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunityGalleriesConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunityGalleriesConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommunityGallery_gallery(ctx context.Context, field graphql.CollectedField, obj *model.CommunityGallery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityGallery_gallery(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunityGallery_gallery(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunityGallery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Gallery_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Gallery_dbid(ctx, field)
+			case "name":
+				return ec.fieldContext_Gallery_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Gallery_description(ctx, field)
+			case "position":
+				return ec.fieldContext_Gallery_position(ctx, field)
+			case "hidden":
+				return ec.fieldContext_Gallery_hidden(ctx, field)
+			case "tokenPreviews":
+				return ec.fieldContext_Gallery_tokenPreviews(ctx, field)
+			case "owner":
+				return ec.fieldContext_Gallery_owner(ctx, field)
+			case "collections":
+				return ec.fieldContext_Gallery_collections(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Gallery", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommunityGallery_tokenPreviews(ctx context.Context, field graphql.CollectedField, obj *model.CommunityGallery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityGallery_tokenPreviews(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenPreviews, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalOPreviewURLSet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunityGallery_tokenPreviews(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunityGallery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "raw":
+				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
+			case "thumbnail":
+				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
+			case "small":
+				return ec.fieldContext_PreviewURLSet_small(ctx, field)
+			case "medium":
+				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
+			case "large":
+				return ec.fieldContext_PreviewURLSet_large(ctx, field)
+			case "srcSet":
+				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommunityGalleryEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityGalleryEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityGalleryEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CommunityGallery)
+	fc.Result = res
+	return ec.marshalOCommunityGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunityGalleryEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunityGalleryEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "gallery":
+				return ec.fieldContext_CommunityGallery_gallery(ctx, field)
+			case "tokenPreviews":
+				return ec.fieldContext_CommunityGallery_tokenPreviews(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommunityGallery", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommunityGalleryEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.CommunityGalleryEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityGalleryEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunityGalleryEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunityGalleryEdge",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -23886,6 +24399,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -44442,6 +44957,8 @@ func (ec *executionContext) fieldContext_PostComposerDraftDetailsPayload_communi
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -53279,6 +53796,8 @@ func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotificati
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -53644,6 +54163,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_commu
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -56868,6 +57389,8 @@ func (ec *executionContext) fieldContext_Token_community(ctx context.Context, fi
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -58030,6 +58553,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_community(ctx context.C
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -58113,6 +58638,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_communities(ctx context
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "galleries":
+				return ec.fieldContext_Community_galleries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -75599,6 +76126,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 				return innerFunc(ctx)
 
 			})
+		case "galleries":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_galleries(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -75627,6 +76171,96 @@ func (ec *executionContext) _CommunityEdge(ctx context.Context, sel ast.Selectio
 		case "cursor":
 
 			out.Values[i] = ec._CommunityEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var communityGalleriesConnectionImplementors = []string{"CommunityGalleriesConnection"}
+
+func (ec *executionContext) _CommunityGalleriesConnection(ctx context.Context, sel ast.SelectionSet, obj *model.CommunityGalleriesConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, communityGalleriesConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommunityGalleriesConnection")
+		case "edges":
+
+			out.Values[i] = ec._CommunityGalleriesConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._CommunityGalleriesConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var communityGalleryImplementors = []string{"CommunityGallery"}
+
+func (ec *executionContext) _CommunityGallery(ctx context.Context, sel ast.SelectionSet, obj *model.CommunityGallery) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, communityGalleryImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommunityGallery")
+		case "gallery":
+
+			out.Values[i] = ec._CommunityGallery_gallery(ctx, field, obj)
+
+		case "tokenPreviews":
+
+			out.Values[i] = ec._CommunityGallery_tokenPreviews(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var communityGalleryEdgeImplementors = []string{"CommunityGalleryEdge"}
+
+func (ec *executionContext) _CommunityGalleryEdge(ctx context.Context, sel ast.SelectionSet, obj *model.CommunityGalleryEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, communityGalleryEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommunityGalleryEdge")
+		case "node":
+
+			out.Values[i] = ec._CommunityGalleryEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._CommunityGalleryEdge_cursor(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -88563,6 +89197,68 @@ func (ec *executionContext) marshalOCommunityEdge2ᚖgithubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._CommunityEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommunityGalleriesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGalleriesConnection(ctx context.Context, sel ast.SelectionSet, v *model.CommunityGalleriesConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommunityGalleriesConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommunityGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGallery(ctx context.Context, sel ast.SelectionSet, v *model.CommunityGallery) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommunityGallery(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommunityGalleryEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGalleryEdge(ctx context.Context, sel ast.SelectionSet, v []*model.CommunityGalleryEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOCommunityGalleryEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGalleryEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOCommunityGalleryEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGalleryEdge(ctx context.Context, sel ast.SelectionSet, v *model.CommunityGalleryEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommunityGalleryEdge(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCommunitySearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitySearchResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CommunitySearchResult) graphql.Marshaler {

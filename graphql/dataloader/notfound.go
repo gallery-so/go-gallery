@@ -169,3 +169,7 @@ func (*GetCommunityByKey) getNotFoundError(key coredb.GetCommunityByKeyParams) e
 func (*GetCommunityByIDBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrCommunityNotFound{ID: key}
 }
+
+func (*CountGalleriesDisplayingCommunityIDBatch) getNotFoundError(key persist.DBID) error {
+	return persist.ErrGalleryNotFound{ID: key}
+}

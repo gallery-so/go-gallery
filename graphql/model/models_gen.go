@@ -819,25 +819,26 @@ type CommunitiesConnection struct {
 
 type Community struct {
 	HelperCommunityData
-	Dbid              persist.DBID            `json:"dbid"`
-	LastUpdated       *time.Time              `json:"lastUpdated"`
-	Name              *string                 `json:"name"`
-	Description       *string                 `json:"description"`
-	ProfileImageURL   *string                 `json:"profileImageURL"`
-	BadgeURL          *string                 `json:"badgeURL"`
-	MintURL           *string                 `json:"mintURL"`
-	Subtype           CommunitySubtype        `json:"subtype"`
-	Creators          []GalleryUserOrAddress  `json:"creators"`
-	Holders           *TokenHoldersConnection `json:"holders"`
-	Tokens            *TokensConnection       `json:"tokens"`
-	Posts             *PostsConnection        `json:"posts"`
-	Contract          *Contract               `json:"contract"`
-	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
-	Chain             *persist.Chain          `json:"chain"`
-	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
-	Creator           GalleryUserOrAddress    `json:"creator"`
-	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
-	Owners            *TokenHoldersConnection `json:"owners"`
+	Dbid              persist.DBID                  `json:"dbid"`
+	LastUpdated       *time.Time                    `json:"lastUpdated"`
+	Name              *string                       `json:"name"`
+	Description       *string                       `json:"description"`
+	ProfileImageURL   *string                       `json:"profileImageURL"`
+	BadgeURL          *string                       `json:"badgeURL"`
+	MintURL           *string                       `json:"mintURL"`
+	Subtype           CommunitySubtype              `json:"subtype"`
+	Creators          []GalleryUserOrAddress        `json:"creators"`
+	Holders           *TokenHoldersConnection       `json:"holders"`
+	Tokens            *TokensConnection             `json:"tokens"`
+	Posts             *PostsConnection              `json:"posts"`
+	Contract          *Contract                     `json:"contract"`
+	ContractAddress   *persist.ChainAddress         `json:"contractAddress"`
+	Chain             *persist.Chain                `json:"chain"`
+	CreatorAddress    *persist.ChainAddress         `json:"creatorAddress"`
+	Creator           GalleryUserOrAddress          `json:"creator"`
+	TokensInCommunity *TokensConnection             `json:"tokensInCommunity"`
+	Owners            *TokenHoldersConnection       `json:"owners"`
+	Galleries         *CommunityGalleriesConnection `json:"galleries"`
 }
 
 func (Community) IsNode()                      {}
@@ -849,6 +850,21 @@ func (Community) IsMentionEntity()             {}
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
+}
+
+type CommunityGalleriesConnection struct {
+	Edges    []*CommunityGalleryEdge `json:"edges"`
+	PageInfo *PageInfo               `json:"pageInfo"`
+}
+
+type CommunityGallery struct {
+	Gallery       *Gallery         `json:"gallery"`
+	TokenPreviews []*PreviewURLSet `json:"tokenPreviews"`
+}
+
+type CommunityGalleryEdge struct {
+	Node   *CommunityGallery `json:"node"`
+	Cursor *string           `json:"cursor"`
 }
 
 type CommunitySearchResult struct {

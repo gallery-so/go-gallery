@@ -250,6 +250,43 @@ func newCountCommentsByPostIDBatch(
 	return d
 }
 
+// CountGalleriesDisplayingCommunityIDBatch batches and caches requests
+type CountGalleriesDisplayingCommunityIDBatch struct {
+	generator.Dataloader[persist.DBID, int64]
+}
+
+// newCountGalleriesDisplayingCommunityIDBatch creates a new CountGalleriesDisplayingCommunityIDBatch with the given settings, functions, and options
+func newCountGalleriesDisplayingCommunityIDBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *CountGalleriesDisplayingCommunityIDBatch, []persist.DBID) ([]int64, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *CountGalleriesDisplayingCommunityIDBatch {
+	d := &CountGalleriesDisplayingCommunityIDBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]int64, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "CountGalleriesDisplayingCommunityIDBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "CountGalleriesDisplayingCommunityIDBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // CountInteractionsByFeedEventIDBatch batches and caches requests
 type CountInteractionsByFeedEventIDBatch struct {
 	generator.Dataloader[coredb.CountInteractionsByFeedEventIDBatchParams, []coredb.CountInteractionsByFeedEventIDBatchRow]
@@ -1149,6 +1186,43 @@ func newGetGalleriesByUserIdBatch(
 
 		if postFetchHook != nil {
 			postFetchHook(ctx, "GetGalleriesByUserIdBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+// GetGalleriesDisplayingCommunityIDPaginateBatch batches and caches requests
+type GetGalleriesDisplayingCommunityIDPaginateBatch struct {
+	generator.Dataloader[coredb.GetGalleriesDisplayingCommunityIDPaginateBatchParams, []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow]
+}
+
+// newGetGalleriesDisplayingCommunityIDPaginateBatch creates a new GetGalleriesDisplayingCommunityIDPaginateBatch with the given settings, functions, and options
+func newGetGalleriesDisplayingCommunityIDPaginateBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetGalleriesDisplayingCommunityIDPaginateBatch, []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchParams) ([][]coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetGalleriesDisplayingCommunityIDPaginateBatch {
+	d := &GetGalleriesDisplayingCommunityIDPaginateBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchParams) ([][]coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetGalleriesDisplayingCommunityIDPaginateBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetGalleriesDisplayingCommunityIDPaginateBatch")
 		}
 
 		return results, errors

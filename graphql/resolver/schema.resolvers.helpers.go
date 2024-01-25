@@ -2414,9 +2414,13 @@ func resolveTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain st
 }
 
 func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {
-	url := tokenMedia.Media.ThumbnailURL.String()
-	if (tokenMedia.Media.MediaType == persist.MediaTypeImage || tokenMedia.Media.MediaType == persist.MediaTypeSVG || tokenMedia.Media.MediaType == persist.MediaTypeGIF) && url == "" {
-		url = tokenMedia.Media.MediaURL.String()
+	return previewURLsFromMedia(ctx, tokenMedia.Media, tokenMedia.LastUpdated, options...)
+}
+
+func previewURLsFromMedia(ctx context.Context, media persist.Media, mediaLastUpdated time.Time, options ...mediamapper.Option) *model.PreviewURLSet {
+	url := media.ThumbnailURL.String()
+	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG || media.MediaType == persist.MediaTypeGIF) && url == "" {
+		url = media.MediaURL.String()
 	}
 
 	preview := remapLargeImageUrls(url)
@@ -2425,12 +2429,12 @@ func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, op
 	options = append(options, mediamapper.WithFormatAuto())
 
 	// Add timestamp to options
-	options = append(options, mediamapper.WithTimestamp(tokenMedia.LastUpdated))
+	options = append(options, mediamapper.WithTimestamp(mediaLastUpdated))
 
 	// Add live render
-	live := tokenMedia.Media.LivePreviewURL.String()
-	if tokenMedia.Media.LivePreviewURL == "" {
-		live = tokenMedia.Media.MediaURL.String()
+	live := media.LivePreviewURL.String()
+	if media.LivePreviewURL == "" {
+		live = media.MediaURL.String()
 	}
 
 	return previewURLs(ctx, preview, &live, options...)

@@ -612,6 +612,21 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
+type CommunityGallery {
+  gallery: Gallery
+  tokenPreviews: [PreviewURLSet]
+}
+
+type CommunityGalleryEdge {
+  node: CommunityGallery
+  cursor: String
+}
+
+type CommunityGalleriesConnection {
+  edges: [CommunityGalleryEdge]
+  pageInfo: PageInfo!
+}
+
 type ContractCommunity @goEmbedHelper {
   communityKey: ContractCommunityKey
   contract: Contract @goField(forceResolver: true)
@@ -681,6 +696,9 @@ type Community implements Node @goEmbedHelper {
   ): TokenHoldersConnection
     @goField(forceResolver: true)
     @deprecated(reason: "Use Community.holders")
+
+  galleries(maxPreviews: Int!, before: String, after: String, first: Int, last: Int): CommunityGalleriesConnection
+    @goField(forceResolver: true)
 }
 
 type Contract implements Node {

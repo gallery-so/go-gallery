@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/generated"
@@ -442,6 +441,42 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 // Owners is the resolver for the owners field.
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
 	return resolveCommunityHoldersByCommunityID(ctx, obj.Dbid, before, after, first, last)
+}
+
+// Galleries is the resolver for the galleries field.
+func (r *communityResolver) Galleries(ctx context.Context, obj *model.Community, maxPreviews int, before *string, after *string, first *int, last *int) (*model.CommunityGalleriesConnection, error) {
+	galleries, previewMedia, previewMediaLastUpdated, pageInfo, err := publicapi.For(ctx).Gallery.GetGalleriesDisplayingCommunityID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.CommunityGalleryEdge
+	for i, gallery := range galleries {
+		media := previewMedia[i]
+		mediaLastUpdated := previewMediaLastUpdated[i]
+
+		max := maxPreviews
+		if len(media) < max {
+			max = len(media)
+		}
+
+		previews := make([]*model.PreviewURLSet, max)
+		for j, m := range media[:max] {
+			previews[j] = previewURLsFromMedia(ctx, m, mediaLastUpdated[j])
+		}
+
+		edges = append(edges, &model.CommunityGalleryEdge{
+			Node: &model.CommunityGallery{
+				Gallery:       galleryToModel(ctx, gallery),
+				TokenPreviews: previews,
+			},
+		})
+	}
+
+	return &model.CommunityGalleriesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // Contract is the resolver for the contract field.

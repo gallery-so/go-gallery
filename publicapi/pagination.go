@@ -1190,6 +1190,8 @@ func packVal(e *cursorEncoder, val any) error {
 		e.appendUInt64(*v)
 	case *int64:
 		e.appendInt64(*v)
+	case *float64:
+		e.appendFloat64(*v)
 	case *int:
 		e.appendInt64(int64(*v))
 	case *time.Time:
@@ -1263,6 +1265,8 @@ func unpackVal(d *cursorDecoder, val any) unpackF {
 		return unpackTo(v, d.readBool)
 	case *int64:
 		return unpackTo(v, d.readInt64)
+	case *float64:
+		return unpackTo(v, d.readFloat64)
 	case *[]persist.FeedEntityType:
 		return unpackSliceTo(v, d, d.readFeedEntityType)
 	case *[]persist.DBID:

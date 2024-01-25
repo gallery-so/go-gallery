@@ -20,6 +20,7 @@ type Loaders struct {
 	CountAdmiresByTokenIDBatch                           *CountAdmiresByTokenIDBatch
 	CountCommentsByFeedEventIDBatch                      *CountCommentsByFeedEventIDBatch
 	CountCommentsByPostIDBatch                           *CountCommentsByPostIDBatch
+	CountGalleriesDisplayingCommunityIDBatch             *CountGalleriesDisplayingCommunityIDBatch
 	CountInteractionsByFeedEventIDBatch                  *CountInteractionsByFeedEventIDBatch
 	CountInteractionsByPostIDBatch                       *CountInteractionsByPostIDBatch
 	CountRepliesByCommentIDBatch                         *CountRepliesByCommentIDBatch
@@ -44,6 +45,7 @@ type Loaders struct {
 	GetFollowersByUserIdBatch                            *GetFollowersByUserIdBatch
 	GetFollowingByUserIdBatch                            *GetFollowingByUserIdBatch
 	GetGalleriesByUserIdBatch                            *GetGalleriesByUserIdBatch
+	GetGalleriesDisplayingCommunityIDPaginateBatch       *GetGalleriesDisplayingCommunityIDPaginateBatch
 	GetGalleryByCollectionIdBatch                        *GetGalleryByCollectionIdBatch
 	GetGalleryByIdBatch                                  *GetGalleryByIdBatch
 	GetGalleryTokenMediasByGalleryIDBatch                *GetGalleryTokenMediasByGalleryIDBatch
@@ -103,6 +105,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.CountAdmiresByTokenIDBatch = newCountAdmiresByTokenIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountAdmiresByTokenIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountCommentsByFeedEventIDBatch = newCountCommentsByFeedEventIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountCommentsByFeedEventIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountCommentsByPostIDBatch = newCountCommentsByPostIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountCommentsByPostIDBatch(q), preFetchHook, postFetchHook)
+	loaders.CountGalleriesDisplayingCommunityIDBatch = newCountGalleriesDisplayingCommunityIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountGalleriesDisplayingCommunityIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountInteractionsByFeedEventIDBatch = newCountInteractionsByFeedEventIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountInteractionsByFeedEventIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountInteractionsByPostIDBatch = newCountInteractionsByPostIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountInteractionsByPostIDBatch(q), preFetchHook, postFetchHook)
 	loaders.CountRepliesByCommentIDBatch = newCountRepliesByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadCountRepliesByCommentIDBatch(q), preFetchHook, postFetchHook)
@@ -127,6 +130,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetFollowersByUserIdBatch = newGetFollowersByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetFollowersByUserIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetFollowingByUserIdBatch = newGetFollowingByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetFollowingByUserIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleriesByUserIdBatch = newGetGalleriesByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleriesByUserIdBatch(q), preFetchHook, postFetchHook)
+	loaders.GetGalleriesDisplayingCommunityIDPaginateBatch = newGetGalleriesDisplayingCommunityIDPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleriesDisplayingCommunityIDPaginateBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryByCollectionIdBatch = newGetGalleryByCollectionIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryByCollectionIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryByIdBatch = newGetGalleryByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryTokenMediasByGalleryIDBatch = newGetGalleryTokenMediasByGalleryIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryTokenMediasByGalleryIDBatch(q), preFetchHook, postFetchHook)
@@ -297,6 +301,18 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			}
 		}
 	})
+	loaders.GetGalleriesDisplayingCommunityIDPaginateBatch.RegisterResultSubscriber(func(result []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow) {
+		for _, entry := range result {
+			loaders.GetGalleryByCollectionIdBatch.Prime(loaders.GetGalleryByCollectionIdBatch.getKeyForResult(entry.Gallery), entry.Gallery)
+		}
+	})
+	loaders.GetGalleriesDisplayingCommunityIDPaginateBatch.RegisterResultSubscriber(func(result []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow) {
+		for _, entry := range result {
+			for _, key := range loaders.GetGalleryByCollectionIdBatch.getKeysForResult(entry.Gallery) {
+				loaders.GetGalleryByCollectionIdBatch.Prime(key, entry.Gallery)
+			}
+		}
+	})
 	loaders.GetGalleryByIdBatch.RegisterResultSubscriber(func(result coredb.Gallery) {
 		loaders.GetGalleryByCollectionIdBatch.Prime(loaders.GetGalleryByCollectionIdBatch.getKeyForResult(result), result)
 	})
@@ -308,6 +324,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetGalleriesByUserIdBatch.RegisterResultSubscriber(func(result []coredb.Gallery) {
 		for _, entry := range result {
 			loaders.GetGalleryByIdBatch.Prime(loaders.GetGalleryByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetGalleriesDisplayingCommunityIDPaginateBatch.RegisterResultSubscriber(func(result []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow) {
+		for _, entry := range result {
+			loaders.GetGalleryByIdBatch.Prime(loaders.GetGalleryByIdBatch.getKeyForResult(entry.Gallery), entry.Gallery)
 		}
 	})
 	loaders.GetGalleryByCollectionIdBatch.RegisterResultSubscriber(func(result coredb.Gallery) {
@@ -602,6 +623,25 @@ func loadCountCommentsByPostIDBatch(q *coredb.Queries) func(context.Context, *Co
 		errors := make([]error, len(params))
 
 		b := q.CountCommentsByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, r int64, err error) {
+			results[i], errors[i] = r, err
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = d.getNotFoundError(params[i])
+			}
+		})
+
+		return results, errors
+	}
+}
+
+func loadCountGalleriesDisplayingCommunityIDBatch(q *coredb.Queries) func(context.Context, *CountGalleriesDisplayingCommunityIDBatch, []persist.DBID) ([]int64, []error) {
+	return func(ctx context.Context, d *CountGalleriesDisplayingCommunityIDBatch, params []persist.DBID) ([]int64, []error) {
+		results := make([]int64, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountGalleriesDisplayingCommunityIDBatch(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, r int64, err error) {
@@ -1028,6 +1068,22 @@ func loadGetGalleriesByUserIdBatch(q *coredb.Queries) func(context.Context, *Get
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.Gallery, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetGalleriesDisplayingCommunityIDPaginateBatch(q *coredb.Queries) func(context.Context, *GetGalleriesDisplayingCommunityIDPaginateBatch, []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchParams) ([][]coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow, []error) {
+	return func(ctx context.Context, d *GetGalleriesDisplayingCommunityIDPaginateBatch, params []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchParams) ([][]coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow, []error) {
+		results := make([][]coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetGalleriesDisplayingCommunityIDPaginateBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.GetGalleriesDisplayingCommunityIDPaginateBatchRow, err error) {
 			results[i], errors[i] = r, err
 		})
 

@@ -289,6 +289,53 @@ func (b *CountCommentsByPostIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const countGalleriesDisplayingCommunityIDBatch = `-- name: CountGalleriesDisplayingCommunityIDBatch :batchone
+select count(*) from community_galleries cg
+    join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
+where cg.community_id = $1
+`
+
+type CountGalleriesDisplayingCommunityIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) CountGalleriesDisplayingCommunityIDBatch(ctx context.Context, communityID []persist.DBID) *CountGalleriesDisplayingCommunityIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range communityID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(countGalleriesDisplayingCommunityIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &CountGalleriesDisplayingCommunityIDBatchBatchResults{br, len(communityID), false}
+}
+
+func (b *CountGalleriesDisplayingCommunityIDBatchBatchResults) QueryRow(f func(int, int64, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var count int64
+		if b.closed {
+			if f != nil {
+				f(t, count, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&count)
+		if f != nil {
+			f(t, count, err)
+		}
+	}
+}
+
+func (b *CountGalleriesDisplayingCommunityIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const countInteractionsByFeedEventIDBatch = `-- name: CountInteractionsByFeedEventIDBatch :batchmany
 SELECT count(*), $1::int as tag FROM admires t WHERE $1 != 0 AND t.feed_event_id = $2 AND t.deleted = false
                                                         UNION
@@ -2054,6 +2101,125 @@ func (b *GetGalleriesByUserIdBatchBatchResults) Query(f func(int, []Gallery, err
 }
 
 func (b *GetGalleriesByUserIdBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getGalleriesDisplayingCommunityIDPaginateBatch = `-- name: GetGalleriesDisplayingCommunityIDPaginateBatch :batchmany
+select g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id, g.collections, g.name, g.description, g.hidden, g.position,
+       cg.token_ids as community_token_ids,
+       cg.token_medias as community_medias,
+       cg.token_media_last_updated::timestamptz[] as community_media_last_updated,
+       cg2.token_ids as all_token_ids,
+       cg2.token_medias as all_medias,
+       cg2.token_media_last_updated::timestamptz[] as all_media_last_updated,
+       (-cg.gallery_relevance)::float8 as relevance from community_galleries cg
+    join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
+    join community_galleries cg2 on cg2.gallery_id = cg.gallery_id and cg2.community_id is null
+where cg.community_id = $1
+    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) < ($1, $2::float8, $3)
+    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) > ($1, $4::float8, $5)
+order by case when $6::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
+         case when not $6::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
+limit $7
+`
+
+type GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetGalleriesDisplayingCommunityIDPaginateBatchParams struct {
+	CommunityID        persist.DBID `db:"community_id" json:"community_id"`
+	CurBeforeRelevance float64      `db:"cur_before_relevance" json:"cur_before_relevance"`
+	CurBeforeID        persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterRelevance  float64      `db:"cur_after_relevance" json:"cur_after_relevance"`
+	CurAfterID         persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward      bool         `db:"paging_forward" json:"paging_forward"`
+	Limit              int32        `db:"limit" json:"limit"`
+}
+
+type GetGalleriesDisplayingCommunityIDPaginateBatchRow struct {
+	Gallery                   Gallery           `db:"gallery" json:"gallery"`
+	CommunityTokenIds         persist.DBIDList  `db:"community_token_ids" json:"community_token_ids"`
+	CommunityMedias           persist.MediaList `db:"community_medias" json:"community_medias"`
+	CommunityMediaLastUpdated []time.Time       `db:"community_media_last_updated" json:"community_media_last_updated"`
+	AllTokenIds               persist.DBIDList  `db:"all_token_ids" json:"all_token_ids"`
+	AllMedias                 persist.MediaList `db:"all_medias" json:"all_medias"`
+	AllMediaLastUpdated       []time.Time       `db:"all_media_last_updated" json:"all_media_last_updated"`
+	Relevance                 float64           `db:"relevance" json:"relevance"`
+}
+
+func (q *Queries) GetGalleriesDisplayingCommunityIDPaginateBatch(ctx context.Context, arg []GetGalleriesDisplayingCommunityIDPaginateBatchParams) *GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CommunityID,
+			a.CurBeforeRelevance,
+			a.CurBeforeID,
+			a.CurAfterRelevance,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(getGalleriesDisplayingCommunityIDPaginateBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults{br, len(arg), false}
+}
+
+func (b *GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults) Query(f func(int, []GetGalleriesDisplayingCommunityIDPaginateBatchRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []GetGalleriesDisplayingCommunityIDPaginateBatchRow
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetGalleriesDisplayingCommunityIDPaginateBatchRow
+				if err := rows.Scan(
+					&i.Gallery.ID,
+					&i.Gallery.Deleted,
+					&i.Gallery.LastUpdated,
+					&i.Gallery.CreatedAt,
+					&i.Gallery.Version,
+					&i.Gallery.OwnerUserID,
+					&i.Gallery.Collections,
+					&i.Gallery.Name,
+					&i.Gallery.Description,
+					&i.Gallery.Hidden,
+					&i.Gallery.Position,
+					&i.CommunityTokenIds,
+					&i.CommunityMedias,
+					&i.CommunityMediaLastUpdated,
+					&i.AllTokenIds,
+					&i.AllMedias,
+					&i.AllMediaLastUpdated,
+					&i.Relevance,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
