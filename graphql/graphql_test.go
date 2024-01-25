@@ -95,7 +95,7 @@ func testTokenSyncs(t *testing.T) {
 		{title: "should sync new tokens multichain", run: testSyncNewTokensMultichain},
 		{title: "should submit new tokens to tokenprocessing", run: testSyncOnlySubmitsNewTokens},
 		{title: "should not submit old tokens to tokenprocessing", run: testSyncSkipsSubmittingOldTokens},
-		{title: "should replace old tokens", run: testSyncReplacesOldTokens},
+		{title: "should keep old tokens", run: testSyncKeepsOldTokens},
 		{title: "should merge duplicates within provider", run: testSyncShouldMergeDuplicatesInProvider},
 		{title: "should process media", run: testSyncShouldProcessMedia},
 	}
@@ -981,9 +981,11 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 	tokenRecorder.AssertNotCalled(t, "Send")
 }
 
-func testSyncReplacesOldTokens(t *testing.T) {
+func testSyncKeepsOldTokens(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, 4))
+	initialTokensLen := len(userF.TokenIDs)
+	newTokensLen := 4
+	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, newTokensLen))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	h := handlerWithProviders(t, submitUserTokensNoop, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
@@ -991,7 +993,7 @@ func testSyncReplacesOldTokens(t *testing.T) {
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	require.NoError(t, err)
-	assertSyncedTokens(t, response, err, 4)
+	assertSyncedTokens(t, response, err, initialTokensLen+newTokensLen)
 }
 
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
