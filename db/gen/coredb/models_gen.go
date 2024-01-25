@@ -113,6 +113,17 @@ type CommunityCreator struct {
 	Deleted               bool                         `db:"deleted" json:"deleted"`
 }
 
+type CommunityGallery struct {
+	UserID                persist.DBID      `db:"user_id" json:"user_id"`
+	CommunityID           persist.DBID      `db:"community_id" json:"community_id"`
+	GalleryID             persist.DBID      `db:"gallery_id" json:"gallery_id"`
+	GalleryRelevance      int32             `db:"gallery_relevance" json:"gallery_relevance"`
+	TokenIds              persist.DBIDList  `db:"token_ids" json:"token_ids"`
+	TokenDefinitionIds    persist.DBIDList  `db:"token_definition_ids" json:"token_definition_ids"`
+	TokenMedias           persist.MediaList `db:"token_medias" json:"token_medias"`
+	TokenMediaLastUpdated interface{}       `db:"token_media_last_updated" json:"token_media_last_updated"`
+}
+
 type CommunityRelevance struct {
 	ID    persist.DBID `db:"id" json:"id"`
 	Score int32        `db:"score" json:"score"`

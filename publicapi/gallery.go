@@ -6,22 +6,21 @@ import (
 	"encoding"
 	"encoding/base64"
 	"fmt"
-	"net"
-
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgtype"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/go-playground/validator/v10"
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/service/persist"
+	"net"
+	"time"
 )
 
 const maxCollectionsPerGallery = 1000
@@ -652,6 +651,88 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	}
 
 	return gallery, nil
+}
+
+func (api GalleryAPI) GetGalleriesDisplayingCommunityID(ctx context.Context, communityID persist.DBID, before *string, after *string,
+	first *int, last *int) ([]db.Gallery, [][]persist.Media, [][]time.Time, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"communityID": validate.WithTag(communityID, "required"),
+	}); err != nil {
+		return nil, nil, nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, nil, nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params floatIDPagingParams) ([]db.GetGalleriesDisplayingCommunityIDPaginateBatchRow, error) {
+		return api.loaders.GetGalleriesDisplayingCommunityIDPaginateBatch.Load(db.GetGalleriesDisplayingCommunityIDPaginateBatchParams{
+			CommunityID:        communityID,
+			Limit:              params.Limit,
+			CurBeforeRelevance: params.CursorBeforeFloat,
+			CurBeforeID:        params.CursorBeforeID,
+			CurAfterRelevance:  params.CursorAfterFloat,
+			CurAfterID:         params.CursorAfterID,
+			PagingForward:      params.PagingForward,
+		})
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.loaders.CountGalleriesDisplayingCommunityIDBatch.Load(communityID)
+		return int(total), err
+	}
+
+	cursorFunc := func(r db.GetGalleriesDisplayingCommunityIDPaginateBatchRow) (float64, persist.DBID, error) {
+		return r.Relevance, r.Gallery.ID, nil
+	}
+
+	paginator := floatIDPaginator[db.GetGalleriesDisplayingCommunityIDPaginateBatchRow]{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	rows, pageInfo, err := paginator.paginate(before, after, first, last)
+	if err != nil {
+		return nil, nil, nil, PageInfo{}, err
+	}
+
+	galleries := make([]db.Gallery, len(rows))
+	medias := make([][]persist.Media, len(rows))
+	mediasLastUpdated := make([][]time.Time, len(rows))
+	for i, row := range rows {
+		galleries[i] = row.Gallery
+		medias[i], mediasLastUpdated[i] = getPreviewMediaForCommunityGallery(ctx, row.CommunityTokenIds, row.CommunityMedias, row.CommunityMediaLastUpdated, row.AllTokenIds, row.AllMedias, row.AllMediaLastUpdated)
+	}
+
+	return galleries, medias, mediasLastUpdated, pageInfo, nil
+}
+
+// getPreviewMediaForCommunityGallery returns a slice of media that contains all community media first, then all other media
+func getPreviewMediaForCommunityGallery(ctx context.Context, communityTokenIDs []persist.DBID, communityMedia []persist.Media, communityLastUpdated []time.Time,
+	allTokenIDs []persist.DBID, allMedia []persist.Media, allLastUpdated []time.Time) ([]persist.Media, []time.Time) {
+	media := make([]persist.Media, 0, len(communityTokenIDs)+len(allTokenIDs))
+	lastUpdated := make([]time.Time, 0, len(communityTokenIDs)+len(allTokenIDs))
+
+	communityIDMap := make(map[persist.DBID]bool)
+	for _, id := range communityTokenIDs {
+		communityIDMap[id] = true
+	}
+
+	for i, m := range communityMedia {
+		media = append(media, m)
+		lastUpdated = append(lastUpdated, communityLastUpdated[i])
+	}
+
+	for i, m := range allMedia {
+		if _, ok := communityIDMap[allTokenIDs[i]]; !ok {
+			media = append(media, m)
+			lastUpdated = append(lastUpdated, allLastUpdated[i])
+		}
+	}
+
+	return media, lastUpdated
 }
 
 func getExternalID(ctx context.Context) *string {

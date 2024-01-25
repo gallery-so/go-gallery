@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/lib/pq"
 )
 
 // Media represents a token's media content with processed images from metadata
@@ -33,6 +34,18 @@ func (m *Media) Scan(src interface{}) error {
 		return nil
 	}
 	return json.Unmarshal(src.([]byte), &m)
+}
+
+// MediaList is a slice of Media, used to implement scanner/valuer interfaces
+type MediaList []Media
+
+func (l MediaList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+// Scan implements the Scanner interface for the MediaList type
+func (l *MediaList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
 }
 
 var errMediaNotFound ErrMediaNotFound

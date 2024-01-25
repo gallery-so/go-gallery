@@ -1965,3 +1965,26 @@ select communities.* from communities
 
 -- name: GetActiveWallets :many
 select w.* from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal;
+
+-- name: GetGalleriesDisplayingCommunityIDPaginateBatch :batchmany
+select sqlc.embed(g),
+       cg.token_ids as community_token_ids,
+       cg.token_medias as community_medias,
+       cg.token_media_last_updated::timestamptz[] as community_media_last_updated,
+       cg2.token_ids as all_token_ids,
+       cg2.token_medias as all_medias,
+       cg2.token_media_last_updated::timestamptz[] as all_media_last_updated,
+       (-cg.gallery_relevance)::float8 as relevance from community_galleries cg
+    join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
+    join community_galleries cg2 on cg2.gallery_id = cg.gallery_id and cg2.community_id is null
+where cg.community_id = @community_id
+    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) < (@community_id, @cur_before_relevance::float8, @cur_before_id)
+    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) > (@community_id, @cur_after_relevance::float8, @cur_after_id)
+order by case when @paging_forward::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
+         case when not @paging_forward::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
+limit sqlc.arg('limit');
+
+-- name: CountGalleriesDisplayingCommunityIDBatch :batchone
+select count(*) from community_galleries cg
+    join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
+where cg.community_id = @community_id;
