@@ -235,6 +235,9 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
+	if len(tokens) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for contract %s", contractAddress.String())
+	}
 	if len(contracts) == 0 {
 		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found with address: %s", contractAddress)
 	}
@@ -475,6 +478,7 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 	case "ERC1155":
 		tokenType = persist.TokenTypeERC1155
 	default:
+		panic(fmt.Sprintf("unknown standard: %s", standard))
 		return multichain.ChainAgnosticToken{}, fmt.Errorf("unknown token standard %s", token.TokenStandard)
 	}
 

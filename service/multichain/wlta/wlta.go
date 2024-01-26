@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
+	// "sync"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -22,17 +21,26 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-type submission struct {
-	ID       int
-	Link     string
-	Domain   domain
-	Category Category
-	Chain    persist.Chain
-	Contract persist.Address
+type Submission struct {
+	ID                string
+	Link              string
+	Domain            Domain
+	Category          Category
+	Chain             persist.Chain
+	Contract          persist.Address
+	IsNSFW            bool
+	Title             string
+	Description       string
+	AuthorName        string
+	AuthorTwitter     string
+	AuthorBio         string
+	AuthorWallet      persist.Address
+	IsMissingContract bool
+	IsMissingData     bool
 }
 
 type fetchRequirements struct {
-	Submission     submission
+	Submission     Submission
 	Token          persist.TokenIdentifiers
 	Contract       persist.ContractIdentifiers
 	RequireTokenID persist.TokenID // only used for zora pre-mint
@@ -40,7 +48,7 @@ type fetchRequirements struct {
 }
 
 type Category int
-type domain int
+type Domain int
 
 const (
 	GenreOneOfOnes Category = iota
@@ -50,11 +58,27 @@ const (
 )
 
 const (
-	domainZora domain = iota
-	domainOpensea
-	domainManifold
-	domainDecent
-	domainMintFun
+	DomainZora              Domain = iota // 0
+	DomainOpensea                         // 1
+	DomainManifold                        // 2
+	DomainDecent                          // 3
+	DomainMintFun                         // 4
+	DomainZoraEnergy                      // 5
+	DomainOptimismEtherscan               // 6
+	DomainSuperCollector                  // 7
+	DomainOptimismMan                     // 8
+	DomainLoogies                         // 9
+	DomainZonic                           // 10
+	DomainWeLoveTheArt                    // 11
+	DomainHighlight                       // 12
+	DomainSound                           // 13
+	DomainHolograph                       // 14
+	DomainTitles                          // 15
+	DomainMirror                          // 16
+	DomainCurate                          // 17
+	DomainUnknown                         // 18
+	DomainCoopdville                      // 19
+	DomainBonfire                         // 20
 )
 
 type Provider struct {
@@ -65,8 +89,8 @@ type Provider struct {
 }
 
 func NewProvider() *Provider {
-	submissions := readSubmissions("./service/multichain/wlta/tokens.csv")
-	requirements := util.MapWithoutError(submissions, func(s submission) fetchRequirements { return handleSubmission(s) })
+	submissions := readSubmissions("./service/multichain/wlta/submissions_clean.csv")
+	requirements := util.MapWithoutError(submissions, func(s Submission) fetchRequirements { return handleSubmission(s) })
 	return &Provider{
 		Zora:         zora.NewProvider(http.DefaultClient),
 		Base:         reservoir.NewProvider(http.DefaultClient, persist.ChainBase),
@@ -81,31 +105,47 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		p.fulfillRequirements(ctx, address, recCh, errCh)
+		p.FullfillRequirements(ctx, address, recCh, errCh)
 	}()
 	return recCh, errCh
 }
 
-func (p *Provider) fulfillRequirements(
+func (p *Provider) FullfillRequirements(
 	ctx context.Context,
 	address persist.Address,
 	recCh chan<- multichain.ChainAgnosticTokensAndContracts,
 	errCh chan<- error,
 ) {
-	tokenToSubmission := make(map[persist.TokenIdentifiers]submission)
-	submissionErrors := make(map[submission]error)
+	tokenToSubmission := make(map[persist.TokenIdentifiers]Submission)
+	submissionErrors := make(map[Submission]error)
 
-	var tokenMu sync.Mutex
-	var errMu sync.Mutex
+	optResults := multichain.ChainAgnosticTokensAndContracts{
+		Tokens:      []multichain.ChainAgnosticToken{},
+		Contracts:   []multichain.ChainAgnosticContract{},
+		ActualChain: persist.ChainOptimism,
+	}
+	baseResults := multichain.ChainAgnosticTokensAndContracts{
+		Tokens:      []multichain.ChainAgnosticToken{},
+		Contracts:   []multichain.ChainAgnosticContract{},
+		ActualChain: persist.ChainBase,
+	}
+	zoraResults := multichain.ChainAgnosticTokensAndContracts{
+		Tokens:      []multichain.ChainAgnosticToken{},
+		Contracts:   []multichain.ChainAgnosticContract{},
+		ActualChain: persist.ChainZora,
+	}
+
+	// var tokenMu sync.Mutex
+	// var errMu sync.Mutex
 
 	for _, req := range p.requirements {
 		r, err := p.fullfillRequirement(ctx, req)
 
 		// swallow the error for debugging
 		if err != nil {
-			errMu.Lock()
+			// errMu.Lock()
 			submissionErrors[req.Submission] = err
-			errMu.Unlock()
+			// errMu.Unlock()
 			continue
 		}
 
@@ -115,7 +155,7 @@ func (p *Provider) fulfillRequirements(
 		})
 
 		// append to mapping file of token identifiers to category
-		tokenMu.Lock()
+		// tokenMu.Lock()
 		for _, t := range r.Tokens {
 			tokenToSubmission[persist.TokenIdentifiers{
 				TokenID:         t.TokenID,
@@ -123,16 +163,39 @@ func (p *Provider) fulfillRequirements(
 				Chain:           r.ActualChain,
 			}] = req.Submission
 		}
-		tokenMu.Unlock()
+		// tokenMu.Unlock()
 
-		recCh <- r
+		if r.ActualChain == persist.ChainOptimism {
+			optResults.Tokens = append(optResults.Tokens, r.Tokens...)
+			optResults.Contracts = append(optResults.Contracts, r.Contracts...)
+			continue
+		}
+
+		if r.ActualChain == persist.ChainBase {
+			baseResults.Tokens = append(baseResults.Tokens, r.Tokens...)
+			baseResults.Contracts = append(baseResults.Contracts, r.Contracts...)
+			continue
+		}
+
+		if r.ActualChain == persist.ChainZora {
+			zoraResults.Tokens = append(zoraResults.Tokens, r.Tokens...)
+			zoraResults.Contracts = append(zoraResults.Contracts, r.Contracts...)
+			continue
+		}
+
+		panic(fmt.Errorf("unknown chain :%d", r.ActualChain))
+
+		// recCh <- r
 	}
 
 	writeMappingFile(tokenToSubmission)
 	writeErrorsFile(submissionErrors)
+	recCh <- optResults
+	recCh <- baseResults
+	recCh <- zoraResults
 }
 
-func writeMappingFile(m map[persist.TokenIdentifiers]submission) {
+func writeMappingFile(m map[persist.TokenIdentifiers]Submission) {
 	f, err := os.Create(fmt.Sprintf("./service/multichain/wlta/id_to_category_%s.csv", env.GetString("ENV")))
 	if err != nil {
 		panic(err)
@@ -146,13 +209,14 @@ func writeMappingFile(m map[persist.TokenIdentifiers]submission) {
 			fmt.Sprintf("%d", t.Chain),    // chain
 			t.ContractAddress.String(),    // contract_address
 			t.TokenID.String(),            // token_id
-			fmt.Sprintf("%d", s.ID),       // submission_id
+			s.ID,                          // submission_id
 			fmt.Sprintf("%d", s.Category), // category
+			strconv.FormatBool(s.IsNSFW),  // is_nsfw
 		})
 	}
 }
 
-func writeErrorsFile(m map[submission]error) {
+func writeErrorsFile(m map[Submission]error) {
 	f, err := os.Create(fmt.Sprintf("./service/multichain/wlta/submission_errors_%s.csv", env.GetString("ENV")))
 	if err != nil {
 		panic(err)
@@ -163,7 +227,7 @@ func writeErrorsFile(m map[submission]error) {
 	defer w.Flush()
 	for s, e := range m {
 		w.Write([]string{
-			fmt.Sprintf("%d", s.ID),    // submission_id
+			s.ID,                       // submission_id
 			s.Link,                     // link
 			fmt.Sprintf("%d", s.Chain), // chain
 			s.Contract.String(),        // contract_address
@@ -178,7 +242,10 @@ func overrideTokenOwner(t multichain.ChainAgnosticToken, a persist.Address) mult
 }
 
 func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirements) (multichain.ChainAgnosticTokensAndContracts, error) {
-	fmt.Printf("[%d] handling submission\n", req.Submission.ID)
+	fmt.Printf("[%s] handling submission\n", req.Submission.ID)
+	if req.Submission.IsMissingContract {
+		return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("missing contract data")
+	}
 	// require exact token
 	if req.Token != (persist.TokenIdentifiers{}) {
 		tID := multichain.ChainAgnosticIdentifiers{
@@ -188,7 +255,7 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 		if req.Token.Chain == persist.ChainBase {
 			token, contract, err := p.Base.GetTokenByTokenIdentifiers(ctx, tID)
 			if err != nil {
-				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed exact token requirement: %s", req.Submission.ID, err)
+				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed exact token requirement: %s", err)
 			}
 			return multichain.ChainAgnosticTokensAndContracts{
 				Tokens:      []multichain.ChainAgnosticToken{token},
@@ -199,7 +266,7 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 		if req.Token.Chain == persist.ChainOptimism {
 			token, contract, err := p.Optimism.GetTokenByTokenIdentifiers(ctx, tID)
 			if err != nil {
-				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed exact token requirement: %s", req.Submission.ID, err)
+				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed exact token requirement: %s", err)
 			}
 			return multichain.ChainAgnosticTokensAndContracts{
 				Tokens:      []multichain.ChainAgnosticToken{token},
@@ -210,7 +277,7 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 		if req.Token.Chain == persist.ChainZora {
 			token, contract, err := p.Zora.GetTokenByTokenIdentifiers(ctx, tID)
 			if err != nil {
-				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed exact token requirement: %s", req.Submission.ID, err)
+				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed exact token requirement: %s", err)
 			}
 			return multichain.ChainAgnosticTokensAndContracts{
 				Tokens:      []multichain.ChainAgnosticToken{token},
@@ -225,7 +292,7 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 		if req.Contract.Chain == persist.ChainZora {
 			tokens, contract, err := p.Zora.GetTokensByContractAddress(ctx, req.Contract.ContractAddress, 0, 0)
 			if err != nil {
-				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed require match token requirements: %s", req.Submission.ID, err)
+				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed require matching token requirements: %s", err)
 			}
 			for _, t := range tokens {
 				if t.TokenID == req.RequireTokenID {
@@ -243,9 +310,9 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 					ActualChain: persist.ChainZora,
 				}, nil
 			}
-			return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed require match token requirements", req.Submission.ID)
+			return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed require matching token requirements")
 		}
-		panic(fmt.Errorf("[%d] invalid chain: %d", req.Submission.ID, req.Token.Chain))
+		panic(fmt.Errorf("[%s] invalid chain: %d", req.Submission.ID, req.Token.Chain))
 	}
 	// require at least one token
 	if req.RequireOne {
@@ -255,7 +322,7 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 		if req.Contract.Chain == persist.ChainBase {
 			tokens, contract, err = p.Base.GetTokensByContractAddress(ctx, req.Contract.ContractAddress, 0, 0)
 			if err != nil {
-				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed require one token requirements: %s", req.Submission.ID, err)
+				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed require one token requirements: %s", err)
 			}
 			return multichain.ChainAgnosticTokensAndContracts{
 				Tokens:      tokens[:1],
@@ -266,7 +333,7 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 		if req.Contract.Chain == persist.ChainOptimism {
 			tokens, contract, err = p.Optimism.GetTokensByContractAddress(ctx, req.Contract.ContractAddress, 0, 0)
 			if err != nil {
-				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed require one token requirements: %s", req.Submission.ID, err)
+				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed require at least one token requirements: %s", err)
 			}
 			return multichain.ChainAgnosticTokensAndContracts{
 				Tokens:      tokens[:1],
@@ -277,7 +344,7 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 		if req.Contract.Chain == persist.ChainZora {
 			tokens, contract, err = p.Zora.GetTokensByContractAddress(ctx, req.Contract.ContractAddress, 0, 0)
 			if err != nil {
-				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed require one token requirements: %s", req.Submission.ID, err)
+				return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed require at least one token requirements: %s", err)
 			}
 			return multichain.ChainAgnosticTokensAndContracts{
 				Tokens:      tokens[:1],
@@ -286,17 +353,29 @@ func (p *Provider) fullfillRequirement(ctx context.Context, req fetchRequirement
 			}, nil
 		}
 		if len(tokens) == 0 {
-			return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("[%d] failed require one token requirements: %s", req.Submission.ID, errors.New("no tokens found"))
+			return multichain.ChainAgnosticTokensAndContracts{}, fmt.Errorf("failed require at least one token requirements: %s", err)
 		}
 		panic(fmt.Errorf("invalid chain: %d", req.Contract.Chain))
 	}
 	panic(fmt.Errorf("invalid requirements: %+v", req))
 }
 
-func handleSubmission(s submission) fetchRequirements {
-	parts := urlParts(s.Link)
+func handleSubmission(s Submission) fetchRequirements {
+	parts := URLParts(s.Link)
 
-	if s.Domain == domainZora {
+	if s.IsMissingContract {
+		cID := persist.ContractIdentifiers{
+			ContractAddress: s.Contract,
+			Chain:           s.Chain,
+		}
+		return fetchRequirements{
+			Submission: s,
+			Contract:   cID,
+			RequireOne: true,
+		}
+	}
+
+	if s.Domain == DomainZora {
 		// zora collect url with pre-mint
 		if len(parts) == 3 && parts[0] == "collect" && strings.HasPrefix(parts[2], "premint") {
 			cID := persist.ContractIdentifiers{
@@ -307,45 +386,6 @@ func handleSubmission(s submission) fetchRequirements {
 				Submission:     s,
 				Contract:       cID,
 				RequireTokenID: persist.MustTokenID(strings.TrimPrefix(parts[2], "premint-")),
-			}
-		}
-
-		// zora manage url with pre-mint
-		if len(parts) == 4 && parts[0] == "manage" && strings.HasPrefix(parts[3], "premint") {
-			cID := persist.ContractIdentifiers{
-				ContractAddress: s.Contract,
-				Chain:           s.Chain,
-			}
-			return fetchRequirements{
-				Submission:     s,
-				Contract:       cID,
-				RequireTokenID: persist.MustTokenID(strings.TrimPrefix(parts[3], "premint-")),
-			}
-		}
-
-		// zora manage url with token ID
-		if len(parts) == 4 && parts[0] == "manage" {
-			tID := persist.TokenIdentifiers{
-				TokenID:         persist.MustTokenID(parts[3]),
-				ContractAddress: s.Contract,
-				Chain:           s.Chain,
-			}
-			return fetchRequirements{
-				Submission: s,
-				Token:      tID,
-			}
-		}
-
-		// zora manage url no token ID
-		if len(parts) == 3 && parts[0] == "manage" {
-			cID := persist.ContractIdentifiers{
-				ContractAddress: s.Contract,
-				Chain:           s.Chain,
-			}
-			return fetchRequirements{
-				Submission: s,
-				Contract:   cID,
-				RequireOne: true,
 			}
 		}
 
@@ -375,9 +415,32 @@ func handleSubmission(s submission) fetchRequirements {
 			}
 		}
 
+		if len(parts) == 1 && strings.HasSuffix(parts[0], ".eth") {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 1 && strings.HasPrefix(parts[0], "0x") {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
 	}
 
-	if s.Domain == domainOpensea {
+	if s.Domain == DomainOpensea {
 		// opensea asset url with token ID
 		if len(parts) == 4 && parts[0] == "assets" {
 			tID := persist.TokenIdentifiers{
@@ -388,11 +451,103 @@ func handleSubmission(s submission) fetchRequirements {
 			return fetchRequirements{
 				Submission: s,
 				Token:      tID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 3 && parts[0] == "collection" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 5 && parts[1] == "assets" {
+			tID := persist.TokenIdentifiers{
+				TokenID:         persist.MustTokenID(parts[4]),
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Token:      tID,
+				RequireOne: true,
+			}
+		}
+
+		// bad URL
+		if s.ID == "12562" && len(parts) == 10 {
+			p := strings.Split(s.Link, "https://")
+			link := fmt.Sprintf("https://%s", p[1])
+			parts = URLParts(link)
+			if len(parts) == 4 && parts[0] == "assets" {
+				tID := persist.TokenIdentifiers{
+					TokenID:         persist.MustTokenID(parts[3]),
+					ContractAddress: s.Contract,
+					Chain:           s.Chain,
+				}
+				return fetchRequirements{
+					Submission: s,
+					Token:      tID,
+				}
+			}
+		}
+
+		if len(parts) == 5 && parts[0] == "assets" {
+			tID := persist.TokenIdentifiers{
+				TokenID:         persist.MustTokenID(parts[3]),
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Token:      tID,
+			}
+		}
+
+		if len(parts) == 1 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
 			}
 		}
 	}
 
-	if s.Domain == domainManifold {
+	if s.Domain == DomainManifold {
+		if len(parts) == 1 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 3 && parts[2] == "edit" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
 		// manifold asset url with token ID
 		if len(parts) == 3 {
 			tID := persist.TokenIdentifiers{
@@ -407,7 +562,7 @@ func handleSubmission(s submission) fetchRequirements {
 		}
 	}
 
-	if s.Domain == domainDecent {
+	if s.Domain == DomainDecent {
 		// decent asset url no token ID
 		cID := persist.ContractIdentifiers{
 			ContractAddress: s.Contract,
@@ -420,9 +575,8 @@ func handleSubmission(s submission) fetchRequirements {
 		}
 	}
 
-	if s.Domain == domainMintFun {
-		// mint.fun asset url no token ID
-		if len(parts) == 2 {
+	if s.Domain == DomainOpensea {
+		if len(parts) == 2 && parts[0] == "collection" {
 			cID := persist.ContractIdentifiers{
 				ContractAddress: s.Contract,
 				Chain:           s.Chain,
@@ -435,7 +589,36 @@ func handleSubmission(s submission) fetchRequirements {
 		}
 	}
 
-	if s.Domain == domainManifold {
+	if s.Domain == DomainMintFun {
+		// mint.fun asset url no token ID
+		cID := persist.ContractIdentifiers{
+			ContractAddress: s.Contract,
+			Chain:           s.Chain,
+		}
+		if len(parts) == 2 {
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+		if len(parts) == 3 && parts[2] == "created" {
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+		if len(parts) == 4 {
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainManifold {
 		// manifold asset url with no token ID
 		if len(parts) == 2 {
 			cID := persist.ContractIdentifiers{
@@ -448,17 +631,269 @@ func handleSubmission(s submission) fetchRequirements {
 				RequireOne: true,
 			}
 		}
+
+		if len(parts) == 4 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
 	}
 
-	panic(fmt.Errorf("%+v", s))
+	if s.Domain == DomainOptimismEtherscan {
+		if len(parts) == 2 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainOptimismMan {
+		if len(parts) == 1 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainSuperCollector {
+		if len(parts) == 1 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainLoogies {
+		if len(parts) == 1 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainZonic {
+		if len(parts) == 2 && parts[0] == "collection" && parts[1] == "omniwonders" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainWeLoveTheArt {
+		cID := persist.ContractIdentifiers{
+			ContractAddress: s.Contract,
+			Chain:           s.Chain,
+		}
+		return fetchRequirements{
+			Submission: s,
+			Contract:   cID,
+			RequireOne: true,
+		}
+	}
+
+	if s.Domain == DomainHighlight {
+		if len(parts) == 2 && parts[0] == "mint" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 3 && parts[0] == "mint" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 4 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainHolograph {
+		if len(parts) == 2 && parts[0] == "collections" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if s.ID == "11020" {
+			tID := persist.TokenIdentifiers{
+				TokenID:         persist.MustTokenID("188719626670054478562669105609137414715460010957784007367725272453685"),
+				ContractAddress: "0x8c531f965c05fab8135d951e2ad0ad75cf3405a2",
+				Chain:           persist.ChainOptimism,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Token:      tID,
+			}
+		}
+
+		if len(parts) == 4 && parts[0] == "collections" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 4 && parts[0] == "collector" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainSound {
+		if len(parts) == 2 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+
+		if len(parts) == 1 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainTitles {
+		if len(parts) == 3 && parts[0] == "collect" {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	if s.Domain == DomainCurate {
+		cID := persist.ContractIdentifiers{
+			ContractAddress: s.Contract,
+			Chain:           s.Chain,
+		}
+		return fetchRequirements{
+			Submission: s,
+			Contract:   cID,
+			RequireOne: true,
+		}
+	}
+
+	if s.Domain == DomainMirror {
+		if len(parts) == 2 {
+			cID := persist.ContractIdentifiers{
+				ContractAddress: s.Contract,
+				Chain:           s.Chain,
+			}
+			return fetchRequirements{
+				Submission: s,
+				Contract:   cID,
+				RequireOne: true,
+			}
+		}
+	}
+
+	fmt.Printf("submissionID: %s; link: %s; parts: %d\n", s.ID, s.Link, len(parts))
+	for i, p := range parts {
+		fmt.Printf("part %d: %s\n", i, p)
+	}
+	panic("not implemented")
 }
 
-func urlParts(u string) []string {
-	u = strings.Trim(removeQueryParams(u).Path, "/")
+func URLParts(u string) []string {
+	u = strings.Trim(RemoveQueryParams(u).Path, "/")
 	return strings.Split(u, "/")
 }
 
-func removeQueryParams(link string) *url.URL {
+func RemoveQueryParams(link string) *url.URL {
 	u, err := url.Parse(link)
 	if err != nil {
 		panic(err)
@@ -467,7 +902,7 @@ func removeQueryParams(link string) *url.URL {
 	return u
 }
 
-func readSubmissions(f string) []submission {
+func readSubmissions(f string) []Submission {
 	byt, err := os.ReadFile(f)
 	if err != nil {
 		panic(err)
@@ -476,7 +911,7 @@ func readSubmissions(f string) []submission {
 	r := bytes.NewReader(byt)
 	c := csv.NewReader(r)
 
-	submissions := make([]submission, 0)
+	submissions := make([]Submission, 0)
 
 	for {
 		record, err := c.Read()
@@ -494,53 +929,116 @@ func readSubmissions(f string) []submission {
 	return submissions
 }
 
-func rowToSubmission(r []string) submission {
-	id, err := strconv.Atoi(r[0])
+func rowToSubmission(r []string) Submission {
+	chainRaw, err := strconv.Atoi(r[4])
 	if err != nil {
 		panic(err)
 	}
 
-	chain, ok := map[string]persist.Chain{
-		"base":     persist.ChainBase,
-		"zora":     persist.ChainZora,
-		"optimism": persist.ChainOptimism,
-	}[r[4]]
+	chain, ok := map[int]persist.Chain{
+		3: persist.ChainOptimism,
+		6: persist.ChainZora,
+		7: persist.ChainBase,
+		8: persist.ChainUnknown,
+	}[chainRaw]
 	if !ok {
-		panic(r[4])
+		panic(chainRaw)
 	}
 
-	category, ok := map[string]Category{
-		"1of1s":          GenreOneOfOnes,
-		"AI Art":         GenreAi,
-		"Generative Art": GenreGenArt,
-		"Music":          GenreMusic,
-	}[r[3]]
-	if !ok {
-		panic(category)
+	domainRaw, err := strconv.Atoi(r[2])
+	if err != nil {
+		panic(err)
 	}
 
-	domain, ok := map[string]domain{
-		"zora.co":              domainZora,
-		"opensea.io":           domainOpensea,
-		"gallery.manifold.xyz": domainManifold,
-		"hq.decent.xyz":        domainDecent,
-		"mint.fun":             domainMintFun,
-	}[r[2]]
+	domain, ok := map[int]Domain{
+		0:  DomainZora,
+		1:  DomainOpensea,
+		2:  DomainManifold,
+		3:  DomainDecent,
+		4:  DomainMintFun,
+		5:  DomainZoraEnergy,
+		6:  DomainOptimismEtherscan,
+		7:  DomainSuperCollector,
+		8:  DomainOptimismMan,
+		9:  DomainLoogies,
+		10: DomainZonic,
+		11: DomainWeLoveTheArt,
+		12: DomainHighlight,
+		13: DomainSound,
+		14: DomainHolograph,
+		15: DomainTitles,
+		16: DomainMirror,
+		17: DomainCurate,
+		18: DomainUnknown,
+		19: DomainCoopdville,
+		20: DomainBonfire,
+	}[domainRaw]
 	if !ok {
-		panic(r[2])
+		panic(domainRaw)
+	}
+
+	categoryRaw, err := strconv.Atoi(r[3])
+	if err != nil {
+		panic(err)
+	}
+
+	category, ok := map[int]Category{
+		0: GenreOneOfOnes,
+		1: GenreAi,
+		2: GenreGenArt,
+		3: GenreMusic,
+	}[categoryRaw]
+	if !ok {
+		panic(categoryRaw)
+	}
+
+	isNSFW, err := strconv.ParseBool(r[6])
+	if err != nil {
+		panic(err)
+	}
+
+	isMissingContract, err := strconv.ParseBool(r[13])
+	if err != nil {
+		panic(err)
+	}
+
+	isMissingData, err := strconv.ParseBool(r[14])
+	if err != nil {
+		panic(err)
 	}
 
 	contract := persist.Address(r[5])
-	if contract == "" {
-		panic(fmt.Errorf("empty address: %d", id))
+	if contract == "" && !isMissingContract {
+		panic(fmt.Errorf("empty address: %s", r[0]))
 	}
 
-	return submission{
-		ID:       id,
-		Link:     strings.TrimSpace(r[1]),
-		Domain:   domain,
-		Category: category,
-		Chain:    persist.Chain(chain),
-		Contract: persist.Address(chain.NormalizeAddress(contract)),
+	return Submission{
+		ID:                r[0],
+		Link:              r[1],
+		Domain:            domain,
+		Category:          category,
+		Chain:             chain,
+		Contract:          persist.Address(r[5]),
+		IsNSFW:            isNSFW,
+		Title:             r[7],
+		Description:       r[8],
+		AuthorName:        r[9],
+		AuthorTwitter:     r[10],
+		AuthorBio:         r[11],
+		AuthorWallet:      persist.Address(r[12]),
+		IsMissingContract: isMissingContract,
+		IsMissingData:     isMissingData,
+	}
+}
+
+func ValidateTokenID(s string) {
+	if _, err := strconv.Atoi(s); err != nil {
+		panic(fmt.Sprintf("invalid token id: %s", s))
+	}
+}
+
+func ValidateChainAndAddress(s string) {
+	if len(strings.Split(s, ":")) != 2 {
+		panic(fmt.Sprintf("invalid chain and address: %s", s))
 	}
 }

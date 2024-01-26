@@ -104,6 +104,7 @@ const (
 	// ChainBase represents the base chain
 	ChainBase
 	// ChainWlta
+	ChainUnknown
 	ChainWlta = 1337
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to

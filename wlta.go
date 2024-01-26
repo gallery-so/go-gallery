@@ -52,13 +52,12 @@ func main() {
 
 	// create gallery for each category
 	var pos int
-	for cat, name := range map[wlta.Category]string{
-		wlta.GenreOneOfOnes: "1 of 1's",
-		wlta.GenreAi:        "AI Art",
-		wlta.GenreGenArt:    "Generative Art",
-		wlta.GenreMusic:     "Music",
-	} {
-		fmt.Printf("[%s] creating gallery: %d tokens\n", name, len(categorySubmissions[cat]))
+	for name, submissions := range categorySubmissions {
+		if len(submissions) == 0 {
+			fmt.Printf("[%s] no submissions\n", name)
+			continue
+		}
+		fmt.Printf("[%s] creating gallery: %d tokens\n", name, len(submissions))
 		gallery, err := api.Gallery.CreateGallery(ctx, &name, util.ToPointer(""), strconv.Itoa(pos))
 		if err != nil {
 			panic(err)
@@ -77,8 +76,8 @@ func main() {
 			SectionLayout: []persist.CollectionSectionLayout{{Columns: 4}},
 		}
 
-		params := make([]db.GetTokenByUserTokenIdentifiersBatchParams, len(categorySubmissions[cat]))
-		for i, m := range categorySubmissions[cat] {
+		params := make([]db.GetTokenByUserTokenIdentifiersBatchParams, len(submissions))
+		for i, m := range submissions {
 			params[i] = db.GetTokenByUserTokenIdentifiersBatchParams{
 				OwnerID:         userID,
 				TokenID:         m.TokenID,
@@ -87,8 +86,13 @@ func main() {
 			}
 		}
 
-		tokens, _ := loaders.GetTokenByUserTokenIdentifiersBatch.LoadAll(params)
-		tokens = util.Filter(tokens, func(t db.GetTokenByUserTokenIdentifiersBatchRow) bool { return t.Token.ID != "" }, true)
+		tokens, errors := loaders.GetTokenByUserTokenIdentifiersBatch.LoadAll(params)
+		for _, err := range errors {
+			if err != nil {
+				panic(err)
+			}
+		}
+		// tokens = util.Filter(tokens, func(t db.GetTokenByUserTokenIdentifiersBatchRow) bool { return t.Token.ID != "" }, true)
 		tokenIDs := util.MapWithoutError(tokens, func(t db.GetTokenByUserTokenIdentifiersBatchRow) persist.DBID { return t.Token.ID })
 
 		collections := [][]persist.DBID{[]persist.DBID{}}
@@ -164,9 +168,10 @@ type submissionMapping struct {
 	TokenID         persist.TokenID
 	SubmissionID    int
 	Category        wlta.Category
+	IsNSFW          bool
 }
 
-func readSubmissionMappings(f string) map[wlta.Category][]submissionMapping {
+func readSubmissionMappings(f string) map[string][]submissionMapping {
 	fmt.Printf("reading submission mappings from: %s\n", f)
 	byt, err := os.ReadFile(f)
 	if err != nil {
@@ -176,11 +181,19 @@ func readSubmissionMappings(f string) map[wlta.Category][]submissionMapping {
 	r := bytes.NewReader(byt)
 	c := csv.NewReader(r)
 
-	categorySubmissions := make(map[wlta.Category][]submissionMapping)
-	categorySubmissions[wlta.GenreOneOfOnes] = make([]submissionMapping, 0)
-	categorySubmissions[wlta.GenreAi] = make([]submissionMapping, 0)
-	categorySubmissions[wlta.GenreGenArt] = make([]submissionMapping, 0)
-	categorySubmissions[wlta.GenreMusic] = make([]submissionMapping, 0)
+	categoryToName := map[wlta.Category]string{
+		wlta.GenreOneOfOnes: "1 of 1's",
+		wlta.GenreAi:        "AI Art",
+		wlta.GenreGenArt:    "Generative Art",
+		wlta.GenreMusic:     "Music",
+	}
+
+	categorySubmissions := make(map[string][]submissionMapping)
+	categorySubmissions["1 of 1's"] = make([]submissionMapping, 0)
+	categorySubmissions["AI Art"] = make([]submissionMapping, 0)
+	categorySubmissions["Generative Art"] = make([]submissionMapping, 0)
+	categorySubmissions["Music"] = make([]submissionMapping, 0)
+	categorySubmissions["NSFW"] = make([]submissionMapping, 0)
 
 	for {
 		record, err := c.Read()
@@ -193,7 +206,22 @@ func readSubmissionMappings(f string) map[wlta.Category][]submissionMapping {
 		}
 
 		m := rowToSubmissionMapping(record)
-		categorySubmissions[m.Category] = append(categorySubmissions[m.Category], m)
+
+		var catName string
+
+		if m.IsNSFW {
+			catName = "NSFW"
+		}
+
+		if catName == "" {
+			catName = categoryToName[m.Category]
+		}
+
+		if catName == "" {
+			panic(fmt.Errorf("no category name for category: %d", m.Category))
+		}
+
+		categorySubmissions[catName] = append(categorySubmissions[catName], m)
 	}
 
 	return categorySubmissions
@@ -212,11 +240,16 @@ func rowToSubmissionMapping(r []string) submissionMapping {
 	if err != nil {
 		panic(err)
 	}
+	isNSFW, err := strconv.ParseBool(r[5])
+	if err != nil {
+		panic(err)
+	}
 	return submissionMapping{
 		Chain:           persist.Chain(c),
 		ContractAddress: persist.Address(r[1]),
 		TokenID:         persist.TokenID(r[2]),
 		SubmissionID:    s,
 		Category:        wlta.Category(cat),
+		IsNSFW:          isNSFW,
 	}
 }

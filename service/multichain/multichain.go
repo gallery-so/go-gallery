@@ -261,6 +261,10 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 							chainOverride = page.ActualChain
 						}
 
+						if chainOverride == persist.ChainWlta {
+							panic("WTF")
+						}
+
 						recCh <- chainTokensAndContracts{
 							tokens:    chainTokens{chain: chainOverride, tokens: page.Tokens},
 							contracts: chainContracts{chain: chainOverride, contracts: page.Contracts},
@@ -286,7 +290,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 		wg.Wait()
 	}()
 
-	_, _, _, err = p.replaceHolderTokensForUser(ctx, user, chains, recCh, errCh)
+	_, _, _, err = p.addHolderTokensForUser(ctx, user, chains, recCh, errCh)
 	return err
 }
 
@@ -769,14 +773,22 @@ func (p *Provider) receiveProviderData(ctx context.Context, user persist.User, r
 			if !ok {
 				return
 			}
-			currentContracts, _, err = p.processContracts(ctx, []chainContracts{page.contracts}, currentContracts, false)
+
+			var curContractsInc []db.Contract
+			var curTokensInc []op.TokenFullDetails
+
+			curContractsInc, _, err = p.processContracts(ctx, []chainContracts{page.contracts}, currentContracts, false)
 			if err != nil {
 				return
 			}
-			currentTokens, newTokens, err = addTokensF(ctx, user, []chainTokens{page.tokens}, currentContracts, currentTokens)
+
+			curTokensInc, newTokens, err = addTokensF(ctx, user, []chainTokens{page.tokens}, currentContracts, currentTokens)
 			if err != nil {
 				return
 			}
+
+			currentContracts = curContractsInc
+			currentTokens = curTokensInc
 		case <-ctx.Done():
 			err = ctx.Err()
 			return

@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	DefaultRetry = Retry{Base: 4, Cap: 64, Tries: 12}
+	DefaultRetry = Retry{Base: 4, Cap: 24, Tries: 12}
 )
 
 type ErrOutOfRetries struct {
