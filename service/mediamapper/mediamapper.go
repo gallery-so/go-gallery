@@ -172,6 +172,14 @@ func WithFormatAuto() Option {
 	}
 }
 
+// WithBackgroundColor will set the background color of the media.
+// See https://docs.imgix.com/apis/rendering#colors for valid parameter values.
+func WithBackgroundColor(color string) Option {
+	return func(params *[]imgix.IxParam) {
+		*params = append(*params, imgix.Param("bg", color))
+	}
+}
+
 func (u *MediaMapper) GetThumbnailImageUrl(sourceUrl string, options ...Option) string {
 	return u.buildPreviewImageUrl(sourceUrl, thumbnailWidth, u.thumbnailUrlParams, options...)
 }

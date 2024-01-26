@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/generated"
@@ -2369,6 +2370,12 @@ func (r *postResolver) ViewerAdmire(ctx context.Context, obj *model.Post) (*mode
 	return admireToModel(ctx, *admire), nil
 }
 
+// Media is the resolver for the media field.
+func (r *postComposerDraftDetailsPayloadResolver) Media(ctx context.Context, obj *model.PostComposerDraftDetailsPayload, darkMode *persist.DarkMode) (model.MediaSubtype, error) {
+	highDef := false
+	return resolveTokenMedia(ctx, obj.TokenDefinition, obj.TokenMedia, highDef, util.GetOptionalValue(darkMode, persist.DarkModeDisabled)), nil
+}
+
 // Community is the resolver for the community field.
 func (r *postComposerDraftDetailsPayloadResolver) Community(ctx context.Context, obj *model.PostComposerDraftDetailsPayload) (*model.Community, error) {
 	if obj.HelperPostComposerDraftDetailsPayloadData.ContractID != "" {
@@ -2758,16 +2765,16 @@ func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input mode
 		return nil, err
 	}
 
-	highDef := false
-
 	return model.PostComposerDraftDetailsPayload{
-		Media:            resolveTokenMedia(ctx, td, media, highDef),
 		TokenName:        util.ToPointer(td.Name.String),
 		TokenDescription: util.ToPointer(td.Description.String),
+		Media:            nil, // handled by dedicated resolver
 		Community:        nil, // handled by dedicated resolver
 		HelperPostComposerDraftDetailsPayloadData: model.HelperPostComposerDraftDetailsPayloadData{
-			Token:      tID,
-			ContractID: td.ContractID,
+			Token:           tID,
+			TokenDefinition: td,
+			TokenMedia:      media,
+			ContractID:      td.ContractID,
 		},
 	}, err
 }
@@ -3086,7 +3093,7 @@ func (r *tokenResolver) ViewerAdmire(ctx context.Context, obj *model.Token) (*mo
 }
 
 // Media is the resolver for the media field.
-func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
+func (r *tokenResolver) Media(ctx context.Context, obj *model.Token, darkMode *persist.DarkMode) (model.MediaSubtype, error) {
 	var highDef bool
 	if obj.CollectionID != nil {
 		settings, err := resolveTokenSettingsByIDs(ctx, obj.Dbid, *obj.CollectionID)
@@ -3111,7 +3118,7 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		}
 	}
 
-	return resolveTokenMedia(ctx, td, media, highDef), err
+	return resolveTokenMedia(ctx, td, media, highDef, util.GetOptionalValue(darkMode, persist.DarkModeDisabled)), err
 }
 
 // TokenType is the resolver for the tokenType field.
@@ -3203,7 +3210,7 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 }
 
 // Media is the resolver for the media field.
-func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error) {
+func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDefinition, darkMode *persist.DarkMode) (model.MediaSubtype, error) {
 	var media coredb.TokenMedia
 	var err error
 
@@ -3215,7 +3222,7 @@ func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDef
 		}
 	}
 
-	return resolveTokenMedia(ctx, obj.HelperTokenDefinitionData.Definition, media, false), nil
+	return resolveTokenMedia(ctx, obj.HelperTokenDefinitionData.Definition, media, false, util.GetOptionalValue(darkMode, persist.DarkModeDisabled)), nil
 }
 
 // Contract is the resolver for the contract field.

@@ -218,8 +218,10 @@ type HelperPostData struct {
 }
 
 type HelperPostComposerDraftDetailsPayloadData struct {
-	Token      persist.TokenIdentifiers
-	ContractID persist.DBID
+	Token           persist.TokenIdentifiers
+	TokenDefinition db.TokenDefinition
+	TokenMedia      db.TokenMedia
+	ContractID      persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

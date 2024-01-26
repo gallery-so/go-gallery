@@ -118,6 +118,9 @@ models:
   ReportReason:
     model:
       - github.com/mikeydub/go-gallery/service/persist.ReportReason
+  DarkMode:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.DarkMode
 directives:
   goGqlId:
     skip_runtime: true

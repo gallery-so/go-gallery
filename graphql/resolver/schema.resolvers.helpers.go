@@ -41,6 +41,9 @@ import (
 
 const topActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
 
+const lightModeMP4BackgroundColor = "F2F2F2"
+const darkModeMP4BackgroundColor = "000000"
+
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
 var nodeFetcher = model.NodeFetcher{
@@ -2276,10 +2279,10 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 	}
 }
 
-func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
+func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool, darkMode persist.DarkMode) model.MediaSubtype {
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash, darkMode)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2293,7 +2296,7 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash)
+		return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash, darkMode)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
@@ -2303,10 +2306,10 @@ func resolveTokenMedia(ctx context.Context, td db.TokenDefinition, tokenMedia db
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash)
+	return mediaToModel(ctx, tokenMedia, td.FallbackMedia, highDef, td.IsFxhash, darkMode)
 }
 
-func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool, isFxHash bool) model.MediaSubtype {
+func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool, isFxHash bool, darkMode persist.DarkMode) model.MediaSubtype {
 	fallback.ImageURL = persist.NullString(rpc.RewriteURIToHTTP(fallback.ImageURL.String(), isFxHash))
 	tokenMedia.Media.MediaURL = persist.NullString(rpc.RewriteURIToHTTP(tokenMedia.Media.MediaURL.String(), isFxHash))
 
@@ -2316,7 +2319,7 @@ func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persis
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
 		return getImageMedia(ctx, tokenMedia, fallbackMedia, highDef)
 	case persist.MediaTypeGIF:
-		return getGIFMedia(ctx, tokenMedia, fallbackMedia)
+		return getGIFMedia(ctx, tokenMedia, fallbackMedia, darkMode)
 	case persist.MediaTypeVideo:
 		return getVideoMedia(ctx, tokenMedia, fallbackMedia, highDef)
 	case persist.MediaTypeAudio:
@@ -2479,16 +2482,27 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 	}
 }
 
-// getGIFMedia returns VideoMedia because we convert GIFs to videos
-func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.VideoMedia {
+// getGIFMedia returns VideoMedia because we convert GIFs to videos.
+func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, darkMode persist.DarkMode) model.VideoMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
+
+	options := make([]mediamapper.Option, 2)
+	options[0] = mediamapper.WithFormatVideo()
+
+	// GIFs support transparency, but MP4s don't, so we need to set a background color for the MP4
+	// that will look transparent.
+	if darkMode == persist.DarkModeEnabled {
+		options[1] = mediamapper.WithBackgroundColor(darkModeMP4BackgroundColor)
+	} else {
+		options[1] = mediamapper.WithBackgroundColor(lightModeMP4BackgroundColor)
+	}
 
 	mm := mediamapper.For(ctx)
 	videoUrls := model.VideoURLSet{
-		Raw:    util.ToPointer(mm.GetLargeImageUrl(url, mediamapper.WithFormatVideo())),
-		Small:  util.ToPointer(mm.GetSmallImageUrl(url, mediamapper.WithFormatVideo())),
-		Medium: util.ToPointer(mm.GetMediumImageUrl(url, mediamapper.WithFormatVideo())),
-		Large:  util.ToPointer(mm.GetLargeImageUrl(url, mediamapper.WithFormatVideo())),
+		Raw:    util.ToPointer(mm.GetLargeImageUrl(url, options...)),
+		Small:  util.ToPointer(mm.GetSmallImageUrl(url, options...)),
+		Medium: util.ToPointer(mm.GetMediumImageUrl(url, options...)),
+		Large:  util.ToPointer(mm.GetLargeImageUrl(url, options...)),
 	}
 
 	return model.VideoMedia{

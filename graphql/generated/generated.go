@@ -1084,7 +1084,7 @@ type ComplexityRoot struct {
 
 	PostComposerDraftDetailsPayload struct {
 		Community        func(childComplexity int) int
-		Media            func(childComplexity int) int
+		Media            func(childComplexity int, darkMode *persist.DarkMode) int
 		TokenDescription func(childComplexity int) int
 		TokenName        func(childComplexity int) int
 	}
@@ -1482,7 +1482,7 @@ type ComplexityRoot struct {
 		IsSpamByProvider      func(childComplexity int) int
 		IsSpamByUser          func(childComplexity int) int
 		LastUpdated           func(childComplexity int) int
-		Media                 func(childComplexity int) int
+		Media                 func(childComplexity int, darkMode *persist.DarkMode) int
 		Name                  func(childComplexity int) int
 		OpenseaCollectionName func(childComplexity int) int
 		OpenseaID             func(childComplexity int) int
@@ -1520,7 +1520,7 @@ type ComplexityRoot struct {
 		ExternalURL   func(childComplexity int) int
 		ID            func(childComplexity int) int
 		LastUpdated   func(childComplexity int) int
-		Media         func(childComplexity int) int
+		Media         func(childComplexity int, darkMode *persist.DarkMode) int
 		MintURL       func(childComplexity int) int
 		Name          func(childComplexity int) int
 		TokenID       func(childComplexity int) int
@@ -2058,6 +2058,7 @@ type PostResolver interface {
 	ViewerAdmire(ctx context.Context, obj *model.Post) (*model.Admire, error)
 }
 type PostComposerDraftDetailsPayloadResolver interface {
+	Media(ctx context.Context, obj *model.PostComposerDraftDetailsPayload, darkMode *persist.DarkMode) (model.MediaSubtype, error)
 	Community(ctx context.Context, obj *model.PostComposerDraftDetailsPayload) (*model.Community, error)
 }
 type PreviewURLSetResolver interface {
@@ -2181,7 +2182,7 @@ type TokenResolver interface {
 
 	Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.Token) (*model.Admire, error)
-	Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error)
+	Media(ctx context.Context, obj *model.Token, darkMode *persist.DarkMode) (model.MediaSubtype, error)
 	TokenType(ctx context.Context, obj *model.Token) (*model.TokenType, error)
 	Chain(ctx context.Context, obj *model.Token) (*persist.Chain, error)
 	Name(ctx context.Context, obj *model.Token) (*string, error)
@@ -2194,7 +2195,7 @@ type TokenResolver interface {
 	IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error)
 }
 type TokenDefinitionResolver interface {
-	Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error)
+	Media(ctx context.Context, obj *model.TokenDefinition, darkMode *persist.DarkMode) (model.MediaSubtype, error)
 
 	Contract(ctx context.Context, obj *model.TokenDefinition) (*model.Contract, error)
 
@@ -6538,7 +6539,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.PostComposerDraftDetailsPayload.Media(childComplexity), true
+		args, err := ec.field_PostComposerDraftDetailsPayload_media_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.PostComposerDraftDetailsPayload.Media(childComplexity, args["darkMode"].(*persist.DarkMode)), true
 
 	case "PostComposerDraftDetailsPayload.tokenDescription":
 		if e.complexity.PostComposerDraftDetailsPayload.TokenDescription == nil {
@@ -8369,7 +8375,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Token.Media(childComplexity), true
+		args, err := ec.field_Token_media_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Token.Media(childComplexity, args["darkMode"].(*persist.DarkMode)), true
 
 	case "Token.name":
 		if e.complexity.Token.Name == nil {
@@ -8572,7 +8583,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.TokenDefinition.Media(childComplexity), true
+		args, err := ec.field_TokenDefinition_media_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.TokenDefinition.Media(childComplexity, args["darkMode"].(*persist.DarkMode)), true
 
 	case "TokenDefinition.mintUrl":
 		if e.complexity.TokenDefinition.MintURL == nil {
@@ -9997,7 +10013,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
-  media: MediaSubtype @goField(forceResolver: true)
+  media(darkMode: DarkMode): MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
   contract: Contract @goField(forceResolver: true)
   chain: Chain
@@ -10036,7 +10052,7 @@ type Token implements Node @goEmbedHelper {
   viewerAdmire: Admire @goField(forceResolver: true)
 
   # The following fields will be deprecated and removed in the future.
-  media: MediaSubtype
+  media(darkMode: DarkMode): MediaSubtype
     @goField(forceResolver: true)
     @deprecated(reason: "Use definition.media instead")
   tokenType: TokenType
@@ -10255,8 +10271,13 @@ type Community implements Node @goEmbedHelper {
     @goField(forceResolver: true)
     @deprecated(reason: "Use Community.holders")
 
-  galleries(maxPreviews: Int!, before: String, after: String, first: Int, last: Int): CommunityGalleriesConnection
-    @goField(forceResolver: true)
+  galleries(
+    maxPreviews: Int!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunityGalleriesConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -10940,7 +10961,7 @@ input PostComposerDraftDetailsInput {
 }
 
 type PostComposerDraftDetailsPayload @goEmbedHelper {
-  media: MediaSubtype
+  media(darkMode: DarkMode): MediaSubtype @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
   tokenName: String
   tokenDescription: String
@@ -11857,6 +11878,11 @@ enum Platform {
   Web
   Mobile
   All
+}
+
+enum DarkMode {
+  Disabled
+  Enabled
 }
 
 type GalleryAnnouncementNotification implements Notification & Node {
@@ -14841,6 +14867,21 @@ func (ec *executionContext) field_Mutation_viewToken_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_PostComposerDraftDetailsPayload_media_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *persist.DarkMode
+	if tmp, ok := rawArgs["darkMode"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("darkMode"))
+		arg0, err = ec.unmarshalODarkMode2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDarkMode(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["darkMode"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Post_admires_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -16143,6 +16184,21 @@ func (ec *executionContext) field_SomeoneViewedYourGalleryNotification_userViewe
 	return args, nil
 }
 
+func (ec *executionContext) field_TokenDefinition_media_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *persist.DarkMode
+	if tmp, ok := rawArgs["darkMode"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("darkMode"))
+		arg0, err = ec.unmarshalODarkMode2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDarkMode(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["darkMode"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Token_admires_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -16191,6 +16247,21 @@ func (ec *executionContext) field_Token_admires_args(ctx context.Context, rawArg
 		}
 	}
 	args["userID"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_Token_media_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *persist.DarkMode
+	if tmp, ok := rawArgs["darkMode"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("darkMode"))
+		arg0, err = ec.unmarshalODarkMode2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDarkMode(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["darkMode"] = arg0
 	return args, nil
 }
 
@@ -44854,7 +44925,7 @@ func (ec *executionContext) _PostComposerDraftDetailsPayload_media(ctx context.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Media, nil
+		return ec.resolvers.PostComposerDraftDetailsPayload().Media(rctx, obj, fc.Args["darkMode"].(*persist.DarkMode))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -44872,11 +44943,22 @@ func (ec *executionContext) fieldContext_PostComposerDraftDetailsPayload_media(c
 	fc = &graphql.FieldContext{
 		Object:     "PostComposerDraftDetailsPayload",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type MediaSubtype does not have child fields")
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_PostComposerDraftDetailsPayload_media_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -56973,7 +57055,7 @@ func (ec *executionContext) _Token_media(ctx context.Context, field graphql.Coll
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Token().Media(rctx, obj)
+		return ec.resolvers.Token().Media(rctx, obj, fc.Args["darkMode"].(*persist.DarkMode))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -56996,6 +57078,17 @@ func (ec *executionContext) fieldContext_Token_media(ctx context.Context, field 
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type MediaSubtype does not have child fields")
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Token_media_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -58137,7 +58230,7 @@ func (ec *executionContext) _TokenDefinition_media(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TokenDefinition().Media(rctx, obj)
+		return ec.resolvers.TokenDefinition().Media(rctx, obj, fc.Args["darkMode"].(*persist.DarkMode))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -58160,6 +58253,17 @@ func (ec *executionContext) fieldContext_TokenDefinition_media(ctx context.Conte
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type MediaSubtype does not have child fields")
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_TokenDefinition_media_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -81063,9 +81167,22 @@ func (ec *executionContext) _PostComposerDraftDetailsPayload(ctx context.Context
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("PostComposerDraftDetailsPayload")
 		case "media":
+			field := field
 
-			out.Values[i] = ec._PostComposerDraftDetailsPayload_media(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._PostComposerDraftDetailsPayload_media(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "community":
 			field := field
 
@@ -89438,6 +89555,22 @@ func (ec *executionContext) marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	}
 	res := graphql.MarshalString(string(*v))
 	return res
+}
+
+func (ec *executionContext) unmarshalODarkMode2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDarkMode(ctx context.Context, v interface{}) (*persist.DarkMode, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(persist.DarkMode)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalODarkMode2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDarkMode(ctx context.Context, sel ast.SelectionSet, v *persist.DarkMode) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugAuth(ctx context.Context, v interface{}) (*model.DebugAuth, error) {

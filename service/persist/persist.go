@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"unicode"
 
@@ -272,4 +273,37 @@ func ToJSONB(v any) (pgtype.JSONB, error) {
 	ret := pgtype.JSONB{}
 	err = ret.Set(byt)
 	return ret, err
+}
+
+type DarkMode int
+
+const (
+	DarkModeDisabled DarkMode = iota
+	DarkModeEnabled
+)
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (d *DarkMode) UnmarshalGQL(v interface{}) error {
+	n, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("darkMode must be a string")
+	}
+
+	switch strings.ToLower(n) {
+	case "disabled":
+		*d = DarkModeDisabled
+	case "enabled":
+		*d = DarkModeEnabled
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (d DarkMode) MarshalGQL(w io.Writer) {
+	switch d {
+	case DarkModeDisabled:
+		w.Write([]byte(`"Disabled"`))
+	case DarkModeEnabled:
+		w.Write([]byte(`"Enabled"`))
+	}
 }
