@@ -300,9 +300,10 @@ func addGalleries(
 	var i int
 	var wg conc.WaitGroup
 
-	for len(*spotlightGalleries) < n && i < len(entityIDs)-1 {
+	for len(*spotlightGalleries) < n && i < len(entityIDs) {
 		// fill the batch not exceeding the number of entities needed
-		for j := 0; j < 4 && (len(batch)+len(*spotlightGalleries)) < n; j++ {
+		// and not exceeding the number of entities available
+		for j := 0; j < 4 && (len(batch)+len(*spotlightGalleries)) < n && i < len(entityIDs); j++ {
 			batch = append(batch, entityIDs[i])
 			i++
 		}
@@ -344,9 +345,10 @@ func addCommunities(
 	var i int
 	var wg conc.WaitGroup
 
-	for len(*spotlightCommunities) < n && i < len(entityIDs)-1 {
+	for len(*spotlightCommunities) < n && i < len(entityIDs) {
 		// fill the batch not exceeding the number of entities needed
-		for j := 0; j < 4 && (len(batch)+len(*spotlightCommunities)) < n; j++ {
+		// and not exceeding the number of entities available
+		for j := 0; j < 4 && (len(batch)+len(*spotlightCommunities)) < n && i < len(entityIDs); j++ {
 			batch = append(batch, entityIDs[i])
 			i++
 		}
@@ -388,9 +390,10 @@ func addPosts(
 	var i int
 	var wg conc.WaitGroup
 
-	for len(*spotlightPosts) < n && i < len(entityIDs)-1 {
+	for len(*spotlightPosts) < n && i < len(entityIDs) {
 		// fill the batch not exceeding the number of entities needed
-		for j := 0; j < 4 && (len(batch)+len(*spotlightPosts)) < n; j++ {
+		// and not exceeding the number of entities available
+		for j := 0; j < 4 && (len(batch)+len(*spotlightPosts)) < n && i < len(entityIDs); j++ {
 			batch = append(batch, entityIDs[i])
 			i++
 		}
@@ -430,7 +433,7 @@ func getOverrides(ctx context.Context, b *store.BucketStorer) (DigestValueOverri
 
 	r, err := b.NewReader(ctx, overrideFile)
 	if err != nil {
-		return DigestValueOverrides{}, nil
+		return DigestValueOverrides{}, err
 	}
 
 	defer r.Close()
