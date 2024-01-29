@@ -42,7 +42,7 @@ import (
 const topActivityImageURL = "https://storage.googleapis.com/gallery-prod-325303.appspot.com/top_100.png"
 
 const lightModeMP4BackgroundColor = "F2F2F2"
-const darkModeMP4BackgroundColor = "000000"
+const darkModeMP4BackgroundColor = "202020"
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
