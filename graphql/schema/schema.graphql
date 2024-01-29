@@ -439,7 +439,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
-  media: MediaSubtype @goField(forceResolver: true)
+  media(darkMode: DarkMode): MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
   contract: Contract @goField(forceResolver: true)
   chain: Chain
@@ -478,7 +478,7 @@ type Token implements Node @goEmbedHelper {
   viewerAdmire: Admire @goField(forceResolver: true)
 
   # The following fields will be deprecated and removed in the future.
-  media: MediaSubtype
+  media(darkMode: DarkMode): MediaSubtype
     @goField(forceResolver: true)
     @deprecated(reason: "Use definition.media instead")
   tokenType: TokenType
@@ -1387,7 +1387,7 @@ input PostComposerDraftDetailsInput {
 }
 
 type PostComposerDraftDetailsPayload @goEmbedHelper {
-  media: MediaSubtype
+  media(darkMode: DarkMode): MediaSubtype @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
   tokenName: String
   tokenDescription: String
@@ -2304,6 +2304,11 @@ enum Platform {
   Web
   Mobile
   All
+}
+
+enum DarkMode {
+  Disabled
+  Enabled
 }
 
 type GalleryAnnouncementNotification implements Notification & Node {
