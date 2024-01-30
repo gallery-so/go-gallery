@@ -87,8 +87,8 @@ func ethProviderSet(serverEnvInit envInit, client *http.Client) *multichain.Ethe
 	ethclientClient := rpc.NewEthClient()
 	provider := indexer.NewProvider(client, ethclientClient)
 	chain := _wireChainValue
-	reservoirProvider := newReservoirProvider(client, chain)
-	openseaProvider := newOpenseaProvider(client, chain)
+	reservoirProvider := reservoir.NewProvider(client, chain)
+	openseaProvider := opensea.NewProvider(client, chain)
 	ethereumProvider := ethProvidersConfig(provider, reservoirProvider, openseaProvider)
 	return ethereumProvider
 }
@@ -97,31 +97,17 @@ var (
 	_wireChainValue = persist.ChainETH
 )
 
-func newOpenseaProvider(c *http.Client, chain persist.Chain) *opensea.Provider {
-	provider := reservoir.NewProvider(c, chain)
-	tokenByIdentifiersFetcher := newTokenByIdentifiersFetcher(provider)
-	openseaProvider := opensea.NewProviderAltFallbackMedia(c, chain, tokenByIdentifiersFetcher)
-	return openseaProvider
-}
-
-func newReservoirProvider(c *http.Client, chain persist.Chain) *reservoir.Provider {
-	provider := opensea.NewProvider(c, chain)
-	infoerContractFetcher := newInfoerContractFetcher(provider)
-	reservoirProvider := reservoir.NewProviderAltContractFetcher(c, chain, infoerContractFetcher)
-	return reservoirProvider
-}
-
 func ethProvidersConfig(indexerProvider *indexer.Provider, reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
 		ContractRefresher:                indexerProvider,
-		ContractFetcher:                  openseaProvider,
+		ContractsFetcher:                 reservoirProvider,
 		ContractsOwnerFetcher:            indexerProvider,
 		TokenDescriptorsFetcher:          openseaProvider,
 		TokenMetadataFetcher:             openseaProvider,
-		TokensContractFetcher:            openseaProvider,
-		TokensIncrementalContractFetcher: openseaProvider,
-		TokensIncrementalOwnerFetcher:    openseaProvider,
-		TokensOwnerFetcher:               openseaProvider,
+		TokensContractFetcher:            reservoirProvider,
+		TokensIncrementalContractFetcher: reservoirProvider,
+		TokensIncrementalOwnerFetcher:    reservoirProvider,
+		TokensOwnerFetcher:               reservoirProvider,
 		Verifier:                         indexerProvider,
 	}
 	return ethereumProvider
@@ -150,8 +136,8 @@ func tezosProvidersConfig(tezosProvider *tezos.Provider, tzktProvider *tzkt.Prov
 
 func optimismProviderSet(client *http.Client) *multichain.OptimismProvider {
 	chain := _wirePersistChainValue
-	provider := newReservoirProvider(client, chain)
-	openseaProvider := newOpenseaProvider(client, chain)
+	provider := reservoir.NewProvider(client, chain)
+	openseaProvider := opensea.NewProvider(client, chain)
 	optimismProvider := optimismProvidersConfig(provider, openseaProvider)
 	return optimismProvider
 }
@@ -173,8 +159,8 @@ func optimismProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvi
 
 func arbitrumProviderSet(client *http.Client) *multichain.ArbitrumProvider {
 	chain := _wireChainValue2
-	provider := newReservoirProvider(client, chain)
-	openseaProvider := newOpenseaProvider(client, chain)
+	provider := reservoir.NewProvider(client, chain)
+	openseaProvider := opensea.NewProvider(client, chain)
 	arbitrumProvider := arbitrumProvidersConfig(provider, openseaProvider)
 	return arbitrumProvider
 }
@@ -219,7 +205,7 @@ func zoraProviderSet(serverEnvInit envInit, client *http.Client) *multichain.Zor
 
 func zoraProvidersConfig(zoraProvider *zora.Provider) *multichain.ZoraProvider {
 	multichainZoraProvider := &multichain.ZoraProvider{
-		ContractFetcher:                  zoraProvider,
+		ContractsFetcher:                 zoraProvider,
 		ContractsOwnerFetcher:            zoraProvider,
 		TokenDescriptorsFetcher:          zoraProvider,
 		TokenMetadataFetcher:             zoraProvider,
@@ -233,8 +219,8 @@ func zoraProvidersConfig(zoraProvider *zora.Provider) *multichain.ZoraProvider {
 
 func baseProviderSet(client *http.Client) *multichain.BaseProvider {
 	chain := _wireChainValue3
-	provider := newReservoirProvider(client, chain)
-	openseaProvider := newOpenseaProvider(client, chain)
+	provider := reservoir.NewProvider(client, chain)
+	openseaProvider := opensea.NewProvider(client, chain)
 	baseProvider := baseProvidersConfig(provider, openseaProvider)
 	return baseProvider
 }
@@ -256,8 +242,8 @@ func baseProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider 
 
 func polygonProviderSet(client *http.Client) *multichain.PolygonProvider {
 	chain := _wireChainValue4
-	provider := newReservoirProvider(client, chain)
-	openseaProvider := newOpenseaProvider(client, chain)
+	provider := reservoir.NewProvider(client, chain)
+	openseaProvider := opensea.NewProvider(client, chain)
 	polygonProvider := polygonProvidersConfig(provider, openseaProvider)
 	return polygonProvider
 }
@@ -312,14 +298,6 @@ func newQueries(p *pgxpool.Pool) *coredb.Queries {
 
 func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
 	return multichain.ProviderLookup{persist.ChainETH: p.Ethereum, persist.ChainTezos: p.Tezos, persist.ChainOptimism: p.Optimism, persist.ChainArbitrum: p.Arbitrum, persist.ChainPOAP: p.Poap, persist.ChainZora: p.Zora, persist.ChainBase: p.Base, persist.ChainPolygon: p.Polygon}
-}
-
-func newInfoerContractFetcher(openseaProvider *opensea.Provider) multichain.InfoerContractFetcher {
-	return openseaProvider
-}
-
-func newTokenByIdentifiersFetcher(reservoirProvider *reservoir.Provider) multichain.TokenByIdentifiersFetcher {
-	return reservoirProvider
 }
 
 func newCommunitiesCache() *redis.Cache {
