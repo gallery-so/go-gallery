@@ -26,7 +26,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
-	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 )
 
@@ -316,13 +315,11 @@ func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
 }
 
 func newInfoerContractFetcher(openseaProvider *opensea.Provider) multichain.InfoerContractFetcher {
-	wire.Bind(new(multichain.InfoerContractFetcher), util.ToPointer(openseaProvider))
-	return nil
+	return openseaProvider
 }
 
 func newTokenByIdentifiersFetcher(reservoirProvider *reservoir.Provider) multichain.TokenByIdentifiersFetcher {
-	wire.Bind(new(multichain.TokenByIdentifiersFetcher), util.ToPointer(reservoirProvider))
-	return nil
+	return reservoirProvider
 }
 
 func newCommunitiesCache() *redis.Cache {

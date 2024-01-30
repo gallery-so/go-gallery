@@ -120,13 +120,11 @@ func ethProviderSet(envInit, *http.Client) *multichain.EthereumProvider {
 }
 
 func newInfoerContractFetcher(openseaProvider *opensea.Provider) multichain.InfoerContractFetcher {
-	wire.Bind(new(multichain.InfoerContractFetcher), util.ToPointer(openseaProvider))
-	return nil
+	return openseaProvider
 }
 
 func newTokenByIdentifiersFetcher(reservoirProvider *reservoir.Provider) multichain.TokenByIdentifiersFetcher {
-	wire.Bind(new(multichain.TokenByIdentifiersFetcher), util.ToPointer(reservoirProvider))
-	return nil
+	return reservoirProvider
 }
 
 func newOpenseaProvider(c *http.Client, chain persist.Chain) *opensea.Provider {
