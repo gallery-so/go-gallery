@@ -265,6 +265,24 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 	return contractToChainAgnosticContract(cc.Contract, cc.Collection), nil
 }
 
+func (p *Provider) streamTokenAndContract(
+	ctx context.Context,
+	ownerAddress persist.Address,
+	asset Asset,
+	tokenCh chan<- multichain.ChainAgnosticToken,
+	contractCh chan<- multichain.ChainAgnosticContract,
+	seenContracts *sync.Map,
+	contractLocks map[string]*sync.Mutex, mu *sync.RWMutex,
+) error {
+	err := p.streamContract(ctx, asset.Contract, contractCh, seenContracts, contractLocks, mu)
+	if err != nil {
+		return err
+	}
+	cc, _ := seenContracts.Load(asset.Contract)
+	collection := cc.(contractCollection).Collection
+	return p.streamToken(ctx, ownerAddress, collection, asset, tokenCh)
+}
+
 func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	seenContracts := &sync.Map{} // Mapping of contract address to contractCollection
 	tokensCh := make(chan multichain.ChainAgnosticToken)
@@ -286,10 +304,7 @@ func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Addr
 			for _, n := range assetsReceived.Assets {
 				nft := n
 				wp.Go(func(ctx context.Context) error {
-					return p.streamContract(ctx, nft.Contract, contractsCh, seenContracts, contractLocks, &mu)
-				})
-				wp.Go(func(ctx context.Context) error {
-					return p.streamToken(ctx, ownerAddress, nft, tokensCh)
+					return p.streamTokenAndContract(ctx, ownerAddress, nft, tokensCh, contractsCh, seenContracts, contractLocks, &mu)
 				})
 			}
 		}
@@ -332,7 +347,7 @@ func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Addr
 	}
 }
 
-func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, rec chan<- multichain.ChainAgnosticTokensAndContracts, errCh chan<- error) {
 	seenContracts := &sync.Map{}
 	mu := sync.RWMutex{}
 	contractLocks := make(map[string]*sync.Mutex)
@@ -340,32 +355,29 @@ func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persis
 		assetsReceived := a
 
 		if assetsReceived.Err != nil {
-			errChan <- assetsReceived.Err
+			errCh <- assetsReceived.Err
 			return
 		}
 
 		innerTokens := make([]multichain.ChainAgnosticToken, 0, len(assetsReceived.Assets))
 		innerContracts := make([]multichain.ChainAgnosticContract, 0, len(assetsReceived.Assets))
-		innerTokenReceived := make(chan multichain.ChainAgnosticToken)
-		innerContractReceived := make(chan multichain.ChainAgnosticContract)
-		innerErrChan := make(chan error)
+		tokenCh := make(chan multichain.ChainAgnosticToken)
+		contractCh := make(chan multichain.ChainAgnosticContract)
+		innerErrCh := make(chan error)
 
 		go func() {
 			wp := pool.New().WithMaxGoroutines(10).WithContext(ctx)
-			defer close(innerTokenReceived)
-			defer close(innerContractReceived)
+			defer close(tokenCh)
+			defer close(contractCh)
 			for _, n := range assetsReceived.Assets {
 				nft := n
 				wp.Go(func(ctx context.Context) error {
-					return p.streamContract(ctx, nft.Contract, innerContractReceived, seenContracts, contractLocks, &mu)
-				})
-				wp.Go(func(ctx context.Context) error {
-					return p.streamToken(ctx, ownerAddress, nft, innerTokenReceived)
+					return p.streamTokenAndContract(ctx, ownerAddress, nft, tokenCh, contractCh, seenContracts, contractLocks, &mu)
 				})
 			}
 			err := wp.Wait()
 			if err != nil {
-				innerErrChan <- err
+				innerErrCh <- err
 			}
 		}()
 
@@ -376,7 +388,7 @@ func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persis
 	outer:
 		for {
 			select {
-			case token, tokenOpen = <-innerTokenReceived:
+			case token, tokenOpen = <-tokenCh:
 				if tokenOpen {
 					innerTokens = append(innerTokens, token)
 					continue
@@ -384,7 +396,7 @@ func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persis
 				if !contractOpen {
 					break outer
 				}
-			case contract, contractOpen = <-innerContractReceived:
+			case contract, contractOpen = <-contractCh:
 				if contractOpen {
 					innerContracts = append(innerContracts, contract)
 					continue
@@ -393,11 +405,11 @@ func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persis
 					break outer
 				}
 			case <-ctx.Done():
-				errChan <- ctx.Err()
+				errCh <- ctx.Err()
 				return
-			case err := <-innerErrChan:
+			case err := <-innerErrCh:
 				logger.For(ctx).Error(err)
-				errChan <- err
+				errCh <- err
 				return
 			}
 		}
@@ -459,14 +471,20 @@ func (p *Provider) streamContract(
 	return nil
 }
 
-func (p *Provider) streamToken(ctx context.Context, ownerAddress persist.Address, asset Asset, tokenCh chan<- multichain.ChainAgnosticToken) error {
+func (p *Provider) streamToken(
+	ctx context.Context,
+	ownerAddress persist.Address,
+	collection Collection,
+	asset Asset,
+	tokenCh chan<- multichain.ChainAgnosticToken,
+) error {
 	typ, err := tokenTypeFromAsset(asset)
 	if err != nil {
 		return err
 	}
 
 	if ownerAddress != "" {
-		tokenCh <- assetToAgnosticToken(ctx, asset, typ, ownerAddress, 1, p.tFetcher)
+		tokenCh <- assetToAgnosticToken(ctx, asset, collection, typ, ownerAddress, 1, p.tFetcher)
 		return nil
 	}
 
@@ -476,17 +494,17 @@ func (p *Provider) streamToken(ctx context.Context, ownerAddress persist.Address
 	switch typ {
 	case persist.TokenTypeERC721:
 		if numOwners := len(asset.Owners); numOwners == 1 {
-			tokenCh <- assetToAgnosticToken(ctx, asset, typ, persist.Address(asset.Owners[0].Address), 1, p.tFetcher)
+			tokenCh <- assetToAgnosticToken(ctx, asset, collection, typ, persist.Address(asset.Owners[0].Address), 1, p.tFetcher)
 		} else {
-			tokenCh <- assetToAgnosticToken(ctx, asset, typ, "", 1, p.tFetcher)
+			tokenCh <- assetToAgnosticToken(ctx, asset, collection, typ, "", 1, p.tFetcher)
 		}
 	case persist.TokenTypeERC1155:
 		if numOwners := len(asset.Owners); numOwners > 0 {
 			for _, o := range asset.Owners {
-				tokenCh <- assetToAgnosticToken(ctx, asset, typ, persist.Address(o.Address), o.Quantity, p.tFetcher)
+				tokenCh <- assetToAgnosticToken(ctx, asset, collection, typ, persist.Address(o.Address), o.Quantity, p.tFetcher)
 			}
 		} else {
-			tokenCh <- assetToAgnosticToken(ctx, asset, typ, "", 1, p.tFetcher)
+			tokenCh <- assetToAgnosticToken(ctx, asset, collection, typ, "", 1, p.tFetcher)
 		}
 	default:
 		return fmt.Errorf("don't know how to handle owners for token type %s", typ)
@@ -645,7 +663,7 @@ func contractToChainAgnosticContract(contract Contract, collection Collection) m
 	}
 }
 
-func assetToAgnosticToken(ctx context.Context, asset Asset, tokenType persist.TokenType, tokenOwner persist.Address, quantity int, tFetcher multichain.TokenByIdentifiersFetcher) multichain.ChainAgnosticToken {
+func assetToAgnosticToken(ctx context.Context, asset Asset, collection Collection, tokenType persist.TokenType, tokenOwner persist.Address, quantity int, tFetcher multichain.TokenByIdentifiersFetcher) multichain.ChainAgnosticToken {
 	t := multichain.ChainAgnosticToken{
 		TokenType:       tokenType,
 		Descriptors:     multichain.ChainAgnosticTokenDescriptors{Name: asset.Name, Description: asset.Description},
@@ -653,6 +671,7 @@ func assetToAgnosticToken(ctx context.Context, asset Asset, tokenType persist.To
 		TokenID:         persist.MustTokenID(asset.Identifier),
 		OwnerAddress:    tokenOwner,
 		ContractAddress: persist.Address(asset.Contract),
+		ExternalURL:     collection.ProjectURL, // OpenSea doesn't return a token-specific external URL, so we use the collection's project URL
 		TokenMetadata:   metadataFromAsset(asset),
 		Quantity:        persist.HexString(fmt.Sprintf("%x", quantity)),
 	}
