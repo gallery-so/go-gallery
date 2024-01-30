@@ -160,48 +160,57 @@ type Verifier interface {
 
 // TokensOwnerFetcher supports fetching tokens for syncing
 type TokensOwnerFetcher interface {
-	GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokenByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
 // TokensIncrementalOwnerFetcher supports fetching tokens for syncing incrementally
 type TokensIncrementalOwnerFetcher interface {
 	// NOTE: implementation MUST close the rec channel
-	GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (rec <-chan ChainAgnosticTokensAndContracts, errChain <-chan error)
+	GetTokensIncrementallyByWalletAddress(context.Context, persist.Address) (<-chan ChainAgnosticTokensAndContracts, <-chan error)
 }
 
 // TokensIncrementalContractFetcher supports fetching tokens by contract for syncing incrementally
 type TokensIncrementalContractFetcher interface {
 	// NOTE: implementations MUST close the rec channel
 	// maxLimit is not for pagination, it is to make sure we don't fetch a bajilion tokens from an omnibus contract
-	GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (rec <-chan ChainAgnosticTokensAndContracts, errChain <-chan error)
+	GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan ChainAgnosticTokensAndContracts, <-chan error)
 }
 
 type TokensContractFetcher interface {
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
-type ContractsFetcher interface {
-	GetContractByAddress(ctx context.Context, contract persist.Address) (ChainAgnosticContract, error)
+type ContractFetcher interface {
+	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
 }
 
 type ContractsOwnerFetcher interface {
-	GetContractsByOwnerAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
+	GetContractsByOwnerAddress(context.Context, persist.Address) ([]ChainAgnosticContract, error)
 }
 
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
-	ContractsFetcher
+	ContractFetcher
 	RefreshContract(context.Context, persist.Address) error
 }
 
 // TokenMetadataFetcher supports fetching token metadata
 type TokenMetadataFetcher interface {
-	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (persist.TokenMetadata, error)
+	GetTokenMetadataByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) (persist.TokenMetadata, error)
 }
 
 type TokenDescriptorsFetcher interface {
-	GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (ChainAgnosticTokenDescriptors, ChainAgnosticContractDescriptors, error)
+	GetTokenDescriptorsByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) (ChainAgnosticTokenDescriptors, ChainAgnosticContractDescriptors, error)
+}
+
+type TokenByIdentifiersFetcher interface {
+	GetTokenByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) (ChainAgnosticToken, ChainAgnosticContract, error)
+}
+
+type InfoerContractFetcher interface {
+	Infoer
+	ContractFetcher
 }
 
 type chainTokensAndContracts struct {
@@ -1038,7 +1047,7 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 		}
 	}
 
-	if fetcher, ok := p.Chains[ci.Chain].(ContractsFetcher); ok {
+	if fetcher, ok := p.Chains[ci.Chain].(ContractFetcher); ok {
 		c, err := fetcher.GetContractByAddress(ctx, ci.ContractAddress)
 		if err != nil {
 			return err
