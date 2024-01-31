@@ -131,7 +131,7 @@ func ethProvidersConfig(
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(reservoirProvider)),
+		wire.Bind(new(multichain.ContractFetcher), util.ToPointer(reservoirProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
@@ -239,7 +239,7 @@ func zoraProviderSet(envInit, *http.Client) *multichain.ZoraProvider {
 func zoraProvidersConfig(zoraProvider *zora.Provider) *multichain.ZoraProvider {
 	wire.Build(
 		wire.Struct(new(multichain.ZoraProvider), "*"),
-		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.ContractFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(zoraProvider)),

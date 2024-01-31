@@ -100,7 +100,7 @@ var (
 func ethProvidersConfig(indexerProvider *indexer.Provider, reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
 		ContractRefresher:                indexerProvider,
-		ContractsFetcher:                 reservoirProvider,
+		ContractFetcher:                  reservoirProvider,
 		ContractsOwnerFetcher:            indexerProvider,
 		TokenDescriptorsFetcher:          openseaProvider,
 		TokenMetadataFetcher:             openseaProvider,
@@ -205,7 +205,7 @@ func zoraProviderSet(serverEnvInit envInit, client *http.Client) *multichain.Zor
 
 func zoraProvidersConfig(zoraProvider *zora.Provider) *multichain.ZoraProvider {
 	multichainZoraProvider := &multichain.ZoraProvider{
-		ContractsFetcher:                 zoraProvider,
+		ContractFetcher:                  zoraProvider,
 		ContractsOwnerFetcher:            zoraProvider,
 		TokenDescriptorsFetcher:          zoraProvider,
 		TokenMetadataFetcher:             zoraProvider,

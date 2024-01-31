@@ -181,7 +181,7 @@ type TokensContractFetcher interface {
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
-type ContractsFetcher interface {
+type ContractFetcher interface {
 	GetContractByAddress(ctx context.Context, contract persist.Address) (ChainAgnosticContract, error)
 }
 
@@ -191,7 +191,6 @@ type ContractsOwnerFetcher interface {
 
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
-	ContractsFetcher
 	RefreshContract(context.Context, persist.Address) error
 }
 
@@ -1038,7 +1037,7 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 		}
 	}
 
-	if fetcher, ok := p.Chains[ci.Chain].(ContractsFetcher); ok {
+	if fetcher, ok := p.Chains[ci.Chain].(ContractFetcher); ok {
 		c, err := fetcher.GetContractByAddress(ctx, ci.ContractAddress)
 		if err != nil {
 			return err

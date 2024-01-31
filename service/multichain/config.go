@@ -19,7 +19,7 @@ type ChainProvider struct {
 
 type EthereumProvider struct {
 	ContractRefresher
-	ContractsFetcher
+	ContractFetcher
 	ContractsOwnerFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
@@ -66,7 +66,7 @@ type PoapProvider struct {
 }
 
 type ZoraProvider struct {
-	ContractsFetcher
+	ContractFetcher
 	ContractsOwnerFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
