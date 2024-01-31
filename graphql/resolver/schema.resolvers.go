@@ -718,6 +718,16 @@ func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser
 	return tokensToModel(ctx, tokens), nil
 }
 
+// TokensBookmarked is the resolver for the tokensBookmarked field.
+func (r *galleryUserResolver) TokensBookmarked(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.TokensConnection, error) {
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensBookmarkedByUserId(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+	connection := tokensToConnection(ctx, tokens, pageInfo)
+	return &connection, nil
+}
+
 // Wallets is the resolver for the wallets field.
 func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
 	return resolveWalletsByUserID(ctx, obj.Dbid)

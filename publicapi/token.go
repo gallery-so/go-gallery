@@ -123,6 +123,46 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
+func (api TokenAPI) GetTokensBookmarkedByUserId(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Token, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, "required"),
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]db.Token, error) {
+		return api.loaders.PaginateTokensAdmiredByUserIDBatch.Load(db.PaginateTokensAdmiredByUserIDBatchParams{
+			UserID:        userID,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+			Limit:         params.Limit,
+		})
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountTokensAdmiredByUserID(ctx, userID)
+		return int(total), err
+	}
+
+	cursorFunc := func(t db.Token) (time.Time, persist.DBID, error) { return t.CreatedAt, t.ID, nil }
+
+	paginator := timeIDPaginator[db.Token]{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
 func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.Token, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

@@ -1611,6 +1611,7 @@ type GalleryUser struct {
 	Roles                    []*persist.Role        `json:"roles"`
 	SocialAccounts           *SocialAccounts        `json:"socialAccounts"`
 	Tokens                   []*Token               `json:"tokens"`
+	TokensBookmarked         *TokensConnection      `json:"tokensBookmarked"`
 	Wallets                  []*Wallet              `json:"wallets"`
 	PrimaryWallet            *Wallet                `json:"primaryWallet"`
 	FeaturedGallery          *Gallery               `json:"featuredGallery"`

@@ -99,6 +99,8 @@ type GalleryUser implements Node @goEmbedHelper {
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
   tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
+  tokensBookmarked(before: String, after: String, first: Int, last: Int): TokensConnection
+    @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
   primaryWallet: Wallet @goField(forceResolver: true)

@@ -91,6 +91,7 @@ type Loaders struct {
 	PaginatePostsByCommunityID                           *PaginatePostsByCommunityID
 	PaginatePostsByContractID                            *PaginatePostsByContractID
 	PaginateRepliesByCommentIDBatch                      *PaginateRepliesByCommentIDBatch
+	PaginateTokensAdmiredByUserIDBatch                   *PaginateTokensAdmiredByUserIDBatch
 	PaginateTokensByCommunityID                          *PaginateTokensByCommunityID
 	GetContractCreatorsByIds                             *GetContractCreatorsByIds
 	GetContractsByIDs                                    *GetContractsByIDs
@@ -176,6 +177,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.PaginatePostsByCommunityID = newPaginatePostsByCommunityID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginatePostsByCommunityID(q), preFetchHook, postFetchHook)
 	loaders.PaginatePostsByContractID = newPaginatePostsByContractID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginatePostsByContractID(q), preFetchHook, postFetchHook)
 	loaders.PaginateRepliesByCommentIDBatch = newPaginateRepliesByCommentIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateRepliesByCommentIDBatch(q), preFetchHook, postFetchHook)
+	loaders.PaginateTokensAdmiredByUserIDBatch = newPaginateTokensAdmiredByUserIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateTokensAdmiredByUserIDBatch(q), preFetchHook, postFetchHook)
 	loaders.PaginateTokensByCommunityID = newPaginateTokensByCommunityID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadPaginateTokensByCommunityID(q), preFetchHook, postFetchHook)
 	loaders.GetContractCreatorsByIds = newGetContractCreatorsByIds(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractCreatorsByIds(q), preFetchHook, postFetchHook)
 	loaders.GetContractsByIDs = newGetContractsByIDs(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetContractsByIDs(q), preFetchHook, postFetchHook)
@@ -1852,6 +1854,22 @@ func loadPaginateRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.Comment, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadPaginateTokensAdmiredByUserIDBatch(q *coredb.Queries) func(context.Context, *PaginateTokensAdmiredByUserIDBatch, []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.Token, []error) {
+	return func(ctx context.Context, d *PaginateTokensAdmiredByUserIDBatch, params []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.Token, []error) {
+		results := make([][]coredb.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateTokensAdmiredByUserIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.Token, err error) {
 			results[i], errors[i] = r, err
 		})
 
