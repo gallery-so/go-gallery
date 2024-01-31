@@ -6202,6 +6202,106 @@ func (b *PaginateRepliesByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const paginateTokensAdmiredByUserIDBatch = `-- name: PaginateTokensAdmiredByUserIDBatch :batchmany
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable
+from admires
+join tokens on admires.token_id = tokens.id
+where actor_id = $1 and not admires.deleted and not tokens.deleted
+and (admires.created_at, admires.id) < ($2, $3)
+and (admires.created_at, admires.id) > ($4, $5)
+order by case when $6::bool then (admires.created_at, admires.id) end asc,
+    case when not $6::bool then (admires.created_at, admires.id) end desc
+limit $7
+`
+
+type PaginateTokensAdmiredByUserIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginateTokensAdmiredByUserIDBatchParams struct {
+	UserID        persist.DBID `db:"user_id" json:"user_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
+}
+
+func (q *Queries) PaginateTokensAdmiredByUserIDBatch(ctx context.Context, arg []PaginateTokensAdmiredByUserIDBatchParams) *PaginateTokensAdmiredByUserIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.UserID,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(paginateTokensAdmiredByUserIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateTokensAdmiredByUserIDBatchBatchResults{br, len(arg), false}
+}
+
+func (b *PaginateTokensAdmiredByUserIDBatchBatchResults) Query(f func(int, []Token, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Token
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Token
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.CollectorsNote,
+					&i.Quantity,
+					&i.BlockNumber,
+					&i.OwnerUserID,
+					&i.OwnedByWallets,
+					&i.ContractID,
+					&i.IsUserMarkedSpam,
+					&i.LastSynced,
+					&i.IsCreatorToken,
+					&i.TokenDefinitionID,
+					&i.IsHolderToken,
+					&i.Displayable,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginateTokensAdmiredByUserIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const paginateTokensByCommunityID = `-- name: PaginateTokensByCommunityID :batchmany
 with community_data as (
     select id as community_id, community_type, contract_id

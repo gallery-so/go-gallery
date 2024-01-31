@@ -353,6 +353,17 @@ func (q *Queries) CountSocialConnections(ctx context.Context, arg CountSocialCon
 	return count, err
 }
 
+const countTokensAdmiredByUserID = `-- name: CountTokensAdmiredByUserID :one
+select count(*) from admires, tokens where actor_id = $1 and admires.token_id = tokens.id and not admires.deleted and not tokens.deleted
+`
+
+func (q *Queries) CountTokensAdmiredByUserID(ctx context.Context, actorID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countTokensAdmiredByUserID, actorID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countTokensByContractId = `-- name: CountTokensByContractId :one
 select count(*)
 from tokens

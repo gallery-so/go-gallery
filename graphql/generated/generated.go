@@ -750,6 +750,7 @@ type ComplexityRoot struct {
 		SharedFollowers          func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts           func(childComplexity int) int
 		Tokens                   func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
+		TokensBookmarked         func(childComplexity int, before *string, after *string, first *int, last *int) int
 		Universal                func(childComplexity int) int
 		Username                 func(childComplexity int) int
 		Wallets                  func(childComplexity int) int
@@ -1936,6 +1937,7 @@ type GalleryUserResolver interface {
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
 	Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error)
+	TokensBookmarked(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.TokensConnection, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error)
 	FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error)
@@ -4599,6 +4601,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Tokens(childComplexity, args["ownershipFilter"].([]persist.TokenOwnershipType)), true
+
+	case "GalleryUser.tokensBookmarked":
+		if e.complexity.GalleryUser.TokensBookmarked == nil {
+			break
+		}
+
+		args, err := ec.field_GalleryUser_tokensBookmarked_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.TokensBookmarked(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "GalleryUser.universal":
 		if e.complexity.GalleryUser.Universal == nil {
@@ -9673,6 +9687,7 @@ type GalleryUser implements Node @goEmbedHelper {
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
   tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
+  tokensBookmarked(before: String, after: String, first: Int, last: Int): TokensConnection @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
   primaryWallet: Wallet @goField(forceResolver: true)
@@ -13481,6 +13496,48 @@ func (ec *executionContext) field_GalleryUser_sharedFollowers_args(ctx context.C
 	return args, nil
 }
 
+func (ec *executionContext) field_GalleryUser_tokensBookmarked_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field_GalleryUser_tokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -16557,6 +16614,8 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -16816,6 +16875,8 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -18479,6 +18540,8 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -19424,6 +19487,8 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -20357,6 +20422,8 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -20786,6 +20853,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -21059,6 +21128,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -21520,6 +21591,8 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -29443,6 +29516,8 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -29636,6 +29711,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -30373,6 +30450,8 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -31109,6 +31188,8 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -31423,6 +31504,8 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -32186,6 +32269,64 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _GalleryUser_tokensBookmarked(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().TokensBookmarked(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokensConnection)
+	fc.Result = res
+	return ec.marshalOTokensConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokensConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryUser_tokensBookmarked(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_TokensConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_TokensConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TokensConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_GalleryUser_tokensBookmarked_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_GalleryUser_wallets(ctx, field)
 	if err != nil {
@@ -32564,6 +32705,8 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -32653,6 +32796,8 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -33351,6 +33496,8 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -42988,6 +43135,8 @@ func (ec *executionContext) fieldContext_OptInForRolesPayload_user(ctx context.C
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -43077,6 +43226,8 @@ func (ec *executionContext) fieldContext_OptOutForRolesPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -43875,6 +44026,8 @@ func (ec *executionContext) fieldContext_Post_author(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -46213,6 +46366,8 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -46738,6 +46893,8 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -49400,6 +49557,8 @@ func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -49876,6 +50035,8 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -56592,6 +56753,8 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -59129,6 +59292,8 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -59603,6 +59768,8 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -59991,6 +60158,8 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -60388,6 +60557,8 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -60584,6 +60755,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -62256,6 +62429,8 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -62386,6 +62561,8 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -62776,6 +62953,8 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -62953,6 +63132,8 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -63895,6 +64076,8 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
 			case "tokens":
 				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
 			case "wallets":
 				return ec.fieldContext_GalleryUser_wallets(ctx, field)
 			case "primaryWallet":
@@ -78861,6 +79044,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._GalleryUser_tokens(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tokensBookmarked":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_tokensBookmarked(ctx, field, obj)
 				return res
 			}
 
