@@ -194,6 +194,20 @@ func (c *Client) CreateTaskForWalletRemoval(ctx context.Context, message TokenPr
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
+func (c *Client) CreateTaskForOpenseaStreamerTokenProcessing(ctx context.Context, message persist.OpenSeaWebhookInput) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForOpenseaStreamerTokenProcessing")
+	defer tracing.FinishSpan(span)
+	tracing.AddEventDataToSpan(span, map[string]any{
+		"contract": message.Payload.Item.NFTID.ContractAddress.String(),
+		"tokenID":  message.Payload.Item.NFTID.TokenID.String(),
+		"chain":    message.Payload.Item.NFTID.Chain,
+		"wallet":   message.Payload.ToAccount.Address.String(),
+	})
+	queue := env.GetString("GCLOUD_OPENSEA_STREAMER_QUEUE")
+	url := fmt.Sprintf("%s/owners/process/opensea", env.GetString("TOKEN_PROCESSING_URL"))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
+}
+
 func (c *Client) CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmailToMailingListMessage) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAddingEmailToMailingList")
 	defer tracing.FinishSpan(span)

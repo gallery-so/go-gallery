@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -557,108 +556,10 @@ item transferred payload:
 }
 */
 
-type OpenseaNFTID struct {
-	Chain           persist.Chain
-	ContractAddress persist.Address
-	TokenID         persist.TokenID
-}
-
-func (o OpenseaNFTID) String() string {
-	cstring := "ethereum"
-	switch o.Chain {
-	case persist.ChainPolygon:
-		cstring = "matic"
-	case persist.ChainArbitrum:
-		cstring = "arbitrum"
-	case persist.ChainOptimism:
-		cstring = "optimism"
-	case persist.ChainZora:
-		cstring = "zora"
-	case persist.ChainBase:
-		cstring = "base"
-
-	}
-	return fmt.Sprintf("%s/%s/%s", cstring, o.ContractAddress, o.TokenID.Base10String())
-}
-
-func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-
-	split := strings.Split(s, "/")
-	if len(split) != 3 {
-		return fmt.Errorf("invalid opensea nft id: %s", s)
-	}
-
-	var chain persist.Chain
-	switch split[0] {
-	case "ethereum":
-		chain = persist.ChainETH
-	case "matic":
-		chain = persist.ChainPolygon
-	case "arbitrum":
-		chain = persist.ChainArbitrum
-	case "optimism":
-		chain = persist.ChainOptimism
-	case "zora":
-		chain = persist.ChainZora
-	case "base":
-		chain = persist.ChainBase
-
-	default:
-		return fmt.Errorf("invalid opensea chain: %s", split[0])
-	}
-
-	o.Chain = chain
-	o.ContractAddress = persist.Address(strings.ToLower(split[1]))
-	asBig, ok := big.NewInt(0).SetString(split[2], 10)
-	if !ok {
-		asBig, ok = big.NewInt(0).SetString(split[2], 16)
-		if !ok {
-			return fmt.Errorf("invalid opensea token id: %s", split[2])
-		}
-	}
-	o.TokenID = persist.TokenID(asBig.Text(16))
-
-	return nil
-}
-
-func (o OpenseaNFTID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(o.String())
-}
-
-type OpenSeaWebhookInput struct {
-	EventType string `json:"event_type"`
-	Payload   struct {
-		Chain      string `json:"chain"`
-		Collection struct {
-			Slug string `json:"slug"`
-		} `json:"collection"`
-		EventTimestamp string `json:"event_timestamp"`
-		FromAccount    struct {
-			Address persist.EthereumAddress `json:"address"`
-		} `json:"from_account"`
-		Item struct {
-			Chain struct {
-				Name string `json:"name"`
-			} `json:"chain"`
-			Metadata  persist.TokenMetadata `json:"metadata"`
-			NFTID     OpenseaNFTID          `json:"nft_id"`
-			Permalink string                `json:"permalink"`
-		} `json:"item"`
-		Quantity  int `json:"quantity"`
-		ToAccount struct {
-			Address persist.EthereumAddress `json:"address"`
-		} `json:"to_account"`
-	} `json:"payload"`
-}
-
 func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		var in OpenSeaWebhookInput
+		var in persist.OpenSeaWebhookInput
 		if err := c.ShouldBindJSON(&in); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
