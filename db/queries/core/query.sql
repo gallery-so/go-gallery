@@ -222,7 +222,7 @@ select t.* from collections c,
     limit sqlc.narg('limit');
 
 -- name: PaginateTokensAdmiredByUserIDBatch :batchmany
-select tokens.*
+select sqlc.embed(tokens), sqlc.embed(admires)
 from admires
 join tokens on admires.token_id = tokens.id
 where actor_id = @user_id and not admires.deleted and not tokens.deleted

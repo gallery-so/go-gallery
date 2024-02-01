@@ -6203,7 +6203,7 @@ func (b *PaginateRepliesByCommentIDBatchBatchResults) Close() error {
 }
 
 const paginateTokensAdmiredByUserIDBatch = `-- name: PaginateTokensAdmiredByUserIDBatch :batchmany
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, admires.id, admires.version, admires.feed_event_id, admires.actor_id, admires.deleted, admires.created_at, admires.last_updated, admires.post_id, admires.token_id, admires.comment_id
 from admires
 join tokens on admires.token_id = tokens.id
 where actor_id = $1 and not admires.deleted and not tokens.deleted
@@ -6230,6 +6230,11 @@ type PaginateTokensAdmiredByUserIDBatchParams struct {
 	Limit         int32        `db:"limit" json:"limit"`
 }
 
+type PaginateTokensAdmiredByUserIDBatchRow struct {
+	Token  Token  `db:"token" json:"token"`
+	Admire Admire `db:"admire" json:"admire"`
+}
+
 func (q *Queries) PaginateTokensAdmiredByUserIDBatch(ctx context.Context, arg []PaginateTokensAdmiredByUserIDBatchParams) *PaginateTokensAdmiredByUserIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
@@ -6248,10 +6253,10 @@ func (q *Queries) PaginateTokensAdmiredByUserIDBatch(ctx context.Context, arg []
 	return &PaginateTokensAdmiredByUserIDBatchBatchResults{br, len(arg), false}
 }
 
-func (b *PaginateTokensAdmiredByUserIDBatchBatchResults) Query(f func(int, []Token, error)) {
+func (b *PaginateTokensAdmiredByUserIDBatchBatchResults) Query(f func(int, []PaginateTokensAdmiredByUserIDBatchRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []Token
+		var items []PaginateTokensAdmiredByUserIDBatchRow
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -6265,25 +6270,35 @@ func (b *PaginateTokensAdmiredByUserIDBatchBatchResults) Query(f func(int, []Tok
 				return err
 			}
 			for rows.Next() {
-				var i Token
+				var i PaginateTokensAdmiredByUserIDBatchRow
 				if err := rows.Scan(
-					&i.ID,
-					&i.Deleted,
-					&i.Version,
-					&i.CreatedAt,
-					&i.LastUpdated,
-					&i.CollectorsNote,
-					&i.Quantity,
-					&i.BlockNumber,
-					&i.OwnerUserID,
-					&i.OwnedByWallets,
-					&i.ContractID,
-					&i.IsUserMarkedSpam,
-					&i.LastSynced,
-					&i.IsCreatorToken,
-					&i.TokenDefinitionID,
-					&i.IsHolderToken,
-					&i.Displayable,
+					&i.Token.ID,
+					&i.Token.Deleted,
+					&i.Token.Version,
+					&i.Token.CreatedAt,
+					&i.Token.LastUpdated,
+					&i.Token.CollectorsNote,
+					&i.Token.Quantity,
+					&i.Token.BlockNumber,
+					&i.Token.OwnerUserID,
+					&i.Token.OwnedByWallets,
+					&i.Token.ContractID,
+					&i.Token.IsUserMarkedSpam,
+					&i.Token.LastSynced,
+					&i.Token.IsCreatorToken,
+					&i.Token.TokenDefinitionID,
+					&i.Token.IsHolderToken,
+					&i.Token.Displayable,
+					&i.Admire.ID,
+					&i.Admire.Version,
+					&i.Admire.FeedEventID,
+					&i.Admire.ActorID,
+					&i.Admire.Deleted,
+					&i.Admire.CreatedAt,
+					&i.Admire.LastUpdated,
+					&i.Admire.PostID,
+					&i.Admire.TokenID,
+					&i.Admire.CommentID,
 				); err != nil {
 					return err
 				}

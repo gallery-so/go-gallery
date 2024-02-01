@@ -2935,7 +2935,7 @@ func newPaginateRepliesByCommentIDBatch(
 
 // PaginateTokensAdmiredByUserIDBatch batches and caches requests
 type PaginateTokensAdmiredByUserIDBatch struct {
-	generator.Dataloader[coredb.PaginateTokensAdmiredByUserIDBatchParams, []coredb.Token]
+	generator.Dataloader[coredb.PaginateTokensAdmiredByUserIDBatchParams, []coredb.PaginateTokensAdmiredByUserIDBatchRow]
 }
 
 // newPaginateTokensAdmiredByUserIDBatch creates a new PaginateTokensAdmiredByUserIDBatch with the given settings, functions, and options
@@ -2945,13 +2945,13 @@ func newPaginateTokensAdmiredByUserIDBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, *PaginateTokensAdmiredByUserIDBatch, []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.Token, []error),
+	fetch func(context.Context, *PaginateTokensAdmiredByUserIDBatch, []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.PaginateTokensAdmiredByUserIDBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *PaginateTokensAdmiredByUserIDBatch {
 	d := &PaginateTokensAdmiredByUserIDBatch{}
 
-	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.Token, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.PaginateTokensAdmiredByUserIDBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "PaginateTokensAdmiredByUserIDBatch")
