@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
+	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
 	"github.com/mikeydub/go-gallery/service/multichain/zora"
@@ -86,7 +87,7 @@ func ethProviderSet(serverEnvInit envInit, client *http.Client) *multichain.Ethe
 	ethclientClient := rpc.NewEthClient()
 	provider := indexer.NewProvider(client, ethclientClient)
 	chain := _wireChainValue
-	openseaProvider := opensea.NewProvider(client, chain)
+	openseaProvider := newOpenseaProvider(client, chain)
 	ethereumProvider := ethProvidersConfig(provider, openseaProvider)
 	return ethereumProvider
 }
@@ -94,6 +95,12 @@ func ethProviderSet(serverEnvInit envInit, client *http.Client) *multichain.Ethe
 var (
 	_wireChainValue = persist.ChainETH
 )
+
+func newOpenseaProvider(client *http.Client, chain persist.Chain) *opensea.Provider {
+	provider := reservoir.NewProvider(client, chain)
+	openseaProvider := opensea.NewProvider(client, chain, provider)
+	return openseaProvider
+}
 
 func ethProvidersConfig(indexerProvider *indexer.Provider, openseaProvider *opensea.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
@@ -134,7 +141,7 @@ func tezosProvidersConfig(tezosProvider *tezos.Provider, tzktProvider *tzkt.Prov
 
 func optimismProviderSet(client *http.Client) *multichain.OptimismProvider {
 	chain := _wirePersistChainValue
-	provider := opensea.NewProvider(client, chain)
+	provider := newOpenseaProvider(client, chain)
 	optimismProvider := optimismProvidersConfig(provider)
 	return optimismProvider
 }
@@ -156,7 +163,7 @@ func optimismProvidersConfig(openseaProvider *opensea.Provider) *multichain.Opti
 
 func arbitrumProviderSet(client *http.Client) *multichain.ArbitrumProvider {
 	chain := _wireChainValue2
-	provider := opensea.NewProvider(client, chain)
+	provider := newOpenseaProvider(client, chain)
 	arbitrumProvider := arbitrumProvidersConfig(provider)
 	return arbitrumProvider
 }
@@ -195,7 +202,7 @@ func poapProvidersConfig(poapProvider *poap.Provider) *multichain.PoapProvider {
 
 func zoraProviderSet(serverEnvInit envInit, client *http.Client) *multichain.ZoraProvider {
 	chain := _wireChainValue3
-	provider := opensea.NewProvider(client, chain)
+	provider := newOpenseaProvider(client, chain)
 	zoraProvider := zora.NewProvider(client)
 	multichainZoraProvider := zoraProvidersConfig(provider, zoraProvider)
 	return multichainZoraProvider
@@ -221,7 +228,7 @@ func zoraProvidersConfig(openseaProvider *opensea.Provider, zoraProvider *zora.P
 
 func baseProviderSet(client *http.Client) *multichain.BaseProvider {
 	chain := _wireChainValue4
-	provider := opensea.NewProvider(client, chain)
+	provider := newOpenseaProvider(client, chain)
 	baseProvider := baseProvidersConfig(provider)
 	return baseProvider
 }
@@ -243,7 +250,7 @@ func baseProvidersConfig(openseaProvider *opensea.Provider) *multichain.BaseProv
 
 func polygonProviderSet(client *http.Client) *multichain.PolygonProvider {
 	chain := _wireChainValue5
-	provider := opensea.NewProvider(client, chain)
+	provider := newOpenseaProvider(client, chain)
 	polygonProvider := polygonProvidersConfig(provider)
 	return polygonProvider
 }

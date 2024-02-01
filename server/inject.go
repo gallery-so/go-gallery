@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
+	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
 	"github.com/mikeydub/go-gallery/service/multichain/zora"
@@ -112,6 +113,14 @@ func ethProviderSet(envInit, *http.Client) *multichain.EthereumProvider {
 		rpc.NewEthClient,
 		wire.Value(persist.ChainETH),
 		indexer.NewProvider,
+		newOpenseaProvider,
+	)
+	return nil
+}
+
+func newOpenseaProvider(*http.Client, persist.Chain) *opensea.Provider {
+	wire.Build(
+		reservoir.NewProvider,
 		opensea.NewProvider,
 	)
 	return nil
@@ -165,7 +174,7 @@ func optimismProviderSet(*http.Client) *multichain.OptimismProvider {
 	wire.Build(
 		optimismProvidersConfig,
 		wire.Value(persist.ChainOptimism),
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
@@ -186,7 +195,7 @@ func arbitrumProviderSet(*http.Client) *multichain.ArbitrumProvider {
 	wire.Build(
 		arbitrumProvidersConfig,
 		wire.Value(persist.ChainArbitrum),
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
@@ -228,7 +237,7 @@ func zoraProviderSet(envInit, *http.Client) *multichain.ZoraProvider {
 		zoraProvidersConfig,
 		wire.Value(persist.ChainZora),
 		zora.NewProvider,
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
@@ -252,7 +261,7 @@ func baseProviderSet(*http.Client) *multichain.BaseProvider {
 	wire.Build(
 		baseProvidersConfig,
 		wire.Value(persist.ChainBase),
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
@@ -273,7 +282,7 @@ func polygonProviderSet(*http.Client) *multichain.PolygonProvider {
 	wire.Build(
 		polygonProvidersConfig,
 		wire.Value(persist.ChainPolygon),
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
