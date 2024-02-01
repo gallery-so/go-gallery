@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sourcegraph/conc/pool"
@@ -24,6 +25,13 @@ func init() {
 }
 
 var ErrAPIKeyExpired = errors.New("opensea api key expired")
+
+type ErrOpenseaRateLimited struct{ Err error }
+
+func (e ErrOpenseaRateLimited) Unwrap() error { return e.Err }
+func (e ErrOpenseaRateLimited) Error() string {
+	return fmt.Sprintf("rate limited by opensea: %s", e.Err)
+}
 
 var (
 	baseURL, _                        = url.Parse("https://api.opensea.io/api/v2")
@@ -480,7 +488,7 @@ func fetchContractByAddress(ctx context.Context, client *http.Client, chain pers
 	endpoint := mustContractEndpoint(chain, contractAddress)
 	resp, err := retry.RetryRequest(client, mustAuthRequest(ctx, endpoint))
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, wrapRateLimitErr(ctx, err)
 	}
 	defer resp.Body.Close()
 
@@ -500,7 +508,7 @@ func fetchCollectionBySlug(ctx context.Context, client *http.Client, chain persi
 	endpoint := mustCollectionEndpoint(slug)
 	resp, err := retry.RetryRequest(client, mustAuthRequest(ctx, endpoint))
 	if err != nil {
-		return Collection{}, err
+		return Collection{}, wrapRateLimitErr(ctx, err)
 	}
 	defer resp.Body.Close()
 
@@ -673,7 +681,7 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 	for {
 		resp, err := retry.RetryRequest(client, req)
 		if err != nil {
-			outCh <- assetsReceived{Err: err}
+			outCh <- assetsReceived{Err: wrapRateLimitErr(ctx, err)}
 			return
 		}
 
@@ -751,4 +759,14 @@ func mustChainIdentifierFrom(c persist.Chain) string {
 		panic(fmt.Sprintf("unknown chain identifier: %d", c))
 	}
 	return id
+}
+
+func wrapRateLimitErr(ctx context.Context, err error) error {
+	if !util.ErrorIs[retry.ErrOutOfRetries](err) {
+		return err
+	}
+	err = ErrOpenseaRateLimited{err}
+	logger.For(ctx).Error(err)
+	sentryutil.ReportError(ctx, err)
+	return err
 }
