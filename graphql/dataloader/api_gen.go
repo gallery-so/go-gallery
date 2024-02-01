@@ -219,6 +219,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetAdmireByAdmireIDBatch.Prime(loaders.GetAdmireByAdmireIDBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.PaginateTokensAdmiredByUserIDBatch.RegisterResultSubscriber(func(result []coredb.PaginateTokensAdmiredByUserIDBatchRow) {
+		for _, entry := range result {
+			loaders.GetAdmireByAdmireIDBatch.Prime(loaders.GetAdmireByAdmireIDBatch.getKeyForResult(entry.Admire), entry.Admire)
+		}
+	})
 	loaders.GetCollectionsByGalleryIdBatch.RegisterResultSubscriber(func(result []coredb.Collection) {
 		for _, entry := range result {
 			loaders.GetCollectionByIdBatch.Prime(loaders.GetCollectionByIdBatch.getKeyForResult(entry), entry)
@@ -1861,15 +1866,15 @@ func loadPaginateRepliesByCommentIDBatch(q *coredb.Queries) func(context.Context
 	}
 }
 
-func loadPaginateTokensAdmiredByUserIDBatch(q *coredb.Queries) func(context.Context, *PaginateTokensAdmiredByUserIDBatch, []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.Token, []error) {
-	return func(ctx context.Context, d *PaginateTokensAdmiredByUserIDBatch, params []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.Token, []error) {
-		results := make([][]coredb.Token, len(params))
+func loadPaginateTokensAdmiredByUserIDBatch(q *coredb.Queries) func(context.Context, *PaginateTokensAdmiredByUserIDBatch, []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.PaginateTokensAdmiredByUserIDBatchRow, []error) {
+	return func(ctx context.Context, d *PaginateTokensAdmiredByUserIDBatch, params []coredb.PaginateTokensAdmiredByUserIDBatchParams) ([][]coredb.PaginateTokensAdmiredByUserIDBatchRow, []error) {
+		results := make([][]coredb.PaginateTokensAdmiredByUserIDBatchRow, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginateTokensAdmiredByUserIDBatch(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, r []coredb.Token, err error) {
+		b.Query(func(i int, r []coredb.PaginateTokensAdmiredByUserIDBatchRow, err error) {
 			results[i], errors[i] = r, err
 		})
 
