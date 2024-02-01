@@ -318,7 +318,7 @@ func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Addr
 	}
 }
 
-func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, recCh chan<- multichain.ChainAgnosticTokensAndContracts, errCh chan<- error) {
 	seenContracts := &sync.Map{}
 	mu := sync.RWMutex{}
 	contractLocks := make(map[string]*sync.Mutex)
@@ -326,29 +326,27 @@ func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persis
 		assetsReceived := a
 
 		if assetsReceived.Err != nil {
-			errChan <- assetsReceived.Err
+			errCh <- assetsReceived.Err
 			return
 		}
 
-		innerTokens := make([]multichain.ChainAgnosticToken, 0, len(assetsReceived.Assets))
-		innerContracts := make([]multichain.ChainAgnosticContract, 0, len(assetsReceived.Assets))
-		innerTokenReceived := make(chan multichain.ChainAgnosticToken)
-		innerContractReceived := make(chan multichain.ChainAgnosticContract)
-		innerErrChan := make(chan error)
+		tokenCh := make(chan multichain.ChainAgnosticToken)
+		contractCh := make(chan multichain.ChainAgnosticContract)
+		innerErrCh := make(chan error)
 
 		go func() {
 			wp := pool.New().WithMaxGoroutines(10).WithContext(ctx)
-			defer close(innerTokenReceived)
-			defer close(innerContractReceived)
+			defer close(tokenCh)
+			defer close(contractCh)
 			for _, n := range assetsReceived.Assets {
 				nft := n
 				wp.Go(func(ctx context.Context) error {
-					return p.streamTokenAndContract(ctx, ownerAddress, nft, innerTokenReceived, innerContractReceived, seenContracts, contractLocks, &mu)
+					return p.streamTokenAndContract(ctx, ownerAddress, nft, tokenCh, contractCh, seenContracts, contractLocks, &mu)
 				})
 			}
 			err := wp.Wait()
 			if err != nil {
-				innerErrChan <- err
+				innerErrCh <- err
 			}
 		}()
 
@@ -356,39 +354,38 @@ func (p *Provider) streamAssetsToTokens(ctx context.Context, ownerAddress persis
 		var token multichain.ChainAgnosticToken
 		var contract multichain.ChainAgnosticContract
 
+		tokens := make([]multichain.ChainAgnosticToken, 0, len(assetsReceived.Assets))
+		contracts := make([]multichain.ChainAgnosticContract, 0, len(assetsReceived.Assets))
+
 	outer:
 		for {
 			select {
-			case token, tokenOpen = <-innerTokenReceived:
+			case token, tokenOpen = <-tokenCh:
 				if tokenOpen {
-					innerTokens = append(innerTokens, token)
+					tokens = append(tokens, token)
 					continue
 				}
 				if !contractOpen {
 					break outer
 				}
-			case contract, contractOpen = <-innerContractReceived:
+			case contract, contractOpen = <-contractCh:
 				if contractOpen {
-					innerContracts = append(innerContracts, contract)
+					contracts = append(contracts, contract)
 					continue
 				}
 				if !tokenOpen {
 					break outer
 				}
 			case <-ctx.Done():
-				errChan <- ctx.Err()
+				errCh <- ctx.Err()
 				return
-			case err := <-innerErrChan:
-				logger.For(ctx).Error(err)
-				errChan <- err
+			case err := <-innerErrCh:
+				errCh <- err
 				return
 			}
 		}
 
-		rec <- multichain.ChainAgnosticTokensAndContracts{
-			Tokens:    innerTokens,
-			Contracts: innerContracts,
-		}
+		recCh <- multichain.ChainAgnosticTokensAndContracts{Tokens: tokens, Contracts: contracts}
 	}
 }
 
