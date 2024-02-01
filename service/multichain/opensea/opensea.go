@@ -742,6 +742,7 @@ var chainToIdentifier = map[persist.Chain]string{
 	persist.ChainOptimism: "optimism",
 	persist.ChainArbitrum: "arbitrum",
 	persist.ChainBase:     "base",
+	persist.ChainZora:     "zora",
 }
 
 func mustChainIdentifierFrom(c persist.Chain) string {
