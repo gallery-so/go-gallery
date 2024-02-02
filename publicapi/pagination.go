@@ -238,7 +238,14 @@ type timeIDPagingParams struct {
 	PagingForward    bool
 }
 
-func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+func withDefaultCursorTime(before, after time.Time) func(beforeCur, afterCur *timeIDCursor) {
+	return func(beforeCur, afterCur *timeIDCursor) {
+		beforeCur.Time = before
+		afterCur.Time = after
+	}
+}
+
+func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int, opts ...func(beforeCur, afterCur *timeIDCursor)) ([]Node, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewTimeIDCursor()
 		beforeCur.Time = defaultCursorBeforeTime
@@ -246,6 +253,10 @@ func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *i
 		afterCur := cursors.NewTimeIDCursor()
 		afterCur.Time = defaultCursorAfterTime
 		afterCur.ID = defaultCursorAfterID
+
+		for _, opt := range opts {
+			opt(beforeCur, afterCur)
+		}
 
 		if before != nil {
 			if err := beforeCur.Unpack(*before); err != nil {

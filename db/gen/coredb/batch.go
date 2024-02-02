@@ -6207,10 +6207,10 @@ select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last
 from admires
 join tokens on admires.token_id = tokens.id
 where actor_id = $1 and not admires.deleted and not tokens.deleted
-and (admires.created_at, admires.id) < ($2, $3)
-and (admires.created_at, admires.id) > ($4, $5)
-order by case when $6::bool then (admires.created_at, admires.id) end asc,
-    case when not $6::bool then (admires.created_at, admires.id) end desc
+and (admires.created_at, admires.id) > ($2, $3)
+and (admires.created_at, admires.id) < ($4, $5)
+order by case when $6::bool then (admires.created_at, admires.id) end desc,
+    case when not $6::bool then (admires.created_at, admires.id) end asc
 limit $7
 `
 

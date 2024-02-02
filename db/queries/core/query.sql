@@ -226,10 +226,10 @@ select sqlc.embed(tokens), sqlc.embed(admires)
 from admires
 join tokens on admires.token_id = tokens.id
 where actor_id = @user_id and not admires.deleted and not tokens.deleted
-and (admires.created_at, admires.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-and (admires.created_at, admires.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-order by case when sqlc.arg('paging_forward')::bool then (admires.created_at, admires.id) end asc,
-    case when not sqlc.arg('paging_forward')::bool then (admires.created_at, admires.id) end desc
+and (admires.created_at, admires.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+and (admires.created_at, admires.id) < (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+order by case when sqlc.arg('paging_forward')::bool then (admires.created_at, admires.id) end desc,
+    case when not sqlc.arg('paging_forward')::bool then (admires.created_at, admires.id) end asc
 limit sqlc.arg('limit');
 
 -- name: CountTokensAdmiredByUserID :one
