@@ -6,8 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/sirupsen/logrus"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -33,8 +36,12 @@ const (
 	itemTransferredEventType = "item_transferred"
 
 	// At this false positive rate (1 out of every 1,000,000), the bloom filter uses approximately 3-4 bytes per wallet.
-	falsePositiveRate    = 0.000001
-	numConcurrentStreams = 3
+	falsePositiveRate        = 0.000001
+	numConcurrentConnections = 10
+	numConcurrentSubscribers = 2
+
+	refIDHeartbeat = 0
+	refIDSubscribe = 1
 )
 
 // TODO add more chains here
@@ -44,12 +51,20 @@ var enabledChains = map[string]bool{
 	"zora": true,
 }
 
+type phoenixEvent struct {
+	Event   string `json:"event"`
+	Payload struct {
+		Status string `json:"status"`
+	} `json:"payload"`
+	Ref   int    `json:"ref"`
+	Topic string `json:"topic"`
+}
+
 type openseaEvent struct {
 	Event   string                      `json:"event"`
 	Payload persist.OpenSeaWebhookInput `json:"payload"`
 }
 
-var numConnections atomic.Int32
 var bloomFilter atomic.Pointer[bloom.BloomFilter]
 
 var mapLock = sync.Mutex{}
@@ -101,14 +116,8 @@ func main() {
 		}
 	}()
 
-	go func() {
-		go streamOpenseaTransfers(ctx, taskClient, "stream 1", 1)
-
-		for i := 2; i <= numConcurrentStreams; i++ {
-			time.Sleep(2 * time.Minute)
-			go streamOpenseaTransfers(ctx, taskClient, fmt.Sprintf("stream %d", i), i)
-		}
-	}()
+	cm := newConnectionManager(ctx, taskClient, numConcurrentConnections, numConcurrentSubscribers)
+	go cm.start()
 
 	err = router.Run(":3000")
 	if err != nil {
@@ -150,50 +159,6 @@ func addSeenEvent(messageBytes []byte) bool {
 	return true
 }
 
-func onConnect(ctx context.Context) {
-	numConnections.Add(1)
-}
-
-func onDisconnect(ctx context.Context) {
-	current := numConnections.Add(-1)
-	if current == 0 {
-		logger.For(ctx).Errorf("there are no active websocket connections. events will be missed until we reconnect...")
-	}
-}
-
-func openWebsocket(ctx context.Context, streamName string, refID int) *websocket.Conn {
-	apiKey := env.GetString("OPENSEA_API_KEY")
-
-	for {
-		var dialer *websocket.Dialer
-
-		conn, _, err := dialer.Dial("wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
-		if err != nil {
-			logger.For(ctx).Errorf("[%s] error connecting to opensea: %s", streamName, err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		// Subscribe to events
-		subscribeMessage := map[string]interface{}{
-			"topic":   "collection:*",
-			"event":   "phx_join",
-			"payload": map[string]interface{}{},
-			"ref":     refID,
-		}
-
-		if err := conn.WriteJSON(subscribeMessage); err != nil {
-			conn.Close()
-			logger.For(ctx).Errorf("[%s] error subscribing to collection updates: %s", streamName, err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		onConnect(ctx)
-		return conn
-	}
-}
-
 func dispatchToTokenProcessing(ctx context.Context, taskClient *task.Client, payload persist.OpenSeaWebhookInput) {
 	err := taskClient.CreateTaskForOpenseaStreamerTokenProcessing(ctx, payload)
 	if err != nil {
@@ -202,8 +167,8 @@ func dispatchToTokenProcessing(ctx context.Context, taskClient *task.Client, pay
 		sentryutil.ReportError(ctx, err)
 	}
 
-	return
-	
+	//return
+	//
 	//ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	//defer cancel()
 	//
@@ -236,102 +201,504 @@ func dispatchToTokenProcessing(ctx context.Context, taskClient *task.Client, pay
 	//}
 }
 
-func sendHeartbeat(ctx context.Context, conn *websocket.Conn, streamName string, refID int) {
+func sendHeartbeat(ctx context.Context, conn *websocket.Conn) {
 	heartbeat := map[string]interface{}{
 		"topic":   "phoenix",
 		"event":   "heartbeat",
 		"payload": map[string]interface{}{},
-		"ref":     refID,
+		"ref":     refIDHeartbeat,
 	}
 
 	err := conn.WriteJSON(heartbeat)
 	if err != nil {
-		logger.For(ctx).Errorf("[%s] error sending heartbeat: %s", streamName, err)
+		logger.For(ctx).Errorf("error sending heartbeat: %s", err)
 	}
-
-	//logger.For(ctx).Debug("Sent heartbeat")
 }
 
-func streamOpenseaTransfers(ctx context.Context, taskClient *task.Client, streamName string, refID int) {
-	conn := openWebsocket(ctx, streamName, refID)
-	defer conn.Close()
+type StateChange struct {
+	ConnectionID int
+	State        ConnectionState
+}
 
-	logger.For(ctx).Infof("[%s] subscribed to opensea events", streamName)
+type SubscriptionTimeout struct {
+	ConnectionID int
+	ReferenceID  uuid.UUID
+}
 
-	errChan := make(chan error)
+type ConnectionState int
 
-	go func() {
-		// Listen for messages
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				errChan <- err
-				break
-			}
+const (
+	Connecting ConnectionState = iota
+	Connected
+	Subscribed
+)
 
-			var oe openseaEvent
-			err = json.Unmarshal(message, &oe)
-			if err != nil {
-				// No need to log these errors; they're expected and spammy. But if we see any other errors, we want to know about them!
-				errStr := err.Error()
-				if !strings.HasPrefix(errStr, "invalid opensea chain") &&
-					!strings.HasPrefix(errStr, "json: cannot unmarshal object into Go struct field .payload.payload.chain of type string") &&
-					!strings.HasPrefix(errStr, "json: cannot unmarshal number") {
-					logger.For(ctx).Errorf("[%s] unmarshaling error: %s", streamName, err)
-				}
-				continue
-			}
+func (s ConnectionState) String() string {
+	switch s {
+	case Connecting:
+		return "connecting"
+	case Connected:
+		return "connected"
+	case Subscribed:
+		return "subscribed"
+	default:
+		return "unknown"
+	}
+}
 
-			win := oe.Payload
+type connectionManager struct {
+	ctx                 context.Context
+	taskClient          *task.Client
+	maxSubscribers      int
+	started             bool
+	timeouts            chan SubscriptionTimeout
+	incoming            chan StateChange
+	connections         []chan StateChange
+	remoteStates        map[ConnectionState]map[int]bool
+	pendingRemoteStates map[ConnectionState]map[int]uuid.UUID
+}
 
-			if win.EventType != itemTransferredEventType {
-				continue
-			}
+func newConnectionManager(ctx context.Context, taskClient *task.Client, numConcurrentConnections int, numConcurrentSubscribers int) *connectionManager {
+	c := &connectionManager{
+		ctx:            ctx,
+		taskClient:     taskClient,
+		maxSubscribers: numConcurrentSubscribers,
+		timeouts:       make(chan SubscriptionTimeout),
+		incoming:       make(chan StateChange),
+		connections:    make([]chan StateChange, numConcurrentConnections),
+		remoteStates:   map[ConnectionState]map[int]bool{},
+	}
 
-			if !enabledChains[win.Payload.Chain] {
-				continue
-			}
+	c.remoteStates = map[ConnectionState]map[int]bool{
+		Connecting: {},
+		Connected:  {},
+		Subscribed: {},
+	}
 
-			// check if the wallet is in the bloom filter
-			chainAddress, err := persist.NewL1ChainAddress(persist.Address(win.Payload.ToAccount.Address.String()), win.Payload.Item.NFTID.Chain).MarshalJSON()
-			if err != nil {
-				err = fmt.Errorf("error marshaling chain address: %w", err)
-				logger.For(ctx).Error(err)
-				continue
-			}
+	c.pendingRemoteStates = map[ConnectionState]map[int]uuid.UUID{
+		Connecting: {},
+		Connected:  {},
+		Subscribed: {},
+	}
 
-			if !bloomFilter.Load().Test(chainAddress) {
-				continue
-			}
+	return c
+}
 
-			logger.For(ctx).Infof("[%s] received user item transfer event (%d bytes) for token (contract=%s, tokenID=%s) transferred to wallet %s on chain %d",
-				streamName, len(message), win.Payload.Item.NFTID.ContractAddress.String(), win.Payload.Item.NFTID.TokenID.String(), win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
+func (m *connectionManager) start() {
+	if m.started {
+		logger.For(m.ctx).Error("connection manager already started")
+		return
+	}
 
-			if !addSeenEvent(message) {
-				continue
-			}
+	go m.managerLoop()
 
-			// send to token processing service
-			go dispatchToTokenProcessing(ctx, taskClient, win)
+	connections := make([]*connection, len(m.connections))
+
+	for i := 0; i < len(m.connections); i++ {
+		outgoing := make(chan StateChange)
+		m.connections[i] = outgoing
+		m.setRemoteState(i, Connecting)
+		connections[i] = newConnection(m.incoming, outgoing, m.taskClient, i)
+	}
+
+	for i, c := range connections {
+		if i != 0 {
+			// Add a delay between starting each connection
+			time.Sleep(17 * time.Second)
 		}
-	}()
 
+		c.start()
+	}
+}
+
+func (m *connectionManager) managerLoop() {
+	for {
+		select {
+		case stateChange := <-m.incoming:
+			switch stateChange.State {
+			case Connecting:
+				m.onConnecting(stateChange.ConnectionID)
+			case Connected:
+				m.onConnected(stateChange.ConnectionID)
+			case Subscribed:
+				m.onSubscribed(stateChange.ConnectionID)
+			}
+		case timeout := <-m.timeouts:
+			m.onTimeout(timeout.ConnectionID, timeout.ReferenceID)
+		}
+	}
+}
+
+func (m *connectionManager) onConnecting(connectionID int) {
+	previousNumSubscribers := len(m.remoteStates[Subscribed])
+	m.setRemoteState(connectionID, Connecting)
+	currentNumSubscribers := len(m.remoteStates[Subscribed])
+
+	if previousNumSubscribers > 0 && currentNumSubscribers == 0 {
+		logger.For(m.ctx).Warnf("no active subscribers! events will be missed until a subscription is re-established.")
+	}
+
+	m.updateSubscribers()
+}
+
+func (m *connectionManager) onConnected(connectionID int) {
+	wasConnecting := m.hasRemoteState(connectionID, Connecting)
+	m.setRemoteState(connectionID, Connected)
+
+	if !wasConnecting {
+		logger.For(m.ctx).Warnf("unexpected state transition to \"connected\" for connection %d", connectionID)
+		m.requestStateChange(connectionID, Connecting)
+		return
+	}
+
+	m.updateSubscribers()
+}
+
+func (m *connectionManager) onSubscribed(connectionID int) {
+	wasConnected := m.hasRemoteState(connectionID, Connected)
+	m.setRemoteState(connectionID, Subscribed)
+
+	if !wasConnected {
+		logger.For(m.ctx).Warnf("unexpected state transition to \"subscribed\" for connection %d", connectionID)
+		m.requestStateChange(connectionID, Connecting)
+		return
+	}
+
+	m.updateSubscribers()
+}
+
+func (m *connectionManager) onTimeout(connectionID int, refID uuid.UUID) {
+	// If the subscription is still pending when the timeout message is received,
+	// subscribing took too long and we should force a reconnection
+	if pendingRefID, ok := m.pendingRemoteStates[Subscribed][connectionID]; ok && pendingRefID == refID {
+		m.requestStateChange(connectionID, Subscribed)
+	}
+}
+
+func (m *connectionManager) hasRemoteState(connectionID int, state ConnectionState) bool {
+	_, ok := m.remoteStates[state][connectionID]
+	return ok
+}
+
+func (m *connectionManager) setRemoteState(connectionID int, state ConnectionState) {
+	// Remove the connection from its existing state map
+	for _, stateMap := range m.remoteStates {
+		delete(stateMap, connectionID)
+	}
+
+	// Clear out pending states, too, since we've gotten an actual state
+	for _, stateMap := range m.pendingRemoteStates {
+		delete(stateMap, connectionID)
+	}
+
+	// Add the connection to its new state map
+	m.remoteStates[state][connectionID] = true
+}
+
+func (m *connectionManager) requestStateChange(connectionID int, state ConnectionState) uuid.UUID {
+	m.connections[connectionID] <- StateChange{
+		ConnectionID: connectionID,
+		State:        state,
+	}
+
+	randomID := uuid.New()
+	m.pendingRemoteStates[state][connectionID] = randomID
+
+	return randomID
+}
+
+func (m *connectionManager) setPendingRemoteState(connectionID int, state ConnectionState, refID uuid.UUID) {
+	m.pendingRemoteStates[state][connectionID] = refID
+}
+
+func (m *connectionManager) updateSubscribers() {
+	numRequiredSubscribers := m.maxSubscribers - (len(m.remoteStates[Subscribed]) + len(m.pendingRemoteStates[Subscribed]))
+
+	// If we have enough subscribers (including pending subscribers), we don't need to do anything
+	if numRequiredSubscribers <= 0 {
+		return
+	}
+
+	// If we don't have enough subscribers, we need to promote some connections from connected to subscribing
+	for connectionID := range m.remoteStates[Connected] {
+		if numRequiredSubscribers == 0 {
+			break
+		}
+
+		// Skip connections that are already attempting to subscribe
+		if _, ok := m.pendingRemoteStates[Subscribed][connectionID]; ok {
+			continue
+		}
+
+		refID := m.requestStateChange(connectionID, Subscribed)
+		numRequiredSubscribers--
+
+		go func(cID int, rID uuid.UUID) {
+			time.Sleep(5 * time.Second)
+			m.timeouts <- SubscriptionTimeout{
+				ConnectionID: cID,
+				ReferenceID:  rID,
+			}
+		}(connectionID, refID)
+	}
+}
+
+type connection struct {
+	ctx                 context.Context
+	state               ConnectionState
+	toManager           chan StateChange
+	fromManager         chan StateChange
+	fromListener        chan StateChange
+	conn                *websocket.Conn
+	taskClient          *task.Client
+	madeFirstConnection bool
+	connectionID        int
+}
+
+func newConnection(toManager chan StateChange, fromManager chan StateChange, taskClient *task.Client, connectionID int) *connection {
+	c := &connection{
+		ctx:          context.Background(),
+		toManager:    toManager,
+		fromManager:  fromManager,
+		fromListener: make(chan StateChange),
+		taskClient:   taskClient,
+		connectionID: connectionID,
+	}
+
+	c.ctx = logger.NewContextWithFields(c.ctx, logrus.Fields{
+		"connectionID": connectionID,
+	})
+
+	return c
+}
+
+func (c *connection) start() {
+	go c.connectionLoop()
+	c.startNewListener()
+}
+
+func openWebsocket(ctx context.Context, reconnecting bool) *websocket.Conn {
+	apiKey := env.GetString("OPENSEA_API_KEY")
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	for {
+		if reconnecting {
+			// Add a random delay to reconnections in an attempt to keep all connections from ending up
+			// on the same backend server. Hopefully we can distribute them among backend servers so
+			// we don't lose all of our connections when one backend node goes down.
+			time.Sleep(time.Duration(random.Intn(60)) * time.Second)
+		}
+
+		var dialer *websocket.Dialer
+
+		conn, _, err := dialer.Dial("wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
+		if err == nil {
+			return conn
+		}
+
+		logger.For(ctx).Errorf("error connecting to OpenSea: %s", err)
+		reconnecting = true
+	}
+}
+
+func (c *connection) subscribe() error {
+	logger.For(c.ctx).Infof("subscribing to events...")
+
+	// Subscribe to events
+	subscribeMessage := map[string]interface{}{
+		"topic":   "collection:*",
+		"event":   "phx_join",
+		"payload": map[string]interface{}{},
+		"ref":     refIDSubscribe,
+	}
+
+	if err := c.conn.WriteJSON(subscribeMessage); err != nil {
+		logger.For(c.ctx).Errorf("error subscribing to events: %s", err)
+		return err
+	}
+
+	return nil
+}
+
+func (c *connection) connectionLoop() {
 	// Per OpenSea docs, we need to send a heartbeat every 30 seconds
 	ticker := time.NewTicker(30 * time.Second)
 
 	for {
 		select {
 		case <-ticker.C:
-			sendHeartbeat(ctx, conn, streamName, refID)
-		case err := <-errChan:
-			if err != nil {
-				onDisconnect(ctx)
-				logger.For(ctx).Errorf("[%s] encountered error: %s", streamName, err)
-				logger.For(ctx).Infof("[%s] reconnecting to opensea...", streamName)
-				go streamOpenseaTransfers(ctx, taskClient, streamName, refID)
-				return
+			if c.state != Connecting {
+				sendHeartbeat(c.ctx, c.conn)
+			}
+		case stateChange := <-c.fromManager:
+			switch stateChange.State {
+			case Connecting:
+				c.onManagerRequestedConnecting()
+			case Subscribed:
+				c.onManagerRequestedSubscribed()
+			default:
+				logger.For(c.ctx).Errorf("received unexpected state change: %d", stateChange.State)
+			}
+		case stateChange := <-c.fromListener:
+			switch stateChange.State {
+			case Connecting:
+				c.onListenerRequestedConnecting()
+			case Subscribed:
+				c.onListenerSubscribed()
+			default:
+				logger.For(c.ctx).Errorf("received unexpected state change: %d", stateChange.State)
 			}
 		}
+	}
+}
+
+func (c *connection) startNewListener() {
+	if c.conn != nil {
+		logger.For(c.ctx).Info("closing existing connection")
+		c.conn.Close()
+	}
+
+	logger.For(c.ctx).Info("connecting to OpenSea...")
+	c.setState(Connecting)
+
+	c.fromListener = make(chan StateChange)
+
+	c.conn = openWebsocket(c.ctx, c.madeFirstConnection)
+	c.madeFirstConnection = true
+
+	logger.For(c.ctx).Info("connected to OpenSea")
+	c.setState(Connected)
+
+	go listenerLoop(c.ctx, c.connectionID, c.conn, c.taskClient, c.fromListener)
+}
+
+func (c *connection) setState(state ConnectionState) {
+	logger.For(c.ctx).Debugf("setting state to %s", state)
+	c.state = state
+	c.toManager <- StateChange{
+		ConnectionID: c.connectionID,
+		State:        c.state,
+	}
+}
+
+func (c *connection) onManagerRequestedConnecting() {
+	if c.state == Connecting {
+		return
+	}
+
+	c.startNewListener()
+}
+
+func (c *connection) onManagerRequestedSubscribed() {
+	if c.state != Connected {
+		return
+	}
+
+	err := c.subscribe()
+	if err != nil {
+		c.startNewListener()
+	}
+}
+
+func (c *connection) onListenerRequestedConnecting() {
+	c.startNewListener()
+}
+
+func (c *connection) onListenerSubscribed() {
+	logger.For(c.ctx).Infof("subscribed to events")
+	c.setState(Subscribed)
+}
+
+func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, taskClient *task.Client, toConnection chan StateChange) {
+	defer conn.Close()
+	defer close(toConnection)
+
+	// Listen for messages
+	for {
+		t, message, err := conn.ReadMessage()
+		if err != nil {
+			logger.For(ctx).Errorf("error while reading messages: %s", err)
+			toConnection <- StateChange{
+				ConnectionID: connectionID,
+				State:        Connecting,
+			}
+			break
+		}
+
+		if t != 1 {
+			logger.For(ctx).Warnf("received message with type %d and payload: %s", t, message)
+		}
+
+		pe := phoenixEvent{}
+		err = json.Unmarshal(message, &pe)
+		if err != nil {
+			logger.For(ctx).Errorf("error unmarshaling phoenix event: %s. Message is: %s", err, string(message))
+			continue
+		}
+
+		if pe.Event == "phx_reply" {
+			if pe.Payload.Status == "ok" && pe.Ref == refIDSubscribe {
+				toConnection <- StateChange{
+					ConnectionID: connectionID,
+					State:        Subscribed,
+				}
+				continue
+			}
+		}
+
+		var oe openseaEvent
+		err = json.Unmarshal(message, &oe)
+		if err != nil {
+			// No need to log these errors; they're expected and spammy. But if we see any other errors, we want to know about them!
+			errStr := err.Error()
+			if !strings.HasPrefix(errStr, "invalid opensea chain") &&
+				!strings.HasPrefix(errStr, "json: cannot unmarshal object into Go struct field .payload.payload.chain of type string") &&
+				!strings.HasPrefix(errStr, "json: cannot unmarshal number") {
+				logger.For(ctx).Errorf("unmarshaling error: %s", err)
+			}
+			continue
+		}
+
+		win := oe.Payload
+
+		if win.EventType != itemTransferredEventType {
+			continue
+		}
+
+		if !enabledChains[win.Payload.Chain] {
+			continue
+		}
+
+		// check if the wallet is in the bloom filter
+		chainAddress, err := persist.NewL1ChainAddress(persist.Address(win.Payload.ToAccount.Address.String()), win.Payload.Item.NFTID.Chain).MarshalJSON()
+		if err != nil {
+			err = fmt.Errorf("error marshaling chain address: %w", err)
+			logger.For(ctx).Error(err)
+			continue
+		}
+
+		if !bloomFilter.Load().Test(chainAddress) {
+			continue
+		}
+
+		reportCtx := logger.NewContextWithFields(ctx, logrus.Fields{
+			"eventSizeBytes": len(message),
+			"eventType":      win.EventType,
+			"contract":       win.Payload.Item.NFTID.ContractAddress.String(),
+			"tokenID":        win.Payload.Item.NFTID.TokenID.String(),
+			"walletAddress":  win.Payload.ToAccount.Address.String(),
+			"chain":          win.Payload.Item.NFTID.Chain,
+		})
+
+		logger.For(reportCtx).Infof("received user item transfer event for token (contract=%s, tokenID=%s) transferred to wallet %s on chain %d",
+			win.Payload.Item.NFTID.ContractAddress.String(), win.Payload.Item.NFTID.TokenID.String(), win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
+
+		if !addSeenEvent(message) {
+			continue
+		}
+
+		// send to token processing service
+		go dispatchToTokenProcessing(ctx, taskClient, win)
 	}
 }
 
