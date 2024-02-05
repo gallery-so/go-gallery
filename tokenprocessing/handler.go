@@ -2,6 +2,9 @@ package tokenprocessing
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/middleware"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -26,10 +29,15 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, tokenmanage.New(ctx, taskClient, tokenManageCache)))
 	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, taskClient, tokenManageCache))
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, mc, repos.UserRepository, taskClient, tokenManageCache))
+
+	authOpts := middleware.BasicAuthOptionBuilder{}
 	ownersGroup := router.Group("/owners")
+
+	// Return 200 on auth failures to prevent task/job retries
+	ownersGroup.POST("/process/opensea", middleware.BasicHeaderAuthRequired(env.GetString("OPENSEA_WEBHOOK_SECRET"), authOpts.WithFailureStatus(http.StatusOK)), processOwnersForOpenseaTokens(mc, mc.Queries))
+
 	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries))
-	ownersGroup.POST("/process/opensea", processOwnersForOpenseaTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.POST("/detect-spam", detectSpamContracts(mc.Queries))

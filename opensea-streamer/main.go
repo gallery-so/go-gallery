@@ -166,39 +166,6 @@ func dispatchToTokenProcessing(ctx context.Context, taskClient *task.Client, pay
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
-
-	//return
-	//
-	//ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	//defer cancel()
-	//
-	//payloadJSON, err := json.Marshal(payload)
-	//if err != nil {
-	//	err = fmt.Errorf("error marshaling payload: %w", err)
-	//	logger.For(ctx).Error(err)
-	//	sentryutil.ReportError(ctx, err)
-	//	return
-	//}
-	//
-	//req, err := http.NewRequestWithContext(ctx, http.MethodPost, env.GetString("TOKEN_PROCESSING_URL")+"/owners/process/opensea", bytes.NewBuffer(payloadJSON))
-	//if err != nil {
-	//	logger.For(ctx).Error(err)
-	//	return
-	//}
-	//
-	//req.Header.Set("Content-Type", "application/json")
-	//req.Header.Set("Authorization", env.GetString("WEBHOOK_TOKEN"))
-	//
-	//resp, err := http.DefaultClient.Do(req)
-	//if err != nil {
-	//	logger.For(ctx).Error(err)
-	//	return
-	//}
-	//
-	//if resp.StatusCode != http.StatusOK {
-	//	logger.For(ctx).Errorf("non-200 response from token processing service: %d", resp.StatusCode)
-	//	return
-	//}
 }
 
 func sendHeartbeat(ctx context.Context, conn *websocket.Conn) {
