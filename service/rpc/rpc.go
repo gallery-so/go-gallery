@@ -256,7 +256,7 @@ func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(i)
+		retry.DefaultRetry.Sleep(ctx, i)
 	}
 	return height, err
 }
@@ -275,7 +275,7 @@ func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethere
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(i)
+		retry.DefaultRetry.Sleep(ctx, i)
 	}
 	return logs, err
 }
@@ -295,7 +295,7 @@ func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHas
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.Sleep(i)
+		retry.Sleep(ctx, i)
 	}
 	return tx, pending, err
 }
@@ -333,7 +333,7 @@ func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(i)
+		retry.DefaultRetry.Sleep(ctx, i)
 	}
 	return metadata, err
 }
@@ -685,7 +685,7 @@ func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contract
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(i)
+		retry.DefaultRetry.Sleep(ctx, i)
 	}
 	return u, err
 }

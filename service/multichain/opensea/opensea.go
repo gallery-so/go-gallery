@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/eth"
@@ -27,13 +28,9 @@ func init() {
 }
 
 const (
-	pageSize = 10
+	pageSize = 50
 	poolSize = 12
 )
-
-var newRecCh = func() chan multichain.ChainAgnosticTokensAndContracts {
-	return make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
-}
 
 var newPool = func(ctx context.Context, s int) *pool.ContextPool {
 	return pool.New().WithMaxGoroutines(s).WithContext(ctx)
@@ -153,9 +150,9 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for an address
 func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := newRecCh()
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
-	outCh := make(chan assetsReceived)
+	outCh := make(chan assetsReceived, 32)
 	go func() {
 		defer close(outCh)
 		streamAssetsForWallet(ctx, p.httpClient, p.Chain, ownerAddress, outCh)
@@ -170,7 +167,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for a contract address
 func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := newRecCh()
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
 	assetsCh := make(chan assetsReceived)
 	go func() {
@@ -281,7 +278,7 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 }
 
 func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
-	recCh := newRecCh()
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
@@ -311,7 +308,7 @@ func (p *Provider) streamAssetsToTokens(
 	contracts := &sync.Map{}                            // used to avoid duplicate contract fetches
 	contractsL := make(map[persist.Address]*sync.Mutex) // contract job locks
 	mu := sync.RWMutex{}                                // manages access to contract locks
-	wp := newPool(ctx, poolSize)                        // pool to process pages
+	wp := newPool(ctx, 4)                               // pool to process pages
 
 	for page := range outCh {
 		page := page
@@ -327,36 +324,48 @@ func (p *Provider) streamAssetsToTokens(
 
 		wp.Go(func(ctx context.Context) error {
 			fallbacks := make([]persist.FallbackMedia, len(page.Assets))
-
-			// inner pool to fetch fallbacks and contracts
 			pagePool := newPool(ctx, 2)
 
 			// fetch fallbacks
 			pagePool.Go(func(ctx context.Context) error {
+				ctx, cancel := context.WithTimeout(ctx, time.Duration(10)*time.Second)
+				defer cancel()
+
 				altFallbacks, err := p.fallbackMediaFromAssets(ctx, page.Assets)
 				if err != nil {
 					logger.For(ctx).Errorf("failed to get fallbacks for page: %s", err)
 					sentryutil.ReportError(ctx, err)
 				}
+
 				if err == nil {
 					fallbacks = altFallbacks
 				}
+
+				if errors.Is(err, context.DeadlineExceeded) {
+					logger.For(ctx).Error(err)
+					err = nil
+				}
+
 				return err
 			})
 
 			// fetch contracts
 			pagePool.Go(func(ctx context.Context) error {
 				addresses := util.MapWithoutError(page.Assets, func(a Asset) persist.Address { return persist.Address(a.Contract) })
+				addresses = util.Dedupe(addresses, true)
 
 				s := len(addresses)
-				if len(addresses) > 8 {
-					s = 8
+				if s > 24 {
+					s = 24
 				}
 
 				contractPool := newPool(ctx, s)
+
 				for _, a := range addresses {
 					a := a
-					contractPool.Go(func(ctx context.Context) error { return p.getChainAgnosticContract(ctx, a, contracts, contractsL, &mu) })
+					contractPool.Go(func(ctx context.Context) error {
+						return p.getChainAgnosticContract(ctx, a, contracts, contractsL, &mu)
+					})
 				}
 
 				return contractPool.Wait()
