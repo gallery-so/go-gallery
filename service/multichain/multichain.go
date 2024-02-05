@@ -181,7 +181,7 @@ type TokensContractFetcher interface {
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
-type ContractsFetcher interface {
+type ContractFetcher interface {
 	GetContractByAddress(ctx context.Context, contract persist.Address) (ChainAgnosticContract, error)
 }
 
@@ -191,7 +191,6 @@ type ContractsOwnerFetcher interface {
 
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
-	ContractsFetcher
 	RefreshContract(context.Context, persist.Address) error
 }
 
@@ -651,52 +650,15 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		currentUserTokens[userID] = util.DedupeWithTranslate(append(currentUserTokens[userID], existingTokensForUsers[userID]...), false, func(t op.TokenFullDetails) persist.DBID { return t.Instance.ID })
 	}
 
-	// Sort by the default ordering the frontend uses to displays tokens so that tokens are processed in the same order
-	// The order is created time desc, token name desc, then token DBID desc.
-	sort.Slice(upsertedTokens, func(i, j int) bool {
-		tokenI := upsertedTokens[i]
-		tokenJ := upsertedTokens[j]
-
-		if tokenI.Instance.CreatedAt.After(tokenJ.Instance.CreatedAt) {
-			return true
-		} else if tokenI.Instance.CreatedAt.Before(tokenJ.Instance.CreatedAt) {
-			return false
-		}
-
-		if tokenI.Definition.Name.String > tokenJ.Definition.Name.String {
-			return true
-		} else if tokenI.Definition.Name.String < tokenJ.Definition.Name.String {
-			return false
-		}
-
-		return tokenI.Instance.ID > tokenJ.Instance.ID
-	})
-
-	batches := make([][]persist.DBID, 0)
-
+	ids := make([]persist.DBID, 0, len(upsertedTokens))
 	for _, t := range upsertedTokens {
-		// Submit tokens that are missing media IDs. Tokens that are missing media IDs are new tokens, or tokens that weren't processed for whatever reason.
 		if t.Definition.TokenMediaID == "" {
-			curBatch := len(batches) - 1
-
-			if curBatch == -1 {
-				batches = append(batches, []persist.DBID{})
-				curBatch = 0
-			}
-
-			// Break up into smaller batches so that a batch is handled per request
-			if len(batches[curBatch]) >= 50 {
-				batches = append(batches, make([]persist.DBID, 0, 50))
-				curBatch++
-			}
-
-			batches[curBatch] = append(batches[curBatch], t.Definition.ID)
+			ids = append(ids, t.Definition.ID)
 		}
 	}
 
-	for _, b := range batches {
-		err = p.SubmitTokens(ctx, b)
-		if err != nil {
+	for _, b := range util.ChunkBy(ids, 50) {
+		if err = p.SubmitTokens(ctx, b); err != nil {
 			logger.For(ctx).Errorf("failed to submit batch: %s", err)
 			sentryutil.ReportError(ctx, err)
 		}
@@ -1038,7 +1000,7 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 		}
 	}
 
-	if fetcher, ok := p.Chains[ci.Chain].(ContractsFetcher); ok {
+	if fetcher, ok := p.Chains[ci.Chain].(ContractFetcher); ok {
 		c, err := fetcher.GetContractByAddress(ctx, ci.ContractAddress)
 		if err != nil {
 			return err

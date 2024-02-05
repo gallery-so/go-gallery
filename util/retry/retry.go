@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
 )
@@ -35,7 +36,7 @@ type Retry struct {
 	Tries int // Number of times to retry
 }
 
-func (r Retry) Sleep(i int) {
+func (r *Retry) Sleep(ctx context.Context, i int) {
 	// powerInt returns the base-x exponential of y.
 	powerInt := func(x, y int) int {
 		ret := 1
@@ -54,7 +55,9 @@ func (r Retry) Sleep(i int) {
 	}
 
 	sleepFor := rand.Intn(minInt(r.Cap, r.Base*powerInt(2, i)))
-	time.Sleep(time.Duration(sleepFor) * time.Second)
+	d := time.Duration(sleepFor) * time.Second
+	logger.For(ctx).Infof("retrying in %s", d)
+	time.Sleep(d)
 }
 
 func RetryRequest(c *http.Client, req *http.Request) (*http.Response, error) {
@@ -74,7 +77,8 @@ func RetryRequestWithRetry(c *http.Client, req *http.Request, r Retry) (*http.Re
 			return resp, err
 		}
 
-		r.Sleep(i)
+		logger.For(req.Context()).Infof("rate limited by '%s'\n", req.Host)
+		r.Sleep(req.Context(), i)
 	}
 	return nil, ErrOutOfRetries{Err: err, Retry: r}
 }
@@ -102,7 +106,7 @@ func RetryFunc(ctx context.Context, f func(ctx context.Context) error, shouldRet
 		}
 
 		if i != r.Tries-1 {
-			r.Sleep(i)
+			r.Sleep(ctx, i)
 		}
 	}
 	return ErrOutOfRetries{Err: err, Retry: r}

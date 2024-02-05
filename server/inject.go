@@ -113,6 +113,13 @@ func ethProviderSet(envInit, *http.Client) *multichain.EthereumProvider {
 		rpc.NewEthClient,
 		wire.Value(persist.ChainETH),
 		indexer.NewProvider,
+		newOpenseaProvider,
+	)
+	return nil
+}
+
+func newOpenseaProvider(*http.Client, persist.Chain) *opensea.Provider {
+	wire.Build(
 		reservoir.NewProvider,
 		opensea.NewProvider,
 	)
@@ -121,17 +128,16 @@ func ethProviderSet(envInit, *http.Client) *multichain.EthereumProvider {
 
 func ethProvidersConfig(
 	indexerProvider *indexer.Provider,
-	reservoirProvider *reservoir.Provider,
 	openseaProvider *opensea.Provider,
 ) *multichain.EthereumProvider {
 	wire.Build(
 		wire.Struct(new(multichain.EthereumProvider), "*"),
 		wire.Bind(new(multichain.Verifier), util.ToPointer(indexerProvider)),
-		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(reservoirProvider)),
+		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.ContractFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
@@ -168,18 +174,17 @@ func optimismProviderSet(*http.Client) *multichain.OptimismProvider {
 	wire.Build(
 		optimismProvidersConfig,
 		wire.Value(persist.ChainOptimism),
-		reservoir.NewProvider,
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
 
-func optimismProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.OptimismProvider {
+func optimismProvidersConfig(openseaProvider *opensea.Provider) *multichain.OptimismProvider {
 	wire.Build(
 		wire.Struct(new(multichain.OptimismProvider), "*"),
-		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
+		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
 	)
@@ -190,18 +195,17 @@ func arbitrumProviderSet(*http.Client) *multichain.ArbitrumProvider {
 	wire.Build(
 		arbitrumProvidersConfig,
 		wire.Value(persist.ChainArbitrum),
-		reservoir.NewProvider,
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
 
-func arbitrumProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.ArbitrumProvider {
+func arbitrumProvidersConfig(openseaProvider *opensea.Provider) *multichain.ArbitrumProvider {
 	wire.Build(
 		wire.Struct(new(multichain.ArbitrumProvider), "*"),
-		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
+		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
 	)
@@ -231,22 +235,24 @@ func poapProvidersConfig(poapProvider *poap.Provider) *multichain.PoapProvider {
 func zoraProviderSet(envInit, *http.Client) *multichain.ZoraProvider {
 	wire.Build(
 		zoraProvidersConfig,
+		wire.Value(persist.ChainZora),
 		zora.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
 
-func zoraProvidersConfig(zoraProvider *zora.Provider) *multichain.ZoraProvider {
+func zoraProvidersConfig(openseaProvider *opensea.Provider, zoraProvider *zora.Provider) *multichain.ZoraProvider {
 	wire.Build(
 		wire.Struct(new(multichain.ZoraProvider), "*"),
-		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(zoraProvider)),
-		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(zoraProvider)),
-		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(zoraProvider)),
-		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(zoraProvider)),
-		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.ContractFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(zoraProvider)),
-		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(zoraProvider)),
-		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
 	)
 	return nil
 }
@@ -255,18 +261,17 @@ func baseProviderSet(*http.Client) *multichain.BaseProvider {
 	wire.Build(
 		baseProvidersConfig,
 		wire.Value(persist.ChainBase),
-		reservoir.NewProvider,
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
 
-func baseProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.BaseProvider {
+func baseProvidersConfig(openseaProvider *opensea.Provider) *multichain.BaseProvider {
 	wire.Build(
 		wire.Struct(new(multichain.BaseProvider), "*"),
-		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
+		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
 	)
@@ -277,18 +282,17 @@ func polygonProviderSet(*http.Client) *multichain.PolygonProvider {
 	wire.Build(
 		polygonProvidersConfig,
 		wire.Value(persist.ChainPolygon),
-		reservoir.NewProvider,
-		opensea.NewProvider,
+		newOpenseaProvider,
 	)
 	return nil
 }
 
-func polygonProvidersConfig(reservoirProvider *reservoir.Provider, openseaProvider *opensea.Provider) *multichain.PolygonProvider {
+func polygonProvidersConfig(openseaProvider *opensea.Provider) *multichain.PolygonProvider {
 	wire.Build(
 		wire.Struct(new(multichain.PolygonProvider), "*"),
-		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(reservoirProvider)),
-		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(reservoirProvider)),
+		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
 	)
