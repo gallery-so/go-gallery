@@ -569,12 +569,6 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 
 		logger.For(c).WithFields(logrus.Fields{"to_address": incomingToken.ToAccount.Address, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "amount": incomingToken.Quantity}).Infof("OPENSEA: %s - Processing Opensea User Tokens Refresh", incomingToken.ToAccount.Address)
 
-		auth := c.GetHeader("authorization")
-		if auth != env.GetString("OPENSEA_WEBHOOK_SECRET") {
-			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid opensea signature"))
-			return
-		}
-
 		user, _ := queries.GetUserByAddressAndL1(c, db.GetUserByAddressAndL1Params{
 			Address: persist.Address(incomingToken.ToAccount.Address.String()),
 			L1Chain: incomingToken.Item.NFTID.Chain.L1Chain(),
