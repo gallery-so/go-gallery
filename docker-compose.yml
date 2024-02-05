@@ -71,6 +71,8 @@ services:
         'projects/gallery-local/locations/here/queues/autosocial',
         '-queue',
         'projects/gallery-local/locations/here/queues/autosocial-poll',
+        '-queue',
+        'projects/gallery-local/locations/here/queues/opensea-streamer',
       ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
