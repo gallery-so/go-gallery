@@ -64,6 +64,13 @@ func (e ErrOpenseaRateLimited) Error() string {
 	return fmt.Sprintf("rate limited by opensea: %s", e.Err)
 }
 
+type fetchOptions struct {
+	// Skip fetching fallback media from reservoir.
+	// This is useful in certain contexts where fallback media isn't needed
+	// such as fetching a token's metadata or its descriptors
+	ExcludeFallbackMedia bool
+}
+
 // Asset is an NFT from OpenSea
 type Asset struct {
 	Identifier    string  `json:"identifier"`
@@ -145,7 +152,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 		defer close(outCh)
 		streamAssetsForWallet(ctx, p.httpClient, p.Chain, ownerAddress, outCh)
 	}()
-	return p.assetsToTokens(ctx, ownerAddress, outCh)
+	return p.assetsToTokens(ctx, ownerAddress, outCh, nil)
 }
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for an address
@@ -160,7 +167,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh)
+		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh, nil)
 	}()
 	return recCh, errCh
 }
@@ -177,7 +184,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		p.streamAssetsToTokens(ctx, address, assetsCh, recCh, errCh)
+		p.streamAssetsToTokens(ctx, address, assetsCh, recCh, errCh, nil)
 	}()
 	return recCh, errCh
 }
@@ -189,7 +196,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		defer close(outCh)
 		streamAssetsForContract(ctx, p.httpClient, p.Chain, contractAddress, outCh)
 	}()
-	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh)
+	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh, nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -202,12 +209,17 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
 func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	return p.GetTokensByTokenIdentifiersOptions(ctx, ti, nil)
+}
+
+// GetTokensByTokenIdentifiersOptions supports configuring options for fetching tokens
+func (p *Provider) GetTokensByTokenIdentifiersOptions(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, opt *fetchOptions) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	outCh := make(chan assetsReceived)
 	go func() {
 		defer close(outCh)
 		streamAssetsForToken(ctx, p.httpClient, p.Chain, ti.ContractAddress, ti.TokenID, outCh)
 	}()
-	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh)
+	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh, opt)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -225,7 +237,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 		streamAssetsForTokenIdentifiersAndOwner(ctx, p.httpClient, p.Chain, ownerAddress, ti.ContractAddress, ti.TokenID, outCh)
 	}()
 
-	tokens, contracts, err := p.assetsToTokens(ctx, ownerAddress, outCh)
+	tokens, contracts, err := p.assetsToTokens(ctx, ownerAddress, outCh, nil)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -243,7 +255,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
+	tokens, _, err := p.GetTokensByTokenIdentifiersOptions(ctx, ti, &fetchOptions{ExcludeFallbackMedia: true})
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +268,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 }
 
 func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
-	tokens, contract, err := p.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
+	tokens, contract, err := p.GetTokensByTokenIdentifiersOptions(ctx, ti, &fetchOptions{ExcludeFallbackMedia: true})
 	if err != nil {
 		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
 	}
@@ -277,13 +289,13 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 	return contractToChainAgnosticContract(cc.Contract, cc.Collection), nil
 }
 
-func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
+func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, opt *fetchOptions) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
 	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh)
+		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh, opt)
 	}()
 
 	if err = <-errCh; err != nil {
@@ -304,6 +316,7 @@ func (p *Provider) streamAssetsToTokens(
 	outCh <-chan assetsReceived,
 	recCh chan<- multichain.ChainAgnosticTokensAndContracts,
 	errCh chan<- error,
+	opt *fetchOptions,
 ) {
 	contracts := &sync.Map{}                            // used to avoid duplicate contract fetches
 	contractsL := make(map[persist.Address]*sync.Mutex) // contract job locks
@@ -327,27 +340,30 @@ func (p *Provider) streamAssetsToTokens(
 			pagePool := newPool(ctx, 2)
 
 			// fetch fallbacks
-			pagePool.Go(func(ctx context.Context) error {
-				ctx, cancel := context.WithTimeout(ctx, time.Duration(10)*time.Second)
-				defer cancel()
+			if opt == nil || !opt.ExcludeFallbackMedia {
+				pagePool.Go(func(ctx context.Context) error {
+					ctx, cancel := context.WithTimeout(ctx, time.Duration(10)*time.Second)
+					defer cancel()
 
-				altFallbacks, err := p.fallbackMediaFromAssets(ctx, page.Assets)
-				if err != nil {
-					logger.For(ctx).Errorf("failed to get fallbacks for page: %s", err)
-					sentryutil.ReportError(ctx, err)
-				}
+					altFallbacks, err := p.fallbackMediaFromAssets(ctx, page.Assets)
+					if err != nil {
+						logger.For(ctx).Errorf("failed to get fallbacks for page: %s", err)
+						if !errors.Is(err, context.DeadlineExceeded) {
+							sentryutil.ReportError(ctx, err)
+						}
+					}
 
-				if err == nil {
-					fallbacks = altFallbacks
-				}
+					if err == nil {
+						fallbacks = altFallbacks
+					}
 
-				if errors.Is(err, context.DeadlineExceeded) {
-					logger.For(ctx).Error(err)
-					err = nil
-				}
+					if errors.Is(err, context.DeadlineExceeded) {
+						return nil
+					}
 
-				return err
-			})
+					return err
+				})
+			}
 
 			// fetch contracts
 			pagePool.Go(func(ctx context.Context) error {
