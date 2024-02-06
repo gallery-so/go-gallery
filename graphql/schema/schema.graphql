@@ -706,6 +706,8 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
   ): CommunityGalleriesConnection @goField(forceResolver: true)
+
+  viewerIsMember: Boolean @goField(forceResolver: true)
 }
 
 type Contract implements Node {

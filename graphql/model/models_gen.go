@@ -839,6 +839,7 @@ type Community struct {
 	TokensInCommunity *TokensConnection             `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection       `json:"owners"`
 	Galleries         *CommunityGalleriesConnection `json:"galleries"`
+	ViewerIsMember    *bool                         `json:"viewerIsMember"`
 }
 
 func (Community) IsNode()                      {}

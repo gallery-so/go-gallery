@@ -480,6 +480,27 @@ func (r *communityResolver) Galleries(ctx context.Context, obj *model.Community,
 	}, nil
 }
 
+// ViewerIsMember is the resolver for the viewerIsMember field.
+func (r *communityResolver) ViewerIsMember(ctx context.Context, obj *model.Community) (*bool, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+
+	isMember, err := api.User.IsMemberOfCommunity(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting membership fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns membership status or nil.
+		return nil, nil
+	}
+
+	return &isMember, nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *contractCommunityResolver) Contract(ctx context.Context, obj *model.ContractCommunity) (*model.Contract, error) {
 	return resolveContractByContractID(ctx, obj.HelperContractCommunityData.Community.ContractID)
