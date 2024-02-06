@@ -372,6 +372,7 @@ type ComplexityRoot struct {
 		Subtype           func(childComplexity int) int
 		Tokens            func(childComplexity int, before *string, after *string, first *int, last *int) int
 		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
+		ViewerIsMember    func(childComplexity int) int
 	}
 
 	CommunityEdge struct {
@@ -1884,6 +1885,7 @@ type CommunityResolver interface {
 	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error)
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
 	Galleries(ctx context.Context, obj *model.Community, maxPreviews int, before *string, after *string, first *int, last *int) (*model.CommunityGalleriesConnection, error)
+	ViewerIsMember(ctx context.Context, obj *model.Community) (*bool, error)
 }
 type ContractCommunityResolver interface {
 	Contract(ctx context.Context, obj *model.ContractCommunity) (*model.Contract, error)
@@ -3307,6 +3309,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.TokensInCommunity(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool)), true
+
+	case "Community.viewerIsMember":
+		if e.complexity.Community.ViewerIsMember == nil {
+			break
+		}
+
+		return e.complexity.Community.ViewerIsMember(childComplexity), true
 
 	case "CommunityEdge.cursor":
 		if e.complexity.CommunityEdge.Cursor == nil {
@@ -9687,7 +9696,8 @@ type GalleryUser implements Node @goEmbedHelper {
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
   tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
-  tokensBookmarked(before: String, after: String, first: Int, last: Int): TokensConnection @goField(forceResolver: true)
+  tokensBookmarked(before: String, after: String, first: Int, last: Int): TokensConnection
+    @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
   primaryWallet: Wallet @goField(forceResolver: true)
@@ -10293,6 +10303,8 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
   ): CommunityGalleriesConnection @goField(forceResolver: true)
+
+  viewerIsMember: Boolean @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -24028,6 +24040,47 @@ func (ec *executionContext) fieldContext_Community_galleries(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_viewerIsMember(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_viewerIsMember(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().ViewerIsMember(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_viewerIsMember(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CommunityEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CommunityEdge_node(ctx, field)
 	if err != nil {
@@ -24106,6 +24159,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -24545,6 +24600,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -45194,6 +45251,8 @@ func (ec *executionContext) fieldContext_PostComposerDraftDetailsPayload_communi
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -54041,6 +54100,8 @@ func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotificati
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -54408,6 +54469,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_commu
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -57647,6 +57710,8 @@ func (ec *executionContext) fieldContext_Token_community(ctx context.Context, fi
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -58822,6 +58887,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_community(ctx context.C
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -58907,6 +58974,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_communities(ctx context
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "galleries":
 				return ec.fieldContext_Community_galleries(ctx, field)
+			case "viewerIsMember":
+				return ec.fieldContext_Community_viewerIsMember(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -76423,6 +76492,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 					}
 				}()
 				res = ec._Community_galleries(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "viewerIsMember":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_viewerIsMember(ctx, field, obj)
 				return res
 			}
 

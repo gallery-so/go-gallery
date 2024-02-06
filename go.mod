@@ -65,6 +65,7 @@ require (
 	github.com/ertan/go-farcaster v1.0.0-beta
 	github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277
 	github.com/golang-jwt/jwt/v5 v5.0.0
+	github.com/google/uuid v1.3.0
 	github.com/google/wire v0.5.0
 	github.com/james-bowman/sparse v0.0.0-20210729090128-1e6c7dd483e9
 	github.com/miguelmota/go-ethereum-hdwallet v0.1.1
@@ -149,7 +150,6 @@ require (
 	github.com/google/pprof v0.0.0-20221203041831-ce31453925ec // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
 	github.com/google/subcommands v1.0.1 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/goware/prefixer v0.0.0-20160118172347-395022866408 // indirect
