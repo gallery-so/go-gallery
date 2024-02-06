@@ -139,7 +139,7 @@ async function createAnimation(page) {
     }
 
     // Scale the SVG to a fixed height
-    const fixedHeight = 500;
+    const fixedHeight = 800;
     const aspectRatio = width / height;
     const scaledWidth = fixedHeight * aspectRatio;
 
