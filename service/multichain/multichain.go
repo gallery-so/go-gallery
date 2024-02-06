@@ -199,6 +199,11 @@ type TokenMetadataFetcher interface {
 	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (persist.TokenMetadata, error)
 }
 
+type CustomMetadataFetcher interface {
+	GetCustomTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (persist.TokenMetadata, error)
+	HasCustomMetadata(ctx context.Context, ti ChainAgnosticIdentifiers) (bool, error)
+}
+
 type TokenDescriptorsFetcher interface {
 	GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (ChainAgnosticTokenDescriptors, ChainAgnosticContractDescriptors, error)
 }
@@ -868,12 +873,21 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	fetcher, ok := p.Chains[chain].(TokenMetadataFetcher)
+	fetcher := p.Chains[chain]
+	if custom, ok := fetcher.(CustomMetadataFetcher); ok {
+		logger.For(ctx).Printf("fetching custom metadata for token %s-%s-%d with provider of type %T\n", tokenID, contractAddress, chain, custom)
+		if has, _ := custom.HasCustomMetadata(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}); has {
+			logger.For(ctx).Printf("fetching custom metadata for token %s-%s-%d with provider of type %T\n", tokenID, contractAddress, chain, custom)
+			return custom.GetCustomTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
+		}
+	}
+
+	regular, ok := fetcher.(TokenMetadataFetcher)
 	if !ok {
 		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
 	}
+	return regular.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
 
-	return fetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
 }
 
 // VerifySignature verifies a signature for a wallet address

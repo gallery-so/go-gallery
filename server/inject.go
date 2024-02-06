@@ -142,6 +142,7 @@ func ethProvidersConfig(
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.CustomMetadataFetcher), util.ToPointer(indexerProvider)),
 	)
 	return nil
 }

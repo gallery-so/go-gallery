@@ -109,6 +109,7 @@ func ethProvidersConfig(indexerProvider *indexer.Provider, openseaProvider *open
 		ContractsOwnerFetcher:            indexerProvider,
 		TokenDescriptorsFetcher:          openseaProvider,
 		TokenMetadataFetcher:             openseaProvider,
+		CustomMetadataFetcher:            indexerProvider,
 		TokensContractFetcher:            openseaProvider,
 		TokensIncrementalContractFetcher: openseaProvider,
 		TokensIncrementalOwnerFetcher:    openseaProvider,

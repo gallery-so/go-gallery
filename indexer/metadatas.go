@@ -45,6 +45,11 @@ type uniqueMetadataHandler func(context.Context, persist.TokenURI, persist.Ether
 
 type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
 
+func HasCustomMetadata(ctx context.Context, addr persist.EthereumAddress) bool {
+	_, ok := uniqueMetadataHandlers[addr]
+	return ok
+}
+
 type errNoMetadataFound struct {
 	Contract persist.EthereumAddress `json:"contract"`
 	TokenID  persist.TokenID         `json:"tokenID"`
