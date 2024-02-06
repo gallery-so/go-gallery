@@ -15,17 +15,42 @@ fragment definitionFrag on TokenDefinition {
   description
   media {
      ...on Media {
-      ...mediaFragment
+      ...mediaFrag
      }
   }
 }
 
-fragment mediaFragment on Media {
+fragment mediaFrag on Media {
   previewURLs {
     small
   }
   fallbackMedia {
     mediaURL
+  }
+}
+
+fragment userFrag on GalleryUser {
+  username
+  profileImage {
+    ...on TokenProfileImage {
+      token {
+        definition {
+          ...definitionFrag
+        }
+      }
+    }
+    ...on EnsProfileImage {
+      ensToken: profileImage {
+        previewURLs {
+          small
+        }
+      }
+      pfpToken: token {
+        definition {
+          ...definitionFrag
+        }
+      }
+    }
   }
 }
 
@@ -37,7 +62,7 @@ query galleryDigestEntityQuery($id: DBID!) {
     ...on Gallery {
       dbid
       owner {
-        username
+        ...userFrag
       }
       name
       description
@@ -82,28 +107,7 @@ query communityDigestEntityQuery($id: DBID!) {
       profileImageURL
       creators {
         ...on GalleryUser {
-          username
-          profileImage {
-            ...on TokenProfileImage {
-              token {
-                definition {
-                  ...definitionFrag
-                }
-              }
-            }
-            ...on EnsProfileImage {
-              ensToken: profileImage {
-                previewURLs {
-                  small
-                }
-              }
-              pfpToken: token {
-                definition {
-                  ...definitionFrag
-                }
-              }
-            }
-          }
+          ...userFrag
         }
         ...on ChainAddress {
           address
@@ -130,28 +134,7 @@ query postDigestEntityQuery($id: DBID!) {
       dbid
       caption
       author {
-        username
-        profileImage {
-          ...on TokenProfileImage {
-            token {
-              definition {
-                ...definitionFrag
-              }
-            }
-          }
-          ...on EnsProfileImage {
-            ensToken: profileImage {
-              previewURLs {
-                small
-              }
-            }
-            pfpToken: token {
-              definition {
-                ...definitionFrag
-              }
-            }
-          }
-        }
+        ...userFrag
       }
       tokens {
         ...tokenFrag

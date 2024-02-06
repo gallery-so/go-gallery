@@ -2408,14 +2408,6 @@ func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, 
 	}, nil
 }
 
-func resolveTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (*model.Token, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain)
-	if err != nil {
-		return nil, err
-	}
-	return tokenToModel(ctx, token, nil), nil
-}
-
 func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {
 	return previewURLsFromMedia(ctx, tokenMedia.Media, tokenMedia.LastUpdated, options...)
 }

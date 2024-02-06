@@ -527,7 +527,17 @@ func (r *ensProfileImageResolver) Token(ctx context.Context, obj *model.EnsProfi
 	if obj.HelperEnsProfileImageData.EnsDomain == "" || obj.HelperEnsProfileImageData.UserID == "" {
 		return nil, nil
 	}
-	return resolveTokenByEnsDomain(ctx, obj.HelperEnsProfileImageData.UserID, obj.HelperEnsProfileImageData.EnsDomain)
+
+	token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, obj.HelperEnsProfileImageData.UserID, obj.HelperEnsProfileImageData.EnsDomain)
+	if err != nil {
+		if util.ErrorIs[persist.ErrTokenNotFound](err) {
+			logger.For(ctx).Warnf("unable to find token for PFP via ENS: %s", err)
+			return nil, nil
+		}
+		return nil, nil
+	}
+
+	return tokenToModel(ctx, token, nil), nil
 }
 
 // EventData is the resolver for the eventData field.

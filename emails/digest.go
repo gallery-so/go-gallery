@@ -96,12 +96,13 @@ type CommunityDigestEntity struct {
 }
 
 type GalleryDigestEntity struct {
-	GalleryID       persist.DBID        `json:"gallery_id"`
-	CreatorUsername string              `json:"creator_username"`
-	Name            string              `json:"name"`
-	Description     string              `json:"description"`
-	Tokens          []TokenDigestEntity `json:"tokens"`
-	Editorialized   bool                `json:"editorialized"`
+	GalleryID              persist.DBID        `json:"gallery_id"`
+	CreatorUsername        string              `json:"creator_username"`
+	CreatorPreviewImageURL string              `json:"creator_preview_image_url"`
+	Name                   string              `json:"name"`
+	Description            string              `json:"description"`
+	Tokens                 []TokenDigestEntity `json:"tokens"`
+	Editorialized          bool                `json:"editorialized"`
 }
 
 func getDigestValues(q *db.Queries, b *store.BucketStorer, gql *graphql.Client) gin.HandlerFunc {
@@ -462,6 +463,9 @@ func galleryToEntity(ctx context.Context, gql graphql.Client, galleryID persist.
 
 		if t.Owner != nil {
 			entity.CreatorUsername = util.GetOptionalValue(t.Owner.Username, "")
+			if t.Owner.ProfileImage != nil {
+				entity.CreatorPreviewImageURL = addProfileImage(*t.Owner.ProfileImage)
+			}
 		}
 
 		for _, t := range t.TokenPreviews {
@@ -521,21 +525,10 @@ func communityToEntity(ctx context.Context, gql graphql.Client, communityID pers
 			switch creator := (*t.Creators[0]).(type) {
 			case *communityDigestEntityQueryCommunityByIdCommunityCreatorsChainAddress:
 				entity.CreatorName = creator.Address.String()
-				entity.CreatorPreviewImageURL = ""
 			case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser:
 				entity.CreatorName = util.GetOptionalValue(creator.Username, "")
 				if creator.ProfileImage != nil {
-					switch pfp := (*creator.ProfileImage).(type) {
-					case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage:
-						entity.CreatorPreviewImageURL = addImagePreview(*pfp.Token.Definition.Media)
-						entity.CreatorPreviewImageURL = ""
-					case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage:
-						if pfp.PfpToken != nil {
-							entity.CreatorPreviewImageURL = addImagePreview(*pfp.PfpToken.Definition.Media)
-						} else if pfp.EnsToken != nil && pfp.EnsToken.PreviewURLs != nil {
-							entity.CreatorPreviewImageURL = util.GetOptionalValue(pfp.EnsToken.PreviewURLs.Small, "")
-						}
-					}
+					entity.CreatorPreviewImageURL = addProfileImage(*creator.ProfileImage)
 				}
 			}
 		}
@@ -590,16 +583,7 @@ func postToEntity(ctx context.Context, gql graphql.Client, postID persist.DBID, 
 		if t.Author != nil {
 			entity.AuthorUsername = util.GetOptionalValue(t.Author.Username, "")
 			if t.Author.ProfileImage != nil {
-				switch pfp := (*t.Author.ProfileImage).(type) {
-				case *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage:
-					entity.AuthorPFPURL = addImagePreview(*pfp.Token.Definition.Media)
-				case *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage:
-					if pfp.PfpToken != nil {
-						entity.AuthorPFPURL = addImagePreview(*pfp.PfpToken.Definition.Media)
-					} else if pfp.EnsToken != nil && pfp.EnsToken.PreviewURLs != nil {
-						entity.AuthorPFPURL = util.GetOptionalValue(pfp.EnsToken.PreviewURLs.Small, "")
-					}
-				}
+				entity.AuthorPFPURL = addProfileImage(*t.Author.ProfileImage)
 			}
 		}
 		for _, token := range t.Tokens {
@@ -629,6 +613,19 @@ func tokenToEntity(t tokenFrag) TokenDigestEntity {
 		PreviewImageURL: addImagePreview(*t.Definition.Media),
 		Editorialized:   false,
 	}
+}
+
+func addProfileImage(p userFragProfileImage) string {
+	switch pfp := (p).(type) {
+	case *userFragProfileImageTokenProfileImage:
+		return addImagePreview(*pfp.Token.Definition.Media)
+	case *userFragProfileImageEnsProfileImage:
+		if pfpURL := util.GetOptionalValue(pfp.EnsToken.PreviewURLs.Small, ""); pfpURL != "" {
+			return pfpURL
+		}
+		return addImagePreview(*pfp.PfpToken.Definition.Media)
+	}
+	return ""
 }
 
 func addImagePreview(m definitionFragMediaMediaSubtype) string {
