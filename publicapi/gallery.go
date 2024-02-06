@@ -666,15 +666,23 @@ func (api GalleryAPI) GetGalleriesDisplayingCommunityID(ctx context.Context, com
 		return nil, nil, nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params floatIDPagingParams) ([]db.GetGalleriesDisplayingCommunityIDPaginateBatchRow, error) {
+	relativeToUserID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		relativeToUserID = ""
+	}
+
+	queryFunc := func(params boolIDFloatIDPagingParams) ([]db.GetGalleriesDisplayingCommunityIDPaginateBatchRow, error) {
 		return api.loaders.GetGalleriesDisplayingCommunityIDPaginateBatch.Load(db.GetGalleriesDisplayingCommunityIDPaginateBatchParams{
-			CommunityID:        communityID,
-			Limit:              params.Limit,
-			CurBeforeRelevance: params.CursorBeforeFloat,
-			CurBeforeID:        params.CursorBeforeID,
-			CurAfterRelevance:  params.CursorAfterFloat,
-			CurAfterID:         params.CursorAfterID,
-			PagingForward:      params.PagingForward,
+			CommunityID:                communityID,
+			RelativeToUserID:           relativeToUserID,
+			CurBeforeIsNotRelativeUser: params.CursorBeforeBool,
+			CurBeforeRelevance:         params.CursorBeforeFloat,
+			CurBeforeID:                params.CursorBeforeID2,
+			CurAfterIsNotRelativeUser:  params.CursorAfterBool,
+			CurAfterRelevance:          params.CursorAfterFloat,
+			CurAfterID:                 params.CursorAfterID2,
+			PagingForward:              params.PagingForward,
+			Limit:                      params.Limit,
 		})
 	}
 
@@ -683,11 +691,12 @@ func (api GalleryAPI) GetGalleriesDisplayingCommunityID(ctx context.Context, com
 		return int(total), err
 	}
 
-	cursorFunc := func(r db.GetGalleriesDisplayingCommunityIDPaginateBatchRow) (float64, persist.DBID, error) {
-		return r.Relevance, r.Gallery.ID, nil
+	cursorFunc := func(r db.GetGalleriesDisplayingCommunityIDPaginateBatchRow) (bool, persist.DBID, float64, persist.DBID, error) {
+		relativeUserIsNotOwner := r.Gallery.OwnerUserID != relativeToUserID
+		return relativeUserIsNotOwner, r.Gallery.OwnerUserID, r.Relevance, r.Gallery.ID, nil
 	}
 
-	paginator := floatIDPaginator[db.GetGalleriesDisplayingCommunityIDPaginateBatchRow]{
+	paginator := boolIDFloatIDPaginator[db.GetGalleriesDisplayingCommunityIDPaginateBatchRow]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,

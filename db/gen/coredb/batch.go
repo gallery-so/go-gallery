@@ -2117,11 +2117,11 @@ select g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
     join community_galleries cg2 on cg2.gallery_id = cg.gallery_id and cg2.community_id is null
 where cg.community_id = $1
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) < ($1, $2::float8, $3)
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) > ($1, $4::float8, $5)
-order by case when $6::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
-         case when not $6::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
-limit $7
+    and (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) < ($3::bool, $1, $4::float8, $5)
+    and (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) > ($6::bool, $1, $7::float8, $8)
+order by case when $9::bool then (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
+         case when not $9::bool then (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
+limit $10
 `
 
 type GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults struct {
@@ -2131,13 +2131,16 @@ type GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults struct {
 }
 
 type GetGalleriesDisplayingCommunityIDPaginateBatchParams struct {
-	CommunityID        persist.DBID `db:"community_id" json:"community_id"`
-	CurBeforeRelevance float64      `db:"cur_before_relevance" json:"cur_before_relevance"`
-	CurBeforeID        persist.DBID `db:"cur_before_id" json:"cur_before_id"`
-	CurAfterRelevance  float64      `db:"cur_after_relevance" json:"cur_after_relevance"`
-	CurAfterID         persist.DBID `db:"cur_after_id" json:"cur_after_id"`
-	PagingForward      bool         `db:"paging_forward" json:"paging_forward"`
-	Limit              int32        `db:"limit" json:"limit"`
+	CommunityID                persist.DBID `db:"community_id" json:"community_id"`
+	RelativeToUserID           persist.DBID `db:"relative_to_user_id" json:"relative_to_user_id"`
+	CurBeforeIsNotRelativeUser bool         `db:"cur_before_is_not_relative_user" json:"cur_before_is_not_relative_user"`
+	CurBeforeRelevance         float64      `db:"cur_before_relevance" json:"cur_before_relevance"`
+	CurBeforeID                persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterIsNotRelativeUser  bool         `db:"cur_after_is_not_relative_user" json:"cur_after_is_not_relative_user"`
+	CurAfterRelevance          float64      `db:"cur_after_relevance" json:"cur_after_relevance"`
+	CurAfterID                 persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward              bool         `db:"paging_forward" json:"paging_forward"`
+	Limit                      int32        `db:"limit" json:"limit"`
 }
 
 type GetGalleriesDisplayingCommunityIDPaginateBatchRow struct {
@@ -2156,8 +2159,11 @@ func (q *Queries) GetGalleriesDisplayingCommunityIDPaginateBatch(ctx context.Con
 	for _, a := range arg {
 		vals := []interface{}{
 			a.CommunityID,
+			a.RelativeToUserID,
+			a.CurBeforeIsNotRelativeUser,
 			a.CurBeforeRelevance,
 			a.CurBeforeID,
+			a.CurAfterIsNotRelativeUser,
 			a.CurAfterRelevance,
 			a.CurAfterID,
 			a.PagingForward,

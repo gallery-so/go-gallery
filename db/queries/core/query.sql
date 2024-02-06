@@ -1981,7 +1981,8 @@ select communities.* from communities
 select w.* from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal;
 
 -- name: GetGalleriesDisplayingCommunityIDPaginateBatch :batchmany
-select sqlc.embed(g),
+--select sqlc.embed(g),
+select g.*,
        cg.token_ids as community_token_ids,
        cg.token_medias as community_medias,
        cg.token_media_last_updated::timestamptz[] as community_media_last_updated,
@@ -1992,11 +1993,20 @@ select sqlc.embed(g),
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
     join community_galleries cg2 on cg2.gallery_id = cg.gallery_id and cg2.community_id is null
 where cg.community_id = @community_id
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) < (@community_id, @cur_before_relevance::float8, @cur_before_id)
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) > (@community_id, @cur_after_relevance::float8, @cur_after_id)
-order by case when @paging_forward::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
-         case when not @paging_forward::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
+    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) < (@cur_before_is_not_relative_user::bool, @community_id, @cur_before_relevance::float8, @cur_before_id)
+    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) > (@cur_after_is_not_relative_user::bool, @community_id, @cur_after_relevance::float8, @cur_after_id)
+order by case when @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
+         case when not @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
 limit sqlc.arg('limit');
+
+create index community_galleries_community_id_gallery_relevance_test_idx
+    on public.community_galleries (user_id, community_id, gallery_relevance, gallery_id);
+
+
+
+select * from users where username_idempotent = 'robin';
+
+select * from communities where name = 'Art Blocks';
 
 -- name: CountGalleriesDisplayingCommunityIDBatch :batchone
 select count(*) from community_galleries cg
