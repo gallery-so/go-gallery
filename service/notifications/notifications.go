@@ -839,7 +839,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				data.Action = "admired your gallery update"
 			}
 		} else if n.Action == persist.ActionAdmiredToken {
-			data.Action = "admired your token"
+			data.Action = "bookmarked your token"
 		} else if n.Action == persist.ActionAdmiredComment {
 			data.Action = "admired your comment"
 		} else {
