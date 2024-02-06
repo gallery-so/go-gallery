@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -680,6 +681,10 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		return nil, fmt.Errorf("could not decode base64 data: %s", err)
 	}
 
+	pngObjectType := objectTypeThumbnail
+	if tids.ContractAddress == eth.PunkAddress {
+		pngObjectType = objectTypeImage
+	}
 	pngObject := cachedMediaObject{
 		MediaType:       persist.MediaTypeImage,
 		ContentType:     "image/png",
@@ -687,7 +692,7 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		ContractAddress: tids.ContractAddress,
 		Chain:           tids.Chain,
 		ContentLength:   util.ToPointer(int64(len(data))),
-		ObjectType:      mediaTypeToObjectType(persist.MediaTypeImage, objectTypeThumbnail),
+		ObjectType:      mediaTypeToObjectType(persist.MediaTypeImage, pngObjectType),
 	}
 
 	sw := newObjectWriter(ctx, client, bucket, pngObject.fileName(), pngObject.ContentLength,
@@ -974,6 +979,9 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			return result, nil
 		}
 		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
+		if tids.ContractAddress == eth.PunkAddress {
+			return append(result[1:], obj...), nil
+		}
 		return append(result, obj...), nil
 	}
 
