@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	op "github.com/mikeydub/go-gallery/service/multichain/operation"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -45,10 +47,11 @@ const maxCommunitySize = 1000
 type SubmitTokensF func(ctx context.Context, tDefIDs []persist.DBID) error
 
 type Provider struct {
-	Repos        *postgres.Repositories
-	Queries      *db.Queries
-	SubmitTokens SubmitTokensF
-	Chains       ProviderLookup
+	Repos                  *postgres.Repositories
+	Queries                *db.Queries
+	SubmitTokens           SubmitTokensF
+	Chains                 ProviderLookup
+	CustomMetadataHandlers *media.CustomMetadataHandlers
 }
 
 // ChainAgnosticToken is a token that is agnostic to the chain it is on
@@ -197,11 +200,6 @@ type ContractRefresher interface {
 // TokenMetadataFetcher supports fetching token metadata
 type TokenMetadataFetcher interface {
 	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (persist.TokenMetadata, error)
-}
-
-type CustomMetadataFetcher interface {
-	GetCustomTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (persist.TokenMetadata, error)
-	HasCustomMetadata(ctx context.Context, ti ChainAgnosticIdentifiers) (bool, error)
 }
 
 type TokenDescriptorsFetcher interface {
@@ -870,24 +868,23 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain) (persist.TokenMetadata, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	fetcher := p.Chains[chain]
-	if custom, ok := fetcher.(CustomMetadataFetcher); ok {
-		logger.For(ctx).Printf("fetching custom metadata for token %s-%s-%d with provider of type %T\n", tokenID, contractAddress, chain, custom)
-		if has, _ := custom.HasCustomMetadata(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}); has {
-			logger.For(ctx).Printf("fetching custom metadata for token %s-%s-%d with provider of type %T\n", tokenID, contractAddress, chain, custom)
-			return custom.GetCustomTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
-		}
+	metadata, err := p.CustomMetadataHandlers.GetTokenMetadataByTokenIdentifiers(ctx, persist.TokenIdentifiers{
+		TokenID:         tokenID,
+		ContractAddress: contractAddress,
+		Chain:           chain,
+	})
+	if err == nil {
+		return metadata, nil
+	}
+	if err != nil && errors.Is(err, media.ErrNoCustomMetadataHandler) {
+		return persist.TokenMetadata{}, err
 	}
 
-	regular, ok := fetcher.(TokenMetadataFetcher)
+	fetcher, ok := p.Chains[chain].(TokenMetadataFetcher)
 	if !ok {
 		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
 	}
-	return regular.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
-
+	return fetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
 }
 
 // VerifySignature verifies a signature for a wallet address

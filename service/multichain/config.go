@@ -23,7 +23,6 @@ type EthereumProvider struct {
 	ContractsOwnerFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	CustomMetadataFetcher
 	TokensContractFetcher
 	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher

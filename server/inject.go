@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
@@ -24,6 +25,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
@@ -42,9 +45,12 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		newCommunitiesCache,
 		postgres.NewRepositories,
 		dbConnSet,
+
+		// Provider that configures the multichain provider
 		wire.Struct(new(multichain.ChainProvider), "*"),
 		multichainProviderSet,
-		// Add additional chains here
+
+		// Individual provider sets for each chain
 		ethProviderSet,
 		tezosProviderSet,
 		optimismProviderSet,
@@ -56,6 +62,14 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	)
 	return nil, nil
 }
+
+// customMetadataHandlerSet is a wire provider set for initializing custom metadata handlers
+var customMetadataHandlerSet = wire.NewSet(
+	rpc.NewEthClient,
+	ipfs.NewShell,
+	arweave.NewClient,
+	media.NewCustomMetadataHandlers,
+)
 
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(
@@ -90,6 +104,7 @@ func multichainProviderSet(context.Context, *postgres.Repositories, *db.Queries,
 		tokenmanage.New,
 		task.NewClient,
 		newProviderLookup,
+		customMetadataHandlerSet,
 	)
 	return nil
 }
@@ -142,7 +157,6 @@ func ethProvidersConfig(
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(openseaProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
-		wire.Bind(new(multichain.CustomMetadataFetcher), util.ToPointer(indexerProvider)),
 	)
 	return nil
 }

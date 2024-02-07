@@ -12,6 +12,7 @@ import (
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
@@ -24,6 +25,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/arweave"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"net/http"
@@ -74,11 +77,16 @@ func multichainProviderSet(contextContext context.Context, repositories *postgre
 	manager := tokenmanage.New(contextContext, client, cache)
 	submitTokensF := newSubmitBatch(manager)
 	providerLookup := newProviderLookup(chainProvider)
+	ethclientClient := rpc.NewEthClient()
+	shell := ipfs.NewShell()
+	goarClient := arweave.NewClient()
+	customMetadataHandlers := media.NewCustomMetadataHandlers(ethclientClient, shell, goarClient)
 	provider := &multichain.Provider{
-		Repos:        repositories,
-		Queries:      queries,
-		SubmitTokens: submitTokensF,
-		Chains:       providerLookup,
+		Repos:                  repositories,
+		Queries:                queries,
+		SubmitTokens:           submitTokensF,
+		Chains:                 providerLookup,
+		CustomMetadataHandlers: customMetadataHandlers,
 	}
 	return provider
 }
@@ -109,7 +117,6 @@ func ethProvidersConfig(indexerProvider *indexer.Provider, openseaProvider *open
 		ContractsOwnerFetcher:            indexerProvider,
 		TokenDescriptorsFetcher:          openseaProvider,
 		TokenMetadataFetcher:             openseaProvider,
-		CustomMetadataFetcher:            indexerProvider,
 		TokensContractFetcher:            openseaProvider,
 		TokensIncrementalContractFetcher: openseaProvider,
 		TokensIncrementalOwnerFetcher:    openseaProvider,
@@ -277,6 +284,9 @@ func polygonProvidersConfig(openseaProvider *opensea.Provider) *multichain.Polyg
 // Adding envInit as a dependency to a provider will ensure that the environment is set up prior
 // to calling the provider
 type envInit struct{}
+
+// customMetadataHandlerSet is a wire provider set for initializing custom metadata handlers
+var customMetadataHandlerSet = wire.NewSet(rpc.NewEthClient, ipfs.NewShell, arweave.NewClient, media.NewCustomMetadataHandlers)
 
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(
