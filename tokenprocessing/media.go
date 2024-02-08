@@ -636,7 +636,7 @@ type rasterizeResponse struct {
 	GIF *string `json:"gif"`
 }
 
-func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, httpClient *http.Client, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+func cacheRasterizedSVG(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, httpClient *http.Client, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
 	defer traceCallback()
 
@@ -645,10 +645,17 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		persist.FailStep(subMeta.SVGRasterize)
 		return nil, err
 	}
+
 	idToken, _ := metadata.Get(fmt.Sprintf("instance/service-accounts/default/identity?audience=%s", env.GetString("RASTERIZER_URL")))
 	if idToken != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", idToken))
 	}
+
+	q := req.URL.Query()
+	q.Add("chain", strconv.Itoa(int(tids.Chain)))
+	q.Add("address", tids.ContractAddress.String())
+	q.Add("tokenId", tids.TokenID.Base10String())
+	req.URL.RawQuery = q.Encode()
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -967,7 +974,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	} else if mediaType == persist.MediaTypeSVG {
 		timeBeforeCache := time.Now()
-		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, httpClient, storageClient, subMeta)
+		obj, err := cacheRasterizedSVG(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, httpClient, storageClient, subMeta)
 		if err != nil {
 			logger.For(pCtx).Errorf("could not cache svg rasterization: %s", err)
 			// still return the original object as svg
