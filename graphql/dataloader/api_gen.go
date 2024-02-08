@@ -44,6 +44,7 @@ type Loaders struct {
 	GetEventByIdBatch                                    *GetEventByIdBatch
 	GetFollowersByUserIdBatch                            *GetFollowersByUserIdBatch
 	GetFollowingByUserIdBatch                            *GetFollowingByUserIdBatch
+	GetFrameTokensByCommunityID                          *GetFrameTokensByCommunityID
 	GetGalleriesByUserIdBatch                            *GetGalleriesByUserIdBatch
 	GetGalleriesDisplayingCommunityIDPaginateBatch       *GetGalleriesDisplayingCommunityIDPaginateBatch
 	GetGalleryByCollectionIdBatch                        *GetGalleryByCollectionIdBatch
@@ -130,6 +131,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetEventByIdBatch = newGetEventByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetEventByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetFollowersByUserIdBatch = newGetFollowersByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetFollowersByUserIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetFollowingByUserIdBatch = newGetFollowingByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetFollowingByUserIdBatch(q), preFetchHook, postFetchHook)
+	loaders.GetFrameTokensByCommunityID = newGetFrameTokensByCommunityID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetFrameTokensByCommunityID(q), preFetchHook, postFetchHook)
 	loaders.GetGalleriesByUserIdBatch = newGetGalleriesByUserIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleriesByUserIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleriesDisplayingCommunityIDPaginateBatch = newGetGalleriesDisplayingCommunityIDPaginateBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleriesDisplayingCommunityIDPaginateBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryByCollectionIdBatch = newGetGalleryByCollectionIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryByCollectionIdBatch(q), preFetchHook, postFetchHook)
@@ -277,6 +279,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetFrameTokensByCommunityID.RegisterResultSubscriber(func(result []coredb.GetFrameTokensByCommunityIDRow) {
+		for _, entry := range result {
+			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
+		}
+	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
 		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result.Contract), result.Contract)
 	})
@@ -370,6 +377,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.PaginatePostsByContractID.RegisterResultSubscriber(func(result []coredb.Post) {
 		for _, entry := range result {
 			loaders.GetPostByIdBatch.Prime(loaders.GetPostByIdBatch.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetFrameTokensByCommunityID.RegisterResultSubscriber(func(result []coredb.GetFrameTokensByCommunityIDRow) {
+		for _, entry := range result {
+			loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
 		}
 	})
 	loaders.GetTokenByIdBatch.RegisterResultSubscriber(func(result coredb.GetTokenByIdBatchRow) {
@@ -507,6 +519,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCreatedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.Contract) {
 		for _, entry := range result {
 			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetFrameTokensByCommunityID.RegisterResultSubscriber(func(result []coredb.GetFrameTokensByCommunityIDRow) {
+		for _, entry := range result {
+			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry.Contract), entry.Contract)
 		}
 	})
 	loaders.GetTokenByUserTokenIdentifiersBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersBatchRow) {
@@ -1059,6 +1076,22 @@ func loadGetFollowingByUserIdBatch(q *coredb.Queries) func(context.Context, *Get
 		defer b.Close()
 
 		b.Query(func(i int, r []coredb.User, err error) {
+			results[i], errors[i] = r, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGetFrameTokensByCommunityID(q *coredb.Queries) func(context.Context, *GetFrameTokensByCommunityID, []coredb.GetFrameTokensByCommunityIDParams) ([][]coredb.GetFrameTokensByCommunityIDRow, []error) {
+	return func(ctx context.Context, d *GetFrameTokensByCommunityID, params []coredb.GetFrameTokensByCommunityIDParams) ([][]coredb.GetFrameTokensByCommunityIDRow, []error) {
+		results := make([][]coredb.GetFrameTokensByCommunityIDRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetFrameTokensByCommunityID(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []coredb.GetFrameTokensByCommunityIDRow, err error) {
 			results[i], errors[i] = r, err
 		})
 

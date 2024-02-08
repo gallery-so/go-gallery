@@ -831,6 +831,7 @@ type Community struct {
 	Holders           *TokenHoldersConnection       `json:"holders"`
 	Tokens            *TokensConnection             `json:"tokens"`
 	Posts             *PostsConnection              `json:"posts"`
+	TokensForFrame    []*Token                      `json:"tokensForFrame"`
 	Contract          *Contract                     `json:"contract"`
 	ContractAddress   *persist.ChainAddress         `json:"contractAddress"`
 	Chain             *persist.Chain                `json:"chain"`

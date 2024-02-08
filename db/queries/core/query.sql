@@ -1981,8 +1981,7 @@ select communities.* from communities
 select w.* from users u join wallets w on w.id = any(u.wallets) where not u.deleted and not w.deleted and not u.universal;
 
 -- name: GetGalleriesDisplayingCommunityIDPaginateBatch :batchmany
---select sqlc.embed(g),
-select g.*,
+select sqlc.embed(g),
        cg.token_ids as community_token_ids,
        cg.token_medias as community_medias,
        cg.token_media_last_updated::timestamptz[] as community_media_last_updated,

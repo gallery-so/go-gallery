@@ -361,6 +361,16 @@ func (r *communityResolver) Posts(ctx context.Context, obj *model.Community, bef
 	return resolveCommunityPostsByCommunityID(ctx, obj.Dbid, before, after, first, last)
 }
 
+// TokensForFrame is the resolver for the tokensForFrame field.
+func (r *communityResolver) TokensForFrame(ctx context.Context, obj *model.Community, limit int) ([]*model.Token, error) {
+	tokens, err := publicapi.For(ctx).Community.GetFrameTokensByCommunityID(ctx, obj.Dbid, int32(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *communityResolver) Contract(ctx context.Context, obj *model.Community) (*model.Contract, error) {
 	contractID := obj.HelperCommunityData.Community.ContractID
