@@ -371,6 +371,7 @@ type ComplexityRoot struct {
 		ProfileImageURL   func(childComplexity int) int
 		Subtype           func(childComplexity int) int
 		Tokens            func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TokensForFrame    func(childComplexity int, limit int) int
 		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 		ViewerIsMember    func(childComplexity int) int
 	}
@@ -1877,6 +1878,7 @@ type CommunityResolver interface {
 	Holders(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error)
 	Tokens(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error)
 	Posts(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.PostsConnection, error)
+	TokensForFrame(ctx context.Context, obj *model.Community, limit int) ([]*model.Token, error)
 	Contract(ctx context.Context, obj *model.Community) (*model.Contract, error)
 	ContractAddress(ctx context.Context, obj *model.Community) (*persist.ChainAddress, error)
 	Chain(ctx context.Context, obj *model.Community) (*persist.Chain, error)
@@ -3297,6 +3299,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.Tokens(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
+	case "Community.tokensForFrame":
+		if e.complexity.Community.TokensForFrame == nil {
+			break
+		}
+
+		args, err := ec.field_Community_tokensForFrame_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.TokensForFrame(childComplexity, args["limit"].(int)), true
 
 	case "Community.tokensInCommunity":
 		if e.complexity.Community.TokensInCommunity == nil {
@@ -10263,6 +10277,9 @@ type Community implements Node @goEmbedHelper {
   posts(before: String, after: String, first: Int, last: Int): PostsConnection
     @goField(forceResolver: true)
 
+  # Temporary fields
+  tokensForFrame(limit: Int!): [Token] @goField(forceResolver: true)
+
   # Deprecated fields
   contract: Contract
     @goField(forceResolver: true)
@@ -13055,6 +13072,21 @@ func (ec *executionContext) field_Community_posts_args(ctx context.Context, rawA
 		}
 	}
 	args["last"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_tokensForFrame_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg0, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg0
 	return args, nil
 }
 
@@ -23623,6 +23655,120 @@ func (ec *executionContext) fieldContext_Community_posts(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_tokensForFrame(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_tokensForFrame(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().TokensForFrame(rctx, obj, fc.Args["limit"].(int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_tokensForFrame(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Token_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Token_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Token_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Token_lastUpdated(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Token_collectorsNote(ctx, field)
+			case "quantity":
+				return ec.fieldContext_Token_quantity(ctx, field)
+			case "owner":
+				return ec.fieldContext_Token_owner(ctx, field)
+			case "ownedByWallets":
+				return ec.fieldContext_Token_ownedByWallets(ctx, field)
+			case "ownershipHistory":
+				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
+			case "contract":
+				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_Token_externalUrl(ctx, field)
+			case "isSpamByProvider":
+				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Token_creatorAddress(ctx, field)
+			case "openseaCollectionName":
+				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
+			case "openseaId":
+				return ec.fieldContext_Token_openseaId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Community_tokensForFrame_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Community_contract(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Community_contract(ctx, field)
 	if err != nil {
@@ -24143,6 +24289,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -24584,6 +24732,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -45235,6 +45385,8 @@ func (ec *executionContext) fieldContext_PostComposerDraftDetailsPayload_communi
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -54084,6 +54236,8 @@ func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotificati
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -54453,6 +54607,8 @@ func (ec *executionContext) fieldContext_SomeonePostedYourWorkNotification_commu
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -57694,6 +57850,8 @@ func (ec *executionContext) fieldContext_Token_community(ctx context.Context, fi
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -58871,6 +59029,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_community(ctx context.C
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -58958,6 +59118,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_communities(ctx context
 				return ec.fieldContext_Community_tokens(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tokensForFrame":
+				return ec.fieldContext_Community_tokensForFrame(ctx, field)
 			case "contract":
 				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
@@ -76356,6 +76518,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 					}
 				}()
 				res = ec._Community_posts(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tokensForFrame":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_tokensForFrame(ctx, field, obj)
 				return res
 			}
 

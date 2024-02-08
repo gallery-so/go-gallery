@@ -666,6 +666,9 @@ type Community implements Node @goEmbedHelper {
   posts(before: String, after: String, first: Int, last: Int): PostsConnection
     @goField(forceResolver: true)
 
+  # Temporary fields
+  tokensForFrame(limit: Int!): [Token] @goField(forceResolver: true)
+
   # Deprecated fields
   contract: Contract
     @goField(forceResolver: true)

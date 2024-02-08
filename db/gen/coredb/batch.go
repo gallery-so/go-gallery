@@ -2035,6 +2035,175 @@ func (b *GetFollowingByUserIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getFrameTokensByCommunityID = `-- name: GetFrameTokensByCommunityID :batchmany
+with community_data as (
+    select id as community_id, community_type, contract_id
+    from communities
+    where communities.id = $1 and not deleted
+    limit 1
+)
+
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd
+    join tokens t on t.contract_id = cd.contract_id
+    join token_definitions td on t.token_definition_id = td.id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+where cd.community_type = 0
+    and t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+limit $2)
+
+union all
+
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd, tokens t
+    join token_community_memberships tcm on t.token_definition_id = tcm.token_definition_id
+    join token_definitions td on td.id = t.token_definition_id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+where cd.community_type != 0
+    and tcm.community_id = cd.community_id
+    and t.displayable
+    and tcm.deleted = false
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+limit $2)
+`
+
+type GetFrameTokensByCommunityIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetFrameTokensByCommunityIDParams struct {
+	CommunityID persist.DBID `db:"community_id" json:"community_id"`
+	Limit       int32        `db:"limit" json:"limit"`
+}
+
+type GetFrameTokensByCommunityIDRow struct {
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
+}
+
+// This is a temporary query that gets tokens from a community without pagination or any specific
+// ordering. It returns them very quickly, and is currently used to populate community frames.
+// At present, a community is either entirely token-based or contract-based, so only
+// one of these two union clauses will return any tokens (which means it's okay for each
+// clause to have its own ordering). This query was originally written with a union
+// of results from contract_memberships and token_memberships and a single outer
+// select + join on the results of that union, but that prevented the query planner from
+// using indexes correctly (since the referenced tables might be indexed, but the union
+// of results is not). The current method is verbose and brittle, but it's fast!
+func (q *Queries) GetFrameTokensByCommunityID(ctx context.Context, arg []GetFrameTokensByCommunityIDParams) *GetFrameTokensByCommunityIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CommunityID,
+			a.Limit,
+		}
+		batch.Queue(getFrameTokensByCommunityID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetFrameTokensByCommunityIDBatchResults{br, len(arg), false}
+}
+
+func (b *GetFrameTokensByCommunityIDBatchResults) Query(f func(int, []GetFrameTokensByCommunityIDRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []GetFrameTokensByCommunityIDRow
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetFrameTokensByCommunityIDRow
+				if err := rows.Scan(
+					&i.Token.ID,
+					&i.Token.Deleted,
+					&i.Token.Version,
+					&i.Token.CreatedAt,
+					&i.Token.LastUpdated,
+					&i.Token.CollectorsNote,
+					&i.Token.Quantity,
+					&i.Token.BlockNumber,
+					&i.Token.OwnerUserID,
+					&i.Token.OwnedByWallets,
+					&i.Token.ContractID,
+					&i.Token.IsUserMarkedSpam,
+					&i.Token.LastSynced,
+					&i.Token.IsCreatorToken,
+					&i.Token.TokenDefinitionID,
+					&i.Token.IsHolderToken,
+					&i.Token.Displayable,
+					&i.TokenDefinition.ID,
+					&i.TokenDefinition.CreatedAt,
+					&i.TokenDefinition.LastUpdated,
+					&i.TokenDefinition.Deleted,
+					&i.TokenDefinition.Name,
+					&i.TokenDefinition.Description,
+					&i.TokenDefinition.TokenType,
+					&i.TokenDefinition.TokenID,
+					&i.TokenDefinition.ExternalUrl,
+					&i.TokenDefinition.Chain,
+					&i.TokenDefinition.Metadata,
+					&i.TokenDefinition.FallbackMedia,
+					&i.TokenDefinition.ContractAddress,
+					&i.TokenDefinition.ContractID,
+					&i.TokenDefinition.TokenMediaID,
+					&i.TokenDefinition.IsFxhash,
+					&i.Contract.ID,
+					&i.Contract.Deleted,
+					&i.Contract.Version,
+					&i.Contract.CreatedAt,
+					&i.Contract.LastUpdated,
+					&i.Contract.Name,
+					&i.Contract.Symbol,
+					&i.Contract.Address,
+					&i.Contract.CreatorAddress,
+					&i.Contract.Chain,
+					&i.Contract.ProfileBannerUrl,
+					&i.Contract.ProfileImageUrl,
+					&i.Contract.BadgeUrl,
+					&i.Contract.Description,
+					&i.Contract.OwnerAddress,
+					&i.Contract.IsProviderMarkedSpam,
+					&i.Contract.ParentID,
+					&i.Contract.OverrideCreatorUserID,
+					&i.Contract.L1Chain,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetFrameTokensByCommunityIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getGalleriesByUserIdBatch = `-- name: GetGalleriesByUserIdBatch :batchmany
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position FROM galleries WHERE owner_user_id = $1 AND deleted = false order by position
 `
