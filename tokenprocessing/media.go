@@ -18,17 +18,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
-	"github.com/sirupsen/logrus"
-
 	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/sirupsen/logrus"
+
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
@@ -966,7 +965,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			result = append(result, liveObj)
 		}
 
-	} else if mediaType == persist.MediaTypeSVG && tids.ContractAddress != eth.PunkAddress {
+	} else if mediaType == persist.MediaTypeSVG {
 		timeBeforeCache := time.Now()
 		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, httpClient, storageClient, subMeta)
 		if err != nil {

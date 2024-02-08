@@ -15,18 +15,12 @@ import (
 func handlersInit(router *gin.Engine, i *indexer, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
 	router.GET("/status", getStatus(i, contractRepository))
 	router.GET("/alive", util.HealthCheckHandler())
-
 	return router
 }
 
 func handlersInitServer(router *gin.Engine, contractRepository persist.ContractRepository, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, idxer *indexer) *gin.Engine {
-
-	nftsGroup := router.Group("/nfts")
-	nftsGroup.GET("/get/metadata", getTokenMetadata(ipfsClient, ethClient, arweaveClient))
-
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.GET("/get", getContract(contractRepository))
 	contractsGroup.POST("/refresh", updateContractMetadata(contractRepository, ethClient, httpClient))
-
 	return router
 }
