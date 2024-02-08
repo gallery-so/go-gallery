@@ -71,9 +71,9 @@ const args = [
   });
 
   // this function defines what is run when you call cluster.execute
-  await cluster.task(async ({ page, data: url }) => {
-    await page.goto(url);
-    return await createAnimation(page);
+  await cluster.task(async ({ page, data }) => {
+    await page.goto(data.url);
+    return await createAnimation(page, data);
   });
 
   app.get('/rasterize', async (req, res) => {
@@ -81,17 +81,25 @@ const args = [
       res.status(400).send('no url provided');
       return;
     }
-    const url = req.query.url;
-    console.log('Requesting ' + url);
+
+    data = {
+      url: req.query.url,
+      chain: req.query.chain,
+      address: req.query.address.toLowerCase(),
+      tokenId: req.query.tokenId,
+    }
+
+    console.log(`handling chain=${data.chain}; address=${data.address}; tokenId=${data.tokenId}; url=${data.url}`)
+
     try {
-      const result = await cluster.execute(url);
+      const result = await cluster.execute(data);
       const j = {};
       j['png'] = result[0];
       if (result.length > 1) {
         j['gif'] = result[1];
-        console.log(`Returning ${j['gif'].length} bytes for gif: ${url}`);
+        console.log(`Returning ${j['gif'].length} bytes for gif: ${data.url}`);
       }
-      console.log(`Returning ${j['png'].length} bytes for thumbnail: ${url}`);
+      console.log(`Returning ${j['png'].length} bytes for svg: ${data.url}`);
       res.status(200).send(j);
     } catch (e) {
       console.log(e);
@@ -119,10 +127,32 @@ process.on('uncaughtException', (err, origin) => {
   console.log(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
 });
 
-async function createAnimation(page) {
-  let svgDimensions = await page.evaluate(() => {
-    let svg = document.querySelector('svg');
+async function createAnimation(page, data) {
+  let svgDimensions = await page.evaluate((data) => {
+
+    const CRYPTOPUNK_CHAIN = 0;
+    const CRYPTOPUNK_ADDRESS = "0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb";
+    const CRYPTOPUNK_BG_COLOR = "#648494";
+
+    function isCryptoPunk(chain, address) {
+      return (chain == CRYPTOPUNK_CHAIN) && (address == CRYPTOPUNK_ADDRESS)
+    }
+
+    function modifyCryptoPunk(chain, address, el) {
+      if (isCryptoPunk(chain, address)) {
+        el.innerHTML = `<rect width="24" height="24" fill="${CRYPTOPUNK_BG_COLOR}"/>` + el.innerHTML
+      }
+    }
+
+    function modifySVG(chain, address, el) {
+      modifyCryptoPunk(chain, address, el)
+    }
+
+    const svg = document.querySelector('svg');
+
     if (!svg) throw new Error('No SVG found');
+
+    modifySVG(data.chain, data.address, svg);
 
     let width, height;
 
@@ -147,7 +177,7 @@ async function createAnimation(page) {
       width: scaledWidth,
       height: fixedHeight,
     };
-  });
+  }, data)
 
   console.log(`SVG dimensions for ${page.url()}: ${JSON.stringify(svgDimensions)}`);
 
@@ -212,7 +242,7 @@ async function createAnimation(page) {
   const pngBuffer = PNG.sync.write(frames[0]);
 
   // uncomment this line if you'd like to see the result of the first frame
-  // fs.writeFileSync('test.png', pngBuffer);
+  //fs.writeFileSync('test.png', pngBuffer);
 
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
