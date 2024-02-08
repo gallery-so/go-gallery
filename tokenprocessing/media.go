@@ -18,17 +18,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
-	"github.com/sirupsen/logrus"
-
 	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/sirupsen/logrus"
+
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
@@ -681,10 +680,6 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		return nil, fmt.Errorf("could not decode base64 data: %s", err)
 	}
 
-	pngObjectType := objectTypeThumbnail
-	if tids.ContractAddress == eth.PunkAddress {
-		pngObjectType = objectTypeImage
-	}
 	pngObject := cachedMediaObject{
 		MediaType:       persist.MediaTypeImage,
 		ContentType:     "image/png",
@@ -692,7 +687,7 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		ContractAddress: tids.ContractAddress,
 		Chain:           tids.Chain,
 		ContentLength:   util.ToPointer(int64(len(data))),
-		ObjectType:      mediaTypeToObjectType(persist.MediaTypeImage, pngObjectType),
+		ObjectType:      mediaTypeToObjectType(persist.MediaTypeImage, objectTypeThumbnail),
 	}
 
 	sw := newObjectWriter(ctx, client, bucket, pngObject.fileName(), pngObject.ContentLength,
@@ -979,9 +974,6 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			return result, nil
 		}
 		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
-		if tids.ContractAddress == eth.PunkAddress {
-			return append(result[1:], obj...), nil
-		}
 		return append(result, obj...), nil
 	}
 

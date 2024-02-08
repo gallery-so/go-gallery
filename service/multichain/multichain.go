@@ -876,7 +876,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	if err == nil {
 		return metadata, nil
 	}
-	if err != nil && errors.Is(err, media.ErrNoCustomMetadataHandler) {
+	if err != nil && !errors.Is(err, media.ErrNoCustomMetadataHandler) {
 		return persist.TokenMetadata{}, err
 	}
 

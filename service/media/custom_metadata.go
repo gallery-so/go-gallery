@@ -389,7 +389,21 @@ func parseHexColor(s string) (c color.RGBA, err error) {
 	}
 	r, g, b := h.RGB255()
 	return color.RGBA{r, g, b, 255}, nil
+}
 
+type ensDomain struct {
+	LabelName string `json:"labelName"`
+}
+
+type ensDomains struct {
+	Domains []ensDomain `json:"domains"`
+}
+
+type graphResponse struct {
+	Data   ensDomains `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
 }
 
 func newEnsHandler() metadataHandler {
@@ -397,57 +411,43 @@ func newEnsHandler() metadataHandler {
 		// The TokenID type removes leading zeros, but we want the zeros for ENS because the token ID
 		// is a hash that is used to look up a label. Here, we convert the token ID to decimal then back to
 		// hexadecimal to get back the padding.
-		labelHash := common.BigToHash(t.TokenID.BigInt()).Hex()[2:]
+		labelHash := fmt.Sprintf("0x%x", t.TokenID.BigInt())
 
-		gql := fmt.Sprintf(`
-	{
-	  domains(first:1, where:{labelhash:"%s"}){
-		labelName
-	  }
-	}`, labelHash)
+		gql := fmt.Sprintf(`{ domains(first:1, where:{labelhash:"%s"}){ labelName }}`, labelHash)
+		marshaled, _ := json.Marshal(map[string]any{"query": gql})
 
-		jsonData := map[string]any{
-			"query": gql,
-		}
-
-		marshaled, err := json.Marshal(jsonData)
-		if err != nil {
-			return persist.TokenMetadata{}, err
-		}
 		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.thegraph.com/subgraphs/name/ensdomains/ens", bytes.NewBuffer(marshaled))
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}
+
+		req.Header.Set("Content-Type", "application/json")
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}
 		defer resp.Body.Close()
 
-		var gr struct {
-			Data struct {
-				Domains []struct {
-					LabelName string `json:"labelName"`
-				} `json:"domains"`
-			} `json:"data"`
-		}
+		var gr graphResponse
 
 		err = json.NewDecoder(resp.Body).Decode(&gr)
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}
 
+		if len(gr.Errors) > 0 {
+			return persist.TokenMetadata{}, fmt.Errorf("error from ENS graph: %s", gr.Errors[0].Message)
+		}
+
 		if len(gr.Data.Domains) == 0 {
 			return persist.TokenMetadata{}, fmt.Errorf("no ENS domain found for %s", t)
 		}
+
 		if len(gr.Data.Domains) > 1 {
 			return persist.TokenMetadata{}, fmt.Errorf("multiple ENS domains found for %s", t)
 		}
 
-		domain := gr.Data.Domains[0]
-
-		result := domain.LabelName + ".eth"
-
+		result := gr.Data.Domains[0].LabelName + ".eth"
 		width := 240
 		height := 240
 		buf := &bytes.Buffer{}
