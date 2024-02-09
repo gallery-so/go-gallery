@@ -10,29 +10,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/validate"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-
-	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
-
+	"github.com/mikeydub/go-gallery/service/redis"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 const trendingFeedCacheKey = "trending:feedEvents:all"
@@ -40,19 +35,25 @@ const trendingFeedCacheKey = "trending:feedEvents:all"
 var feedOpts = struct {
 	FreshnessFactor     float64 // extra weight added to a new post
 	FirstPostFactor     float64 // extra weight added to a first post
-	LookbackWindow      float64 // how far back to look for feed events
+	LookbackWindow      float64 // how far back to look for posts
 	FreshnessWindow     float64 // how long a post is considered new
 	PostHalfLife        float64 // controls the decay rate of posts
 	GalleryPostHalfLife float64 // controls the decay rate of Gallery posts
 	GalleryDecayPeriod  float64 // time it takes for a Gallery post to reach GalleryPostHalfLife from PostHalfLife
+	FetchSize           int     // number of posts to include on the feed
+	StreakThreshold     int     // number of posts before a streak is counted
+	StreakFactor        float64 // factor that controls the impact of each extra post
 }{
-	FreshnessFactor:     2.0,
+	FreshnessFactor:     1.5,
 	FirstPostFactor:     2.0,
 	LookbackWindow:      time.Duration(4 * 24 * time.Hour).Minutes(),
-	FreshnessWindow:     time.Duration(6 * time.Hour).Minutes(),
-	PostHalfLife:        time.Duration(6 * time.Hour).Minutes(),
-	GalleryPostHalfLife: time.Duration(10 * time.Hour).Minutes(),
-	GalleryDecayPeriod:  time.Duration(4 * 24 * time.Hour).Minutes(),
+	FreshnessWindow:     time.Duration(3 * time.Hour).Minutes(),
+	PostHalfLife:        time.Duration(8 * time.Hour).Minutes(),
+	GalleryPostHalfLife: time.Duration(12 * time.Hour).Minutes(),
+	GalleryDecayPeriod:  time.Duration(6 * 24 * time.Hour).Minutes(),
+	FetchSize:           128,
+	StreakThreshold:     1,
+	StreakFactor:        0.75,
 }
 
 type FeedAPI struct {
@@ -632,19 +633,11 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	return paginator.paginate(before, after, first, last)
 }
 
-func fetchFeedEntityScores(ctx context.Context, q *db.Queries, viewerID persist.DBID) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
-	scores, err := q.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
+func fetchFeedEntityScores(ctx context.Context, q *db.Queries, viewerID persist.DBID) ([]db.GetFeedEntityScoresRow, error) {
+	return q.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
 		WindowEnd: time.Now().Add(-time.Minute * time.Duration(feedOpts.LookbackWindow)),
 		ViewerID:  viewerID,
 	})
-	if err != nil {
-		return nil, err
-	}
-	scoreMap := make(map[persist.DBID]db.GetFeedEntityScoresRow)
-	for _, s := range scores {
-		scoreMap[s.Post.ID] = s
-	}
-	return scoreMap, nil
 }
 
 func (api FeedAPI) paginatorFromCursorStr(ctx context.Context, curStr string) (feedPaginator, error) {
@@ -716,11 +709,16 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				return nil, nil, err
 			}
 
+			postLookup := make(map[persist.DBID]db.GetFeedEntityScoresRow, len(postScores))
+			for _, p := range postScores {
+				postLookup[p.Post.ID] = p
+			}
+
 			now := time.Now()
 
-			scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
-			scored := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 {
-				return timeFactor(now.Sub(e.CreatedAt).Minutes(), postScores[e.ID].IsGalleryPost) * engagementFactor(float64(e.Interactions))
+			scores := util.MapWithoutError(postScores, func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
+			scored := api.scoreFeedEntities(ctx, feedOpts.FetchSize, scores, func(e db.FeedEntityScore) float64 {
+				return timeFactor(now.Sub(e.CreatedAt).Minutes(), postLookup[e.ID].IsGalleryPost) * engagementFactor(float64(e.Interactions))
 			})
 
 			postIDs := make([]persist.DBID, len(scored))
@@ -730,7 +728,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			for i, post := range scored {
 				idx := len(scored) - i - 1
 				postIDs[idx] = post.ID
-				posts[idx] = postScores[post.ID].Post
+				posts[idx] = postLookup[post.ID].Post
 				postTypes[idx] = persist.FeedEntityType(post.FeedEntityType)
 			}
 
@@ -796,29 +794,34 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		}
 
 		now := time.Now()
-		scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
+		postLookup := make(map[persist.DBID]db.GetFeedEntityScoresRow, len(postScores))
+		rawScores := make([]db.FeedEntityScore, 0)
 		engagementScores := make(map[persist.DBID]float64)
 		personalizationScores := make(map[persist.DBID]float64)
+		postStreak := make(map[persist.DBID]int)
+
+		// sort in reverse chronological order
+		sort.SliceStable(postScores, func(i, j int) bool { return postScores[i].Post.CreatedAt.After(postScores[j].Post.CreatedAt) })
 
 		for _, e := range postScores {
+			rawScores = append(rawScores, e.FeedEntityScore)
+			postLookup[e.Post.ID] = e
+			postStreak[e.Post.ActorID] += 1
 			age := now.Sub(e.Post.CreatedAt).Minutes()
 			isFresh := isFreshPost(age)
-			engagementScores[e.Post.ID] = scorePost(age, e.IsGalleryPost, e.Post.IsFirstPost, isFresh)
+			engagementScores[e.Post.ID] = scorePost(age, e.IsGalleryPost, e.Post.IsFirstPost, isFresh, postStreak[e.Post.ActorID])
 			personalizationScores[e.Post.ID] = engagementScores[e.Post.ID]
 			engagementScores[e.Post.ID] *= engagementFactor(float64(e.FeedEntityScore.Interactions))
-			// Don't apply personalization to gallery posts or fresh posts
-			if !e.IsGalleryPost && !isFresh {
-				personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(viewerID, e.FeedEntityScore)
-			}
+			personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(viewerID, e.FeedEntityScore)
 		}
 
 		// Rank by engagement first, then by personalization
-		topNByPersonalization := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
-		topNByPersonalization = api.scoreFeedEntities(ctx, 128, topNByPersonalization, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		topNByPersonalization := api.scoreFeedEntities(ctx, feedOpts.FetchSize, rawScores, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
+		topNByPersonalization = api.scoreFeedEntities(ctx, feedOpts.FetchSize, topNByPersonalization, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
 
 		// Rank by personalization, then by engagement
-		topNByEngagement := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
-		topNByEngagement = api.scoreFeedEntities(ctx, 128, topNByEngagement, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
+		topNByEngagement := api.scoreFeedEntities(ctx, feedOpts.FetchSize, rawScores, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		topNByEngagement = api.scoreFeedEntities(ctx, feedOpts.FetchSize, topNByEngagement, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
 
 		// Get ranking of both
 		seen := make(map[persist.DBID]bool)
@@ -843,14 +846,12 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		}
 
 		// Score based on the average of the two rankings
-		interleaved := api.scoreFeedEntities(ctx, 128, combined, func(e db.FeedEntityScore) float64 {
+		interleaved := api.scoreFeedEntities(ctx, feedOpts.FetchSize, combined, func(e db.FeedEntityScore) float64 {
 			if e.ActorID == viewerID {
 				return float64(engagementRank[e.ID])
 			}
 			return float64(engagementRank[e.ID]+personalizationRank[e.ID]) / 2.0
 		})
-
-		recommend.Shuffle(interleaved, 4)
 
 		posts := make([]db.Post, len(interleaved))
 		postIDs := make([]persist.DBID, len(interleaved))
@@ -860,7 +861,7 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		for i, e := range interleaved {
 			idx := len(interleaved) - i - 1
 			postIDs[idx] = e.ID
-			posts[idx] = postScores[e.ID].Post
+			posts[idx] = postLookup[e.ID].Post
 			postTypes[idx] = persist.FeedEntityType(e.FeedEntityType)
 			positions[e.ID] = int64(idx)
 		}
@@ -1070,13 +1071,16 @@ func isFreshPost(age float64) bool {
 	return age < feedOpts.FreshnessWindow
 }
 
-func scorePost(age float64, isGallery, isFirstPost, isFresh bool) (s float64) {
+func scorePost(age float64, isGallery, isFirstPost, isFresh bool, streak int) (s float64) {
 	s = timeFactor(age, isGallery)
-	if isFresh {
-		s *= feedOpts.FreshnessFactor
+	if streak > feedOpts.StreakThreshold {
+		s *= 1 / math.Pow(math.E, feedOpts.StreakFactor*float64(streak-feedOpts.StreakThreshold+1))
 	}
-	if isFirstPost {
+	if isFirstPost && isFresh {
 		s *= feedOpts.FirstPostFactor
+	}
+	if !isFirstPost && isFresh {
+		s *= feedOpts.FreshnessFactor
 	}
 	return s
 }
