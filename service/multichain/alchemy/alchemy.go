@@ -16,7 +16,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -92,17 +91,17 @@ type SpamInfo struct {
 }
 
 type Token struct {
-	Contract         Contract              `json:"contract"`
-	ID               TokenIdentifiers      `json:"id"`
-	Balance          string                `json:"balance"`
-	Title            string                `json:"title"`
-	Description      string                `json:"description"`
-	TokenURI         TokenURI              `json:"tokenUri"`
-	Media            []Media               `json:"media"`
-	Metadata         persist.TokenMetadata `json:"metadata"`
-	ContractMetadata ContractMetadata      `json:"contractMetadata"`
-	TimeLastUpdated  time.Time             `json:"timeLastUpdated"`
-	SpamInfo         SpamInfo              `json:"spamInfo"`
+	Contract         Contract         `json:"contract"`
+	ID               TokenIdentifiers `json:"id"`
+	Balance          string           `json:"balance"`
+	Title            string           `json:"title"`
+	Description      string           `json:"description"`
+	TokenURI         TokenURI         `json:"tokenUri"`
+	Media            []Media          `json:"media"`
+	Metadata         any              `json:"metadata"`
+	ContractMetadata ContractMetadata `json:"contractMetadata"`
+	TimeLastUpdated  time.Time        `json:"timeLastUpdated"`
+	SpamInfo         SpamInfo         `json:"spamInfo"`
 }
 
 type OwnerWithBalances struct {
@@ -165,11 +164,10 @@ type Provider struct {
 	chain         persist.Chain
 	alchemyAPIURL string
 	httpClient    *http.Client
-	cache         *redis.Cache
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(chain persist.Chain, httpClient *http.Client, cache *redis.Cache) *Provider {
+func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
 	// currently using v2 endpoints, alchemy recently added v3
 	var apiURL string
 	switch chain {
@@ -191,7 +189,6 @@ func NewProvider(chain persist.Chain, httpClient *http.Client, cache *redis.Cach
 		alchemyAPIURL: apiURL,
 		chain:         chain,
 		httpClient:    httpClient,
-		cache:         cache,
 	}
 }
 
@@ -215,13 +212,12 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	}
 
 	cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
-
-	return cTokens, cContracts, d.cacheMetadatasForTokens(ctx, cTokens...)
+	return cTokens, cContracts, nil
 }
 
 // GetTokensIncrementallyByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
+	rec := make(chan multichain.ProviderPage)
 	errChan := make(chan error)
 
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
@@ -256,7 +252,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 					break outer
 				}
 				cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
-				rec <- multichain.ChainAgnosticTokensAndContracts{
+				rec <- multichain.ProviderPage{
 					Tokens:    cTokens,
 					Contracts: cContracts,
 				}
@@ -268,8 +264,8 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 // GetTokensIncrementallyByContractAddress retrieves tokens incrementaly for a contract address on the Ethereum Blockchain
-func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ProviderPage, <-chan error) {
+	rec := make(chan multichain.ProviderPage)
 	errChan := make(chan error)
 
 	url := fmt.Sprintf("%s/getNFTsForCollection?contractAddress=%s&withMetadata=true", d.alchemyAPIURL, addr)
@@ -311,7 +307,7 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 					errChan <- fmt.Errorf("no contract found for contract address %s", addr)
 					return
 				}
-				rec <- multichain.ChainAgnosticTokensAndContracts{
+				rec <- multichain.ProviderPage{
 					Tokens:    cTokens,
 					Contracts: cContracts,
 				}
@@ -494,12 +490,6 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, fmt.Errorf("not implemented")
 	}
 
-	// cached, err := d.fetchMetadataFromCache(ctx, ti)
-	// if cached != nil && err == nil {
-	// 	logger.For(ctx).Infof("got cached metadata for %s", ti)
-	// 	return cached, nil
-	// }
-
 	logger.For(ctx).Infof("no cached metadata for %s", ti)
 
 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, true, 0)
@@ -511,7 +501,6 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, nil
 	}
 
-	// return tokens[0].TokenMetadata, d.cacheMetadatasForTokens(ctx, tokens...)
 	return tokens[0].TokenMetadata, nil
 }
 
@@ -531,7 +520,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for contract address %s", contractAddress)
 	}
 
-	return cTokens, cContracts[0], d.cacheMetadatasForTokens(ctx, cTokens...)
+	return cTokens, cContracts[0], nil
 }
 
 func (d *Provider) alchemyContractTokensToChainAgnosticTokens(ctx context.Context, contractAddress persist.Address, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -731,25 +720,6 @@ func (d *Provider) getOwnersForToken(ctx context.Context, token Token) ([]persis
 	return owners.Owners, nil
 }
 
-func (d *Provider) cacheMetadatasForTokens(ctx context.Context, tokens ...multichain.ChainAgnosticToken) error {
-	for _, token := range tokens {
-		if token.TokenMetadata != nil && len(token.TokenMetadata) > 0 {
-			if token.TokenMetadata["name"] == "" && token.TokenMetadata["description"] == "" && token.TokenMetadata["external_url"] == "" && token.TokenMetadata["image_url"] == "" && token.TokenMetadata["animation_url"] == "" {
-				continue
-			}
-			mar, err := json.Marshal(token.TokenMetadata)
-			if err != nil {
-				return err
-			}
-			err = d.cache.Set(ctx, fmt.Sprintf("%s-%d", multichain.ChainAgnosticIdentifiers{ContractAddress: token.ContractAddress, TokenID: token.TokenID}, d.chain), mar, time.Minute*10)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract) {
 
 	var tokenType persist.TokenType
@@ -765,7 +735,16 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		bal = big.NewInt(1)
 	}
 
-	externalURL, _ := token.Metadata["external_url"].(string)
+	var metadata persist.TokenMetadata
+
+	switch typ := token.Metadata.(type) {
+	case map[string]any:
+		metadata = persist.TokenMetadata(typ)
+	default:
+		metadata = persist.TokenMetadata{}
+	}
+
+	externalURL, _ := metadata["external_url"].(string)
 
 	t := multichain.ChainAgnosticToken{
 		TokenType: tokenType,
@@ -774,7 +753,7 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 			Description: token.Description,
 		},
 		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
-		TokenMetadata:   token.Metadata,
+		TokenMetadata:   metadata,
 		TokenID:         token.ID.TokenID.ToTokenID(),
 		Quantity:        persist.HexString(bal.Text(16)),
 		OwnerAddress:    persist.Address(owner),

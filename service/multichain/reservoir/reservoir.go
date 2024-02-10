@@ -183,8 +183,8 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 	return assetsToTokens(ctx, p.chain, p.cFetcher, ownerAddress, outCh)
 }
 
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
+	recCh := make(chan multichain.ProviderPage)
 	errCh := make(chan error)
 	outCh := make(chan pageResult)
 	go func() {
@@ -219,8 +219,8 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 // GetTokensIncrementallyByContractAddress returns tokens for a contract address
-func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ProviderPage, <-chan error) {
+	recCh := make(chan multichain.ProviderPage)
 	errCh := make(chan error)
 	outCh := make(chan pageResult)
 	go func() {
@@ -517,7 +517,7 @@ func assetsToTokens(ctx context.Context, chain persist.Chain, cFetcher multichai
 	return resultTokens, resultContracts, nil
 }
 
-func streamAssetsToTokens(ctx context.Context, chain persist.Chain, cFetcher multichain.ContractFetcher, ownerAddress persist.Address, outCh <-chan pageResult, recCh chan<- multichain.ChainAgnosticTokensAndContracts, errCh chan<- error) {
+func streamAssetsToTokens(ctx context.Context, chain persist.Chain, cFetcher multichain.ContractFetcher, ownerAddress persist.Address, outCh <-chan pageResult, recCh chan<- multichain.ProviderPage, errCh chan<- error) {
 	seenCollections := make(map[string]multichain.ChainAgnosticContract)
 
 	for page := range outCh {
@@ -546,7 +546,7 @@ func streamAssetsToTokens(ctx context.Context, chain persist.Chain, cFetcher mul
 			resultContracts = append(resultContracts, seenCollections[collectionID])
 		}
 
-		recCh <- multichain.ChainAgnosticTokensAndContracts{
+		recCh <- multichain.ProviderPage{
 			Tokens:    resultTokens,
 			Contracts: resultContracts,
 		}

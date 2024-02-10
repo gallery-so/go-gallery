@@ -78,7 +78,7 @@ type ChainAgnosticContract struct {
 	LatestBlock persist.BlockNumber              `json:"latest_block"`
 }
 
-type ChainAgnosticTokensAndContracts struct {
+type ProviderPage struct {
 	Tokens    []ChainAgnosticToken    `json:"tokens"`
 	Contracts []ChainAgnosticContract `json:"contracts"`
 }
@@ -161,27 +161,21 @@ type Verifier interface {
 	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
 }
 
-// TokensOwnerFetcher supports fetching tokens for syncing
-type TokensOwnerFetcher interface {
-	GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+type TokenIdentifierOwnerFetcher interface {
 	GetTokenByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
 // TokensIncrementalOwnerFetcher supports fetching tokens for syncing incrementally
 type TokensIncrementalOwnerFetcher interface {
 	// NOTE: implementation MUST close the rec channel
-	GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (rec <-chan ChainAgnosticTokensAndContracts, errChain <-chan error)
+	GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan ProviderPage, <-chan error)
 }
 
 // TokensIncrementalContractFetcher supports fetching tokens by contract for syncing incrementally
 type TokensIncrementalContractFetcher interface {
 	// NOTE: implementations MUST close the rec channel
 	// maxLimit is not for pagination, it is to make sure we don't fetch a bajilion tokens from an omnibus contract
-	GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (rec <-chan ChainAgnosticTokensAndContracts, errChain <-chan error)
-}
-
-type TokensContractFetcher interface {
-	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan ProviderPage, <-chan error)
 }
 
 type ContractFetcher interface {
@@ -406,7 +400,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 		chain := c
 		tids := t
 
-		fetcher, ok := p.Chains[chain].(TokensOwnerFetcher)
+		fetcher, ok := p.Chains[chain].(TokenIdentifierOwnerFetcher)
 		if !ok {
 			continue
 		}
@@ -803,67 +797,73 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	f, ok := p.Chains[contractAddress.Chain()].(TokensOwnerFetcher)
+	f, ok := p.Chains[contractAddress.Chain()].(TokensIncrementalOwnerFetcher)
 	if !ok {
 		return nil, fmt.Errorf("no tokens owner fetcher for chain: %d", contractAddress.Chain())
 	}
 
-	recCh := make(chan chainTokensAndContracts)
-	errCh := make(chan error)
+	var targetContract chainContracts
+	var targetTokens []ChainAgnosticToken
+	recCh, errCh := f.GetTokensIncrementallyByWalletAddress(ctx, wallet.Address())
+
+outer:
+	for {
+		select {
+		case page, ok := <-recCh:
+			if !ok {
+				break outer
+			}
+			// Only process the contract and tokens of that contract instead of all tokens held in the wallet
+			for _, c := range page.Contracts {
+				if c.Address == contractAddress.Address() {
+					targetContract = chainContracts{chain: contractAddress.Chain(), contracts: []ChainAgnosticContract{c}}
+					break
+				}
+			}
+			for _, t := range page.Tokens {
+				if t.ContractAddress == contractAddress.Address() {
+					targetTokens = append(targetTokens, t)
+				}
+			}
+		case err, ok := <-errCh:
+			if ok {
+				return nil, err
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	if len(targetContract.contracts) == 0 {
+		return nil, fmt.Errorf("unable to fetch %s", contractAddress.String())
+	}
+
+	if len(targetTokens) == 0 {
+		return nil, fmt.Errorf("unable to find tokens owned by wallet=%s for contract=%s", wallet.Address().String(), contractAddress.String())
+	}
+
+	outCh := make(chan chainTokensAndContracts)
+	outErr := make(chan error)
 
 	go func() {
-		defer close(recCh)
-		defer close(errCh)
-		tokens, contracts, err := f.GetTokensByWalletAddress(ctx, wallet.Address())
-		if err != nil {
-			errCh <- err
-			return
-		}
-
-		var targetContract chainContracts
-		var targetTokens []ChainAgnosticToken
-
-		// Only process the contract and tokens of that contract instead of all tokens held in the wallet
-
-		for _, c := range contracts {
-			if c.Address == contractAddress.Address() {
-				targetContract = chainContracts{chain: contractAddress.Chain(), contracts: []ChainAgnosticContract{c}}
-				break
-			}
-		}
-
-		if len(targetContract.contracts) == 0 {
-			errCh <- fmt.Errorf("unable to fetch %s", contractAddress.String())
-			return
-		}
-
-		for _, t := range tokens {
-			if t.ContractAddress == contractAddress.Address() {
-				targetTokens = append(targetTokens, t)
-			}
-		}
-
-		if len(targetTokens) == 0 {
-			errCh <- fmt.Errorf("unable to find tokens owned by wallet=%s for contract=%s", wallet.Address().String(), contractAddress.String())
-			return
-		}
-
-		recCh <- chainTokensAndContracts{
+		defer close(outCh)
+		defer close(outErr)
+		outCh <- chainTokensAndContracts{
 			tokens:    chainTokens{chain: targetContract.chain, tokens: targetTokens},
 			contracts: targetContract,
 		}
 	}()
 
-	currentTokens, _, _, err := p.addHolderTokensForUser(ctx, user, []persist.Chain{contractAddress.Chain()}, recCh, errCh)
+	currentTokens, _, _, err := p.addHolderTokensForUser(ctx, user, []persist.Chain{contractAddress.Chain()}, outCh, outErr)
 	if err != nil {
 		return nil, err
 	}
 
-	targetTokens := util.Filter(currentTokens, func(t op.TokenFullDetails) bool {
+	tokens := util.Filter(currentTokens, func(t op.TokenFullDetails) bool {
 		return persist.NewChainAddress(t.Contract.Address, t.Contract.Chain) == contractAddress
 	}, false)
 
-	return targetTokens, nil
+	return tokens, nil
 }
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier

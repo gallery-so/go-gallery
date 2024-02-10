@@ -320,6 +320,7 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain, incr
 
 	err = api.multichainProvider.SyncTokensByUserID(ctx, userID, chains)
 	if err != nil {
+		panic(err)
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 

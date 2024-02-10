@@ -9,13 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+	// "time"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -126,15 +125,14 @@ func FetchAssetsForTokenIdentifiers(ctx context.Context, chain persist.Chain, co
 }
 
 type Provider struct {
-	Chain             persist.Chain
-	httpClient        *http.Client
-	reservoirProvider *reservoir.Provider
+	Chain      persist.Chain
+	httpClient *http.Client
 }
 
 // NewProvider creates a new provider for OpenSea
-func NewProvider(httpClient *http.Client, chain persist.Chain, reservoirProvider *reservoir.Provider) *Provider {
+func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
 	mustChainIdentifierFrom(chain)
-	return &Provider{httpClient: httpClient, Chain: chain, reservoirProvider: reservoirProvider}
+	return &Provider{httpClient: httpClient, Chain: chain}
 }
 
 func (p *Provider) ProviderInfo() multichain.ProviderInfo {
@@ -156,8 +154,8 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 }
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for an address
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
+	recCh := make(chan multichain.ProviderPage, poolSize)
 	errCh := make(chan error)
 	outCh := make(chan assetsReceived, 32)
 	go func() {
@@ -173,8 +171,8 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 }
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for a contract address
-func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ProviderPage, <-chan error) {
+	recCh := make(chan multichain.ProviderPage, poolSize)
 	errCh := make(chan error)
 	assetsCh := make(chan assetsReceived)
 	go func() {
@@ -290,7 +288,7 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 }
 
 func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, opt *fetchOptions) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
+	recCh := make(chan multichain.ProviderPage, poolSize)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
@@ -314,7 +312,7 @@ func (p *Provider) streamAssetsToTokens(
 	ctx context.Context,
 	ownerAddress persist.Address,
 	outCh <-chan assetsReceived,
-	recCh chan<- multichain.ChainAgnosticTokensAndContracts,
+	recCh chan<- multichain.ProviderPage,
 	errCh chan<- error,
 	opt *fetchOptions,
 ) {
@@ -336,70 +334,37 @@ func (p *Provider) streamAssetsToTokens(
 		}
 
 		wp.Go(func(ctx context.Context) error {
-			fallbacks := make([]persist.FallbackMedia, len(page.Assets))
-			pagePool := newPool(ctx, 2)
+			// fetch contracts
+			addresses := util.MapWithoutError(page.Assets, func(a Asset) persist.Address { return persist.Address(a.Contract) })
+			addresses = util.Dedupe(addresses, true)
 
-			// fetch fallbacks
-			if opt == nil || !opt.ExcludeFallbackMedia {
-				pagePool.Go(func(ctx context.Context) error {
-					ctx, cancel := context.WithTimeout(ctx, time.Duration(10)*time.Second)
-					defer cancel()
+			s := len(addresses)
+			if s > 24 {
+				s = 24
+			}
 
-					altFallbacks, err := p.fallbackMediaFromAssets(ctx, page.Assets)
-					if err != nil {
-						logger.For(ctx).Errorf("failed to get fallbacks for page: %s", err)
-						if !errors.Is(err, context.DeadlineExceeded) {
-							sentryutil.ReportError(ctx, err)
-						}
-					}
+			contractPool := newPool(ctx, s)
 
-					if err == nil {
-						fallbacks = altFallbacks
-					}
-
-					if errors.Is(err, context.DeadlineExceeded) {
-						return nil
-					}
-
-					return err
+			for _, a := range addresses {
+				a := a
+				contractPool.Go(func(ctx context.Context) error {
+					return p.getChainAgnosticContract(ctx, a, contracts, contractsL, &mu)
 				})
 			}
 
-			// fetch contracts
-			pagePool.Go(func(ctx context.Context) error {
-				addresses := util.MapWithoutError(page.Assets, func(a Asset) persist.Address { return persist.Address(a.Contract) })
-				addresses = util.Dedupe(addresses, true)
-
-				s := len(addresses)
-				if s > 24 {
-					s = 24
-				}
-
-				contractPool := newPool(ctx, s)
-
-				for _, a := range addresses {
-					a := a
-					contractPool.Go(func(ctx context.Context) error {
-						return p.getChainAgnosticContract(ctx, a, contracts, contractsL, &mu)
-					})
-				}
-
-				return contractPool.Wait()
-			})
-
-			if err := pagePool.Wait(); err != nil {
+			if err := contractPool.Wait(); err != nil {
 				return err
 			}
 
-			var out multichain.ChainAgnosticTokensAndContracts
+			var out multichain.ProviderPage
 
-			for i, a := range page.Assets {
+			for _, a := range page.Assets {
 				contract, ok := contracts.Load(persist.Address(a.Contract))
 				if !ok {
 					panic("contract should have been loaded")
 				}
 
-				tokens, err := p.assetToChainAgnosticTokens(ctx, ownerAddress, a, fallbacks[i])
+				tokens, err := p.assetToChainAgnosticTokens(ctx, ownerAddress, a)
 				if err != nil {
 					return err
 				}
@@ -421,16 +386,6 @@ func (p *Provider) streamAssetsToTokens(
 type contractCollection struct {
 	Contract   Contract
 	Collection Collection
-}
-
-func (p *Provider) fallbackMediaFromAssets(ctx context.Context, assets []Asset) ([]persist.FallbackMedia, error) {
-	tIDs := util.MapWithoutError(assets, func(a Asset) persist.TokenIdentifiers {
-		return persist.TokenIdentifiers{TokenID: persist.MustTokenID(a.Identifier),
-			ContractAddress: persist.Address(a.Contract),
-			Chain:           p.Chain,
-		}
-	})
-	return p.reservoirProvider.GetFallbackMediaBatch(ctx, tIDs)
 }
 
 func (p *Provider) getChainAgnosticContract(ctx context.Context, address persist.Address, seenContracts *sync.Map, contractLocks map[persist.Address]*sync.Mutex, mu *sync.RWMutex) error {
@@ -471,14 +426,14 @@ func (p *Provider) getChainAgnosticContract(ctx context.Context, address persist
 	return nil
 }
 
-func (p *Provider) assetToChainAgnosticTokens(ctx context.Context, ownerAddress persist.Address, asset Asset, placeholderMedia persist.FallbackMedia) ([]multichain.ChainAgnosticToken, error) {
+func (p *Provider) assetToChainAgnosticTokens(ctx context.Context, ownerAddress persist.Address, asset Asset) ([]multichain.ChainAgnosticToken, error) {
 	typ, err := tokenTypeFromAsset(asset)
 	if err != nil {
 		return nil, err
 	}
 
 	if ownerAddress != "" {
-		token := assetToAgnosticToken(asset, typ, ownerAddress, 1, placeholderMedia)
+		token := assetToAgnosticToken(asset, typ, ownerAddress, 1)
 		return []multichain.ChainAgnosticToken{token}, nil
 	}
 
@@ -487,19 +442,19 @@ func (p *Provider) assetToChainAgnosticTokens(ctx context.Context, ownerAddress 
 	// but we'll to add it to the token if its already available.
 
 	if typ == persist.TokenTypeERC721 && len(asset.Owners) == 1 {
-		token := assetToAgnosticToken(asset, typ, persist.Address(asset.Owners[0].Address), 1, placeholderMedia)
+		token := assetToAgnosticToken(asset, typ, persist.Address(asset.Owners[0].Address), 1)
 		return []multichain.ChainAgnosticToken{token}, nil
 	}
 
 	if typ == persist.TokenTypeERC1155 && len(asset.Owners) > 0 {
 		tokens := make([]multichain.ChainAgnosticToken, len(asset.Owners))
 		for i, o := range asset.Owners {
-			tokens[i] = assetToAgnosticToken(asset, typ, persist.Address(o.Address), o.Quantity, placeholderMedia)
+			tokens[i] = assetToAgnosticToken(asset, typ, persist.Address(o.Address), o.Quantity)
 		}
 		return tokens, nil
 	}
 
-	token := assetToAgnosticToken(asset, typ, "", 1, placeholderMedia)
+	token := assetToAgnosticToken(asset, typ, "", 1)
 	return []multichain.ChainAgnosticToken{token}, nil
 }
 
@@ -645,7 +600,7 @@ func contractToChainAgnosticContract(contract Contract, collection Collection) m
 	}
 }
 
-func assetToAgnosticToken(asset Asset, tokenType persist.TokenType, tokenOwner persist.Address, quantity int, placeholderMedia persist.FallbackMedia) multichain.ChainAgnosticToken {
+func assetToAgnosticToken(asset Asset, tokenType persist.TokenType, tokenOwner persist.Address, quantity int) multichain.ChainAgnosticToken {
 	return multichain.ChainAgnosticToken{
 		TokenType:       tokenType,
 		Descriptors:     multichain.ChainAgnosticTokenDescriptors{Name: asset.Name, Description: asset.Description},
@@ -655,7 +610,6 @@ func assetToAgnosticToken(asset Asset, tokenType persist.TokenType, tokenOwner p
 		ContractAddress: persist.Address(asset.Contract),
 		TokenMetadata:   metadataFromAsset(asset),
 		Quantity:        persist.HexString(fmt.Sprintf("%x", quantity)),
-		FallbackMedia:   placeholderMedia,
 	}
 }
 

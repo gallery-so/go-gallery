@@ -207,16 +207,16 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 	return returnTokens, returnContracts
 }
 
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
-	errChan := make(chan error)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
+	recCh := make(chan multichain.ProviderPage)
+	errCh := make(chan error)
 	go func() {
-		defer close(rec)
+		defer close(recCh)
 
 		ctx = logger.NewContextWithFields(ctx, logrus.Fields{"ownerAddress": ownerAddress})
 		tzOwnerAddress, err := tezos.ToAddress(ownerAddress)
 		if err != nil {
-			errChan <- err
+			errCh <- err
 			return
 		}
 
@@ -232,7 +232,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 				"limit":        graphql.Int(pageSize),
 				"offset":       graphql.Int(offset),
 			}); err != nil {
-				errChan <- err
+				errCh <- err
 				return
 			}
 
@@ -243,7 +243,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 
 			returnTokens, returnContracts := objktTokensToChainAgnostic(query.Holder[0].Held_Tokens, tzOwnerAddress)
 
-			rec <- multichain.ChainAgnosticTokensAndContracts{
+			recCh <- multichain.ProviderPage{
 				Tokens:    returnTokens,
 				Contracts: returnContracts,
 			}
@@ -251,7 +251,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 			offset += len(query.Holder[0].Held_Tokens)
 		}
 	}()
-	return rec, errChan
+	return recCh, errCh
 }
 
 func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
