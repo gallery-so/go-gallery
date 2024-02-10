@@ -54,7 +54,7 @@ var feedOpts = struct {
 	GalleryDecayPeriod:  time.Duration(4 * 24 * time.Hour).Minutes(),
 	FetchSize:           128,
 	StreakThreshold:     1,
-	StreakFactor:        0.75,
+	StreakFactor:        1.0,
 }
 
 type FeedAPI struct {
