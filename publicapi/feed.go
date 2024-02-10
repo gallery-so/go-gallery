@@ -21,6 +21,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -48,12 +49,12 @@ var feedOpts = struct {
 	FirstPostFactor:     2.0,
 	LookbackWindow:      time.Duration(4 * 24 * time.Hour).Minutes(),
 	FreshnessWindow:     time.Duration(3 * time.Hour).Minutes(),
-	PostHalfLife:        time.Duration(8 * time.Hour).Minutes(),
-	GalleryPostHalfLife: time.Duration(12 * time.Hour).Minutes(),
-	GalleryDecayPeriod:  time.Duration(6 * 24 * time.Hour).Minutes(),
+	PostHalfLife:        time.Duration(6 * time.Hour).Minutes(),
+	GalleryPostHalfLife: time.Duration(10 * time.Hour).Minutes(),
+	GalleryDecayPeriod:  time.Duration(4 * 24 * time.Hour).Minutes(),
 	FetchSize:           128,
 	StreakThreshold:     1,
-	StreakFactor:        0.75,
+	StreakFactor:        0.5,
 }
 
 type FeedAPI struct {
@@ -852,6 +853,8 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 			}
 			return float64(engagementRank[e.ID]+personalizationRank[e.ID]) / 2.0
 		})
+
+		recommend.Shuffle(interleaved, 4)
 
 		posts := make([]db.Post, len(interleaved))
 		postIDs := make([]persist.DBID, len(interleaved))
