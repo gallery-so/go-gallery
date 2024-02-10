@@ -53,8 +53,8 @@ var feedOpts = struct {
 	GalleryPostHalfLife: time.Duration(10 * time.Hour).Minutes(),
 	GalleryDecayPeriod:  time.Duration(4 * 24 * time.Hour).Minutes(),
 	FetchSize:           128,
-	StreakThreshold:     1,
-	StreakFactor:        1.0,
+	StreakThreshold:     2,
+	StreakFactor:        1.8,
 }
 
 type FeedAPI struct {
@@ -1082,7 +1082,7 @@ func scorePost(age float64, isGallery, isFirstPost, isFresh bool, streak int) (s
 	if isFirstPost && isFresh {
 		s *= feedOpts.FirstPostFactor
 	}
-	if !isFirstPost && isFresh {
+	if !isFirstPost && streak < feedOpts.StreakThreshold && isFresh {
 		s *= feedOpts.FreshnessFactor
 	}
 	return s
