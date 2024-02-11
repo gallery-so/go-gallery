@@ -11,6 +11,8 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+const sendSize = 350
+
 type idAddressTuple struct {
 	ID      persist.DBID
 	Address persist.ChainAddress
@@ -64,7 +66,7 @@ func processAllUsers(pg *pgxpool.Pool, tc *task.Client) gin.HandlerFunc {
 				send[userID] = it
 			}
 
-			if len(send) >= 200 {
+			if len(send) >= sendSize {
 				err = tc.CreateTaskForAutosocialProcessUsers(c, task.AutosocialProcessUsersMessage{
 					Users: send,
 				})
