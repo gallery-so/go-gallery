@@ -1790,13 +1790,6 @@ update tokens
       and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract_id)
       and not deleted;
 
--- name: InsertExternalSocialConnectionsForUser :many
-insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
-select id, @social_account_type::varchar, @follower_id::varchar, followee_id
-from 
-(select unnest(@ids::varchar[]) as id, unnest(@followee_ids::varchar[]) as followee_id) as bulk_upsert 
-returning *;
-
 -- name: GetUsersBySocialIDs :many
 select * from pii.user_view u where u.pii_socials->sqlc.arg('social_account_type')::varchar->>'id' = any(@social_ids::varchar[]) and not u.deleted and not u.universal;
 
