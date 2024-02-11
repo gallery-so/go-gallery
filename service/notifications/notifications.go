@@ -26,6 +26,7 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 type lockKey struct {
@@ -820,6 +821,8 @@ func (u UserFacingNotificationData) String() string {
 	return html.UnescapeString(cur)
 }
 
+var errNameNotAvailable = errors.New("name not available")
+
 func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (UserFacingNotificationData, error) {
 
 	switch n.Action {
@@ -1029,10 +1032,39 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			return UserFacingNotificationData{}, err
 		}
 
+		nameFound := td.Name.String != ""
+
+		if !nameFound {
+			// name does not exist yet, the token might still be refreshing so let's try and wait a little bit and retry a few times
+			<-time.After(5 * time.Second)
+			retry.RetryFunc(ctx, func(ctx context.Context) error {
+				td, err = queries.GetTokenDefinitionByTokenDbid(ctx, n.Data.NewTokenID)
+				if err != nil {
+					return err
+				}
+				if td.Name.String == "" {
+					return errNameNotAvailable
+				}
+				nameFound = true
+				return nil
+			}, func(err error) bool {
+				return err == errNameNotAvailable
+			}, retry.Retry{Base: 5, Cap: 30, Tries: 3})
+		}
+
 		name := util.TruncateWithEllipsis(td.Name.String, 40)
 
 		amount := n.Data.NewTokenQuantity
 		i := amount.BigInt().Uint64()
+
+		if !nameFound {
+			// name is still empty, use generic
+			name = "token"
+			if i > 1 {
+				name += "s"
+			}
+		}
+
 		if i > 1 {
 			data.Actor = "You"
 			data.Action = fmt.Sprintf("just collected %d new %s. Tap to share now.", i, name)
