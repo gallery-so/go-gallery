@@ -146,7 +146,7 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 }
 
 func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
-	u := fmt.Sprintf("%s/user/bulk-by-address/?api_key=%s&addresses=%s", neynarV2BaseURL, n.apiKey, strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ","))
+	u := fmt.Sprintf("%s/user/bulk-by-address?api_key=%s&addresses=%s", neynarV2BaseURL, n.apiKey, strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ","))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
