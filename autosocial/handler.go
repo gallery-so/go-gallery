@@ -216,7 +216,7 @@ func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, ad
 		}
 
 		logrus.Infof("got farcaster user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
-		return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
+		err := q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
 			UserID: guser,
 			Socials: persist.Socials{
 				persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
@@ -232,6 +232,9 @@ func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, ad
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
