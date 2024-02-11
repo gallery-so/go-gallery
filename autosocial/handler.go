@@ -52,7 +52,7 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 						cur = 0
 					}
 					userLookup[a.Address()] = userID
-					userAddresses = append(userAddresses, a)
+					chunkedAddresses = append(chunkedAddresses, a.Address())
 					cur++
 				}
 			}
