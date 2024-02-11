@@ -279,6 +279,9 @@ func (m *connectionManager) start() {
 }
 
 func (m *connectionManager) managerLoop() {
+	// Disconnect a random connection every hour to keep the connection pool fresh
+	randomDisconnectionTicker := time.NewTicker(1 * time.Hour)
+
 	for {
 		select {
 		case stateChange := <-m.incoming:
@@ -292,8 +295,21 @@ func (m *connectionManager) managerLoop() {
 			}
 		case timeout := <-m.timeouts:
 			m.onTimeout(timeout.ConnectionID, timeout.ReferenceID)
+		case <-randomDisconnectionTicker.C:
+			m.disconnectRandomConnection()
 		}
 	}
+}
+
+func (m *connectionManager) disconnectRandomConnection() {
+	connectionIDs := make([]int, 0, len(m.remoteStates[Connected]))
+	for id := range m.remoteStates[Connected] {
+		connectionIDs = append(connectionIDs, id)
+	}
+
+	randomID := connectionIDs[rand.Intn(len(connectionIDs))]
+	logger.For(m.ctx).Infof("disconnecting random connection (id=%d)", randomID)
+	m.requestStateChange(randomID, Connecting)
 }
 
 func (m *connectionManager) onConnecting(connectionID int) {
@@ -420,6 +436,7 @@ type connection struct {
 	taskClient          *task.Client
 	madeFirstConnection bool
 	connectionID        int
+	lastEventReceived   atomic.Pointer[time.Time]
 }
 
 func newConnection(toManager chan StateChange, fromManager chan StateChange, taskClient *task.Client, connectionID int) *connection {
@@ -489,14 +506,17 @@ func (c *connection) subscribe() error {
 
 func (c *connection) connectionLoop() {
 	// Per OpenSea docs, we need to send a heartbeat every 30 seconds
-	ticker := time.NewTicker(30 * time.Second)
+	heartbeat := time.NewTicker(30 * time.Second)
+	lastEventCheck := time.NewTicker(10 * time.Second)
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-heartbeat.C:
 			if c.state != Connecting {
 				sendHeartbeat(c.ctx, c.conn)
 			}
+		case <-lastEventCheck.C:
+			c.checkLastEventTime()
 		case stateChange := <-c.fromManager:
 			switch stateChange.State {
 			case Connecting:
@@ -536,7 +556,10 @@ func (c *connection) startNewListener() {
 	logger.For(c.ctx).Info("connected to OpenSea")
 	c.setState(Connected)
 
-	go listenerLoop(c.ctx, c.connectionID, c.conn, c.taskClient, c.fromListener)
+	// Update the lastEventReceived time so it's not uninitialized or stale from a previous listener
+	c.lastEventReceived.Store(util.ToPointer(time.Now()))
+
+	go listenerLoop(c.ctx, c.connectionID, c.conn, c.taskClient, c.fromListener, &c.lastEventReceived)
 }
 
 func (c *connection) setState(state ConnectionState) {
@@ -576,7 +599,24 @@ func (c *connection) onListenerSubscribed() {
 	c.setState(Subscribed)
 }
 
-func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, taskClient *task.Client, toConnection chan StateChange) {
+func (c *connection) checkLastEventTime() {
+	lastEventTime := c.lastEventReceived.Load()
+	timeSince := time.Since(*lastEventTime)
+
+	if c.state == Subscribed && timeSince > (10*time.Second) {
+		// Subscribers should receive many events per second (though we filter out most of them). If we haven't seen
+		// any events at all in 10 seconds, something is probably wrong, and we should reconnect.
+		logger.For(c.ctx).Warnf("subscriber hasn't received any events in %v, reconnecting...", timeSince)
+		c.startNewListener()
+	} else if c.state == Connected && timeSince > (2*time.Minute) {
+		// Non-subscribed connections should at least receive a heartbeat response every 30 seconds. If we go 2 minutes
+		// without seeing any events, something is probably wrong, and we should reconnect.
+		logger.For(c.ctx).Warnf("connection hasn't received any events in %v, reconnecting...", timeSince)
+		c.startNewListener()
+	}
+}
+
+func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, taskClient *task.Client, toConnection chan StateChange, lastEventReceived *atomic.Pointer[time.Time]) {
 	defer conn.Close()
 	defer close(toConnection)
 
@@ -595,6 +635,9 @@ func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, t
 		if t != 1 {
 			logger.For(ctx).Warnf("received message with type %d and payload: %s", t, message)
 		}
+
+		// Keep track of when the last event was received
+		lastEventReceived.Store(util.ToPointer(time.Now()))
 
 		pe := phoenixEvent{}
 		err = json.Unmarshal(message, &pe)
