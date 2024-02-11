@@ -145,6 +145,42 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 	return neynarResp.Result.User, nil
 }
 
+func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
+	u := fmt.Sprintf("%s/user/bulk-by-address&addresses=%s", neynarV2BaseURL, strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ","))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", n.apiKey)
+
+	resp, err := n.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		bs, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("neynar returned status %d (%s)", resp.StatusCode, bs)
+	}
+
+	defer resp.Body.Close()
+
+	var neynarResp map[persist.Address][]NeynarUser
+	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
+		return nil, err
+	}
+	if neynarResp == nil || len(neynarResp) == 0 {
+		return nil, fmt.Errorf("no result for %s", addresses)
+	}
+
+	return neynarResp, nil
+}
+
 type NeynarFollowingByUserIDResponse struct {
 	Result *struct {
 		Users []NeynarUser `json:"users"`

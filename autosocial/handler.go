@@ -32,6 +32,37 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 		lp := pool.New().WithMaxGoroutines(3).WithErrors().WithContext(c)
 		fp := pool.New().WithMaxGoroutines(3).WithErrors().WithContext(c)
 
+		// chunk users in groups of 350 for farcaster
+		userLookup := make(map[persist.Address]persist.DBID, 350)
+		chunkedAddresses := make([]persist.Address, 0, 350)
+		cur := 0
+		for u, s := range in.Users {
+			userID := u
+			socials := s
+			if userAddresses, ok := socials[persist.SocialProviderFarcaster]; ok {
+				for _, a := range userAddresses {
+					if cur == 350 {
+						fp.Go(func(ctx context.Context) error {
+							return addFarcasterProfilesToUsers(c, n, chunkedAddresses, q, userLookup)
+						})
+						userLookup = make(map[persist.Address]persist.DBID, 350)
+						chunkedAddresses = make([]persist.Address, 0, 350)
+						cur = 0
+					}
+					userLookup[a.Address()] = userID
+					userAddresses = append(userAddresses, a)
+					cur++
+				}
+			}
+		}
+
+		if cur > 0 {
+			fp.Go(func(ctx context.Context) error {
+				return addFarcasterProfilesToUsers(c, n, chunkedAddresses, q, userLookup)
+			})
+		}
+
+		// process lens profiles one user at a time
 		for u, s := range in.Users {
 			userID := u
 			socials := s
@@ -39,12 +70,6 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 			if addresses, ok := socials[persist.SocialProviderLens]; ok {
 				lp.Go(func(ctx context.Context) error {
 					return addLensProfileToUser(ctx, l, addresses, q, userID)
-				})
-			}
-
-			if addresses, ok := socials[persist.SocialProviderFarcaster]; ok {
-				fp.Go(func(ctx context.Context) error {
-					return addFarcasterProfileToUser(ctx, n, addresses, q, userID)
 				})
 			}
 		}
@@ -161,23 +186,36 @@ func addLensProfileToUser(ctx context.Context, l *lens.LensAPI, address []persis
 	return nil
 }
 
-func addFarcasterProfileToUser(ctx context.Context, n *farcaster.NeynarAPI, address []persist.ChainAddress, q *coredb.Queries, userID persist.DBID) error {
-	for _, a := range address {
-		if a.Address() == "" {
+func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, addresses []persist.Address, q *coredb.Queries, userLookup map[persist.Address]persist.DBID) error {
+	users, err := n.UsersByAddresses(ctx, addresses)
+	if err != nil {
+		return err
+	}
+	for address, fusers := range users {
+		if len(fusers) == 0 {
 			continue
 		}
-		u, err := n.UserByAddress(ctx, a.Address())
-		if err != nil {
-			logrus.Error(err)
-			continue
+		// we only store one farcaster profile per user
+		u := fusers[0]
+	inner:
+		for _, fuser := range fusers {
+			if fuser.Fid.String() != "" {
+				u = fuser
+				break inner
+			}
 		}
-		if u.Fid.String() == "" {
-			continue
+
+		guser, ok := userLookup[address]
+		if !ok {
+			guser, ok = userLookup[persist.Address(strings.ToLower(address.String()))]
+			if !ok {
+				continue
+			}
 		}
 
 		logrus.Infof("got farcaster user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
 		return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
-			UserID: userID,
+			UserID: guser,
 			Socials: persist.Socials{
 				persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
 					Provider: persist.SocialProviderFarcaster,
