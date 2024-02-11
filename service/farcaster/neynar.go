@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -147,13 +149,16 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 }
 
 func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
-	u := fmt.Sprintf("%s/user/bulk-by-address?addresses=%s", neynarV2BaseURL, strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ","))
+	addressesJoined := strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ",")
+	urlEnconded := url.PathEscape(addressesJoined)
+	u := fmt.Sprintf("%s/user/bulk-by-address/?addresses=%s", neynarV2BaseURL, urlEnconded)
+	logger.For(ctx).Infof("neynar url: %s", u)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("accept", "application/json")
 	req.Header.Set("api_key", n.apiKey)
 
 	resp, err := n.httpClient.Do(req)
