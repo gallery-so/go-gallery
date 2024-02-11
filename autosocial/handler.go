@@ -42,8 +42,10 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 			if userAddresses, ok := socials[persist.SocialProviderFarcaster]; ok {
 				for _, a := range userAddresses {
 					if cur == 350 {
+						copylookup := userLookup
+						copychunked := chunkedAddresses
 						fp.Go(func(ctx context.Context) error {
-							return addFarcasterProfilesToUsers(c, n, chunkedAddresses, q, userLookup)
+							return addFarcasterProfilesToUsers(c, n, copychunked, q, copylookup)
 						})
 						userLookup = make(map[persist.Address]persist.DBID, 350)
 						chunkedAddresses = make([]persist.Address, 0, 350)

@@ -150,7 +150,7 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 
 func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
 	addressesJoined := strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ",")
-	urlEnconded := url.PathEscape(addressesJoined)
+	urlEnconded := url.QueryEscape(addressesJoined)
 	u := fmt.Sprintf("%s/user/bulk-by-address/?addresses=%s", neynarV2BaseURL, urlEnconded)
 	logger.For(ctx).Infof("neynar url: %s", u)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
