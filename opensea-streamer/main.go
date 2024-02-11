@@ -279,6 +279,9 @@ func (m *connectionManager) start() {
 }
 
 func (m *connectionManager) managerLoop() {
+	// Disconnect a random connection every hour to keep the connection pool fresh
+	randomDisconnectionTicker := time.NewTicker(1 * time.Hour)
+
 	for {
 		select {
 		case stateChange := <-m.incoming:
@@ -292,8 +295,21 @@ func (m *connectionManager) managerLoop() {
 			}
 		case timeout := <-m.timeouts:
 			m.onTimeout(timeout.ConnectionID, timeout.ReferenceID)
+		case <-randomDisconnectionTicker.C:
+			m.disconnectRandomConnection()
 		}
 	}
+}
+
+func (m *connectionManager) disconnectRandomConnection() {
+	connectionIDs := make([]int, 0, len(m.remoteStates[Connected]))
+	for id := range m.remoteStates[Connected] {
+		connectionIDs = append(connectionIDs, id)
+	}
+
+	randomID := connectionIDs[rand.Intn(len(connectionIDs))]
+	logger.For(m.ctx).Infof("disconnecting random connection (id=%d)", randomID)
+	m.requestStateChange(randomID, Connecting)
 }
 
 func (m *connectionManager) onConnecting(connectionID int) {
