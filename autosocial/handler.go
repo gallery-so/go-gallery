@@ -199,7 +199,7 @@ func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, ad
 		u := fusers[0]
 	inner:
 		for _, fuser := range fusers {
-			if fuser.Fid.String() != "" {
+			if fuser.Fid.String() != "" && fuser.ActiveStatus == "active" {
 				u = fuser
 				break inner
 			}

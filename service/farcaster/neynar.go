@@ -101,6 +101,7 @@ type NeynarUser struct {
 			Text string `json:"text"`
 		} `json:"bio"`
 	} `json:"profile"`
+	ActiveStatus string `json:"active_status"`
 }
 
 type NeynarUserByVerificationResponse struct {
@@ -146,14 +147,14 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 }
 
 func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
-	u := fmt.Sprintf("%s/user/bulk-by-address?api_key=%s&addresses=%s", neynarV2BaseURL, n.apiKey, strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ","))
+	u := fmt.Sprintf("%s/user/bulk-by-address?addresses=%s", neynarV2BaseURL, strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ","))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", n.apiKey)
+	req.Header.Set("api_key", n.apiKey)
 
 	resp, err := n.httpClient.Do(req)
 	if err != nil {
