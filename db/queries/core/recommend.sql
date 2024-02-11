@@ -72,29 +72,23 @@ where contract_id not in (
 ) and displayed;
 
 -- name: GetFeedEntityScores :many
-with refreshed as (
-  select greatest((select last_updated from feed_entity_scores limit 1), @window_end::timestamptz) last_updated
-), gallery_user as (
-  select id from users where username_idempotent = 'gallery' and not deleted and not universal
-)
+with refreshed      as ( select greatest((select last_updated from feed_entity_scores limit 1), @window_end) last_updated )
+     , gallery_user as ( select id from users where username_idempotent = 'gallery' and not deleted and not universal )
+     , t0           as ( select * from feed_entity_scores where feed_entity_scores.created_at > @window_end )
+     , t1           as ( select * from feed_entity_score_view where created_at > (select last_updated from refreshed limit 1) )
+     , t2           as ( select * from t0 union select * from t1 )
+     , t3           as ( select *, (case when lag(created_at) over (partition by actor_id order by created_at desc) is null then 0
+                                         when extract(epoch from created_at - lag(created_at) over (partition by actor_id order by created_at desc)) > -(@span::int) then 0
+                                         else 1 end)::int cume from t2 )
+     , t4           as ( select t3.id, (sum(cume) over (partition by actor_id order by created_at desc))::int group_number from t3 )
 select
-  sqlc.embed(feed_entity_scores),
-  sqlc.embed(posts),
-  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
-from feed_entity_scores
-join posts on feed_entity_scores.id = posts.id
-left join feed_blocklist on posts.actor_id = feed_blocklist.user_id and not feed_blocklist.deleted and feed_blocklist.active
-where feed_entity_scores.created_at > @window_end::timestamptz
-  and not posts.deleted
-  and (feed_blocklist.user_id is null or @viewer_id = feed_blocklist.user_id)
-union
-select
-  sqlc.embed(feed_entity_scores),
-  sqlc.embed(posts),
-  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
-from feed_entity_score_view feed_entity_scores
-join posts on feed_entity_scores.id = posts.id
-left join feed_blocklist on posts.actor_id = feed_blocklist.user_id and not feed_blocklist.deleted and feed_blocklist.active
-where feed_entity_scores.created_at > (select last_updated from refreshed limit 1)
-  and not posts.deleted
-  and (feed_blocklist.user_id is null or @viewer_id = feed_blocklist.user_id);
+  sqlc.embed(feed_entity_scores)
+  , sqlc.embed(p)
+  , row_number() over (partition by p.actor_id order by (t4.group_number, random() > 0.5)) streak
+  , coalesce(p.actor_id = (select id from gallery_user), false)::bool is_gallery_post
+from t2 feed_entity_scores
+join t4 using(id)
+join posts p on feed_entity_scores.id = p.id and not p.deleted
+left join feed_blocklist fb on p.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fb.user_id is null or @viewer_id = fb.user_id)
+order by (t4.group_number, random() > 0.5) desc;

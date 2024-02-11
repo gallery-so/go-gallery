@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -44,6 +43,7 @@ var feedOpts = struct {
 	FetchSize           int     // number of posts to include on the feed
 	StreakThreshold     int     // number of posts before a streak is counted
 	StreakFactor        float64 // factor that controls the impact of each extra post
+	PostSpan            float64 // the max time between posts allowed for a post to be part of the same group
 }{
 	FreshnessFactor:     1.5,
 	FirstPostFactor:     2.0,
@@ -55,6 +55,7 @@ var feedOpts = struct {
 	FetchSize:           128,
 	StreakThreshold:     2,
 	StreakFactor:        1.8,
+	PostSpan:            time.Duration(time.Minute).Seconds(),
 }
 
 type FeedAPI struct {
@@ -638,6 +639,7 @@ func fetchFeedEntityScores(ctx context.Context, q *db.Queries, viewerID persist.
 	return q.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
 		WindowEnd: time.Now().Add(-time.Minute * time.Duration(feedOpts.LookbackWindow)),
 		ViewerID:  viewerID,
+		Span:      int32(feedOpts.PostSpan),
 	})
 }
 
@@ -710,27 +712,22 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				return nil, nil, err
 			}
 
-			postLookup := make(map[persist.DBID]db.GetFeedEntityScoresRow, len(postScores))
-			for _, p := range postScores {
-				postLookup[p.Post.ID] = p
-			}
-
 			now := time.Now()
 
-			scores := util.MapWithoutError(postScores, func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
-			scored := api.scoreFeedEntities(ctx, feedOpts.FetchSize, scores, func(e db.FeedEntityScore) float64 {
-				return timeFactor(now.Sub(e.CreatedAt).Minutes(), postLookup[e.ID].IsGalleryPost) * engagementFactor(float64(e.Interactions))
+			scored := api.scoreFeedEntities(ctx, feedOpts.FetchSize, postScores, func(i int) float64 {
+				e := postScores[i]
+				return timeFactor(now.Sub(e.Post.CreatedAt).Minutes(), e.IsGalleryPost) * engagementFactor(float64(e.FeedEntityScore.Interactions))
 			})
 
 			postIDs := make([]persist.DBID, len(scored))
 			posts = make([]db.Post, len(scored))
 			postTypes := make([]persist.FeedEntityType, len(scored))
 
-			for i, post := range scored {
+			for i, e := range scored {
 				idx := len(scored) - i - 1
-				postIDs[idx] = post.ID
-				posts[idx] = postLookup[post.ID].Post
-				postTypes[idx] = persist.FeedEntityType(post.FeedEntityType)
+				postIDs[idx] = e.Post.ID
+				posts[idx] = e.Post
+				postTypes[idx] = persist.FeedEntityType(e.FeedEntityScore.FeedEntityType)
 			}
 
 			return postTypes, postIDs, nil
@@ -795,63 +792,55 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 		}
 
 		now := time.Now()
-		postLookup := make(map[persist.DBID]db.GetFeedEntityScoresRow, len(postScores))
-		rawScores := make([]db.FeedEntityScore, 0)
 		engagementScores := make(map[persist.DBID]float64)
 		personalizationScores := make(map[persist.DBID]float64)
-		postStreak := make(map[persist.DBID]int)
-
-		// sort in reverse chronological order
-		sort.SliceStable(postScores, func(i, j int) bool { return postScores[i].Post.CreatedAt.After(postScores[j].Post.CreatedAt) })
 
 		for _, e := range postScores {
-			rawScores = append(rawScores, e.FeedEntityScore)
-			postLookup[e.Post.ID] = e
-			postStreak[e.Post.ActorID] += 1
 			age := now.Sub(e.Post.CreatedAt).Minutes()
-			isFresh := isFreshPost(age)
-			engagementScores[e.Post.ID] = scorePost(age, e.IsGalleryPost, e.Post.IsFirstPost, isFresh, postStreak[e.Post.ActorID])
+			engagementScores[e.Post.ID] = scorePost(age, e.IsGalleryPost, e.Post.IsFirstPost, isFreshPost(age), int(e.Streak))
 			personalizationScores[e.Post.ID] = engagementScores[e.Post.ID]
 			engagementScores[e.Post.ID] *= engagementFactor(float64(e.FeedEntityScore.Interactions))
 			personalizationScores[e.Post.ID] *= userpref.For(ctx).RelevanceTo(viewerID, e.FeedEntityScore)
 		}
 
 		// Rank by engagement first, then by personalization
-		topNByPersonalization := api.scoreFeedEntities(ctx, feedOpts.FetchSize, rawScores, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
-		topNByPersonalization = api.scoreFeedEntities(ctx, feedOpts.FetchSize, topNByPersonalization, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		topNByPersonalization := api.scoreFeedEntities(ctx, feedOpts.FetchSize, postScores, func(i int) float64 { return engagementScores[postScores[i].Post.ID] })
+		topNByPersonalization = api.scoreFeedEntities(ctx, feedOpts.FetchSize, topNByPersonalization, func(i int) float64 { return personalizationScores[topNByPersonalization[i].Post.ID] })
 
 		// Rank by personalization, then by engagement
-		topNByEngagement := api.scoreFeedEntities(ctx, feedOpts.FetchSize, rawScores, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
-		topNByEngagement = api.scoreFeedEntities(ctx, feedOpts.FetchSize, topNByEngagement, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
+		topNByEngagement := api.scoreFeedEntities(ctx, feedOpts.FetchSize, postScores, func(i int) float64 { return personalizationScores[postScores[i].Post.ID] })
+		topNByEngagement = api.scoreFeedEntities(ctx, feedOpts.FetchSize, topNByEngagement, func(i int) float64 { return engagementScores[topNByEngagement[i].Post.ID] })
 
 		// Get ranking of both
-		seen := make(map[persist.DBID]bool)
-		combined := make([]db.FeedEntityScore, 0)
-		engagementRank := make(map[persist.DBID]int)
-		personalizationRank := make(map[persist.DBID]int)
+		seen := make(map[persist.DBID]int)
+		combined := make([]db.GetFeedEntityScoresRow, 0)
+		engagementRank := make([]float64, 0)
+		blendedRank := make([]float64, 0)
 
 		for i, e := range topNByEngagement {
-			engagementRank[e.ID] = len(topNByEngagement) - i
-			if !seen[e.ID] {
-				combined = append(combined, e)
-				seen[e.ID] = true
-			}
+			score := float64(len(topNByEngagement) - i)
+			combined = append(combined, e)
+			engagementRank = append(engagementRank, score)
+			blendedRank = append(blendedRank, score)
+			seen[e.Post.ID] = i
 		}
 
 		for i, e := range topNByPersonalization {
-			personalizationRank[e.ID] = len(topNByPersonalization) - i
-			if !seen[e.ID] {
+			score := float64(len(topNByPersonalization) - i)
+			if idx, ok := seen[e.Post.ID]; ok {
+				blendedRank[idx] = (blendedRank[idx] + score) * 0.5
+			} else {
 				combined = append(combined, e)
-				seen[e.ID] = true
+				blendedRank = append(blendedRank, score)
 			}
 		}
 
 		// Score based on the average of the two rankings
-		interleaved := api.scoreFeedEntities(ctx, feedOpts.FetchSize, combined, func(e db.FeedEntityScore) float64 {
-			if e.ActorID == viewerID {
-				return float64(engagementRank[e.ID])
+		interleaved := api.scoreFeedEntities(ctx, feedOpts.FetchSize, combined, func(i int) float64 {
+			if combined[i].Post.ActorID == viewerID {
+				return engagementRank[i]
 			}
-			return float64(engagementRank[e.ID]+personalizationRank[e.ID]) / 2.0
+			return blendedRank[i]
 		})
 
 		recommend.Shuffle(interleaved, 4)
@@ -863,10 +852,10 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 
 		for i, e := range interleaved {
 			idx := len(interleaved) - i - 1
-			postIDs[idx] = e.ID
-			posts[idx] = postLookup[e.ID].Post
-			postTypes[idx] = persist.FeedEntityType(e.FeedEntityType)
-			positions[e.ID] = int64(idx)
+			postIDs[idx] = e.Post.ID
+			posts[idx] = e.Post
+			postTypes[idx] = persist.FeedEntityType(e.FeedEntityScore.FeedEntityType)
+			positions[e.Post.ID] = int64(idx)
 		}
 
 		cursor := cursors.NewFeedPositionCursor()
@@ -1023,25 +1012,15 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) []db.FeedEntityScore {
+func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.GetFeedEntityScoresRow, scoreF func(i int) float64) []db.GetFeedEntityScoresRow {
 	h := make(heap[entityScore], 0)
-
-	var wg sync.WaitGroup
 
 	scores := make([]entityScore, len(trendData))
 
 	for i, event := range trendData {
-		i := i
-		event := event
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			score := scoreF(event)
-			scores[i] = entityScore{v: event, s: score}
-		}()
+		score := scoreF(i)
+		scores[i] = entityScore{v: event, s: score}
 	}
-
-	wg.Wait()
 
 	for _, node := range scores {
 		// Add first n items in the heap
@@ -1056,7 +1035,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 		}
 	}
 
-	scoredEntities := make([]db.FeedEntityScore, h.Len())
+	scoredEntities := make([]db.GetFeedEntityScoresRow, h.Len())
 
 	// Pop returns the smallest score first, so we reverse the order
 	// such that the highest score is first
@@ -1108,7 +1087,7 @@ func engagementFactor(interactions float64) float64 {
 }
 
 type entityScore struct {
-	v db.FeedEntityScore
+	v db.GetFeedEntityScoresRow
 	s float64
 }
 
