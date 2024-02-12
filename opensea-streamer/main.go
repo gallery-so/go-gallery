@@ -354,7 +354,7 @@ func (m *connectionManager) onTimeout(connectionID int, refID uuid.UUID) {
 	// If the subscription is still pending when the timeout message is received,
 	// subscribing took too long and we should force a reconnection
 	if pendingRefID, ok := m.pendingRemoteStates[Subscribed][connectionID]; ok && pendingRefID == refID {
-		m.requestStateChange(connectionID, Subscribed)
+		m.requestStateChange(connectionID, Connecting)
 	}
 }
 
@@ -388,10 +388,6 @@ func (m *connectionManager) requestStateChange(connectionID int, state Connectio
 	m.pendingRemoteStates[state][connectionID] = randomID
 
 	return randomID
-}
-
-func (m *connectionManager) setPendingRemoteState(connectionID int, state ConnectionState, refID uuid.UUID) {
-	m.pendingRemoteStates[state][connectionID] = refID
 }
 
 func (m *connectionManager) updateSubscribers() {
@@ -473,13 +469,18 @@ func openWebsocket(ctx context.Context, reconnecting bool) *websocket.Conn {
 			time.Sleep(time.Duration(random.Intn(60)) * time.Second)
 		}
 
-		var dialer *websocket.Dialer
+		dialer := websocket.DefaultDialer
 
-		conn, _, err := dialer.Dial("wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
+		// Set a timeout to ensure that connection attempts never hang indefinitely
+		dialCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+
+		conn, _, err := dialer.DialContext(dialCtx, "wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
 		if err == nil {
+			cancel()
 			return conn
 		}
 
+		cancel()
 		logger.For(ctx).Errorf("error connecting to OpenSea: %s", err)
 		reconnecting = true
 	}
