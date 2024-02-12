@@ -448,6 +448,8 @@ func newConnection(toManager chan StateChange, fromManager chan StateChange, tas
 		connectionID: connectionID,
 	}
 
+	c.lastEventReceived.Store(util.ToPointer(time.Now()))
+
 	c.ctx = logger.NewContextWithFields(c.ctx, logrus.Fields{
 		"connectionID": connectionID,
 	})
