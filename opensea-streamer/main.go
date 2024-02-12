@@ -379,6 +379,8 @@ func (m *connectionManager) setRemoteState(connectionID int, state ConnectionSta
 }
 
 func (m *connectionManager) requestStateChange(connectionID int, state ConnectionState) uuid.UUID {
+	logger.For(m.ctx).Infof("requesting state change for connection %d to %s", connectionID, state)
+
 	m.connections[connectionID] <- StateChange{
 		ConnectionID: connectionID,
 		State:        state,
@@ -392,6 +394,7 @@ func (m *connectionManager) requestStateChange(connectionID int, state Connectio
 
 func (m *connectionManager) updateSubscribers() {
 	numRequiredSubscribers := m.maxSubscribers - (len(m.remoteStates[Subscribed]) + len(m.pendingRemoteStates[Subscribed]))
+	logger.For(m.ctx).Infof("required subscribers: %d, remoteStates[Subscribed]: %v, pendingRemoteStates[Subscribed]: %v", numRequiredSubscribers, m.remoteStates[Subscribed], m.pendingRemoteStates[Subscribed])
 
 	// If we have enough subscribers (including pending subscribers), we don't need to do anything
 	if numRequiredSubscribers <= 0 {
@@ -564,7 +567,7 @@ func (c *connection) startNewListener() {
 }
 
 func (c *connection) setState(state ConnectionState) {
-	logger.For(c.ctx).Debugf("setting state to %s", state)
+	logger.For(c.ctx).Infof("setting state to %s", state)
 	c.state = state
 	c.toManager <- StateChange{
 		ConnectionID: c.connectionID,
