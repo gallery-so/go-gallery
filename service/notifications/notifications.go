@@ -35,10 +35,16 @@ type lockKey struct {
 }
 
 const viewWindow = 24 * time.Hour
-const groupedWindow = 10 * time.Minute
+const defaultGroupedWindow = 10 * time.Minute
 const notificationTimeout = 10 * time.Second
 const maxLockTimeout = 2 * time.Minute
 const NotificationHandlerContextKey = "notification.notificationHandlers"
+
+var notificationTypeToGroupWindow = map[persist.Action]time.Duration{
+	persist.ActionAdmiredComment: 24 * time.Hour,
+	persist.ActionAdmiredPost:    24 * time.Hour,
+	persist.ActionAdmiredToken:   24 * time.Hour,
+}
 
 type NotificationHandlers struct {
 	Notifications            *notificationDispatcher
@@ -381,7 +387,12 @@ func (h ownerGroupedNotificationHandler) Handle(ctx context.Context, notif db.No
 		OnlyForComment:   onlyForComment,
 	})
 
-	if time.Since(curNotif.CreatedAt) < groupedWindow {
+	window, ok := notificationTypeToGroupWindow[notif.Action]
+	if !ok {
+		window = defaultGroupedWindow
+	}
+
+	if time.Since(curNotif.CreatedAt) < window {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
 		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient, h.limiter)
 	}
@@ -412,7 +423,12 @@ func (h tokenIDGroupedNotificationHandler) Handle(ctx context.Context, notif db.
 		OnlyForPost:      onlyForPost,
 	})
 
-	if time.Since(curNotif.CreatedAt) < groupedWindow {
+	window, ok := notificationTypeToGroupWindow[notif.Action]
+	if !ok {
+		window = defaultGroupedWindow
+	}
+
+	if time.Since(curNotif.CreatedAt) < window {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
 		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient, h.limiter)
 	}
