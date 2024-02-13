@@ -2747,6 +2747,17 @@ func (r *queryResolver) SearchCommunities(ctx context.Context, query string, lim
 	return model.SearchCommunitiesPayload{Results: results}, nil
 }
 
+// IsEmailAddressAvailable is the resolver for the isEmailAddressAvailable field.
+func (r *queryResolver) IsEmailAddressAvailable(ctx context.Context, emailAddress persist.Email) (*bool, error) {
+	exists, err := publicapi.For(ctx).User.VerifiedEmailAddressExists(ctx, emailAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	available := !exists
+	return &available, nil
+}
+
 // UsersByRole is the resolver for the usersByRole field.
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
 	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)

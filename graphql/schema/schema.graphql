@@ -1303,6 +1303,7 @@ enum Role {
   ADMIN
   BETA_TESTER
   EARLY_ACCESS
+  EMAIL_TESTER
 }
 
 enum MerchType {
@@ -1493,6 +1494,8 @@ type Query {
     poapAddressWeight: Float
     providerNameWeight: Float
   ): SearchCommunitiesPayloadOrError
+
+  isEmailAddressAvailable(emailAddress: Email!): Boolean
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
