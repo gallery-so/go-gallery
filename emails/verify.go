@@ -81,26 +81,30 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if userWithPII.EmailVerified.IsVerified() {
+		if userWithPII.PiiVerifiedEmailAddress.String() != "" {
 			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email already verified"))
 			return
 		}
 
-		if !strings.EqualFold(userWithPII.PiiEmailAddress.String(), emailFromToken) {
+		if !strings.EqualFold(userWithPII.PiiUnverifiedEmailAddress.String(), emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email does not match"))
 			return
 		}
 
-		err = queries.UpdateUserVerificationStatus(c, coredb.UpdateUserVerificationStatusParams{
-			ID:            userID,
-			EmailVerified: persist.EmailVerificationStatusVerified,
+		// At this point, the unverified email address has been verified
+		verifiedEmail := userWithPII.PiiUnverifiedEmailAddress
+
+		err = queries.UpdateUserVerifiedEmail(c, coredb.UpdateUserVerifiedEmailParams{
+			UserID:       userID,
+			EmailAddress: verifiedEmail,
 		})
+
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		err = addEmailToSendgridList(c, verifiedEmail.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID"))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -108,7 +112,7 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, emails.VerifyEmailOutput{
 			UserID: userWithPII.ID,
-			Email:  userWithPII.PiiEmailAddress,
+			Email:  verifiedEmail,
 		})
 	}
 }
@@ -129,12 +133,12 @@ func processAddToMailingList(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if userWithPII.EmailVerified != persist.EmailVerificationStatusVerified {
+		if userWithPII.PiiVerifiedEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusOK, fmt.Errorf("email not verified"))
 			return
 		}
 
-		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		err = addEmailToSendgridList(c, userWithPII.PiiVerifiedEmailAddress.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID"))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

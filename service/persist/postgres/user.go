@@ -28,7 +28,7 @@ type UserRepository struct {
 	getByIDsStmt             *sql.Stmt
 	getByWalletIDStmt        *sql.Stmt
 	getByUsernameStmt        *sql.Stmt
-	getByEmailStmt           *sql.Stmt
+	getByVerifiedEmailStmt   *sql.Stmt
 	deleteStmt               *sql.Stmt
 	getGalleriesStmt         *sql.Stmt
 	updateCollectionsStmt    *sql.Stmt
@@ -51,19 +51,19 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED,EMAIL_VERIFIED FROM users WHERE ID = $1 AND DELETED = false;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByIDsStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED,EMAIL_VERIFIED FROM users WHERE ID = ANY($1) AND DELETED = false;`)
+	getByIDsStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE ID = ANY($1) AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED,EMAIL_VERIFIED FROM users WHERE ARRAY[$1]::varchar[] <@ WALLETS AND DELETED = false;`)
+	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE ARRAY[$1]::varchar[] <@ WALLETS AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED,EMAIL_VERIFIED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
+	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByEmailStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED,EMAIL_VERIFIED FROM pii.user_view WHERE PII_EMAIL_ADDRESS = $1 AND DELETED = false;`)
+	getByVerifiedEmailStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM pii.user_view WHERE PII_VERIFIED_EMAIL_ADDRESS = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = TRUE WHERE ID = $1;`)
@@ -105,12 +105,12 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 		queries:        queries,
 		updateInfoStmt: updateInfoStmt,
 
-		getByIDStmt:       getByIDStmt,
-		getByIDsStmt:      getByIDsStmt,
-		getByWalletIDStmt: getByWalletIDStmt,
-		getByUsernameStmt: getByUsernameStmt,
-		getByEmailStmt:    getByEmailStmt,
-		deleteStmt:        deleteStmt,
+		getByIDStmt:            getByIDStmt,
+		getByIDsStmt:           getByIDsStmt,
+		getByWalletIDStmt:      getByWalletIDStmt,
+		getByUsernameStmt:      getByUsernameStmt,
+		getByVerifiedEmailStmt: getByVerifiedEmailStmt,
+		deleteStmt:             deleteStmt,
 
 		getGalleriesStmt:         getGalleriesStmt,
 		updateCollectionsStmt:    updateCollectionsStmt,
@@ -276,14 +276,24 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	}
 
 	if pUser.Email != nil {
-		err := queries.UpdateUserEmail(pCtx, db.UpdateUserEmailParams{
-			UserID:                  userID,
-			EmailAddress:            *pUser.Email,
-			EmailVerificationStatus: int32(pUser.EmailStatus),
-		})
-		if err != nil {
-			logger.For(pCtx).Errorf("failed to insert email address when creating new user with userID=%s\n", userID)
+		if pUser.EmailStatus == persist.EmailVerificationStatusVerified {
+			err := queries.UpdateUserVerifiedEmail(pCtx, db.UpdateUserVerifiedEmailParams{
+				UserID:       userID,
+				EmailAddress: *pUser.Email,
+			})
+			if err != nil {
+				logger.For(pCtx).Errorf("failed to insert verified email address when creating new user with userID=%s\n", userID)
+			}
+		} else if pUser.EmailStatus == persist.EmailVerificationStatusUnverified {
+			err := queries.UpdateUserUnverifiedEmail(pCtx, db.UpdateUserUnverifiedEmailParams{
+				UserID:       userID,
+				EmailAddress: *pUser.Email,
+			})
+			if err != nil {
+				logger.For(pCtx).Errorf("failed to insert unverified email address when creating new user with userID=%s\n", userID)
+			}
 		}
+
 	}
 
 	return userID, nil
@@ -294,7 +304,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 
 	user := persist.User{}
 	walletIDs := []persist.DBID{}
-	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated, &user.EmailVerified)
+	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{UserID: pID}
@@ -330,7 +340,7 @@ func (u *UserRepository) GetByIDs(pCtx context.Context, pIDs []persist.DBID) ([]
 	for rows.Next() {
 		user := persist.User{}
 		walletIDs := []persist.DBID{}
-		rows.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated, &user.EmailVerified)
+		rows.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated)
 		wallets := make([]persist.Wallet, len(walletIDs))
 
 		for i, walletID := range walletIDs {
@@ -367,7 +377,7 @@ func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress p
 func (u *UserRepository) GetByWalletID(pCtx context.Context, pWalletID persist.DBID) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWalletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated, &user.EmailVerified)
+	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWalletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{WalletID: pWalletID}
@@ -395,7 +405,7 @@ func (u *UserRepository) GetByWalletID(pCtx context.Context, pWalletID persist.D
 func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated, &user.EmailVerified)
+	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{Username: pUsername}
@@ -407,10 +417,10 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 }
 
 // GetByEmail gets the user with the given email address
-func (u *UserRepository) GetByEmailIgnoringStatus(pCtx context.Context, pEmail persist.Email) (persist.User, error) {
+func (u *UserRepository) GetByVerifiedEmail(pCtx context.Context, pEmail persist.Email) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByEmailStmt.QueryRowContext(pCtx, pEmail.String()).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated, &user.EmailVerified)
+	err := u.getByVerifiedEmailStmt.QueryRowContext(pCtx, pEmail.String()).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{Email: pEmail}

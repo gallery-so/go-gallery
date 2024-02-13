@@ -671,7 +671,7 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 	if err != nil {
 		return err
 	}
-	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
+	err = api.queries.UpdateUserUnverifiedEmail(ctx, db.UpdateUserUnverifiedEmailParams{
 		UserID:       userID,
 		EmailAddress: email,
 	})

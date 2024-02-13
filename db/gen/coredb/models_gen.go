@@ -433,10 +433,11 @@ type PiiAccountCreationInfo struct {
 }
 
 type PiiForUser struct {
-	UserID          persist.DBID    `db:"user_id" json:"user_id"`
-	PiiEmailAddress persist.Email   `db:"pii_email_address" json:"pii_email_address"`
-	Deleted         bool            `db:"deleted" json:"deleted"`
-	PiiSocials      persist.Socials `db:"pii_socials" json:"pii_socials"`
+	UserID                    persist.DBID    `db:"user_id" json:"user_id"`
+	PiiUnverifiedEmailAddress persist.Email   `db:"pii_unverified_email_address" json:"pii_unverified_email_address"`
+	Deleted                   bool            `db:"deleted" json:"deleted"`
+	PiiSocials                persist.Socials `db:"pii_socials" json:"pii_socials"`
+	PiiVerifiedEmailAddress   persist.Email   `db:"pii_verified_email_address" json:"pii_verified_email_address"`
 }
 
 type PiiSocialsAuth struct {
@@ -452,25 +453,28 @@ type PiiSocialsAuth struct {
 }
 
 type PiiUserView struct {
-	ID                   persist.DBID                     `db:"id" json:"id"`
-	Deleted              bool                             `db:"deleted" json:"deleted"`
-	Version              sql.NullInt32                    `db:"version" json:"version"`
-	LastUpdated          time.Time                        `db:"last_updated" json:"last_updated"`
-	CreatedAt            time.Time                        `db:"created_at" json:"created_at"`
-	Username             sql.NullString                   `db:"username" json:"username"`
-	UsernameIdempotent   sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
-	Wallets              persist.WalletList               `db:"wallets" json:"wallets"`
-	Bio                  sql.NullString                   `db:"bio" json:"bio"`
-	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
-	Universal            bool                             `db:"universal" json:"universal"`
-	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
-	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
-	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
-	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
-	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
-	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
-	PiiEmailAddress      persist.Email                    `db:"pii_email_address" json:"pii_email_address"`
-	PiiSocials           persist.Socials                  `db:"pii_socials" json:"pii_socials"`
+	ID                        persist.DBID                     `db:"id" json:"id"`
+	Deleted                   bool                             `db:"deleted" json:"deleted"`
+	Version                   sql.NullInt32                    `db:"version" json:"version"`
+	LastUpdated               time.Time                        `db:"last_updated" json:"last_updated"`
+	CreatedAt                 time.Time                        `db:"created_at" json:"created_at"`
+	Username                  sql.NullString                   `db:"username" json:"username"`
+	UsernameIdempotent        sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
+	Wallets                   persist.WalletList               `db:"wallets" json:"wallets"`
+	Bio                       sql.NullString                   `db:"bio" json:"bio"`
+	Traits                    pgtype.JSONB                     `db:"traits" json:"traits"`
+	Universal                 bool                             `db:"universal" json:"universal"`
+	NotificationSettings      persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
+	EmailUnsubscriptions      persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
+	FeaturedGallery           *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
+	PrimaryWalletID           persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
+	UserExperiences           pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
+	FtsUsername               interface{}                      `db:"fts_username" json:"fts_username"`
+	FtsBioEnglish             interface{}                      `db:"fts_bio_english" json:"fts_bio_english"`
+	ProfileImageID            persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+	PiiUnverifiedEmailAddress persist.Email                    `db:"pii_unverified_email_address" json:"pii_unverified_email_address"`
+	PiiVerifiedEmailAddress   persist.Email                    `db:"pii_verified_email_address" json:"pii_verified_email_address"`
+	PiiSocials                persist.Socials                  `db:"pii_socials" json:"pii_socials"`
 }
 
 type Post struct {
@@ -553,10 +557,11 @@ type ScrubbedPiiAccountCreationInfo struct {
 }
 
 type ScrubbedPiiForUser struct {
-	UserID          persist.DBID    `db:"user_id" json:"user_id"`
-	PiiEmailAddress persist.Email   `db:"pii_email_address" json:"pii_email_address"`
-	Deleted         bool            `db:"deleted" json:"deleted"`
-	PiiSocials      persist.Socials `db:"pii_socials" json:"pii_socials"`
+	UserID                    persist.DBID    `db:"user_id" json:"user_id"`
+	PiiUnverifiedEmailAddress persist.Email   `db:"pii_unverified_email_address" json:"pii_unverified_email_address"`
+	Deleted                   bool            `db:"deleted" json:"deleted"`
+	PiiSocials                persist.Socials `db:"pii_socials" json:"pii_socials"`
+	PiiVerifiedEmailAddress   persist.Email   `db:"pii_verified_email_address" json:"pii_verified_email_address"`
 }
 
 type Session struct {
@@ -700,7 +705,6 @@ type User struct {
 	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
 	Universal            bool                             `db:"universal" json:"universal"`
 	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
-	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
 	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
 	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
 	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`

@@ -57,7 +57,6 @@ type User struct {
 	Traits             Traits     `json:"traits"`
 	Universal          NullBool   `json:"universal"`
 	PrimaryWalletID    NullString `json:"primary_wallet_id"`
-	EmailVerified      NullInt64  `json:"email_verified"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
@@ -294,6 +293,7 @@ const (
 	RoleAdmin       Role = "ADMIN"
 	RoleBetaTester  Role = "BETA_TESTER"
 	RoleEarlyAccess Role = "EARLY_ACCESS"
+	RoleEmailTester Role = "EMAIL_TESTER"
 )
 
 // Scan implements the database/sql Scanner interface for the DBID type
@@ -328,6 +328,8 @@ func (r *Role) UnmarshalGQL(v interface{}) error {
 		*r = RoleBetaTester
 	case "early_access":
 		*r = RoleEarlyAccess
+	case "email_tester":
+		*r = RoleEmailTester
 	}
 	return nil
 }
@@ -341,6 +343,8 @@ func (r Role) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"BETA_TESTER"`))
 	case RoleEarlyAccess:
 		w.Write([]byte(`"EARLY_ACCESS"`))
+	case RoleEmailTester:
+		w.Write([]byte(`"EMAIL_TESTER"`))
 	}
 }
 
