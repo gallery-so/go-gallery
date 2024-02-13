@@ -43,12 +43,15 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if userWithPII.PiiEmailAddress.String() == "" {
+		emailAddress := userWithPII.PiiVerifiedEmailAddress.String()
+		if emailAddress == "" {
+			emailAddress = userWithPII.PiiUnverifiedEmailAddress.String()
+		}
+
+		if emailAddress == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{input.UserID})
 			return
 		}
-
-		emailAddress := userWithPII.PiiEmailAddress.String()
 
 		errGroup := new(errgroup.Group)
 
@@ -124,12 +127,12 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if userWithPII.PiiEmailAddress.String() == "" {
+		if userWithPII.PiiVerifiedEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID})
 			return
 		}
 
-		emailAddress := userWithPII.PiiEmailAddress.String()
+		emailAddress := userWithPII.PiiVerifiedEmailAddress.String()
 		if !strings.EqualFold(emailAddress, emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
 			return
@@ -204,12 +207,12 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if userWithPII.PiiEmailAddress.String() == "" {
+		if userWithPII.PiiVerifiedEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID})
 			return
 		}
 
-		emailAddress := userWithPII.PiiEmailAddress.String()
+		emailAddress := userWithPII.PiiVerifiedEmailAddress.String()
 		if !strings.EqualFold(emailAddress, emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
 			return
