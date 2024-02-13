@@ -831,11 +831,12 @@ func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first,
 				blendedRank[idx] = (blendedRank[idx] + score) * 0.5
 			} else {
 				combined = append(combined, e)
+				engagementRank = append(engagementRank, 0)
+				// New posts tend to have no engagement, so don't over penalize it by halving it
 				blendedRank = append(blendedRank, score)
 			}
 		}
 
-		// Score based on the average of the two rankings
 		interleaved := api.scoreFeedEntities(ctx, feedOpts.FetchSize, combined, func(i int) float64 {
 			if combined[i].Post.ActorID == viewerID {
 				return engagementRank[i]

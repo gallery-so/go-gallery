@@ -90,5 +90,4 @@ from t2 feed_entity_scores
 join t4 using(id)
 join posts p on feed_entity_scores.id = p.id and not p.deleted
 left join feed_blocklist fb on p.actor_id = fb.user_id and not fb.deleted and fb.active
-where (fb.user_id is null or @viewer_id = fb.user_id)
-order by (t4.group_number, random() > 0.5) desc;
+where (fb.user_id is null or @viewer_id = fb.user_id);
