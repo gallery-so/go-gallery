@@ -107,7 +107,6 @@ join t4 using(id)
 join posts p on feed_entity_scores.id = p.id and not p.deleted
 left join feed_blocklist fb on p.actor_id = fb.user_id and not fb.deleted and fb.active
 where (fb.user_id is null or $1 = fb.user_id)
-order by (t4.group_number, random() > 0.5) desc
 `
 
 type GetFeedEntityScoresParams struct {
