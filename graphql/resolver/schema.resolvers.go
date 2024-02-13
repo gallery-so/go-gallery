@@ -534,19 +534,11 @@ func (r *ensProfileImageResolver) Wallet(ctx context.Context, obj *model.EnsProf
 
 // Token is the resolver for the token field.
 func (r *ensProfileImageResolver) Token(ctx context.Context, obj *model.EnsProfileImage) (*model.Token, error) {
-	if obj.HelperEnsProfileImageData.EnsDomain == "" || obj.HelperEnsProfileImageData.UserID == "" {
-		return nil, nil
-	}
-
-	token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, obj.HelperEnsProfileImageData.UserID, obj.HelperEnsProfileImageData.EnsDomain)
+	token, _, _, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, obj.HelperEnsProfileImageData.UserID, obj.HelperEnsProfileImageData.EnsDomain)
 	if err != nil {
-		if util.ErrorIs[persist.ErrTokenNotFound](err) {
-			logger.For(ctx).Warnf("unable to find token for PFP via ENS: %s", err)
-			return nil, nil
-		}
+		logger.For(ctx).Warnf("unable to find token for PFP via ENS: %s", err)
 		return nil, nil
 	}
-
 	return tokenToModel(ctx, token, nil), nil
 }
 

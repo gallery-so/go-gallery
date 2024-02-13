@@ -2365,16 +2365,9 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
 	api := publicapi.For(ctx).Token
 	// Use the token's profile image if the token exists
-	if token, err := api.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
-		// This should be free because the definition is cached from the call above
-		tDef, err := api.GetTokenDefinitionByID(ctx, token.TokenDefinitionID)
-		if err != nil {
-			return nil, err
-		}
-		if tokenMedia, err := api.GetMediaByMediaID(ctx, tDef.TokenMediaID); err == nil {
-			if tokenMedia.Media.ProfileImageURL != "" {
-				url = string(tokenMedia.Media.ProfileImageURL)
-			}
+	if _, _, media, err := api.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
+		if media.Media.ProfileImageURL != "" {
+			url = string(media.Media.ProfileImageURL)
 		}
 	}
 

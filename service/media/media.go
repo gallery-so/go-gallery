@@ -273,7 +273,7 @@ func FindImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetada
 	for _, keyword := range imgKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
-			animURL = AnimationURL(it)
+			imgURL = ImageURL(it)
 			break
 		}
 	}
@@ -281,7 +281,7 @@ func FindImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetada
 	for _, keyword := range animKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && AnimationURL(it) != animURL {
 			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
-			imgURL = ImageURL(it)
+			animURL = AnimationURL(it)
 			break
 		}
 	}
