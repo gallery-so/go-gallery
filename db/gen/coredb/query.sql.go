@@ -5129,7 +5129,7 @@ func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUns
 }
 
 const getUserWithPIIByID = `-- name: GetUserWithPIIByID :one
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, fts_username, fts_bio_english, profile_image_id, pii_unverified_email_address, pii_verified_email_address, pii_socials from pii.user_view where id = $1 and deleted = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, pii_unverified_email_address, pii_verified_email_address, pii_socials from pii.user_view where id = $1 and deleted = false
 `
 
 func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (PiiUserView, error) {
@@ -5152,8 +5152,6 @@ func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
-		&i.FtsUsername,
-		&i.FtsBioEnglish,
 		&i.ProfileImageID,
 		&i.PiiUnverifiedEmailAddress,
 		&i.PiiVerifiedEmailAddress,
@@ -5300,7 +5298,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 }
 
 const getUsersBySocialIDs = `-- name: GetUsersBySocialIDs :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, fts_username, fts_bio_english, profile_image_id, pii_unverified_email_address, pii_verified_email_address, pii_socials from pii.user_view u where u.pii_socials->$1::varchar->>'id' = any($2::varchar[]) and not u.deleted and not u.universal
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, pii_unverified_email_address, pii_verified_email_address, pii_socials from pii.user_view u where u.pii_socials->$1::varchar->>'id' = any($2::varchar[]) and not u.deleted and not u.universal
 `
 
 type GetUsersBySocialIDsParams struct {
@@ -5334,8 +5332,6 @@ func (q *Queries) GetUsersBySocialIDs(ctx context.Context, arg GetUsersBySocialI
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
-			&i.FtsUsername,
-			&i.FtsBioEnglish,
 			&i.ProfileImageID,
 			&i.PiiUnverifiedEmailAddress,
 			&i.PiiVerifiedEmailAddress,
@@ -5421,7 +5417,7 @@ func (q *Queries) GetUsersByWalletAddressesAndChains(ctx context.Context, arg Ge
 }
 
 const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.fts_username, u.fts_bio_english, u.profile_image_id, u.pii_unverified_email_address, u.pii_verified_email_address, u.pii_socials from pii.user_view u
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.pii_unverified_email_address, u.pii_verified_email_address, u.pii_socials from pii.user_view u
     left join user_roles r on r.user_id = u.id and r.role = 'EMAIL_TESTER' and r.deleted = false
     where (u.email_unsubscriptions->>'all' = 'false' or u.email_unsubscriptions->>'all' is null)
     and (u.email_unsubscriptions->>$2::varchar = 'false' or u.email_unsubscriptions->>$2::varchar is null)
@@ -5481,8 +5477,6 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
-			&i.FtsUsername,
-			&i.FtsBioEnglish,
 			&i.ProfileImageID,
 			&i.PiiUnverifiedEmailAddress,
 			&i.PiiVerifiedEmailAddress,

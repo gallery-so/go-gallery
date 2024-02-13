@@ -469,8 +469,6 @@ type PiiUserView struct {
 	FeaturedGallery           *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
 	PrimaryWalletID           persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
 	UserExperiences           pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
-	FtsUsername               interface{}                      `db:"fts_username" json:"fts_username"`
-	FtsBioEnglish             interface{}                      `db:"fts_bio_english" json:"fts_bio_english"`
 	ProfileImageID            persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
 	PiiUnverifiedEmailAddress persist.Email                    `db:"pii_unverified_email_address" json:"pii_unverified_email_address"`
 	PiiVerifiedEmailAddress   persist.Email                    `db:"pii_verified_email_address" json:"pii_verified_email_address"`
