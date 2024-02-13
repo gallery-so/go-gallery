@@ -952,6 +952,7 @@ type ComplexityRoot struct {
 		ResendVerificationEmail                         func(childComplexity int) int
 		RevokeRolesFromUser                             func(childComplexity int, username string, roles []*persist.Role) int
 		SetCommunityOverrideCreator                     func(childComplexity int, communityID persist.DBID, creatorUserID *persist.DBID) int
+		SetPersona                                      func(childComplexity int, persona persist.Persona) int
 		SetProfileImage                                 func(childComplexity int, input model.SetProfileImageInput) int
 		SetSpamPreference                               func(childComplexity int, input model.SetSpamPreferenceInput) int
 		SyncCreatedTokensForExistingContract            func(childComplexity int, input model.SyncCreatedTokensForExistingContractInput) int
@@ -1141,6 +1142,7 @@ type ComplexityRoot struct {
 		GeneralAllowlist           func(childComplexity int) int
 		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
 		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		IsEmailAddressAvailable    func(childComplexity int, emailAddress persist.Email) int
 		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
 		Node                       func(childComplexity int, id model.GqlID) int
 		PostByID                   func(childComplexity int, id persist.DBID) int
@@ -1236,6 +1238,10 @@ type ComplexityRoot struct {
 
 	SetCommunityOverrideCreatorPayload struct {
 		User func(childComplexity int) int
+	}
+
+	SetPersonaPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
 	SetProfileImagePayload struct {
@@ -1760,6 +1766,7 @@ type ComplexityRoot struct {
 		ID                   func(childComplexity int) int
 		NotificationSettings func(childComplexity int) int
 		Notifications        func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Persona              func(childComplexity int) int
 		SocialAccounts       func(childComplexity int) int
 		SuggestedUsers       func(childComplexity int, before *string, after *string, first *int, last *int) int
 		User                 func(childComplexity int) int
@@ -2029,6 +2036,7 @@ type MutationResolver interface {
 	RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error)
 	OptInForRoles(ctx context.Context, roles []persist.Role) (model.OptInForRolesPayloadOrError, error)
 	OptOutForRoles(ctx context.Context, roles []persist.Role) (model.OptOutForRolesPayloadOrError, error)
+	SetPersona(ctx context.Context, persona persist.Persona) (model.SetPersonaPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
 	AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
@@ -2098,6 +2106,7 @@ type QueryResolver interface {
 	SearchUsers(ctx context.Context, query string, limit *int, usernameWeight *float64, bioWeight *float64) (model.SearchUsersPayloadOrError, error)
 	SearchGalleries(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64) (model.SearchGalleriesPayloadOrError, error)
 	SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64, providerNameWeight *float64) (model.SearchCommunitiesPayloadOrError, error)
+	IsEmailAddressAvailable(ctx context.Context, emailAddress persist.Email) (*bool, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
@@ -2243,6 +2252,7 @@ type ViewerResolver interface {
 	Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error)
 	NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error)
 	UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error)
+	Persona(ctx context.Context, obj *model.Viewer) (*persist.Persona, error)
 	SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 }
 type WalletResolver interface {
@@ -5751,6 +5761,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.SetCommunityOverrideCreator(childComplexity, args["communityID"].(persist.DBID), args["creatorUserID"].(*persist.DBID)), true
 
+	case "Mutation.setPersona":
+		if e.complexity.Mutation.SetPersona == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setPersona_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetPersona(childComplexity, args["persona"].(persist.Persona)), true
+
 	case "Mutation.setProfileImage":
 		if e.complexity.Mutation.SetProfileImage == nil {
 			break
@@ -6867,6 +6889,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
+	case "Query.isEmailAddressAvailable":
+		if e.complexity.Query.IsEmailAddressAvailable == nil {
+			break
+		}
+
+		args, err := ec.field_Query_isEmailAddressAvailable_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.IsEmailAddressAvailable(childComplexity, args["emailAddress"].(persist.Email)), true
+
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
 			break
@@ -7269,6 +7303,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SetCommunityOverrideCreatorPayload.User(childComplexity), true
+
+	case "SetPersonaPayload.viewer":
+		if e.complexity.SetPersonaPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.SetPersonaPayload.Viewer(childComplexity), true
 
 	case "SetProfileImagePayload.viewer":
 		if e.complexity.SetProfileImagePayload.Viewer == nil {
@@ -9323,6 +9364,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Viewer.Notifications(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Viewer.persona":
+		if e.complexity.Viewer.Persona == nil {
+			break
+		}
+
+		return e.complexity.Viewer.Persona(childComplexity), true
+
 	case "Viewer.socialAccounts":
 		if e.complexity.Viewer.SocialAccounts == nil {
 			break
@@ -9740,6 +9788,13 @@ type GalleryUser implements Node @goEmbedHelper {
     last: Int
   ): CommunitiesConnection @goField(forceResolver: true)
   isMemberOfCommunity(communityID: DBID!): Boolean! @goField(forceResolver: true)
+}
+
+enum Persona {
+  None
+  Collector
+  Creator
+  Both
 }
 
 type Wallet implements Node {
@@ -10433,6 +10488,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 
   userExperiences: [UserExperience!] @goField(forceResolver: true)
+  persona: Persona @goField(forceResolver: true)
   suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
 }
@@ -10914,6 +10970,7 @@ enum Role {
   ADMIN
   BETA_TESTER
   EARLY_ACCESS
+  EMAIL_TESTER
 }
 
 enum MerchType {
@@ -11104,6 +11161,8 @@ type Query {
     poapAddressWeight: Float
     providerNameWeight: Float
   ): SearchCommunitiesPayloadOrError
+
+  isEmailAddressAvailable(emailAddress: Email!): Boolean
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
@@ -12047,6 +12106,12 @@ type OptOutForRolesPayload {
 union OptInForRolesPayloadOrError = OptInForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 union OptOutForRolesPayloadOrError = OptOutForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 
+type SetPersonaPayload {
+  viewer: Viewer
+}
+
+union SetPersonaPayloadOrError = SetPersonaPayload | ErrNotAuthorized | ErrInvalidInput
+
 input UploadPersistedQueriesInput {
   persistedQueries: String
 }
@@ -12685,6 +12750,8 @@ type Mutation {
 
   optInForRoles(roles: [Role!]!): OptInForRolesPayloadOrError @authRequired
   optOutForRoles(roles: [Role!]!): OptOutForRolesPayloadOrError @authRequired
+
+  setPersona(persona: Persona!): SetPersonaPayloadOrError @authRequired
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
@@ -14398,6 +14465,21 @@ func (ec *executionContext) field_Mutation_setCommunityOverrideCreator_args(ctx 
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_setPersona_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.Persona
+	if tmp, ok := rawArgs["persona"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("persona"))
+		arg0, err = ec.unmarshalNPersona2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPersona(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["persona"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_setProfileImage_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -15406,6 +15488,21 @@ func (ec *executionContext) field_Query_globalFeed_args(ctx context.Context, raw
 		}
 	}
 	args["includePosts"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_isEmailAddressAvailable_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.Email
+	if tmp, ok := rawArgs["emailAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("emailAddress"))
+		arg0, err = ec.unmarshalNEmail2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["emailAddress"] = arg0
 	return args, nil
 }
 
@@ -16593,6 +16690,8 @@ func (ec *executionContext) fieldContext_AddUserWalletPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -17049,6 +17148,8 @@ func (ec *executionContext) fieldContext_AdmireCommentPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -17236,6 +17337,8 @@ func (ec *executionContext) fieldContext_AdmireFeedEventPayload_viewer(ctx conte
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -17417,6 +17520,8 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -17606,6 +17711,8 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_viewer(ctx context.C
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -22373,6 +22480,8 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -22637,6 +22746,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -24813,6 +24924,8 @@ func (ec *executionContext) fieldContext_ConnectSocialAccountPayload_viewer(ctx 
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -25812,6 +25925,8 @@ func (ec *executionContext) fieldContext_CreateUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -26118,6 +26233,8 @@ func (ec *executionContext) fieldContext_DisconnectSocialAccountPayload_viewer(c
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -29595,6 +29712,8 @@ func (ec *executionContext) fieldContext_FollowAllOnboardingRecommendationsPaylo
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -29658,6 +29777,8 @@ func (ec *executionContext) fieldContext_FollowAllSocialConnectionsPayload_viewe
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -29853,6 +29974,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -35774,6 +35897,8 @@ func (ec *executionContext) fieldContext_LoginPayload_viewer(ctx context.Context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -35837,6 +35962,8 @@ func (ec *executionContext) fieldContext_LogoutPayload_viewer(ctx context.Contex
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -41467,6 +41594,78 @@ func (ec *executionContext) fieldContext_Mutation_optOutForRoles(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_optOutForRoles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_setPersona(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_setPersona(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SetPersona(rctx, fc.Args["persona"].(persist.Persona))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.SetPersonaPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SetPersonaPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.SetPersonaPayloadOrError)
+	fc.Result = res
+	return ec.marshalOSetPersonaPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetPersonaPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_setPersona(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SetPersonaPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setPersona_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -47781,6 +47980,58 @@ func (ec *executionContext) fieldContext_Query_searchCommunities(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_isEmailAddressAvailable(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_isEmailAddressAvailable(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().IsEmailAddressAvailable(rctx, fc.Args["emailAddress"].(persist.Email))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_isEmailAddressAvailable(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_isEmailAddressAvailable_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_usersByRole(ctx, field)
 	if err != nil {
@@ -48900,6 +49151,8 @@ func (ec *executionContext) fieldContext_RegisterUserPushTokenPayload_viewer(ctx
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -48963,6 +49216,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -49201,6 +49456,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -49398,6 +49655,8 @@ func (ec *executionContext) fieldContext_RemoveProfileImagePayload_viewer(ctx co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -49461,6 +49720,8 @@ func (ec *executionContext) fieldContext_RemoveUserWalletsPayload_viewer(ctx con
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -49568,6 +49829,8 @@ func (ec *executionContext) fieldContext_ResendVerificationEmailPayload_viewer(c
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -49803,6 +50066,71 @@ func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user
 	return fc, nil
 }
 
+func (ec *executionContext) _SetPersonaPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SetPersonaPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SetPersonaPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SetPersonaPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SetPersonaPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SetProfileImagePayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SetProfileImagePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SetProfileImagePayload_viewer(ctx, field)
 	if err != nil {
@@ -49857,6 +50185,8 @@ func (ec *executionContext) fieldContext_SetProfileImagePayload_viewer(ctx conte
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -55841,6 +56171,8 @@ func (ec *executionContext) fieldContext_SyncCreatedTokensForExistingContractPay
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -55904,6 +56236,8 @@ func (ec *executionContext) fieldContext_SyncCreatedTokensForNewContractsPayload
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -56099,6 +56433,8 @@ func (ec *executionContext) fieldContext_SyncTokensPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -60921,6 +61257,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -61353,6 +61691,8 @@ func (ec *executionContext) fieldContext_UnregisterUserPushTokenPayload_viewer(c
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -61416,6 +61756,8 @@ func (ec *executionContext) fieldContext_UnsubscribeFromEmailTypePayload_viewer(
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -61725,6 +62067,8 @@ func (ec *executionContext) fieldContext_UpdateEmailNotificationSettingsPayload_
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -61788,6 +62132,8 @@ func (ec *executionContext) fieldContext_UpdateEmailPayload_viewer(ctx context.C
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -61851,6 +62197,8 @@ func (ec *executionContext) fieldContext_UpdateFeaturedGalleryPayload_viewer(ctx
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -62097,6 +62445,8 @@ func (ec *executionContext) fieldContext_UpdateGalleryOrderPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -62221,6 +62571,8 @@ func (ec *executionContext) fieldContext_UpdatePrimaryWalletPayload_viewer(ctx c
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -62284,6 +62636,8 @@ func (ec *executionContext) fieldContext_UpdateSocialAccountDisplayedPayload_vie
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -62450,6 +62804,8 @@ func (ec *executionContext) fieldContext_UpdateUserExperiencePayload_viewer(ctx 
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -62513,6 +62869,8 @@ func (ec *executionContext) fieldContext_UpdateUserInfoPayload_viewer(ctx contex
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "persona":
+				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
@@ -64696,6 +65054,47 @@ func (ec *executionContext) fieldContext_Viewer_userExperiences(ctx context.Cont
 				return ec.fieldContext_UserExperience_experienced(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserExperience", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Viewer_persona(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Viewer_persona(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Viewer().Persona(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Persona)
+	fc.Result = res
+	return ec.marshalOPersona2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPersona(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Viewer_persona(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Persona does not have child fields")
 		},
 	}
 	return fc, nil
@@ -73262,6 +73661,36 @@ func (ec *executionContext) _SetCommunityOverrideCreatorPayloadOrError(ctx conte
 	}
 }
 
+func (ec *executionContext) _SetPersonaPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetPersonaPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SetPersonaPayload:
+		return ec._SetPersonaPayload(ctx, sel, &obj)
+	case *model.SetPersonaPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SetPersonaPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _SetProfileImagePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetProfileImagePayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -77762,7 +78191,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "SetPersonaPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -77923,7 +78352,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "SetPersonaPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -80844,6 +81273,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_optOutForRoles(ctx, field)
 			})
 
+		case "setPersona":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setPersona(ctx, field)
+			})
+
 		case "addRolesToUser":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -82458,6 +82893,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "isEmailAddressAvailable":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_isEmailAddressAvailable(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "usersByRole":
 			field := field
 
@@ -83161,6 +83616,31 @@ func (ec *executionContext) _SetCommunityOverrideCreatorPayload(ctx context.Cont
 		case "user":
 
 			out.Values[i] = ec._SetCommunityOverrideCreatorPayload_user(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var setPersonaPayloadImplementors = []string{"SetPersonaPayload", "SetPersonaPayloadOrError"}
+
+func (ec *executionContext) _SetPersonaPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SetPersonaPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, setPersonaPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SetPersonaPayload")
+		case "viewer":
+
+			out.Values[i] = ec._SetPersonaPayload_viewer(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -87041,6 +87521,23 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 				return innerFunc(ctx)
 
 			})
+		case "persona":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_persona(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "suggestedUsers":
 			field := field
 
@@ -88037,6 +88534,16 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._PageInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNPersona2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPersona(ctx context.Context, v interface{}) (persist.Persona, error) {
+	var res persist.Persona
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPersona2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPersona(ctx context.Context, sel ast.SelectionSet, v persist.Persona) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNPlatform2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPlatform(ctx context.Context, v interface{}) (model.Platform, error) {
@@ -91452,6 +91959,22 @@ func (ec *executionContext) marshalOPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 	return ec._PageInfo(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalOPersona2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPersona(ctx context.Context, v interface{}) (*persist.Persona, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(persist.Persona)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOPersona2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPersona(ctx context.Context, sel ast.SelectionSet, v *persist.Persona) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
 func (ec *executionContext) marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v *model.Post) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -91926,6 +92449,13 @@ func (ec *executionContext) marshalOSetCommunityOverrideCreatorPayloadOrError2gi
 		return graphql.Null
 	}
 	return ec._SetCommunityOverrideCreatorPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOSetPersonaPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetPersonaPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetPersonaPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SetPersonaPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOSetProfileImagePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetProfileImagePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetProfileImagePayloadOrError) graphql.Marshaler {

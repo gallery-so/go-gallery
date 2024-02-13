@@ -444,6 +444,15 @@ func resolveViewerExperiencesByUserID(ctx context.Context, userID persist.DBID) 
 	return publicapi.For(ctx).User.GetUserExperiences(ctx, userID)
 }
 
+func resolveViewerPersonaByUserID(ctx context.Context, userID persist.DBID) (*persist.Persona, error) {
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user.Persona, nil
+}
+
 func resolveViewerSocialsByUserID(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
 	return publicapi.For(ctx).User.GetSocials(ctx, userID)
 }
@@ -568,10 +577,20 @@ func resolveViewerEmail(ctx context.Context) *model.UserEmail {
 }
 
 func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
+	var verificationStatus persist.EmailVerificationStatus
+	var email persist.Email
+
+	if user.PiiVerifiedEmailAddress.String() != "" {
+		email = user.PiiVerifiedEmailAddress
+		verificationStatus = persist.EmailVerificationStatusVerified
+	} else {
+		email = user.PiiUnverifiedEmailAddress
+		verificationStatus = persist.EmailVerificationStatusUnverified
+	}
 
 	return &model.UserEmail{
-		Email:              &user.PiiEmailAddress,
-		VerificationStatus: &user.EmailVerified,
+		Email:              &email,
+		VerificationStatus: &verificationStatus,
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
 			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
