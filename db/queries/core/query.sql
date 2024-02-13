@@ -1074,25 +1074,6 @@ insert into pii.for_users (user_id, pii_unverified_email_address, pii_verified_e
         set pii_unverified_email_address = excluded.pii_unverified_email_address,
             pii_verified_email_address = excluded.pii_verified_email_address;
 
--- -- name: UpdateUserVerificationStatus :exec
--- UPDATE users SET email_verified = $2 WHERE id = $1;
---
--- -- TODO: Probably want to null out the verified email address for now so the behavior matches existing behavior
--- -- name: UpdateUserEmail :exec
--- with upsert_pii as (
---     insert into pii.for_users (user_id, pii_email_address) values (@user_id, @email_address)
---         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
--- ),
---
--- upsert_metadata as (
---     insert into dev_metadata_users (user_id, has_email_address) values (@user_id, (@email_address is not null))
---         on conflict (user_id) do update set has_email_address = excluded.has_email_address
--- )
---
--- update users set email_verified = @email_verification_status where users.id = @user_id;
-
-
-
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
 

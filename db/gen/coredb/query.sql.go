@@ -7207,9 +7207,6 @@ func (q *Queries) UpdateTopActiveUsers(ctx context.Context, topUserIds persist.D
 }
 
 const updateUserEmailUnsubscriptions = `-- name: UpdateUserEmailUnsubscriptions :exec
-
-
-
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1
 `
 
@@ -7218,26 +7215,6 @@ type UpdateUserEmailUnsubscriptionsParams struct {
 	EmailUnsubscriptions persist.EmailUnsubscriptions `db:"email_unsubscriptions" json:"email_unsubscriptions"`
 }
 
-// -- name: UpdateUserVerificationStatus :exec
-// UPDATE users SET email_verified = $2 WHERE id = $1;
-//
-// -- TODO: Probably want to null out the verified email address for now so the behavior matches existing behavior
-// -- name: UpdateUserEmail :exec
-// with upsert_pii as (
-//
-//	insert into pii.for_users (user_id, pii_email_address) values (@user_id, @email_address)
-//	    on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
-//
-// ),
-//
-// upsert_metadata as (
-//
-//	insert into dev_metadata_users (user_id, has_email_address) values (@user_id, (@email_address is not null))
-//	    on conflict (user_id) do update set has_email_address = excluded.has_email_address
-//
-// )
-//
-// update users set email_verified = @email_verification_status where users.id = @user_id;
 func (q *Queries) UpdateUserEmailUnsubscriptions(ctx context.Context, arg UpdateUserEmailUnsubscriptionsParams) error {
 	_, err := q.db.Exec(ctx, updateUserEmailUnsubscriptions, arg.ID, arg.EmailUnsubscriptions)
 	return err
