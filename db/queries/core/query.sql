@@ -2016,3 +2016,6 @@ select * from communities where name = 'Art Blocks';
 select count(*) from community_galleries cg
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
 where cg.community_id = @community_id;
+
+-- name: SetPersonaByUserID :exec
+update users set persona = @persona where id = @user_id and not deleted;

@@ -131,6 +131,13 @@ type GalleryUser implements Node @goEmbedHelper {
   isMemberOfCommunity(communityID: DBID!): Boolean! @goField(forceResolver: true)
 }
 
+enum Persona {
+  None
+  Collector
+  Creator
+  Both
+}
+
 type Wallet implements Node {
   id: ID!
   dbid: DBID!
@@ -822,6 +829,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 
   userExperiences: [UserExperience!] @goField(forceResolver: true)
+  persona: Persona @goField(forceResolver: true)
   suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
 }
@@ -2439,6 +2447,12 @@ type OptOutForRolesPayload {
 union OptInForRolesPayloadOrError = OptInForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 union OptOutForRolesPayloadOrError = OptOutForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 
+type SetPersonaPayload {
+  viewer: Viewer
+}
+
+union SetPersonaPayloadOrError = SetPersonaPayload | ErrNotAuthorized | ErrInvalidInput
+
 input UploadPersistedQueriesInput {
   persistedQueries: String
 }
@@ -3077,6 +3091,8 @@ type Mutation {
 
   optInForRoles(roles: [Role!]!): OptInForRolesPayloadOrError @authRequired
   optOutForRoles(roles: [Role!]!): OptOutForRolesPayloadOrError @authRequired
+
+  setPersona(persona: Persona!): SetPersonaPayloadOrError @authRequired
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth

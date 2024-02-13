@@ -2057,6 +2057,18 @@ func (r *mutationResolver) OptOutForRoles(ctx context.Context, roles []persist.R
 	return payload, nil
 }
 
+// SetPersona is the resolver for the setPersona field.
+func (r *mutationResolver) SetPersona(ctx context.Context, persona persist.Persona) (model.SetPersonaPayloadOrError, error) {
+	err := publicapi.For(ctx).User.SetPersona(ctx, persona)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.SetPersonaPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+}
+
 // AddRolesToUser is the resolver for the addRolesToUser field.
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
@@ -3470,6 +3482,11 @@ func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Vi
 // UserExperiences is the resolver for the userExperiences field.
 func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error) {
 	return resolveViewerExperiencesByUserID(ctx, obj.UserId)
+}
+
+// Persona is the resolver for the persona field.
+func (r *viewerResolver) Persona(ctx context.Context, obj *model.Viewer) (*persist.Persona, error) {
+	return resolveViewerPersonaByUserID(ctx, obj.UserId)
 }
 
 // SuggestedUsers is the resolver for the suggestedUsers field.

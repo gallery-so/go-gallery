@@ -1783,6 +1783,31 @@ func (api UserAPI) UnblockUser(ctx context.Context, userID persist.DBID) error {
 	return api.queries.UnblockUser(ctx, db.UnblockUserParams{UserID: viewerID, BlockedUserID: userID})
 }
 
+func (api UserAPI) SetPersona(ctx context.Context, persona persist.Persona) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"persona": validate.WithTag(persona, "required,persona"),
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.SetPersonaByUserID(ctx, db.SetPersonaByUserIDParams{
+		UserID:  userID,
+		Persona: persona,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRecord) (uri string, err error) {
 	switch u := r.(type) {
 	case nil:

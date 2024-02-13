@@ -710,6 +710,7 @@ type User struct {
 	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
 	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
 	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+	Persona              persist.Persona                  `db:"persona" json:"persona"`
 }
 
 type UserBlocklist struct {

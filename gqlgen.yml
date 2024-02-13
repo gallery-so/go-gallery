@@ -121,6 +121,9 @@ models:
   DarkMode:
     model:
       - github.com/mikeydub/go-gallery/service/persist.DarkMode
+  Persona:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Persona
 directives:
   goGqlId:
     skip_runtime: true
