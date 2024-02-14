@@ -262,7 +262,7 @@ func (m *connectionManager) start() {
 	connections := make([]*connection, len(m.connections))
 
 	for i := 0; i < len(m.connections); i++ {
-		outgoing := make(chan StateChange)
+		outgoing := make(chan StateChange, 10)
 		m.connections[i] = outgoing
 		m.setRemoteState(i, Connecting)
 		connections[i] = newConnection(m.incoming, outgoing, m.taskClient, i)
