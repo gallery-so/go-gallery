@@ -250,9 +250,6 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 
 	user, err := e.UserRepo.GetByVerifiedEmail(pCtx, authedEmail)
 	if err != nil {
-		if util.ErrorIs[persist.ErrUserNotFound](err) {
-			return &authResult, ErrEmailUnverified
-		}
 		return &authResult, err
 	}
 
