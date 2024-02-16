@@ -132,15 +132,6 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-// GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      persist.ChainZora,
-		ChainID:    persist.MustChainToChainID(persist.ChainZora),
-		ProviderID: "zora",
-	}
-}
-
 type getBalanceTokensResponse struct {
 	Tokens      []zoraBalanceToken `json:"results"`
 	HasNextPage bool               `json:"has_next_page"`

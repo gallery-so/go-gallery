@@ -94,14 +94,6 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-func (p *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      persist.ChainTezos,
-		ChainID:    0,
-		ProviderID: "tzkt",
-	}
-}
-
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tzAddr, err := tezos.ToAddress(addr)

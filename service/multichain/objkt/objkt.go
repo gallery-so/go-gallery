@@ -97,14 +97,6 @@ func NewProvider() *Provider {
 	}
 }
 
-func (p *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      persist.ChainTezos,
-		ChainID:    0,
-		ProviderID: "objkt",
-	}
-}
-
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	t, _, err := p.GetTokensByTokenIdentifiers(ctx, ti)
 	if err != nil {

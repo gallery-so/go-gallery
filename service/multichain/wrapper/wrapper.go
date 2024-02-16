@@ -72,9 +72,7 @@ func (o MultiProviderWrapperOpts) WithTokenIdentifierOwnerFetchers(a, b multicha
 }
 
 func (o MultiProviderWrapperOpts) WithContractFetchers(a, b multichain.ContractFetcher) func(*MultiProviderWrapper) {
-	return func(m *MultiProviderWrapper) {
-		m.ContractFetchers = [2]multichain.ContractFetcher{a, b}
-	}
+	return func(m *MultiProviderWrapper) { m.ContractFetchers = [2]multichain.ContractFetcher{a, b} }
 }
 
 func (o MultiProviderWrapperOpts) WithTokenDescriptorsFetchers(a, b multichain.TokenDescriptorsFetcher) func(*MultiProviderWrapper) {
@@ -84,9 +82,7 @@ func (o MultiProviderWrapperOpts) WithTokenDescriptorsFetchers(a, b multichain.T
 }
 
 func (o MultiProviderWrapperOpts) WithTokenMetadataFetchers(a, b multichain.TokenMetadataFetcher) func(*MultiProviderWrapper) {
-	return func(m *MultiProviderWrapper) {
-		m.TokenMetadataFetchers = [2]multichain.TokenMetadataFetcher{a, b}
-	}
+	return func(m *MultiProviderWrapper) { m.TokenMetadataFetchers = [2]multichain.TokenMetadataFetcher{a, b} }
 }
 
 func (o MultiProviderWrapperOpts) WithTokensIncrementalContractFetchers(a, b multichain.TokensIncrementalContractFetcher) func(*MultiProviderWrapper) {
@@ -107,20 +103,16 @@ type MultiProviderWrapper struct {
 }
 
 func NewMultiProviderWrapper(opts ...func(*MultiProviderWrapper)) *MultiProviderWrapper {
-	var m *MultiProviderWrapper
+	m := &MultiProviderWrapper{}
 	for _, o := range opts {
 		o(m)
 	}
 	return m
 }
 
-func NewMultiProviderTokensIncrementalOwnerFetchers(a, b multichain.TokensIncrementalOwnerFetcher) multichain.TokensIncrementalOwnerFetcher {
-	return NewMultiProviderWrapper(MultiProviderWapperOptions.WithTokensIncrementalOwnerFetchers(a, b))
-}
-
-func (m MultiProviderWrapper) GetContractByAddress(ctx context.Context, contract persist.Address) (c multichain.ChainAgnosticContract, err error) {
+func (m MultiProviderWrapper) GetContractByAddress(ctx context.Context, address persist.Address) (c multichain.ChainAgnosticContract, err error) {
 	for _, f := range m.ContractFetchers {
-		if c, err = f.GetContractByAddress(ctx, contract); err == nil {
+		if c, err = f.GetContractByAddress(ctx, address); err == nil {
 			return
 		}
 	}
@@ -145,9 +137,9 @@ func (m MultiProviderWrapper) GetTokenDescriptorsByTokenIdentifiers(ctx context.
 	return
 }
 
-func (m MultiProviderWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (mt persist.TokenMetadata, err error) {
+func (m MultiProviderWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (tm persist.TokenMetadata, err error) {
 	for _, f := range m.TokenMetadataFetchers {
-		if mt, err = f.GetTokenMetadataByTokenIdentifiers(ctx, ti); err == nil {
+		if tm, err = f.GetTokenMetadataByTokenIdentifiers(ctx, ti); err == nil {
 			return
 		}
 	}
@@ -216,6 +208,7 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ProviderPage, errCh chan
 // PlaceholderWrapper is a service for adding placeholder media to tokens.
 // Batching pattern adapted from dataloaden (https://github.com/vektah/dataloaden)
 type PlaceholderWrapper struct {
+	chain             persist.Chain
 	reservoirProvider *reservoir.Provider
 	ctx               context.Context
 	mu                sync.Mutex
@@ -227,6 +220,7 @@ type PlaceholderWrapper struct {
 
 func NewPlaceholderWrapper(ctx context.Context, httpClient *http.Client, chain persist.Chain) *PlaceholderWrapper {
 	return &PlaceholderWrapper{
+		chain:             chain,
 		reservoirProvider: reservoir.NewProvider(httpClient, chain),
 		ctx:               ctx,
 		wait:              250 * time.Millisecond,
@@ -288,7 +282,7 @@ func (w *PlaceholderWrapper) addToken(t multichain.ChainAgnosticToken) func() (p
 	ti := persist.TokenIdentifiers{
 		TokenID:         t.TokenID,
 		ContractAddress: t.ContractAddress,
-		Chain:           w.reservoirProvider.ProviderInfo().Chain,
+		Chain:           w.chain,
 	}
 
 	w.mu.Lock()

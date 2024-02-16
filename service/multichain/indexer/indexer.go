@@ -44,14 +44,6 @@ func NewProvider(httpClient *http.Client, ec *ethclient.Client) *Provider {
 	}
 }
 
-func (d *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      persist.ChainETH,
-		ChainID:    persist.MustChainToChainID(persist.ChainETH),
-		ProviderID: "eth",
-	}
-}
-
 // GetContractByAddress retrieves an ethereum contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
 	logger.For(ctx).Warn("ETH")

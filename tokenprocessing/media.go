@@ -402,14 +402,15 @@ func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, err
 }
 
 func findImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords, animKeywords []string, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
+	// predicting is not critical, so we can afford to give it a timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
-
-	imgURL, vURL, err := media.FindImageAndAnimationURLs(ctx, metadata, imgKeywords, animKeywords)
+	imgURL, vURL, err := media.PredictMediaURLs(ctx, metadata, imgKeywords, animKeywords)
 	if err != nil {
 		persist.FailStep(&pMeta.MediaURLsRetrieval)
 	}
-
 	return imgURL, vURL, err
 }
 

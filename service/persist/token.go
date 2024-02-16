@@ -109,23 +109,6 @@ const (
 	MaxChainValue = ChainBase
 )
 
-var chainToID = map[Chain]int{
-	ChainETH:      0,
-	ChainArbitrum: 42161,
-	ChainPolygon:  137,
-	ChainOptimism: 10,
-	ChainZora:     7777777,
-	ChainBase:     84531,
-}
-
-func MustChainToChainID(c Chain) int {
-	id, ok := chainToID[c]
-	if !ok {
-		panic(fmt.Sprintf("%d is not mapped to a blockchain ID", c))
-	}
-	return id
-}
-
 func MustTokenID(s string) TokenID {
 	return TokenID(MustHexString(s))
 }

@@ -135,14 +135,6 @@ func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
 	return &Provider{httpClient: httpClient, Chain: chain}
 }
 
-func (p *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      p.Chain,
-		ChainID:    persist.MustChainToChainID(p.Chain),
-		ProviderID: "opensea",
-	}
-}
-
 // GetTokensByWalletAddress returns a list of tokens for an address
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	outCh := make(chan assetsReceived)

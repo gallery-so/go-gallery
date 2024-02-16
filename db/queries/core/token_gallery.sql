@@ -36,11 +36,11 @@ with token_definitions_insert as (
   )
   on conflict (chain, contract_id, token_id) where deleted = false
   do update set
-    last_updated = excluded.last_updated
-    , name = coalesce(nullif(excluded.name, ''), nullif(token_definitions.name, ''))
-    , description = coalesce(nullif(excluded.description, ''), nullif(token_definitions.description, ''))
+    last_updated = now()
+    , name = excluded.name
+    , description = excluded.description
     , token_type = excluded.token_type
-    , external_url = coalesce(nullif(excluded.external_url, ''), nullif(token_definitions.external_url, ''))
+    , external_url = excluded.external_url
     , fallback_media = excluded.fallback_media
     , contract_address = excluded.contract_address
     , metadata = excluded.metadata

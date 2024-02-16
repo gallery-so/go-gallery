@@ -112,14 +112,6 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-func (d *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      persist.ChainPOAP,
-		ChainID:    0,
-		ProviderID: "poap",
-	}
-}
-
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Poap Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 

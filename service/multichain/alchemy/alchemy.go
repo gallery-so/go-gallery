@@ -192,14 +192,6 @@ func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
 	}
 }
 
-func (d *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      d.chain,
-		ChainID:    persist.MustChainToChainID(d.chain),
-		ProviderID: "alchemy",
-	}
-}
-
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
@@ -485,22 +477,13 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	if d.chain == persist.ChainETH {
-		// don't use alchemy for ETH
-		return nil, fmt.Errorf("not implemented")
-	}
-
-	logger.For(ctx).Infof("no cached metadata for %s", ti)
-
 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, true, 0)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(tokens) == 0 {
 		return nil, nil
 	}
-
 	return tokens[0].TokenMetadata, nil
 }
 
