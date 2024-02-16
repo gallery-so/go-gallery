@@ -620,22 +620,24 @@ type TokenCommunityMembership struct {
 }
 
 type TokenDefinition struct {
-	ID              persist.DBID          `db:"id" json:"id"`
-	CreatedAt       time.Time             `db:"created_at" json:"created_at"`
-	LastUpdated     time.Time             `db:"last_updated" json:"last_updated"`
-	Deleted         bool                  `db:"deleted" json:"deleted"`
-	Name            sql.NullString        `db:"name" json:"name"`
-	Description     sql.NullString        `db:"description" json:"description"`
-	TokenType       persist.TokenType     `db:"token_type" json:"token_type"`
-	TokenID         persist.TokenID       `db:"token_id" json:"token_id"`
-	ExternalUrl     sql.NullString        `db:"external_url" json:"external_url"`
-	Chain           persist.Chain         `db:"chain" json:"chain"`
-	Metadata        persist.TokenMetadata `db:"metadata" json:"metadata"`
-	FallbackMedia   persist.FallbackMedia `db:"fallback_media" json:"fallback_media"`
-	ContractAddress persist.Address       `db:"contract_address" json:"contract_address"`
-	ContractID      persist.DBID          `db:"contract_id" json:"contract_id"`
-	TokenMediaID    persist.DBID          `db:"token_media_id" json:"token_media_id"`
-	IsFxhash        bool                  `db:"is_fxhash" json:"is_fxhash"`
+	ID               persist.DBID          `db:"id" json:"id"`
+	CreatedAt        time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated      time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted          bool                  `db:"deleted" json:"deleted"`
+	Name             sql.NullString        `db:"name" json:"name"`
+	Description      sql.NullString        `db:"description" json:"description"`
+	TokenType        persist.TokenType     `db:"token_type" json:"token_type"`
+	TokenID          persist.TokenID       `db:"token_id" json:"token_id"`
+	ExternalUrl      sql.NullString        `db:"external_url" json:"external_url"`
+	Chain            persist.Chain         `db:"chain" json:"chain"`
+	Metadata         persist.TokenMetadata `db:"metadata" json:"metadata"`
+	FallbackMedia    persist.FallbackMedia `db:"fallback_media" json:"fallback_media"`
+	ContractAddress  persist.Address       `db:"contract_address" json:"contract_address"`
+	ContractID       persist.DBID          `db:"contract_id" json:"contract_id"`
+	TokenMediaID     persist.DBID          `db:"token_media_id" json:"token_media_id"`
+	IsFxhash         bool                  `db:"is_fxhash" json:"is_fxhash"`
+	Provider         sql.NullString        `db:"provider" json:"provider"`
+	ProviderPriority string                `db:"provider_priority" json:"provider_priority"`
 }
 
 type TokenMedia struct {

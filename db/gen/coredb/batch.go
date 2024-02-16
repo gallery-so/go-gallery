@@ -2043,7 +2043,7 @@ with community_data as (
     limit 1
 )
 
-(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd
     join tokens t on t.contract_id = cd.contract_id
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
@@ -2059,7 +2059,7 @@ limit $2)
 
 union all
 
-(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd, tokens t
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd, tokens t
     join token_community_memberships tcm on t.token_definition_id = tcm.token_definition_id
     join token_definitions td on td.id = t.token_definition_id
     join users u on u.id = t.owner_user_id
@@ -2167,6 +2167,8 @@ func (b *GetFrameTokensByCommunityIDBatchResults) Query(f func(int, []GetFrameTo
 					&i.TokenDefinition.ContractID,
 					&i.TokenDefinition.TokenMediaID,
 					&i.TokenDefinition.IsFxhash,
+					&i.TokenDefinition.Provider,
+					&i.TokenDefinition.ProviderPriority,
 					&i.Contract.ID,
 					&i.Contract.Deleted,
 					&i.Contract.Version,
@@ -3585,7 +3587,7 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Close() error {
 }
 
 const getTokenByIdBatch = `-- name: GetTokenByIdBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
 where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false
@@ -3659,6 +3661,8 @@ func (b *GetTokenByIdBatchBatchResults) QueryRow(f func(int, GetTokenByIdBatchRo
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
+			&i.TokenDefinition.Provider,
+			&i.TokenDefinition.ProviderPriority,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -3672,7 +3676,7 @@ func (b *GetTokenByIdBatchBatchResults) Close() error {
 }
 
 const getTokenByIdIgnoreDisplayableBatch = `-- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
 join token_medias tm on td.token_media_id = tm.id
@@ -3748,6 +3752,8 @@ func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) QueryRow(f func(int, Ge
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
+			&i.TokenDefinition.Provider,
+			&i.TokenDefinition.ProviderPriority,
 			&i.TokenMedia.ID,
 			&i.TokenMedia.CreatedAt,
 			&i.TokenMedia.LastUpdated,
@@ -3769,7 +3775,7 @@ func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) Close() error {
 }
 
 const getTokenByUserTokenIdentifiersBatch = `-- name: GetTokenByUserTokenIdentifiersBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
 from tokens t, token_definitions td, contracts c
 where t.token_definition_id = td.id
     and td.contract_id = c.id
@@ -3863,6 +3869,8 @@ func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) QueryRow(f func(int, G
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
+			&i.TokenDefinition.Provider,
+			&i.TokenDefinition.ProviderPriority,
 			&i.Contract.ID,
 			&i.Contract.Deleted,
 			&i.Contract.Version,
@@ -3895,7 +3903,7 @@ func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) Close() error {
 }
 
 const getTokenByUserTokenIdentifiersIgnoreDisplayableBatch = `-- name: GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain, tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain, tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted
 from tokens t, token_definitions td, contracts c, token_medias tm
 where t.token_definition_id = td.id
     and td.contract_id = c.id
@@ -3990,6 +3998,8 @@ func (b *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchBatchResults) Query
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
+			&i.TokenDefinition.Provider,
+			&i.TokenDefinition.ProviderPriority,
 			&i.Contract.ID,
 			&i.Contract.Deleted,
 			&i.Contract.Version,
@@ -4030,7 +4040,7 @@ func (b *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchBatchResults) Close
 }
 
 const getTokenDefinitionByIdBatch = `-- name: GetTokenDefinitionByIdBatch :batchone
-select id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id, is_fxhash from token_definitions where id = $1 and not deleted
+select id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id, is_fxhash, provider, provider_priority from token_definitions where id = $1 and not deleted
 `
 
 type GetTokenDefinitionByIdBatchBatchResults struct {
@@ -4079,6 +4089,8 @@ func (b *GetTokenDefinitionByIdBatchBatchResults) QueryRow(f func(int, TokenDefi
 			&i.ContractID,
 			&i.TokenMediaID,
 			&i.IsFxhash,
+			&i.Provider,
+			&i.ProviderPriority,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4183,7 +4195,7 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Close() error {
 }
 
 const getTokensByUserIdBatch = `-- name: GetTokensByUserIdBatch :batchmany
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
 join contracts c on c.id = td.contract_id
@@ -4280,6 +4292,8 @@ func (b *GetTokensByUserIdBatchBatchResults) Query(f func(int, []GetTokensByUser
 					&i.TokenDefinition.ContractID,
 					&i.TokenDefinition.TokenMediaID,
 					&i.TokenDefinition.IsFxhash,
+					&i.TokenDefinition.Provider,
+					&i.TokenDefinition.ProviderPriority,
 					&i.Contract.ID,
 					&i.Contract.Deleted,
 					&i.Contract.Version,
@@ -6500,7 +6514,7 @@ with community_data as (
     limit 1
 )
 
-(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd
     join tokens t on t.contract_id = cd.contract_id
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
@@ -6520,7 +6534,7 @@ limit $7)
 
 union all
 
-(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd, tokens t
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, td.provider, td.provider_priority, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd, tokens t
     join token_community_memberships tcm on t.token_definition_id = tcm.token_definition_id
     join token_definitions td on td.id = t.token_definition_id
     join users u on u.id = t.owner_user_id
@@ -6640,6 +6654,8 @@ func (b *PaginateTokensByCommunityIDBatchResults) Query(f func(int, []PaginateTo
 					&i.TokenDefinition.ContractID,
 					&i.TokenDefinition.TokenMediaID,
 					&i.TokenDefinition.IsFxhash,
+					&i.TokenDefinition.Provider,
+					&i.TokenDefinition.ProviderPriority,
 					&i.Contract.ID,
 					&i.Contract.Deleted,
 					&i.Contract.Version,
