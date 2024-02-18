@@ -63,8 +63,6 @@ func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Add
 	}
 }
 
-const farcasterRefetchTime = time.Hour * 24 * 3
-
 func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider persist.SocialProvider, before, after *string, first, last *int, onlyUnfollowing *bool) ([]model.SocialConnection, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
