@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -116,6 +117,12 @@ type notificationsEmailDynamicTemplateData struct {
 
 func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
+	gid := env.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")
+	gidInt, err := strconv.Atoi(gid)
+	if err != nil {
+		panic(err)
+	}
+
 	return func(c *gin.Context) {
 
 		var input sendNotificationEmailHttpInput
@@ -130,7 +137,7 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 			return
 		}
 
-		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, queries, s, 10, 5, input.SendRealEmails); err != nil {
+		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, gidInt, queries, s, 10, 5, input.SendRealEmails); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -191,13 +198,19 @@ func sendAnnouncementNotification(q *coredb.Queries) gin.HandlerFunc {
 
 func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {
 
+	gid := env.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")
+	gidInt, err := strconv.Atoi(gid)
+	if err != nil {
+		return err
+	}
+
 	emailsSent := new(atomic.Uint64)
 	defer func() {
 		logger.For(c).Infof("sent %d emails", emailsSent.Load())
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.PiiUserView) error {
 
-		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, queries, s, 10, 5, sendRealEmails)
+		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, gidInt, queries, s, 10, 5, sendRealEmails)
 		if err != nil {
 			return err
 		}
@@ -213,7 +226,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	})
 }
 
-func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
+func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, unsubscribeGroupID int, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
 
 	// generate notification data for user
 	notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
@@ -291,6 +304,9 @@ outer:
 		p.DynamicTemplateData = asMap
 		m.AddPersonalizations(p)
 		p.AddTos(to)
+		asm := mail.NewASM()
+		asm.SetGroupID(unsubscribeGroupID)
+		m.SetASM(asm)
 
 		response, err := s.Send(m)
 		if err != nil {
@@ -350,6 +366,13 @@ func sendDigestEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cach
 
 // sendDigestTestEmail sends a digest email to an admin user's email address.
 func sendDigestTestEmail(q *coredb.Queries, s *sendgrid.Client, b *store.BucketStorer, gql *graphql.Client) gin.HandlerFunc {
+
+	gid := env.GetString("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID")
+	gidInt, err := strconv.Atoi(gid)
+	if err != nil {
+		panic(err)
+	}
+
 	// Ideally this is handled via OAuth in Retool
 	return func(ctx *gin.Context) {
 		var input struct {
@@ -401,7 +424,7 @@ func sendDigestTestEmail(q *coredb.Queries, s *sendgrid.Client, b *store.BucketS
 			return
 		}
 
-		r, err := sendDigestEmailToUser(ctx, userWithPII, userWithPII.PiiEmailAddress, template, s)
+		r, err := sendDigestEmailToUser(ctx, userWithPII, userWithPII.PiiEmailAddress, gidInt, template, s)
 		if err != nil {
 			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
@@ -418,6 +441,12 @@ func sendDigestTestEmail(q *coredb.Queries, s *sendgrid.Client, b *store.BucketS
 
 func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *coredb.Queries, s *sendgrid.Client) error {
 
+	gid := env.GetString("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID")
+	gidInt, err := strconv.Atoi(gid)
+	if err != nil {
+		panic(err)
+	}
+
 	logger.For(c).Infof("sending digest emails to all users with values: %+v", v)
 	emailsSent := new(atomic.Uint64)
 	defer func() {
@@ -425,7 +454,7 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeDigest, queries, func(u coredb.PiiUserView) error {
 
-		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, v, s)
+		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, gidInt, v, s)
 		if err != nil {
 			return err
 		}
@@ -441,7 +470,7 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 	})
 }
 
-func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, digestValues DigestValues, s *sendgrid.Client) (*rest.Response, error) {
+func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, unsubscribeGroupID int, digestValues DigestValues, s *sendgrid.Client) (*rest.Response, error) {
 	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
@@ -480,6 +509,9 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 	m.AddPersonalizations(p)
 	m.AddCategories("weekly_digest")
 	p.AddTos(to)
+	asm := mail.NewASM()
+	asm.SetGroupID(unsubscribeGroupID)
+	m.SetASM(asm)
 
 	response, err := s.Send(m)
 	if err != nil {
