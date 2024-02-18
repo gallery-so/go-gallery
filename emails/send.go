@@ -141,12 +141,14 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 
 func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		l, _ := r.Get(ctx, "send-notification-emails")
-		if len(l) > 0 {
-			logger.For(ctx).Infof("notification emails already being sent")
-			return
+		if env.GetString("ENV") == "production" {
+			l, _ := r.Get(ctx, "send-notification-emails")
+			if len(l) > 0 {
+				logger.For(ctx).Infof("notification emails already being sent")
+				return
+			}
+			r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
 		}
-		r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
 		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
@@ -235,19 +237,24 @@ func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailR
 		Username:         u.Username.String,
 		UnsubscribeToken: j,
 	}
-	notifTemplates := make(chan notifications.UserFacingNotificationData)
+	notifTemplates := make(chan *notifications.UserFacingNotificationData)
 	errChan := make(chan error)
 
 	for _, n := range notifs {
+
 		notif := n
 		go func() {
+			// don't send viewed gallery notifications
+			if notif.Action == persist.ActionViewedGallery {
+				notifTemplates <- nil
+			}
 			// notifTemplate, err := notifToTemplateData(c, queries, notif)
 			notifTemplate, err := notifications.NotificationToUserFacingData(c, queries, notif)
 			if err != nil {
 				errChan <- err
 				return
 			}
-			notifTemplates <- notifTemplate
+			notifTemplates <- &notifTemplate
 		}()
 	}
 
@@ -257,7 +264,10 @@ outer:
 		case err := <-errChan:
 			logger.For(c).Errorf("failed to get notification template data: %v", err)
 		case notifTemplate := <-notifTemplates:
-			data.Notifications = append(data.Notifications, notifTemplate)
+			if notifTemplate == nil {
+				continue
+			}
+			data.Notifications = append(data.Notifications, *notifTemplate)
 			if len(data.Notifications) >= resultLimit {
 				break outer
 			}

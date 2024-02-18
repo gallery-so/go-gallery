@@ -160,9 +160,9 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 
 func seedAdmireNotif(ctx context.Context, t *testing.T, q *coredb.Queries, userID persist.DBID, userID2 persist.DBID) {
 
-	admire, err := q.CreateAdmire(ctx, coredb.CreateAdmireParams{
-		ActorID:   userID2,
-		FeedEvent: sql.NullString{String: feedEvent.ID.String(), Valid: true},
+	admire, err := q.CreateFeedEventAdmire(ctx, coredb.CreateFeedEventAdmireParams{
+		ActorID:     userID2,
+		FeedEventID: feedEvent.ID,
 	})
 
 	if err != nil {
