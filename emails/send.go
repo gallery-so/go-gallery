@@ -215,7 +215,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	})
 }
 
-func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
+func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int) (*rest.Response, error) {
 
 	// generate notification data for user
 	notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
@@ -290,28 +290,22 @@ outer:
 		return nil, err
 	}
 
-	if sendRealEmail {
-		// send email
-		from := mail.NewEmail("Gallery", env.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(u.Username.String, emailRecipient.String())
-		m := mail.NewV3Mail()
-		m.SetFrom(from)
-		p := mail.NewPersonalization()
-		m.SetTemplateID(env.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
-		p.DynamicTemplateData = asMap
-		m.AddPersonalizations(p)
-		p.AddTos(to)
+	// send email
+	from := mail.NewEmail("Gallery", env.GetString("FROM_EMAIL"))
+	to := mail.NewEmail(u.Username.String, emailRecipient.String())
+	m := mail.NewV3Mail()
+	m.SetFrom(from)
+	p := mail.NewPersonalization()
+	m.SetTemplateID(env.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
+	p.DynamicTemplateData = asMap
+	m.AddPersonalizations(p)
+	p.AddTos(to)
 
-		response, err := s.Send(m)
-		if err != nil {
-			return nil, err
-		}
-		return response, nil
+	response, err := s.Send(m)
+	if err != nil {
+		return nil, err
 	}
-
-	logger.For(c).Infof("would have sent email to %s (username: %s): %s", u.ID, u.Username.String, string(asJSON))
-
-	return &rest.Response{StatusCode: 200, Body: "not sending real emails", Headers: map[string][]string{}}, nil
+	return response, nil
 }
 
 type digestEmailDynamicTemplateData struct {
@@ -525,6 +519,8 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 		if err != nil {
 			return err
 		}
+
+		logger.For(ctx).Infof("got %d users with notifications on for email type %s", len(users), emailType)
 
 		for _, user := range users {
 			u := user
