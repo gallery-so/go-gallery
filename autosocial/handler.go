@@ -199,12 +199,16 @@ func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, ad
 		}
 		// we only store one farcaster profile per user
 		u := fusers[0]
-	inner:
+
 		for _, fuser := range fusers {
 			if fuser.Fid.String() != "" && fuser.ActiveStatus == "active" {
 				u = fuser
-				break inner
+				break
 			}
+		}
+
+		if u.ActiveStatus != "active" || u.Fid.String() == "" {
+			continue
 		}
 
 		guser, ok := userLookup[address]

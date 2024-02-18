@@ -170,6 +170,8 @@ func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Ad
 		return nil, err
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		bs, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -177,8 +179,6 @@ func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Ad
 		}
 		return nil, fmt.Errorf("neynar returned status %d (%s)", resp.StatusCode, bs)
 	}
-
-	defer resp.Body.Close()
 
 	var neynarResp map[persist.Address][]NeynarUser
 	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
