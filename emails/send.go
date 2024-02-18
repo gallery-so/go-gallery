@@ -246,6 +246,7 @@ func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailR
 			// don't send viewed gallery notifications
 			if notif.Action == persist.ActionViewedGallery {
 				notifTemplates <- nil
+				return
 			}
 			// notifTemplate, err := notifToTemplateData(c, queries, notif)
 			notifTemplate, err := notifications.NotificationToUserFacingData(c, queries, notif)
