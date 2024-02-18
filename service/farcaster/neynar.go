@@ -18,12 +18,14 @@ import (
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 )
 
 const neynarV1BaseURL = "https://api.neynar.com/v1/farcaster"
 const neynarV2BaseURL = "https://api.neynar.com/v2/farcaster"
 const expirationSeconds = time.Minute * 10
+const followingCacheExpiration = time.Hour * 24 * 3
 
 func init() {
 	env.RegisterValidation("NEYNAR_API_KEY", "required")
@@ -32,12 +34,14 @@ func init() {
 type NeynarAPI struct {
 	httpClient *http.Client
 	apiKey     string
+	cache      *redis.Cache
 }
 
-func NewNeynarAPI(httpClient *http.Client) *NeynarAPI {
+func NewNeynarAPI(httpClient *http.Client, redisCache *redis.Cache) *NeynarAPI {
 	return &NeynarAPI{
 		httpClient: httpClient,
 		apiKey:     env.GetString("NEYNAR_API_KEY"),
+		cache:      redisCache,
 	}
 }
 
@@ -110,14 +114,14 @@ type NeynarUserByVerificationResponse struct {
 }
 
 func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) (NeynarUser, error) {
-	u := fmt.Sprintf("%s/user-by-verification/?api_key=%s&address=%s", neynarV1BaseURL, n.apiKey, address)
+	u := fmt.Sprintf("%s/user-by-verification?address=%s", neynarV1BaseURL, address)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return NeynarUser{}, err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", n.apiKey)
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("api_key", n.apiKey)
 
 	resp, err := n.httpClient.Do(req)
 	if err != nil {
@@ -152,15 +156,26 @@ type NeynarFollowingByUserIDResponse struct {
 }
 
 func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]NeynarUser, error) {
-	// e.g. https://api.neynar.com/v1/farcaster/following/?api_key={$api-key}&fid=3
-	u := fmt.Sprintf("%s/following/?api_key=%s&fid=%s", neynarV1BaseURL, n.apiKey, fid)
+
+	if n.cache != nil {
+		if cached, err := n.cache.Get(ctx, fmt.Sprintf("neynar-following-%s", fid)); err == nil {
+			var users []NeynarUser
+			if err := json.Unmarshal(cached, &users); err != nil {
+				return nil, err
+			}
+			return users, nil
+		}
+	}
+
+	// e.g. https://api.neynar.com/v1/farcaster/following?fid=3
+	u := fmt.Sprintf("%s/following?fid=%s", neynarV1BaseURL, fid)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", n.apiKey)
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("api_key", n.apiKey)
 
 	resp, err := n.httpClient.Do(req)
 	if err != nil {
@@ -176,6 +191,17 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 
 	if neynarResp.Result == nil {
 		return nil, fmt.Errorf("no following result for %s", fid)
+	}
+
+	if n.cache != nil {
+		asJSON, err := json.Marshal(neynarResp.Result.Users)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := n.cache.Set(ctx, fmt.Sprintf("neynar-following-%s", fid), asJSON, followingCacheExpiration); err != nil {
+			return nil, err
+		}
 	}
 
 	return neynarResp.Result.Users, nil
@@ -202,11 +228,14 @@ type SignedKeyRequest struct {
 }
 
 func (n *NeynarAPI) CreateSignerForUser(ctx context.Context, fid NeynarID) (NeynarSigner, error) {
-	su := fmt.Sprintf("%s/signer/?api_key=%s", neynarV2BaseURL, n.apiKey)
+	su := fmt.Sprintf("%s/signer", neynarV2BaseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, su, nil)
 	if err != nil {
 		return NeynarSigner{}, err
 	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("api_key", n.apiKey)
 
 	sResp, err := n.httpClient.Do(req)
 	if err != nil {
@@ -235,7 +264,7 @@ func (n *NeynarAPI) CreateSignerForUser(ctx context.Context, fid NeynarID) (Neyn
 		return NeynarSigner{}, err
 	}
 
-	rsu := fmt.Sprintf("%s/signer/signed_key/?api_key=%s", neynarV2BaseURL, n.apiKey)
+	rsu := fmt.Sprintf("%s/signer/signed_key", neynarV2BaseURL)
 	in := map[string]any{
 		"signer_uuid": curSigner.SignerUUID,
 		"signature":   fmt.Sprintf("0x%s", hex.EncodeToString(signature)),
@@ -251,6 +280,9 @@ func (n *NeynarAPI) CreateSignerForUser(ctx context.Context, fid NeynarID) (Neyn
 	if err != nil {
 		return NeynarSigner{}, err
 	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("api_key", n.apiKey)
 
 	rsResp, err := n.httpClient.Do(req)
 	if err != nil {
@@ -344,14 +376,14 @@ func signEIP712TypedData(wallet *hdwallet.Wallet, account accounts.Account, type
 }
 
 func (n *NeynarAPI) GetSignerByUUID(ctx context.Context, uuid string) (NeynarSigner, error) {
-	su := fmt.Sprintf("%s/signer/?api_key=%s&signer_uuid=%s", neynarV2BaseURL, n.apiKey, uuid)
+	su := fmt.Sprintf("%s/signer?signer_uuid=%s", neynarV2BaseURL, uuid)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, su, nil)
 	if err != nil {
 		return NeynarSigner{}, err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", n.apiKey)
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("api_key", n.apiKey)
 
 	sResp, err := n.httpClient.Do(req)
 	if err != nil {

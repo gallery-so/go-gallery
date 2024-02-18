@@ -3,9 +3,11 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/task"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/farcaster"
+	"github.com/mikeydub/go-gallery/service/task"
 
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -28,6 +30,7 @@ type SocialAPI struct {
 	validator  *validator.Validate
 	httpClient *http.Client
 	taskClient *task.Client
+	neynarAPI  *farcaster.NeynarAPI
 }
 
 func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string) *socialauth.TwitterAuthenticator {
@@ -108,6 +111,32 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 		socialIDs, _ = util.Map(following, func(t twitter.TwitterIdentifiers) (string, error) {
 			return t.ID, nil
 		})
+	case persist.SocialProviderFarcaster:
+		// first fetch the user's farcaster profile
+		socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+		far, hasFar := socials[persist.SocialProviderFarcaster]
+		if !hasFar {
+			return nil, PageInfo{}, nil
+		}
+
+		farcasterFollowing, err := api.neynarAPI.FollowingByUserID(ctx, far.ID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		initialConnections, _ = util.Map(farcasterFollowing, func(f farcaster.NeynarUser) (model.SocialConnection, error) {
+			return model.SocialConnection{
+				SocialID:       f.Fid.String(),
+				SocialType:     persist.SocialProviderFarcaster,
+				DisplayName:    f.DisplayName,
+				SocialUsername: f.Username,
+				ProfileImage:   f.Pfp.URL,
+			}, nil
+		})
+
 	default:
 		return nil, PageInfo{}, fmt.Errorf("unsupported social provider: %s", socialProvider)
 	}

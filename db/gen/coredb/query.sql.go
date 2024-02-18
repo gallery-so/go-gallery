@@ -5871,55 +5871,6 @@ func (q *Queries) InsertCommentMention(ctx context.Context, arg InsertCommentMen
 	return i, err
 }
 
-const insertExternalSocialConnectionsForUser = `-- name: InsertExternalSocialConnectionsForUser :many
-insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
-select id, $1::varchar, $2::varchar, followee_id
-from 
-(select unnest($3::varchar[]) as id, unnest($4::varchar[]) as followee_id) as bulk_upsert 
-returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
-`
-
-type InsertExternalSocialConnectionsForUserParams struct {
-	SocialAccountType string   `db:"social_account_type" json:"social_account_type"`
-	FollowerID        string   `db:"follower_id" json:"follower_id"`
-	Ids               []string `db:"ids" json:"ids"`
-	FolloweeIds       []string `db:"followee_ids" json:"followee_ids"`
-}
-
-func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, arg InsertExternalSocialConnectionsForUserParams) ([]ExternalSocialConnection, error) {
-	rows, err := q.db.Query(ctx, insertExternalSocialConnectionsForUser,
-		arg.SocialAccountType,
-		arg.FollowerID,
-		arg.Ids,
-		arg.FolloweeIds,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ExternalSocialConnection
-	for rows.Next() {
-		var i ExternalSocialConnection
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.SocialAccountType,
-			&i.FollowerID,
-			&i.FolloweeID,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Deleted,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const insertMention = `-- name: InsertMention :one
 insert into mentions (id, comment_id, user_id, community_id, start, length) values ($1, $2, $5, $6, $3, $4) returning id
 `

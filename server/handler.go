@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/task"
 
 	"cloud.google.com/go/pubsub"
@@ -46,24 +47,24 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization, neynar *farcaster.NeynarAPI) *gin.Engine {
 
 	graphqlGroup := router.Group("/glry/graphql")
-	graphqlHandlersInit(graphqlGroup, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, recommender, p)
+	graphqlHandlersInit(graphqlGroup, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, recommender, p, neynar)
 
 	router.GET("/alive", util.HealthCheckHandler())
 
 	return router
 }
 
-func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization) {
-	handler := graphqlHandler(repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, recommender, p)
+func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization, neynar *farcaster.NeynarAPI) {
+	handler := graphqlHandler(repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, recommender, p, neynar)
 	parent.Any("/query", middleware.ContinueSession(queries, authRefreshCache), handler)
 	parent.Any("/query/:operationName", middleware.ContinueSession(queries, authRefreshCache), handler)
 	parent.GET("/playground", graphqlPlaygroundHandler())
 }
 
-func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization) gin.HandlerFunc {
+func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization, neynar *farcaster.NeynarAPI) gin.HandlerFunc {
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler()
 	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
@@ -122,7 +123,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, httpClien
 	h.AroundFields(graphql.RemapAndReportErrors)
 
 	newPublicAPI := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
-		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, mp, taskClient, throttler, secrets, apqCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient)
+		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, mp, taskClient, throttler, secrets, apqCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, neynar)
 	}
 
 	notificationsHandler := notifications.New(queries, pub, taskClient, lock, true)
