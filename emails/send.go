@@ -41,9 +41,8 @@ func init() {
 const emailsAtATime = 10_000
 
 type sendNotificationEmailHttpInput struct {
-	UserID         persist.DBID  `json:"user_id" binding:"required"`
-	ToEmail        persist.Email `json:"to_email" binding:"required"`
-	SendRealEmails bool          `json:"send_real_emails"`
+	UserID  persist.DBID  `json:"user_id" binding:"required"`
+	ToEmail persist.Email `json:"to_email" binding:"required"`
 }
 
 type errNoEmailSet struct {
@@ -130,7 +129,7 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 			return
 		}
 
-		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, queries, s, 10, 5, input.SendRealEmails); err != nil {
+		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, queries, s, 10, 5); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -199,7 +198,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.PiiUserView) error {
 
-		response, err := sendNotificationEmailToUser(c, u, u.PiiVerifiedEmailAddress, queries, s, 10, 5, sendRealEmails)
+		response, err := sendNotificationEmailToUser(c, u, u.PiiVerifiedEmailAddress, queries, s, 10, 5)
 		if err != nil {
 			return err
 		}
