@@ -205,3 +205,25 @@ func (api CommunityAPI) PaginateTokensByCommunityID(ctx context.Context, communi
 
 	return paginator.paginate(before, after, first, last)
 }
+
+// GetFrameTokensByCommunityID is temporary and shouldn't be used outside of the TokensForFrame resolver
+func (api CommunityAPI) GetFrameTokensByCommunityID(ctx context.Context, communityID persist.DBID, limit int32) ([]db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"communityID": validate.WithTag(communityID, "required"),
+		"limit":       validate.WithTag(limit, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	results, err := api.loaders.GetFrameTokensByCommunityID.Load(db.GetFrameTokensByCommunityIDParams{
+		CommunityID: communityID,
+		Limit:       limit,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return util.MapWithoutError(results, func(r db.GetFrameTokensByCommunityIDRow) db.Token { return r.Token }), err
+}

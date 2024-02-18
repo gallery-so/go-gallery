@@ -104,7 +104,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_PUSH_NOTIFICATIONS_QUEUE", "projects/gallery-local/locations/here/queues/push-notifications")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
 	viper.SetDefault("PUSH_NOTIFICATIONS_URL", "http://localhost:8000")
-	viper.SetDefault("GALLERY_API", "http://localhost:4000")
+	viper.SetDefault("GALLERY_API", "http://localhost:4000/glry/graphql/query")
 
 	viper.AutomaticEnv()
 

@@ -111,6 +111,29 @@ func (api UserAPI) GetUserByVerifiedEmailAddress(ctx context.Context, emailAddre
 	return &user, nil
 }
 
+func (api UserAPI) VerifiedEmailAddressExists(ctx context.Context, emailAddress persist.Email) (bool, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"emailAddress": validate.WithTag(emailAddress, "required"),
+	}); err != nil {
+		return false, err
+	}
+
+	// Intentionally using queries here instead of a dataloader. Caching a user by email address is tricky
+	// because the key (email address) isn't part of the user object, and this method isn't currently invoked
+	// in a way that would benefit from dataloaders or caching anyway.
+	_, err := api.queries.GetUserByVerifiedEmailAddress(ctx, emailAddress.String())
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
 // GetUserWithPII returns the current user and their associated personally identifiable information
 func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.PiiUserView, error) {
 	// Nothing to validate
@@ -671,7 +694,7 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 	if err != nil {
 		return err
 	}
-	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
+	err = api.queries.UpdateUserUnverifiedEmail(ctx, db.UpdateUserUnverifiedEmailParams{
 		UserID:       userID,
 		EmailAddress: email,
 	})
@@ -1758,6 +1781,31 @@ func (api UserAPI) UnblockUser(ctx context.Context, userID persist.DBID) error {
 		return err
 	}
 	return api.queries.UnblockUser(ctx, db.UnblockUserParams{UserID: viewerID, BlockedUserID: userID})
+}
+
+func (api UserAPI) SetPersona(ctx context.Context, persona persist.Persona) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"persona": validate.WithTag(persona, "required,persona"),
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.SetPersonaByUserID(ctx, db.SetPersonaByUserIDParams{
+		UserID:  userID,
+		Persona: persona,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRecord) (uri string, err error) {

@@ -131,6 +131,13 @@ type GalleryUser implements Node @goEmbedHelper {
   isMemberOfCommunity(communityID: DBID!): Boolean! @goField(forceResolver: true)
 }
 
+enum Persona {
+  None
+  Collector
+  Creator
+  Both
+}
+
 type Wallet implements Node {
   id: ID!
   dbid: DBID!
@@ -666,6 +673,9 @@ type Community implements Node @goEmbedHelper {
   posts(before: String, after: String, first: Int, last: Int): PostsConnection
     @goField(forceResolver: true)
 
+  # Temporary fields
+  tokensForFrame(limit: Int!): [Token] @goField(forceResolver: true)
+
   # Deprecated fields
   contract: Contract
     @goField(forceResolver: true)
@@ -706,6 +716,8 @@ type Community implements Node @goEmbedHelper {
     first: Int
     last: Int
   ): CommunityGalleriesConnection @goField(forceResolver: true)
+
+  viewerIsMember: Boolean @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -817,6 +829,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 
   userExperiences: [UserExperience!] @goField(forceResolver: true)
+  persona: Persona @goField(forceResolver: true)
   suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
 }
@@ -1298,6 +1311,7 @@ enum Role {
   ADMIN
   BETA_TESTER
   EARLY_ACCESS
+  EMAIL_TESTER
 }
 
 enum MerchType {
@@ -1488,6 +1502,8 @@ type Query {
     poapAddressWeight: Float
     providerNameWeight: Float
   ): SearchCommunitiesPayloadOrError
+
+  isEmailAddressAvailable(emailAddress: Email!): Boolean
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
@@ -2431,6 +2447,12 @@ type OptOutForRolesPayload {
 union OptInForRolesPayloadOrError = OptInForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 union OptOutForRolesPayloadOrError = OptOutForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 
+type SetPersonaPayload {
+  viewer: Viewer
+}
+
+union SetPersonaPayloadOrError = SetPersonaPayload | ErrNotAuthorized | ErrInvalidInput
+
 input UploadPersistedQueriesInput {
   persistedQueries: String
 }
@@ -3069,6 +3091,8 @@ type Mutation {
 
   optInForRoles(roles: [Role!]!): OptInForRolesPayloadOrError @authRequired
   optOutForRoles(roles: [Role!]!): OptOutForRolesPayloadOrError @authRequired
+
+  setPersona(persona: Persona!): SetPersonaPayloadOrError @authRequired
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth

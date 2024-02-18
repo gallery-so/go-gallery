@@ -3271,7 +3271,7 @@ with sources as (
     union all select recommended_user_id from top_recommended_users
     union all select user_id from user_internal_recommendations
 ), top_recs as (select sources.id from sources group by sources.id order by count(id) desc, random())
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join top_recs using(id) where not users.deleted and not users.universal limit $1
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona from users join top_recs using(id) where not users.deleted and not users.universal limit $1
 `
 
 func (q *Queries) GetOnboardingUserRecommendations(ctx context.Context, limit int32) ([]User, error) {
@@ -3296,12 +3296,12 @@ func (q *Queries) GetOnboardingUserRecommendations(ctx context.Context, limit in
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -4417,7 +4417,7 @@ func (q *Queries) GetTokenFullDetailsByUserTokenIdentifiers(ctx context.Context,
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain, u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from tokens t
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain, u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from tokens t
     join token_definitions td on t.token_definition_id = td.id
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract_id = c.id
@@ -4539,12 +4539,12 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.User.Traits,
 			&i.User.Universal,
 			&i.User.NotificationSettings,
-			&i.User.EmailVerified,
 			&i.User.EmailUnsubscriptions,
 			&i.User.FeaturedGallery,
 			&i.User.PrimaryWalletID,
 			&i.User.UserExperiences,
 			&i.User.ProfileImageID,
+			&i.User.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -4684,7 +4684,7 @@ func (q *Queries) GetTopGalleriesByViews(ctx context.Context, windowEnd time.Tim
 }
 
 const getTrendingUsersByIDs = `-- name: GetTrendingUsersByIDs :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
 `
 
 func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) ([]User, error) {
@@ -4709,12 +4709,12 @@ func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) (
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -4757,7 +4757,7 @@ func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id per
 }
 
 const getUserByAddressAndL1 = `-- name: GetUserByAddressAndL1 :one
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
 from users, wallets
 where wallets.address = $1
 	and wallets.l1_chain = $2
@@ -4787,18 +4787,18 @@ func (q *Queries) GetUserByAddressAndL1(ctx context.Context, arg GetUserByAddres
 		&i.Traits,
 		&i.Universal,
 		&i.NotificationSettings,
-		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
 		&i.ProfileImageID,
+		&i.Persona,
 	)
 	return i, err
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -4817,18 +4817,18 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.Traits,
 		&i.Universal,
 		&i.NotificationSettings,
-		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
 		&i.ProfileImageID,
+		&i.Persona,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id from users where username_idempotent = lower($1) and deleted = false and universal = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona from users where username_idempotent = lower($1) and deleted = false and universal = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -4847,20 +4847,19 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Traits,
 		&i.Universal,
 		&i.NotificationSettings,
-		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
 		&i.ProfileImageID,
+		&i.Persona,
 	)
 	return i, err
 }
 
 const getUserByVerifiedEmailAddress = `-- name: GetUserByVerifiedEmailAddress :one
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u join pii.for_users p on u.id = p.user_id
-where p.pii_email_address = lower($1)
-  and u.email_verified != 0
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from users u join pii.for_users p on u.id = p.user_id
+where p.pii_verified_email_address = lower($1)
   and p.deleted = false
   and u.deleted = false
 `
@@ -4881,18 +4880,18 @@ func (q *Queries) GetUserByVerifiedEmailAddress(ctx context.Context, lower strin
 		&i.Traits,
 		&i.Universal,
 		&i.NotificationSettings,
-		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
 		&i.ProfileImageID,
+		&i.Persona,
 	)
 	return i, err
 }
 
 const getUserByWalletID = `-- name: GetUserByWalletID :one
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id from users where array[$1::varchar]::varchar[] <@ wallets and deleted = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona from users where array[$1::varchar]::varchar[] <@ wallets and deleted = false
 `
 
 func (q *Queries) GetUserByWalletID(ctx context.Context, wallet string) (User, error) {
@@ -4911,12 +4910,12 @@ func (q *Queries) GetUserByWalletID(ctx context.Context, wallet string) (User, e
 		&i.Traits,
 		&i.Universal,
 		&i.NotificationSettings,
-		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
 		&i.ProfileImageID,
+		&i.Persona,
 	)
 	return i, err
 }
@@ -5130,7 +5129,7 @@ func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUns
 }
 
 const getUserWithPIIByID = `-- name: GetUserWithPIIByID :one
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view where id = $1 and deleted = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, pii_unverified_email_address, pii_verified_email_address, pii_socials from pii.user_view where id = $1 and deleted = false
 `
 
 func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (PiiUserView, error) {
@@ -5149,19 +5148,20 @@ func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (
 		&i.Traits,
 		&i.Universal,
 		&i.NotificationSettings,
-		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
-		&i.PiiEmailAddress,
+		&i.ProfileImageID,
+		&i.PiiUnverifiedEmailAddress,
+		&i.PiiVerifiedEmailAddress,
 		&i.PiiSocials,
 	)
 	return i, err
 }
 
 const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.l1_chain = $2 AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.l1_chain = $2 AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
 `
 
 type GetUsersByChainAddressesParams struct {
@@ -5182,12 +5182,12 @@ type GetUsersByChainAddressesRow struct {
 	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
 	Universal            bool                             `db:"universal" json:"universal"`
 	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
-	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
 	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
 	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
 	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
 	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
 	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+	Persona              persist.Persona                  `db:"persona" json:"persona"`
 	Address              persist.Address                  `db:"address" json:"address"`
 }
 
@@ -5213,12 +5213,12 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 			&i.Address,
 		); err != nil {
 			return nil, err
@@ -5232,7 +5232,7 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE id = ANY($2) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona FROM users WHERE id = ANY($2) AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -5280,12 +5280,12 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -5298,7 +5298,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 }
 
 const getUsersBySocialIDs = `-- name: GetUsersBySocialIDs :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view u where u.pii_socials->$1::varchar->>'id' = any($2::varchar[]) and not u.deleted and not u.universal
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, pii_unverified_email_address, pii_verified_email_address, pii_socials from pii.user_view u where u.pii_socials->$1::varchar->>'id' = any($2::varchar[]) and not u.deleted and not u.universal
 `
 
 type GetUsersBySocialIDsParams struct {
@@ -5328,12 +5328,13 @@ func (q *Queries) GetUsersBySocialIDs(ctx context.Context, arg GetUsersBySocialI
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
-			&i.PiiEmailAddress,
+			&i.ProfileImageID,
+			&i.PiiUnverifiedEmailAddress,
+			&i.PiiVerifiedEmailAddress,
 			&i.PiiSocials,
 		); err != nil {
 			return nil, err
@@ -5350,7 +5351,7 @@ const getUsersByWalletAddressesAndChains = `-- name: GetUsersByWalletAddressesAn
 WITH params AS (
     SELECT unnest($1::varchar[]) as address, unnest($2::int[]) as chain
 )
-SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain, users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain, users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
 FROM wallets 
 JOIN users ON wallets.id = any(users.wallets)
 JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
@@ -5398,82 +5399,12 @@ func (q *Queries) GetUsersByWalletAddressesAndChains(ctx context.Context, arg Ge
 			&i.User.Traits,
 			&i.User.Universal,
 			&i.User.NotificationSettings,
-			&i.User.EmailVerified,
 			&i.User.EmailUnsubscriptions,
 			&i.User.FeaturedGallery,
 			&i.User.PrimaryWalletID,
 			&i.User.UserExperiences,
 			&i.User.ProfileImageID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
-    where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
-    and deleted = false and pii_email_address is not null and email_verified = $1
-    and (created_at, id) < ($3, $4)
-    and (created_at, id) > ($5, $6)
-    order by case when $7::bool then (created_at, id) end asc,
-             case when not $7::bool then (created_at, id) end desc
-    limit $2
-`
-
-type GetUsersWithEmailNotificationsOnParams struct {
-	EmailVerified persist.EmailVerificationStatus `db:"email_verified" json:"email_verified"`
-	Limit         int32                           `db:"limit" json:"limit"`
-	CurBeforeTime time.Time                       `db:"cur_before_time" json:"cur_before_time"`
-	CurBeforeID   persist.DBID                    `db:"cur_before_id" json:"cur_before_id"`
-	CurAfterTime  time.Time                       `db:"cur_after_time" json:"cur_after_time"`
-	CurAfterID    persist.DBID                    `db:"cur_after_id" json:"cur_after_id"`
-	PagingForward bool                            `db:"paging_forward" json:"paging_forward"`
-}
-
-// TODO: Does not appear to be used
-func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetUsersWithEmailNotificationsOnParams) ([]PiiUserView, error) {
-	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOn,
-		arg.EmailVerified,
-		arg.Limit,
-		arg.CurBeforeTime,
-		arg.CurBeforeID,
-		arg.CurAfterTime,
-		arg.CurAfterID,
-		arg.PagingForward,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []PiiUserView
-	for rows.Next() {
-		var i PiiUserView
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.PiiEmailAddress,
-			&i.PiiSocials,
+			&i.User.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -5486,38 +5417,40 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 }
 
 const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
-    where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
-    and (email_unsubscriptions->>$3::varchar = 'false' or email_unsubscriptions->>$3::varchar is null)
-    and deleted = false and pii_email_address is not null and email_verified = $1
-    and (created_at, id) < ($4, $5)
-    and (created_at, id) > ($6, $7)
-    order by case when $8::bool then (created_at, id) end asc,
-             case when not $8::bool then (created_at, id) end desc
-    limit $2
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.pii_unverified_email_address, u.pii_verified_email_address, u.pii_socials from pii.user_view u
+    left join user_roles r on r.user_id = u.id and r.role = 'EMAIL_TESTER' and r.deleted = false
+    where (u.email_unsubscriptions->>'all' = 'false' or u.email_unsubscriptions->>'all' is null)
+    and (u.email_unsubscriptions->>$2::varchar = 'false' or u.email_unsubscriptions->>$2::varchar is null)
+    and u.deleted = false and u.pii_verified_email_address is not null
+    and (u.created_at, u.id) < ($3, $4)
+    and (u.created_at, u.id) > ($5, $6)
+    and ($7::bool = false or r.user_id is not null)
+    order by case when $8::bool then (u.created_at, u.id) end asc,
+             case when not $8::bool then (u.created_at, u.id) end desc
+    limit $1
 `
 
 type GetUsersWithEmailNotificationsOnForEmailTypeParams struct {
-	EmailVerified       persist.EmailVerificationStatus `db:"email_verified" json:"email_verified"`
-	Limit               int32                           `db:"limit" json:"limit"`
-	EmailUnsubscription string                          `db:"email_unsubscription" json:"email_unsubscription"`
-	CurBeforeTime       time.Time                       `db:"cur_before_time" json:"cur_before_time"`
-	CurBeforeID         persist.DBID                    `db:"cur_before_id" json:"cur_before_id"`
-	CurAfterTime        time.Time                       `db:"cur_after_time" json:"cur_after_time"`
-	CurAfterID          persist.DBID                    `db:"cur_after_id" json:"cur_after_id"`
-	PagingForward       bool                            `db:"paging_forward" json:"paging_forward"`
+	Limit               int32        `db:"limit" json:"limit"`
+	EmailUnsubscription string       `db:"email_unsubscription" json:"email_unsubscription"`
+	CurBeforeTime       time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID         persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime        time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID          persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	EmailTestersOnly    bool         `db:"email_testers_only" json:"email_testers_only"`
+	PagingForward       bool         `db:"paging_forward" json:"paging_forward"`
 }
 
 // for some reason this query will not allow me to use @tags for $1
 func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Context, arg GetUsersWithEmailNotificationsOnForEmailTypeParams) ([]PiiUserView, error) {
 	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOnForEmailType,
-		arg.EmailVerified,
 		arg.Limit,
 		arg.EmailUnsubscription,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
+		arg.EmailTestersOnly,
 		arg.PagingForward,
 	)
 	if err != nil {
@@ -5540,12 +5473,13 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
-			&i.PiiEmailAddress,
+			&i.ProfileImageID,
+			&i.PiiUnverifiedEmailAddress,
+			&i.PiiVerifiedEmailAddress,
 			&i.PiiSocials,
 		); err != nil {
 			return nil, err
@@ -5559,7 +5493,7 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 }
 
 const getUsersWithRolePaginate = `-- name: GetUsersWithRolePaginate :many
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, user_roles ur where u.deleted = false and ur.deleted = false
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from users u, user_roles ur where u.deleted = false and ur.deleted = false
     and u.id = ur.user_id and ur.role = $2
     and (u.username_idempotent, u.id) < ($3::varchar, $4)
     and (u.username_idempotent, u.id) > ($5::varchar, $6)
@@ -5608,12 +5542,12 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -5626,7 +5560,7 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 }
 
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -5651,12 +5585,12 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -6763,6 +6697,20 @@ func (q *Queries) SetContractOverrideCreator(ctx context.Context, arg SetContrac
 	return err
 }
 
+const setPersonaByUserID = `-- name: SetPersonaByUserID :exec
+update users set persona = $1 where id = $2 and not deleted
+`
+
+type SetPersonaByUserIDParams struct {
+	Persona persist.Persona `db:"persona" json:"persona"`
+	UserID  persist.DBID    `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) SetPersonaByUserID(ctx context.Context, arg SetPersonaByUserIDParams) error {
+	_, err := q.db.Exec(ctx, setPersonaByUserID, arg.Persona, arg.UserID)
+	return err
+}
+
 const setProfileImageToENS = `-- name: SetProfileImageToENS :one
 with profile_images as (
     insert into profile_images (id, user_id, source_type, wallet_id, ens_domain, ens_avatar_uri, deleted, last_updated)
@@ -7203,31 +7151,6 @@ func (q *Queries) UpdateTopActiveUsers(ctx context.Context, topUserIds persist.D
 	return err
 }
 
-const updateUserEmail = `-- name: UpdateUserEmail :exec
-with upsert_pii as (
-    insert into pii.for_users (user_id, pii_email_address) values ($2, $3)
-        on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
-),
-
-upsert_metadata as (
-    insert into dev_metadata_users (user_id, has_email_address) values ($2, ($3 is not null))
-        on conflict (user_id) do update set has_email_address = excluded.has_email_address
-)
-
-update users set email_verified = $1 where users.id = $2
-`
-
-type UpdateUserEmailParams struct {
-	EmailVerificationStatus int32         `db:"email_verification_status" json:"email_verification_status"`
-	UserID                  persist.DBID  `db:"user_id" json:"user_id"`
-	EmailAddress            persist.Email `db:"email_address" json:"email_address"`
-}
-
-func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
-	_, err := q.db.Exec(ctx, updateUserEmail, arg.EmailVerificationStatus, arg.UserID, arg.EmailAddress)
-	return err
-}
-
 const updateUserEmailUnsubscriptions = `-- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1
 `
@@ -7300,17 +7223,37 @@ func (q *Queries) UpdateUserSocials(ctx context.Context, arg UpdateUserSocialsPa
 	return err
 }
 
-const updateUserVerificationStatus = `-- name: UpdateUserVerificationStatus :exec
-UPDATE users SET email_verified = $2 WHERE id = $1
+const updateUserUnverifiedEmail = `-- name: UpdateUserUnverifiedEmail :exec
+insert into pii.for_users (user_id, pii_unverified_email_address, pii_verified_email_address) values ($1, $2, null)
+    on conflict (user_id) do update
+        set pii_unverified_email_address = excluded.pii_unverified_email_address,
+            pii_verified_email_address = excluded.pii_verified_email_address
 `
 
-type UpdateUserVerificationStatusParams struct {
-	ID            persist.DBID                    `db:"id" json:"id"`
-	EmailVerified persist.EmailVerificationStatus `db:"email_verified" json:"email_verified"`
+type UpdateUserUnverifiedEmailParams struct {
+	UserID       persist.DBID  `db:"user_id" json:"user_id"`
+	EmailAddress persist.Email `db:"email_address" json:"email_address"`
 }
 
-func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {
-	_, err := q.db.Exec(ctx, updateUserVerificationStatus, arg.ID, arg.EmailVerified)
+func (q *Queries) UpdateUserUnverifiedEmail(ctx context.Context, arg UpdateUserUnverifiedEmailParams) error {
+	_, err := q.db.Exec(ctx, updateUserUnverifiedEmail, arg.UserID, arg.EmailAddress)
+	return err
+}
+
+const updateUserVerifiedEmail = `-- name: UpdateUserVerifiedEmail :exec
+insert into pii.for_users (user_id, pii_unverified_email_address, pii_verified_email_address) values ($1, null, $2)
+    on conflict (user_id) do update
+        set pii_verified_email_address = excluded.pii_verified_email_address,
+            pii_unverified_email_address = excluded.pii_unverified_email_address
+`
+
+type UpdateUserVerifiedEmailParams struct {
+	UserID       persist.DBID  `db:"user_id" json:"user_id"`
+	EmailAddress persist.Email `db:"email_address" json:"email_address"`
+}
+
+func (q *Queries) UpdateUserVerifiedEmail(ctx context.Context, arg UpdateUserVerifiedEmailParams) error {
+	_, err := q.db.Exec(ctx, updateUserVerifiedEmail, arg.UserID, arg.EmailAddress)
 	return err
 }
 

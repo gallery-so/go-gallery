@@ -291,16 +291,13 @@ func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *i
 	return paginator.paginate(before, after, first, last)
 }
 
-// floatIDPaginator paginates results using a cursor with a float and a persist.DBID.
-// By using the combination of a float and a unique DBID for our ORDER BY clause,
-// we can achieve fast keyset pagination results while avoiding edge cases when multiple
-// rows have the same float value.
-type floatIDPaginator[Node any] struct {
+// boolIDFloatIDPaginator paginates results using a cursor with a bool, an ID,
+type boolIDFloatIDPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params floatIDPagingParams) ([]Node, error)
+	QueryFunc func(params boolIDFloatIDPagingParams) ([]Node, error)
 
-	// CursorFunc returns a float and DBID that will be encoded into a cursor string
-	CursorFunc func(node Node) (float64, persist.DBID, error)
+	// CursorFunc returns a bool, float and two DBIDs that will be encoded into a cursor string
+	CursorFunc func(node Node) (bool, persist.DBID, float64, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
@@ -308,23 +305,31 @@ type floatIDPaginator[Node any] struct {
 }
 
 // floatIDPagingParams are the parameters used to paginate with a float+DBID cursor
-type floatIDPagingParams struct {
+type boolIDFloatIDPagingParams struct {
 	Limit             int32
+	CursorBeforeBool  bool
+	CursorBeforeID1   persist.DBID
 	CursorBeforeFloat float64
-	CursorBeforeID    persist.DBID
+	CursorBeforeID2   persist.DBID
+	CursorAfterBool   bool
+	CursorAfterID1    persist.DBID
 	CursorAfterFloat  float64
-	CursorAfterID     persist.DBID
+	CursorAfterID2    persist.DBID
 	PagingForward     bool
 }
 
-func (p *floatIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
+func (p *boolIDFloatIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
-		beforeCur := cursors.NewFloatIDCursor()
+		beforeCur := cursors.NewBoolIDFloatIDCursor()
+		beforeCur.Bool = true
+		beforeCur.ID1 = defaultCursorBeforeID
 		beforeCur.Float = defaultCursorBeforeFloat
-		beforeCur.ID = defaultCursorBeforeID
-		afterCur := cursors.NewFloatIDCursor()
+		beforeCur.ID1 = defaultCursorBeforeID
+		afterCur := cursors.NewBoolIDFloatIDCursor()
+		afterCur.Bool = false
+		afterCur.ID1 = defaultCursorAfterID
 		afterCur.Float = defaultCursorAfterFloat
-		afterCur.ID = defaultCursorAfterID
+		afterCur.ID2 = defaultCursorAfterID
 
 		if before != nil {
 			if err := beforeCur.Unpack(*before); err != nil {
@@ -338,21 +343,25 @@ func (p *floatIDPaginator[Node]) paginate(before *string, after *string, first *
 			}
 		}
 
-		queryParams := floatIDPagingParams{
+		queryParams := boolIDFloatIDPagingParams{
 			Limit:             limit,
+			CursorBeforeBool:  beforeCur.Bool,
+			CursorBeforeID1:   beforeCur.ID1,
 			CursorBeforeFloat: beforeCur.Float,
-			CursorBeforeID:    beforeCur.ID,
+			CursorBeforeID2:   beforeCur.ID2,
+			CursorAfterBool:   afterCur.Bool,
+			CursorAfterID1:    afterCur.ID1,
 			CursorAfterFloat:  afterCur.Float,
-			CursorAfterID:     afterCur.ID,
+			CursorAfterID2:    afterCur.ID2,
 			PagingForward:     pagingForward,
 		}
 
 		return p.QueryFunc(queryParams)
 	}
 
-	paginator := keysetPaginator[Node, *floatIDCursor]{
+	paginator := keysetPaginator[Node, *boolIDFloatIDCursor]{
 		QueryFunc:  queryFunc,
-		Cursorable: newFloatIDCursor(p.CursorFunc),
+		Cursorable: newBoolIDFloatIDCursor(p.CursorFunc),
 		CountFunc:  p.CountFunc,
 	}
 
@@ -1021,10 +1030,10 @@ func newFeedPositionCursor[Node any](f func(Node) (int64, []persist.FeedEntityTy
 	}
 }
 
-func newFloatIDCursor[Node any](f func(Node) (float64, persist.DBID, error)) cursorable[Node, *floatIDCursor] {
-	return func(node Node) (c *floatIDCursor, err error) {
-		c = cursors.NewFloatIDCursor()
-		c.Float, c.ID, err = f(node)
+func newBoolIDFloatIDCursor[Node any](f func(Node) (bool, persist.DBID, float64, persist.DBID, error)) cursorable[Node, *boolIDFloatIDCursor] {
+	return func(node Node) (c *boolIDFloatIDCursor, err error) {
+		c = cursors.NewBoolIDFloatIDCursor()
+		c.Bool, c.ID1, c.Float, c.ID2, err = f(node)
 		return c, err
 	}
 }
@@ -1154,15 +1163,17 @@ func (cursorN) NewPositionCursor() *positionCursor {
 
 //------------------------------------------------------------------------------
 
-type floatIDCursor struct {
+type boolIDFloatIDCursor struct {
 	*baseCursor
+	Bool  bool
+	ID1   persist.DBID
 	Float float64
-	ID    persist.DBID
+	ID2   persist.DBID
 }
 
-func (cursorN) NewFloatIDCursor() *floatIDCursor {
-	c := floatIDCursor{baseCursor: &baseCursor{}}
-	initCursor(c.baseCursor, &c.Float, &c.ID)
+func (cursorN) NewBoolIDFloatIDCursor() *boolIDFloatIDCursor {
+	c := boolIDFloatIDCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.Bool, &c.ID1, &c.Float, &c.ID2)
 	return &c
 }
 

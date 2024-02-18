@@ -1876,7 +1876,7 @@ func (b *GetEventByIdBatchBatchResults) Close() error {
 }
 
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona FROM follows f
     INNER JOIN users u ON f.follower = u.id
     WHERE f.followee = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -1931,12 +1931,12 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 					&i.FeaturedGallery,
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.Persona,
 				); err != nil {
 					return err
 				}
@@ -1956,7 +1956,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Close() error {
 }
 
 const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -2011,12 +2011,12 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 					&i.FeaturedGallery,
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.Persona,
 				); err != nil {
 					return err
 				}
@@ -2031,6 +2031,175 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 }
 
 func (b *GetFollowingByUserIdBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getFrameTokensByCommunityID = `-- name: GetFrameTokensByCommunityID :batchmany
+with community_data as (
+    select id as community_id, community_type, contract_id
+    from communities
+    where communities.id = $1 and not deleted
+    limit 1
+)
+
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd
+    join tokens t on t.contract_id = cd.contract_id
+    join token_definitions td on t.token_definition_id = td.id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+where cd.community_type = 0
+    and t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+limit $2)
+
+union all
+
+(select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from community_data cd, tokens t
+    join token_community_memberships tcm on t.token_definition_id = tcm.token_definition_id
+    join token_definitions td on td.id = t.token_definition_id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+where cd.community_type != 0
+    and tcm.community_id = cd.community_id
+    and t.displayable
+    and tcm.deleted = false
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+limit $2)
+`
+
+type GetFrameTokensByCommunityIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetFrameTokensByCommunityIDParams struct {
+	CommunityID persist.DBID `db:"community_id" json:"community_id"`
+	Limit       int32        `db:"limit" json:"limit"`
+}
+
+type GetFrameTokensByCommunityIDRow struct {
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	Contract        Contract        `db:"contract" json:"contract"`
+}
+
+// This is a temporary query that gets tokens from a community without pagination or any specific
+// ordering. It returns them very quickly, and is currently used to populate community frames.
+// At present, a community is either entirely token-based or contract-based, so only
+// one of these two union clauses will return any tokens (which means it's okay for each
+// clause to have its own ordering). This query was originally written with a union
+// of results from contract_memberships and token_memberships and a single outer
+// select + join on the results of that union, but that prevented the query planner from
+// using indexes correctly (since the referenced tables might be indexed, but the union
+// of results is not). The current method is verbose and brittle, but it's fast!
+func (q *Queries) GetFrameTokensByCommunityID(ctx context.Context, arg []GetFrameTokensByCommunityIDParams) *GetFrameTokensByCommunityIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CommunityID,
+			a.Limit,
+		}
+		batch.Queue(getFrameTokensByCommunityID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetFrameTokensByCommunityIDBatchResults{br, len(arg), false}
+}
+
+func (b *GetFrameTokensByCommunityIDBatchResults) Query(f func(int, []GetFrameTokensByCommunityIDRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []GetFrameTokensByCommunityIDRow
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetFrameTokensByCommunityIDRow
+				if err := rows.Scan(
+					&i.Token.ID,
+					&i.Token.Deleted,
+					&i.Token.Version,
+					&i.Token.CreatedAt,
+					&i.Token.LastUpdated,
+					&i.Token.CollectorsNote,
+					&i.Token.Quantity,
+					&i.Token.BlockNumber,
+					&i.Token.OwnerUserID,
+					&i.Token.OwnedByWallets,
+					&i.Token.ContractID,
+					&i.Token.IsUserMarkedSpam,
+					&i.Token.LastSynced,
+					&i.Token.IsCreatorToken,
+					&i.Token.TokenDefinitionID,
+					&i.Token.IsHolderToken,
+					&i.Token.Displayable,
+					&i.TokenDefinition.ID,
+					&i.TokenDefinition.CreatedAt,
+					&i.TokenDefinition.LastUpdated,
+					&i.TokenDefinition.Deleted,
+					&i.TokenDefinition.Name,
+					&i.TokenDefinition.Description,
+					&i.TokenDefinition.TokenType,
+					&i.TokenDefinition.TokenID,
+					&i.TokenDefinition.ExternalUrl,
+					&i.TokenDefinition.Chain,
+					&i.TokenDefinition.Metadata,
+					&i.TokenDefinition.FallbackMedia,
+					&i.TokenDefinition.ContractAddress,
+					&i.TokenDefinition.ContractID,
+					&i.TokenDefinition.TokenMediaID,
+					&i.TokenDefinition.IsFxhash,
+					&i.Contract.ID,
+					&i.Contract.Deleted,
+					&i.Contract.Version,
+					&i.Contract.CreatedAt,
+					&i.Contract.LastUpdated,
+					&i.Contract.Name,
+					&i.Contract.Symbol,
+					&i.Contract.Address,
+					&i.Contract.CreatorAddress,
+					&i.Contract.Chain,
+					&i.Contract.ProfileBannerUrl,
+					&i.Contract.ProfileImageUrl,
+					&i.Contract.BadgeUrl,
+					&i.Contract.Description,
+					&i.Contract.OwnerAddress,
+					&i.Contract.IsProviderMarkedSpam,
+					&i.Contract.ParentID,
+					&i.Contract.OverrideCreatorUserID,
+					&i.Contract.L1Chain,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetFrameTokensByCommunityIDBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -2117,11 +2286,11 @@ select g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
     join community_galleries cg2 on cg2.gallery_id = cg.gallery_id and cg2.community_id is null
 where cg.community_id = $1
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) < ($1, $2::float8, $3)
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) > ($1, $4::float8, $5)
-order by case when $6::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
-         case when not $6::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
-limit $7
+    and (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) < ($3::bool, $1, $4::float8, $5)
+    and (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) > ($6::bool, $1, $7::float8, $8)
+order by case when $9::bool then (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
+         case when not $9::bool then (cg.user_id != $2, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
+limit $10
 `
 
 type GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults struct {
@@ -2131,13 +2300,16 @@ type GetGalleriesDisplayingCommunityIDPaginateBatchBatchResults struct {
 }
 
 type GetGalleriesDisplayingCommunityIDPaginateBatchParams struct {
-	CommunityID        persist.DBID `db:"community_id" json:"community_id"`
-	CurBeforeRelevance float64      `db:"cur_before_relevance" json:"cur_before_relevance"`
-	CurBeforeID        persist.DBID `db:"cur_before_id" json:"cur_before_id"`
-	CurAfterRelevance  float64      `db:"cur_after_relevance" json:"cur_after_relevance"`
-	CurAfterID         persist.DBID `db:"cur_after_id" json:"cur_after_id"`
-	PagingForward      bool         `db:"paging_forward" json:"paging_forward"`
-	Limit              int32        `db:"limit" json:"limit"`
+	CommunityID                persist.DBID `db:"community_id" json:"community_id"`
+	RelativeToUserID           persist.DBID `db:"relative_to_user_id" json:"relative_to_user_id"`
+	CurBeforeIsNotRelativeUser bool         `db:"cur_before_is_not_relative_user" json:"cur_before_is_not_relative_user"`
+	CurBeforeRelevance         float64      `db:"cur_before_relevance" json:"cur_before_relevance"`
+	CurBeforeID                persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterIsNotRelativeUser  bool         `db:"cur_after_is_not_relative_user" json:"cur_after_is_not_relative_user"`
+	CurAfterRelevance          float64      `db:"cur_after_relevance" json:"cur_after_relevance"`
+	CurAfterID                 persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward              bool         `db:"paging_forward" json:"paging_forward"`
+	Limit                      int32        `db:"limit" json:"limit"`
 }
 
 type GetGalleriesDisplayingCommunityIDPaginateBatchRow struct {
@@ -2156,8 +2328,11 @@ func (q *Queries) GetGalleriesDisplayingCommunityIDPaginateBatch(ctx context.Con
 	for _, a := range arg {
 		vals := []interface{}{
 			a.CommunityID,
+			a.RelativeToUserID,
+			a.CurBeforeIsNotRelativeUser,
 			a.CurBeforeRelevance,
 			a.CurBeforeID,
+			a.CurAfterIsNotRelativeUser,
 			a.CurAfterRelevance,
 			a.CurAfterID,
 			a.PagingForward,
@@ -2815,8 +2990,8 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 }
 
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from (
-    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, tokens t, contracts c
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona from (
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from users u, tokens t, contracts c
         where t.owner_user_id = u.id
         and t.displayable
         and t.contract_id = c.id and (c.id = $1 or c.parent_id = $1)
@@ -2906,12 +3081,12 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 					&i.FeaturedGallery,
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.Persona,
 				); err != nil {
 					return err
 				}
@@ -3296,7 +3471,7 @@ func (b *GetSharedCommunitiesBatchPaginateBatchResults) Close() error {
 }
 
 const getSharedFollowersBatchPaginate = `-- name: GetSharedFollowersBatchPaginate :batchmany
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, a.created_at followed_on
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona, a.created_at followed_on
 from users, follows a, follows b
 where a.follower = $1
 	and a.followee = b.follower
@@ -3384,12 +3559,12 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Query(f func(int, []GetSha
 					&i.User.Traits,
 					&i.User.Universal,
 					&i.User.NotificationSettings,
-					&i.User.EmailVerified,
 					&i.User.EmailUnsubscriptions,
 					&i.User.FeaturedGallery,
 					&i.User.PrimaryWalletID,
 					&i.User.UserExperiences,
 					&i.User.ProfileImageID,
+					&i.User.Persona,
 					&i.FollowedOn,
 				); err != nil {
 					return err
@@ -4245,7 +4420,7 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 }
 
 const getUserByAddressAndL1Batch = `-- name: GetUserByAddressAndL1Batch :batchone
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
 from users, wallets
 where wallets.address = $1
 	and wallets.l1_chain = $2
@@ -4302,12 +4477,12 @@ func (b *GetUserByAddressAndL1BatchBatchResults) QueryRow(f func(int, User, erro
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4321,7 +4496,7 @@ func (b *GetUserByAddressAndL1BatchBatchResults) Close() error {
 }
 
 const getUserByIdBatch = `-- name: GetUserByIdBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona FROM users WHERE id = $1 AND deleted = false
 `
 
 type GetUserByIdBatchBatchResults struct {
@@ -4366,12 +4541,12 @@ func (b *GetUserByIdBatchBatchResults) QueryRow(f func(int, User, error)) {
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4385,7 +4560,7 @@ func (b *GetUserByIdBatchBatchResults) Close() error {
 }
 
 const getUserByUsernameBatch = `-- name: GetUserByUsernameBatch :batchone
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id from users where username_idempotent = lower($1) and deleted = false and universal = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona from users where username_idempotent = lower($1) and deleted = false and universal = false
 `
 
 type GetUserByUsernameBatchBatchResults struct {
@@ -4430,12 +4605,12 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.Traits,
 			&i.Universal,
 			&i.NotificationSettings,
-			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
 			&i.ProfileImageID,
+			&i.Persona,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4547,7 +4722,7 @@ func (b *GetUserNotificationsBatchBatchResults) Close() error {
 }
 
 const getUsersByPositionPaginateBatch = `-- name: GetUsersByPositionPaginateBatch :batchmany
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona
 from users u
 join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
 where not u.deleted and not u.universal and t.pos > $2::int and t.pos < $3::int
@@ -4611,12 +4786,12 @@ func (b *GetUsersByPositionPaginateBatchBatchResults) Query(f func(int, []User, 
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 					&i.FeaturedGallery,
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.Persona,
 				); err != nil {
 					return err
 				}
@@ -4636,7 +4811,7 @@ func (b *GetUsersByPositionPaginateBatchBatchResults) Close() error {
 }
 
 const getUsersByPositionPersonalizedBatch = `-- name: GetUsersByPositionPersonalizedBatch :batchmany
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona
 from users u
 join unnest($1::varchar[]) with ordinality t(id, pos) using(id)
 left join follows on follows.follower = $2 and follows.followee = u.id
@@ -4700,12 +4875,12 @@ func (b *GetUsersByPositionPersonalizedBatchBatchResults) Query(f func(int, []Us
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 					&i.FeaturedGallery,
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.Persona,
 				); err != nil {
 					return err
 				}
@@ -4725,7 +4900,7 @@ func (b *GetUsersByPositionPersonalizedBatchBatchResults) Close() error {
 }
 
 const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 type GetUsersWithTraitBatchBatchResults struct {
@@ -4777,12 +4952,12 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 					&i.FeaturedGallery,
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.Persona,
 				); err != nil {
 					return err
 				}
@@ -5576,8 +5751,8 @@ community_tokens as (
         and not tokens.deleted
 )
 
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from (
-    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, community_tokens t
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona from (
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from users u, community_tokens t
         where t.owner_user_id = u.id
         and t.displayable
         and u.universal = false
@@ -5660,12 +5835,12 @@ func (b *PaginateHoldersByCommunityIDBatchResults) Query(f func(int, []User, err
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 					&i.FeaturedGallery,
 					&i.PrimaryWalletID,
 					&i.UserExperiences,
 					&i.ProfileImageID,
+					&i.Persona,
 				); err != nil {
 					return err
 				}

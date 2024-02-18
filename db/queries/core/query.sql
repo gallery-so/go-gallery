@@ -23,8 +23,7 @@ select * from users where username_idempotent = lower($1) and deleted = false an
 
 -- name: GetUserByVerifiedEmailAddress :one
 select u.* from users u join pii.for_users p on u.id = p.user_id
-where p.pii_email_address = lower($1)
-  and u.email_verified != 0
+where p.pii_verified_email_address = lower($1)
   and p.deleted = false
   and u.deleted = false;
 
@@ -1026,26 +1025,17 @@ update posts set deleted = true where id = $1;
 
 -- for some reason this query will not allow me to use @tags for $1
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many
-select * from pii.user_view
-    where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
-    and (email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar = 'false' or email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar is null)
-    and deleted = false and pii_email_address is not null and email_verified = $1
-    and (created_at, id) < (@cur_before_time, @cur_before_id)
-    and (created_at, id) > (@cur_after_time, @cur_after_id)
-    order by case when @paging_forward::bool then (created_at, id) end asc,
-             case when not @paging_forward::bool then (created_at, id) end desc
-    limit $2;
-
--- name: GetUsersWithEmailNotificationsOn :many
--- TODO: Does not appear to be used
-select * from pii.user_view
-    where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
-    and deleted = false and pii_email_address is not null and email_verified = $1
-    and (created_at, id) < (@cur_before_time, @cur_before_id)
-    and (created_at, id) > (@cur_after_time, @cur_after_id)
-    order by case when @paging_forward::bool then (created_at, id) end asc,
-             case when not @paging_forward::bool then (created_at, id) end desc
-    limit $2;
+select u.* from pii.user_view u
+    left join user_roles r on r.user_id = u.id and r.role = 'EMAIL_TESTER' and r.deleted = false
+    where (u.email_unsubscriptions->>'all' = 'false' or u.email_unsubscriptions->>'all' is null)
+    and (u.email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar = 'false' or u.email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar is null)
+    and u.deleted = false and u.pii_verified_email_address is not null
+    and (u.created_at, u.id) < (@cur_before_time, @cur_before_id)
+    and (u.created_at, u.id) > (@cur_after_time, @cur_after_id)
+    and (@email_testers_only::bool = false or r.user_id is not null)
+    order by case when @paging_forward::bool then (u.created_at, u.id) end asc,
+             case when not @paging_forward::bool then (u.created_at, u.id) end desc
+    limit $1;
 
 -- name: GetUsersWithRolePaginate :many
 select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = false
@@ -1072,21 +1062,17 @@ where not u.deleted and not u.universal and follows.id is null
 order by t.pos
 limit 100;
 
--- name: UpdateUserVerificationStatus :exec
-UPDATE users SET email_verified = $2 WHERE id = $1;
+-- name: UpdateUserVerifiedEmail :exec
+insert into pii.for_users (user_id, pii_unverified_email_address, pii_verified_email_address) values (@user_id, null, @email_address)
+    on conflict (user_id) do update
+        set pii_verified_email_address = excluded.pii_verified_email_address,
+            pii_unverified_email_address = excluded.pii_unverified_email_address;
 
--- name: UpdateUserEmail :exec
-with upsert_pii as (
-    insert into pii.for_users (user_id, pii_email_address) values (@user_id, @email_address)
-        on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
-),
-
-upsert_metadata as (
-    insert into dev_metadata_users (user_id, has_email_address) values (@user_id, (@email_address is not null))
-        on conflict (user_id) do update set has_email_address = excluded.has_email_address
-)
-
-update users set email_verified = @email_verification_status where users.id = @user_id;
+-- name: UpdateUserUnverifiedEmail :exec
+insert into pii.for_users (user_id, pii_unverified_email_address, pii_verified_email_address) values (@user_id, @email_address, null)
+    on conflict (user_id) do update
+        set pii_unverified_email_address = excluded.pii_unverified_email_address,
+            pii_verified_email_address = excluded.pii_verified_email_address;
 
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
@@ -1985,13 +1971,25 @@ select sqlc.embed(g),
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
     join community_galleries cg2 on cg2.gallery_id = cg.gallery_id and cg2.community_id is null
 where cg.community_id = @community_id
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) < (@community_id, @cur_before_relevance::float8, @cur_before_id)
-    and (cg.community_id, -cg.gallery_relevance, cg.gallery_id) > (@community_id, @cur_after_relevance::float8, @cur_after_id)
-order by case when @paging_forward::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
-         case when not @paging_forward::bool then (cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
+    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) < (@cur_before_is_not_relative_user::bool, @community_id, @cur_before_relevance::float8, @cur_before_id)
+    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) > (@cur_after_is_not_relative_user::bool, @community_id, @cur_after_relevance::float8, @cur_after_id)
+order by case when @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
+         case when not @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
 limit sqlc.arg('limit');
+
+create index community_galleries_community_id_gallery_relevance_test_idx
+    on public.community_galleries (user_id, community_id, gallery_relevance, gallery_id);
+
+
+
+select * from users where username_idempotent = 'robin';
+
+select * from communities where name = 'Art Blocks';
 
 -- name: CountGalleriesDisplayingCommunityIDBatch :batchone
 select count(*) from community_galleries cg
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
 where cg.community_id = @community_id;
+
+-- name: SetPersonaByUserID :exec
+update users set persona = @persona where id = @user_id and not deleted;

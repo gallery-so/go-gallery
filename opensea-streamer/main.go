@@ -262,7 +262,7 @@ func (m *connectionManager) start() {
 	connections := make([]*connection, len(m.connections))
 
 	for i := 0; i < len(m.connections); i++ {
-		outgoing := make(chan StateChange)
+		outgoing := make(chan StateChange, 10)
 		m.connections[i] = outgoing
 		m.setRemoteState(i, Connecting)
 		connections[i] = newConnection(m.incoming, outgoing, m.taskClient, i)
@@ -279,6 +279,9 @@ func (m *connectionManager) start() {
 }
 
 func (m *connectionManager) managerLoop() {
+	// Disconnect a random connection every hour to keep the connection pool fresh
+	randomDisconnectionTicker := time.NewTicker(1 * time.Hour)
+
 	for {
 		select {
 		case stateChange := <-m.incoming:
@@ -292,8 +295,21 @@ func (m *connectionManager) managerLoop() {
 			}
 		case timeout := <-m.timeouts:
 			m.onTimeout(timeout.ConnectionID, timeout.ReferenceID)
+		case <-randomDisconnectionTicker.C:
+			m.disconnectRandomConnection()
 		}
 	}
+}
+
+func (m *connectionManager) disconnectRandomConnection() {
+	connectionIDs := make([]int, 0, len(m.remoteStates[Connected]))
+	for id := range m.remoteStates[Connected] {
+		connectionIDs = append(connectionIDs, id)
+	}
+
+	randomID := connectionIDs[rand.Intn(len(connectionIDs))]
+	logger.For(m.ctx).Infof("disconnecting random connection (id=%d)", randomID)
+	m.requestStateChange(randomID, Connecting)
 }
 
 func (m *connectionManager) onConnecting(connectionID int) {
@@ -338,7 +354,7 @@ func (m *connectionManager) onTimeout(connectionID int, refID uuid.UUID) {
 	// If the subscription is still pending when the timeout message is received,
 	// subscribing took too long and we should force a reconnection
 	if pendingRefID, ok := m.pendingRemoteStates[Subscribed][connectionID]; ok && pendingRefID == refID {
-		m.requestStateChange(connectionID, Subscribed)
+		m.requestStateChange(connectionID, Connecting)
 	}
 }
 
@@ -363,6 +379,8 @@ func (m *connectionManager) setRemoteState(connectionID int, state ConnectionSta
 }
 
 func (m *connectionManager) requestStateChange(connectionID int, state ConnectionState) uuid.UUID {
+	logger.For(m.ctx).Infof("requesting state change for connection %d to %s", connectionID, state)
+
 	m.connections[connectionID] <- StateChange{
 		ConnectionID: connectionID,
 		State:        state,
@@ -374,12 +392,9 @@ func (m *connectionManager) requestStateChange(connectionID int, state Connectio
 	return randomID
 }
 
-func (m *connectionManager) setPendingRemoteState(connectionID int, state ConnectionState, refID uuid.UUID) {
-	m.pendingRemoteStates[state][connectionID] = refID
-}
-
 func (m *connectionManager) updateSubscribers() {
 	numRequiredSubscribers := m.maxSubscribers - (len(m.remoteStates[Subscribed]) + len(m.pendingRemoteStates[Subscribed]))
+	logger.For(m.ctx).Infof("required subscribers: %d, remoteStates[Subscribed]: %v, pendingRemoteStates[Subscribed]: %v", numRequiredSubscribers, m.remoteStates[Subscribed], m.pendingRemoteStates[Subscribed])
 
 	// If we have enough subscribers (including pending subscribers), we don't need to do anything
 	if numRequiredSubscribers <= 0 {
@@ -420,6 +435,7 @@ type connection struct {
 	taskClient          *task.Client
 	madeFirstConnection bool
 	connectionID        int
+	lastEventReceived   atomic.Pointer[time.Time]
 }
 
 func newConnection(toManager chan StateChange, fromManager chan StateChange, taskClient *task.Client, connectionID int) *connection {
@@ -431,6 +447,8 @@ func newConnection(toManager chan StateChange, fromManager chan StateChange, tas
 		taskClient:   taskClient,
 		connectionID: connectionID,
 	}
+
+	c.lastEventReceived.Store(util.ToPointer(time.Now()))
 
 	c.ctx = logger.NewContextWithFields(c.ctx, logrus.Fields{
 		"connectionID": connectionID,
@@ -456,13 +474,18 @@ func openWebsocket(ctx context.Context, reconnecting bool) *websocket.Conn {
 			time.Sleep(time.Duration(random.Intn(60)) * time.Second)
 		}
 
-		var dialer *websocket.Dialer
+		dialer := websocket.DefaultDialer
 
-		conn, _, err := dialer.Dial("wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
+		// Set a timeout to ensure that connection attempts never hang indefinitely
+		dialCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+
+		conn, _, err := dialer.DialContext(dialCtx, "wss://stream.openseabeta.com/socket/websocket?token="+apiKey, nil)
 		if err == nil {
+			cancel()
 			return conn
 		}
 
+		cancel()
 		logger.For(ctx).Errorf("error connecting to OpenSea: %s", err)
 		reconnecting = true
 	}
@@ -489,14 +512,17 @@ func (c *connection) subscribe() error {
 
 func (c *connection) connectionLoop() {
 	// Per OpenSea docs, we need to send a heartbeat every 30 seconds
-	ticker := time.NewTicker(30 * time.Second)
+	heartbeat := time.NewTicker(30 * time.Second)
+	lastEventCheck := time.NewTicker(10 * time.Second)
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-heartbeat.C:
 			if c.state != Connecting {
 				sendHeartbeat(c.ctx, c.conn)
 			}
+		case <-lastEventCheck.C:
+			c.checkLastEventTime()
 		case stateChange := <-c.fromManager:
 			switch stateChange.State {
 			case Connecting:
@@ -536,11 +562,14 @@ func (c *connection) startNewListener() {
 	logger.For(c.ctx).Info("connected to OpenSea")
 	c.setState(Connected)
 
-	go listenerLoop(c.ctx, c.connectionID, c.conn, c.taskClient, c.fromListener)
+	// Update the lastEventReceived time so it's not uninitialized or stale from a previous listener
+	c.lastEventReceived.Store(util.ToPointer(time.Now()))
+
+	go listenerLoop(c.ctx, c.connectionID, c.conn, c.taskClient, c.fromListener, &c.lastEventReceived)
 }
 
 func (c *connection) setState(state ConnectionState) {
-	logger.For(c.ctx).Debugf("setting state to %s", state)
+	logger.For(c.ctx).Infof("setting state to %s", state)
 	c.state = state
 	c.toManager <- StateChange{
 		ConnectionID: c.connectionID,
@@ -576,7 +605,24 @@ func (c *connection) onListenerSubscribed() {
 	c.setState(Subscribed)
 }
 
-func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, taskClient *task.Client, toConnection chan StateChange) {
+func (c *connection) checkLastEventTime() {
+	lastEventTime := c.lastEventReceived.Load()
+	timeSince := time.Since(*lastEventTime)
+
+	if c.state == Subscribed && timeSince > (10*time.Second) {
+		// Subscribers should receive many events per second (though we filter out most of them). If we haven't seen
+		// any events at all in 10 seconds, something is probably wrong, and we should reconnect.
+		logger.For(c.ctx).Warnf("subscriber hasn't received any events in %v, reconnecting...", timeSince)
+		c.startNewListener()
+	} else if c.state == Connected && timeSince > (2*time.Minute) {
+		// Non-subscribed connections should at least receive a heartbeat response every 30 seconds. If we go 2 minutes
+		// without seeing any events, something is probably wrong, and we should reconnect.
+		logger.For(c.ctx).Warnf("connection hasn't received any events in %v, reconnecting...", timeSince)
+		c.startNewListener()
+	}
+}
+
+func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, taskClient *task.Client, toConnection chan StateChange, lastEventReceived *atomic.Pointer[time.Time]) {
 	defer conn.Close()
 	defer close(toConnection)
 
@@ -595,6 +641,9 @@ func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, t
 		if t != 1 {
 			logger.For(ctx).Warnf("received message with type %d and payload: %s", t, message)
 		}
+
+		// Keep track of when the last event was received
+		lastEventReceived.Store(util.ToPointer(time.Now()))
 
 		pe := phoenixEvent{}
 		err = json.Unmarshal(message, &pe)

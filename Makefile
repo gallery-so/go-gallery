@@ -83,6 +83,8 @@ $(DEPLOY)-$(DEV)-emails             : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(DEV)-opensea-streamer   : SERVICE_FILE := opensea-streamer-env.yaml
 $(DEPLOY)-$(DEV)-feedbot            : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(DEV)-routing-rules      : SERVICE_FILE := dispatch.yaml
+$(DEPLOY)-$(DEV)-graphql-gateway    : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(DEV)-userpref-upload    : SERVICE_FILE := userpref-upload.yaml
 $(DEPLOY)-$(SANDBOX)-backend        : SERVICE_FILE := backend-sandbox-env.yaml
 $(DEPLOY)-$(PROD)-backend           : SERVICE_FILE := backend-env.yaml
 $(DEPLOY)-$(PROD)-indexer           : SERVICE_FILE := indexer-env.yaml
@@ -99,10 +101,9 @@ $(DEPLOY)-$(PROD)-opensea-streamer  : SERVICE_FILE := opensea-streamer-env.yaml
 $(DEPLOY)-$(PROD)-dummymetadata     : SERVICE_FILE := dummymetadata-env.yaml
 $(DEPLOY)-$(PROD)-emails            : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(PROD)-routing-rules     : SERVICE_FILE := dispatch.yaml
-$(DEPLOY)-$(DEV)-graphql-gateway    : SERVICE_FILE := graphql-gateway.yml
 $(DEPLOY)-$(PROD)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
-$(DEPLOY)-$(DEV)-userpref-upload    : SERVICE_FILE := userpref-upload.yaml
 $(DEPLOY)-$(PROD)-userpref-upload   : SERVICE_FILE := userpref-upload.yaml
+$(DEPLOY)-$(PROD)-rasterizer        : SERVICE_FILE := rasterizer.yaml
 
 # Service to Sentry project mapping
 $(DEPLOY)-%-backend               : SENTRY_PROJECT := gallery-backend
@@ -252,6 +253,14 @@ $(DEPLOY)-%-opensea-streamer           : CONCURRENCY    := $(OPENSEA_STREAMER_CO
 $(DEPLOY)-%-opensea-streamer           : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
 $(DEPLOY)-$(DEV)-opensea-streamer      : SERVICE        := opensea-streamer
 $(DEPLOY)-$(PROD)-opensea-streamer     : SERVICE        := opensea-streamer
+$(DEPLOY)-%-rasterizer                 : SERVICE        := rasterizer
+$(DEPLOY)-%-rasterizer                 : REPO           := rasterizer
+$(DEPLOY)-%-rasterizer                 : DOCKER_FILE    := $(DOCKER_DIR)/rasterizer/Dockerfile
+$(DEPLOY)-%-rasterizer                 : CPU            := $(RASTERIZER_CPU)
+$(DEPLOY)-%-rasterizer                 : MEMORY         := $(RASTERIZER_MEMORY)
+$(DEPLOY)-%-rasterizer                 : CONCURRENCY    := $(RASTERIZER_CONCURRENCY)
+$(DEPLOY)-%-rasterizer                 : TIMEOUT        := $(RASTERIZER_TIMEOUT)
+$(DEPLOY)-%-rasterizer                 : PORT           := 3000
 
 # Cloud Scheduler Jobs
 $(DEPLOY)-%-alchemy-spam                     : CRON_PREFIX    := alchemy-spam
@@ -475,29 +484,31 @@ $(DEPLOY)-$(DEV)-emails-digest : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-d
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
 
 # PROD deployments
-$(DEPLOY)-$(PROD)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
-$(DEPLOY)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
-$(DEPLOY)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(PROD)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
-$(DEPLOY)-$(PROD)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orch
-$(DEPLOY)-$(PROD)-activitystats      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-activitystats _$(RELEASE)-activitystats
-$(DEPLOY)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
-$(DEPLOY)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
-$(DEPLOY)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
-$(DEPLOY)-$(PROD)-feed               : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
-$(DEPLOY)-$(PROD)-feedbot            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
-$(DEPLOY)-$(PROD)-opensea-streamer   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-opensea-streamer _$(RELEASE)-opensea-streamer
-$(DEPLOY)-$(PROD)-admin              : _set-project-$(ENV) _$(DEPLOY)-admin
-$(DEPLOY)-$(PROD)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rules
-$(DEPLOY)-$(PROD)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
-$(DEPLOY)-$(PROD)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
-$(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
-$(DEPLOY)-$(PROD)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
+$(DEPLOY)-$(PROD)-backend                  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
+$(DEPLOY)-$(PROD)-indexer                  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer-server           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
+$(DEPLOY)-$(PROD)-tokenprocessing          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(PROD)-autosocial               : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
+$(DEPLOY)-$(PROD)-autosocial-orch          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orch
+$(DEPLOY)-$(PROD)-activitystats            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-activitystats _$(RELEASE)-activitystats
+$(DEPLOY)-$(PROD)-pushnotifications        : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
+$(DEPLOY)-$(PROD)-dummymetadata            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
+$(DEPLOY)-$(PROD)-emails                   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
+$(DEPLOY)-$(PROD)-feed                     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
+$(DEPLOY)-$(PROD)-feedbot                  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(PROD)-opensea-streamer         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-opensea-streamer _$(RELEASE)-opensea-streamer
+$(DEPLOY)-$(PROD)-admin                    : _set-project-$(ENV) _$(DEPLOY)-admin
+$(DEPLOY)-$(PROD)-routing-rules            : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(PROD)-graphql-gateway          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(PROD)-alchemy-spam             : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
+$(DEPLOY)-$(PROD)-check-push-tickets       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
+$(DEPLOY)-$(PROD)-userpref-upload          : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 $(DEPLOY)-$(PROD)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
-$(DEPLOY)-$(PROD)-activity-stats-top : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
-$(DEPLOY)-$(PROD)-emails-notifications : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-notifications _$(CRON)-$(PAUSE)-emails-notifications
-$(DEPLOY)-$(PROD)-emails-digest : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-digest _$(CRON)-$(PAUSE)-emails-digest
+$(DEPLOY)-$(PROD)-activity-stats-top       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-activity-stats-top _$(CRON)-$(PAUSE)-activity-stats-top
+$(DEPLOY)-$(PROD)-emails-notifications     : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-notifications _$(CRON)-$(PAUSE)-emails-notifications
+$(DEPLOY)-$(PROD)-emails-digest            : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-emails-digest _$(CRON)-$(PAUSE)-emails-digest
+$(DEPLOY)-$(PROD)-rasterizer               : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-rasterizer
+
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:

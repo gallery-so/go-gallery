@@ -265,3 +265,5 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.CommunityType'
           - column: '*.*.*medias'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.MediaList'
+          - column: '*.*.persona'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Persona'
