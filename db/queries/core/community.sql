@@ -452,3 +452,52 @@ select exists(
       and tokens.displayable
       and tokens.token_definition_id = community_token_definitions.id
 );
+
+-- name: GetFrameTokensByCommunityID :batchmany
+-- This is a temporary query that gets tokens from a community without pagination or any specific
+-- ordering. It returns them very quickly, and is currently used to populate community frames.
+with community_data as (
+    select id as community_id, community_type, contract_id
+    from communities
+    where communities.id = @community_id and not deleted
+    limit 1
+)
+
+-- At present, a community is either entirely token-based or contract-based, so only
+-- one of these two union clauses will return any tokens (which means it's okay for each
+-- clause to have its own ordering). This query was originally written with a union
+-- of results from contract_memberships and token_memberships and a single outer
+-- select + join on the results of that union, but that prevented the query planner from
+-- using indexes correctly (since the referenced tables might be indexed, but the union
+-- of results is not). The current method is verbose and brittle, but it's fast!
+(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_data cd
+    join tokens t on t.contract_id = cd.contract_id
+    join token_definitions td on t.token_definition_id = td.id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+where cd.community_type = 0
+    and t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+limit sqlc.arg('limit'))
+
+union all
+
+(select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c) from community_data cd, tokens t
+    join token_community_memberships tcm on t.token_definition_id = tcm.token_definition_id
+    join token_definitions td on td.id = t.token_definition_id
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract_id = c.id
+where cd.community_type != 0
+    and tcm.community_id = cd.community_id
+    and t.displayable
+    and tcm.deleted = false
+    and t.deleted = false
+    and c.deleted = false
+    and td.deleted = false
+    and u.deleted = false
+    and u.universal = false
+limit sqlc.arg('limit'));

@@ -52,52 +52,6 @@ func (d *Provider) ProviderInfo() multichain.ProviderInfo {
 	}
 }
 
-// GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	url := fmt.Sprintf("%s/nfts/get/metadata?contract_address=%s&token_id=%s", d.indexerBaseURL, ti.ContractAddress, ti.TokenID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := d.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		return nil, util.GetErrFromResp(res)
-	}
-
-	var tokens indexer.GetTokenMetadataOutput
-	err = json.NewDecoder(res.Body).Decode(&tokens)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokens.Metadata, nil
-}
-
-func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
-	metadata, err := d.GetTokenMetadataByTokenIdentifiers(ctx, ti)
-	if err != nil {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
-	}
-	name, _ := metadata["name"].(string)
-	description, _ := metadata["description"].(string)
-	contractName, _ := metadata["contract_name"].(string)
-	contractDescription, _ := metadata["contract_description"].(string)
-	contractSymbol, _ := metadata["contract_symbol"].(string)
-	return multichain.ChainAgnosticTokenDescriptors{
-			Name:        name,
-			Description: description,
-		}, multichain.ChainAgnosticContractDescriptors{
-			Name:        contractName,
-			Symbol:      contractSymbol,
-			Description: contractDescription,
-		}, nil
-}
-
 // GetContractByAddress retrieves an ethereum contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
 	logger.For(ctx).Warn("ETH")

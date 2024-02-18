@@ -444,6 +444,15 @@ func resolveViewerExperiencesByUserID(ctx context.Context, userID persist.DBID) 
 	return publicapi.For(ctx).User.GetUserExperiences(ctx, userID)
 }
 
+func resolveViewerPersonaByUserID(ctx context.Context, userID persist.DBID) (*persist.Persona, error) {
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user.Persona, nil
+}
+
 func resolveViewerSocialsByUserID(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
 	return publicapi.For(ctx).User.GetSocials(ctx, userID)
 }
@@ -568,10 +577,20 @@ func resolveViewerEmail(ctx context.Context) *model.UserEmail {
 }
 
 func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
+	var verificationStatus persist.EmailVerificationStatus
+	var email persist.Email
+
+	if user.PiiVerifiedEmailAddress.String() != "" {
+		email = user.PiiVerifiedEmailAddress
+		verificationStatus = persist.EmailVerificationStatusVerified
+	} else {
+		email = user.PiiUnverifiedEmailAddress
+		verificationStatus = persist.EmailVerificationStatusUnverified
+	}
 
 	return &model.UserEmail{
-		Email:              &user.PiiEmailAddress,
-		VerificationStatus: &user.EmailVerified,
+		Email:              &email,
+		VerificationStatus: &verificationStatus,
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
 			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
@@ -2365,16 +2384,9 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
 	api := publicapi.For(ctx).Token
 	// Use the token's profile image if the token exists
-	if token, err := api.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
-		// This should be free because the definition is cached from the call above
-		tDef, err := api.GetTokenDefinitionByID(ctx, token.TokenDefinitionID)
-		if err != nil {
-			return nil, err
-		}
-		if tokenMedia, err := api.GetMediaByMediaID(ctx, tDef.TokenMediaID); err == nil {
-			if tokenMedia.Media.ProfileImageURL != "" {
-				url = string(tokenMedia.Media.ProfileImageURL)
-			}
+	if _, _, media, err := api.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
+		if media.Media.ProfileImageURL != "" {
+			url = string(media.Media.ProfileImageURL)
 		}
 	}
 
@@ -2406,14 +2418,6 @@ func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, 
 			EnsDomain: domain,
 		},
 	}, nil
-}
-
-func resolveTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (*model.Token, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain)
-	if err != nil {
-		return nil, err
-	}
-	return tokenToModel(ctx, token, nil), nil
 }
 
 func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {

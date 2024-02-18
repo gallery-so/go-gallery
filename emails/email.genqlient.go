@@ -344,9 +344,8 @@ func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsChainAddress) G
 
 // communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser struct {
-	Typename     *string                                                                          `json:"__typename"`
-	Username     *string                                                                          `json:"username"`
-	ProfileImage *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage `json:"-"`
+	Typename *string `json:"__typename"`
+	userFrag `json:"-"`
 }
 
 // GetTypename returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser.Typename, and is useful for accessing the field via an interface.
@@ -356,12 +355,12 @@ func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) Ge
 
 // GetUsername returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser.Username, and is useful for accessing the field via an interface.
 func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) GetUsername() *string {
-	return v.Username
+	return v.userFrag.Username
 }
 
 // GetProfileImage returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser.ProfileImage, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) GetProfileImage() *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage {
-	return v.ProfileImage
+func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) GetProfileImage() *userFragProfileImage {
+	return v.userFrag.ProfileImage
 }
 
 func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) UnmarshalJSON(b []byte) error {
@@ -372,7 +371,6 @@ func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) Un
 
 	var firstPass struct {
 		*communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser
-		ProfileImage json.RawMessage `json:"profileImage"`
 		graphql.NoUnmarshalJSON
 	}
 	firstPass.communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser = v
@@ -382,18 +380,10 @@ func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) Un
 		return err
 	}
 
-	{
-		dst := &v.ProfileImage
-		src := firstPass.ProfileImage
-		if len(src) != 0 && string(src) != "null" {
-			*dst = new(communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage)
-			err = __unmarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage(
-				src, *dst)
-			if err != nil {
-				return fmt.Errorf(
-					"unable to unmarshal communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser.ProfileImage: %w", err)
-			}
-		}
+	err = json.Unmarshal(
+		b, &v.userFrag)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -418,18 +408,18 @@ func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser) __
 	var retval __premarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser
 
 	retval.Typename = v.Typename
-	retval.Username = v.Username
+	retval.Username = v.userFrag.Username
 	{
 
 		dst := &retval.ProfileImage
-		src := v.ProfileImage
+		src := v.userFrag.ProfileImage
 		if src != nil {
 			var err error
-			*dst, err = __marshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage(
+			*dst, err = __marshaluserFragProfileImage(
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"unable to marshal communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser.ProfileImage: %w", err)
+					"unable to marshal communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUser.userFrag.ProfileImage: %w", err)
 			}
 		}
 	}
@@ -511,323 +501,6 @@ func __marshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUse
 		return nil, fmt.Errorf(
 			`unexpected concrete type for communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserOrAddress: "%T"`, v)
 	}
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage includes the requested fields of the GraphQL interface ProfileImage.
-//
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage is implemented by the following types:
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage interface {
-	implementsGraphQLInterfacecommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage()
-	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
-	GetTypename() *string
-}
-
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage) implementsGraphQLInterfacecommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage() {
-}
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage) implementsGraphQLInterfacecommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage() {
-}
-
-func __unmarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage(b []byte, v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage) error {
-	if string(b) == "null" {
-		return nil
-	}
-
-	var tn struct {
-		TypeName string `json:"__typename"`
-	}
-	err := json.Unmarshal(b, &tn)
-	if err != nil {
-		return err
-	}
-
-	switch tn.TypeName {
-	case "EnsProfileImage":
-		*v = new(communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage)
-		return json.Unmarshal(b, *v)
-	case "TokenProfileImage":
-		*v = new(communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage)
-		return json.Unmarshal(b, *v)
-	case "":
-		return fmt.Errorf(
-			"response was missing ProfileImage.__typename")
-	default:
-		return fmt.Errorf(
-			`unexpected concrete type for communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage: "%v"`, tn.TypeName)
-	}
-}
-
-func __marshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage(v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage) ([]byte, error) {
-
-	var typename string
-	switch v := (*v).(type) {
-	case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage:
-		typename = "EnsProfileImage"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage
-		}{typename, v}
-		return json.Marshal(result)
-	case *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage:
-		typename = "TokenProfileImage"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage
-		}{typename, v}
-		return json.Marshal(result)
-	case nil:
-		return []byte("null"), nil
-	default:
-		return nil, fmt.Errorf(
-			`unexpected concrete type for communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImage: "%T"`, v)
-	}
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage includes the requested fields of the GraphQL type EnsProfileImage.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage struct {
-	Typename *string                                                                                                                  `json:"__typename"`
-	EnsToken *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage `json:"ensToken"`
-	PfpToken *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpToken                  `json:"pfpToken"`
-}
-
-// GetTypename returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage.Typename, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage) GetTypename() *string {
-	return v.Typename
-}
-
-// GetEnsToken returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage.EnsToken, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage) GetEnsToken() *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage {
-	return v.EnsToken
-}
-
-// GetPfpToken returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage.PfpToken, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImage) GetPfpToken() *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpToken {
-	return v.PfpToken
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage includes the requested fields of the GraphQL type HTTPSProfileImage.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage struct {
-	PreviewURLs *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet `json:"previewURLs"`
-}
-
-// GetPreviewURLs returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage) GetPreviewURLs() *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet {
-	return v.PreviewURLs
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet includes the requested fields of the GraphQL type PreviewURLSet.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet struct {
-	Small *string `json:"small"`
-}
-
-// GetSmall returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet.Small, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet) GetSmall() *string {
-	return v.Small
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpToken includes the requested fields of the GraphQL type Token.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpToken struct {
-	Definition communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition `json:"definition"`
-}
-
-// GetDefinition returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpToken.Definition, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpToken) GetDefinition() communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition {
-	return v.Definition
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition includes the requested fields of the GraphQL type TokenDefinition.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition struct {
-	definitionFrag `json:"-"`
-}
-
-// GetName returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.Name, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) GetName() *string {
-	return v.definitionFrag.Name
-}
-
-// GetDescription returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.Description, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) GetDescription() *string {
-	return v.definitionFrag.Description
-}
-
-// GetMedia returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.Media, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) GetMedia() *definitionFragMediaMediaSubtype {
-	return v.definitionFrag.Media
-}
-
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) UnmarshalJSON(b []byte) error {
-
-	if string(b) == "null" {
-		return nil
-	}
-
-	var firstPass struct {
-		*communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition
-		graphql.NoUnmarshalJSON
-	}
-	firstPass.communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition = v
-
-	err := json.Unmarshal(b, &firstPass)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(
-		b, &v.definitionFrag)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type __premarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition struct {
-	Name *string `json:"name"`
-
-	Description *string `json:"description"`
-
-	Media json.RawMessage `json:"media"`
-}
-
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) MarshalJSON() ([]byte, error) {
-	premarshaled, err := v.__premarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(premarshaled)
-}
-
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) __premarshalJSON() (*__premarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition, error) {
-	var retval __premarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition
-
-	retval.Name = v.definitionFrag.Name
-	retval.Description = v.definitionFrag.Description
-	{
-
-		dst := &retval.Media
-		src := v.definitionFrag.Media
-		if src != nil {
-			var err error
-			*dst, err = __marshaldefinitionFragMediaMediaSubtype(
-				src)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"unable to marshal communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.definitionFrag.Media: %w", err)
-			}
-		}
-	}
-	return &retval, nil
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage includes the requested fields of the GraphQL type TokenProfileImage.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage struct {
-	Typename *string                                                                                               `json:"__typename"`
-	Token    communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageToken `json:"token"`
-}
-
-// GetTypename returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage.Typename, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage) GetTypename() *string {
-	return v.Typename
-}
-
-// GetToken returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage.Token, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImage) GetToken() communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageToken {
-	return v.Token
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageToken includes the requested fields of the GraphQL type Token.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageToken struct {
-	Definition communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition `json:"definition"`
-}
-
-// GetDefinition returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageToken.Definition, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageToken) GetDefinition() communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition {
-	return v.Definition
-}
-
-// communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition includes the requested fields of the GraphQL type TokenDefinition.
-type communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition struct {
-	definitionFrag `json:"-"`
-}
-
-// GetName returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition.Name, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition) GetName() *string {
-	return v.definitionFrag.Name
-}
-
-// GetDescription returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition.Description, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition) GetDescription() *string {
-	return v.definitionFrag.Description
-}
-
-// GetMedia returns communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition.Media, and is useful for accessing the field via an interface.
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition) GetMedia() *definitionFragMediaMediaSubtype {
-	return v.definitionFrag.Media
-}
-
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition) UnmarshalJSON(b []byte) error {
-
-	if string(b) == "null" {
-		return nil
-	}
-
-	var firstPass struct {
-		*communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition
-		graphql.NoUnmarshalJSON
-	}
-	firstPass.communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition = v
-
-	err := json.Unmarshal(b, &firstPass)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(
-		b, &v.definitionFrag)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type __premarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition struct {
-	Name *string `json:"name"`
-
-	Description *string `json:"description"`
-
-	Media json.RawMessage `json:"media"`
-}
-
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition) MarshalJSON() ([]byte, error) {
-	premarshaled, err := v.__premarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(premarshaled)
-}
-
-func (v *communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition) __premarshalJSON() (*__premarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition, error) {
-	var retval __premarshalcommunityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition
-
-	retval.Name = v.definitionFrag.Name
-	retval.Description = v.definitionFrag.Description
-	{
-
-		dst := &retval.Media
-		src := v.definitionFrag.Media
-		if src != nil {
-			var err error
-			*dst, err = __marshaldefinitionFragMediaMediaSubtype(
-				src)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"unable to marshal communityDigestEntityQueryCommunityByIdCommunityCreatorsGalleryUserProfileImageTokenProfileImageTokenDefinition.definitionFrag.Media: %w", err)
-			}
-		}
-	}
-	return &retval, nil
 }
 
 // communityDigestEntityQueryCommunityByIdCommunitySubtype includes the requested fields of the GraphQL interface CommunitySubtype.
@@ -1385,21 +1058,21 @@ func (v *definitionFrag) __premarshalJSON() (*__premarshaldefinitionFrag, error)
 
 // definitionFragMediaAudioMedia includes the requested fields of the GraphQL type AudioMedia.
 type definitionFragMediaAudioMedia struct {
-	Typename                *string `json:"__typename"`
-	mediaFragmentAudioMedia `json:"-"`
+	Typename            *string `json:"__typename"`
+	mediaFragAudioMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaAudioMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaAudioMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaAudioMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaAudioMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentAudioMedia.PreviewURLs
+func (v *definitionFragMediaAudioMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragAudioMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaAudioMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaAudioMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentAudioMedia.FallbackMedia
+func (v *definitionFragMediaAudioMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragAudioMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaAudioMedia) UnmarshalJSON(b []byte) error {
@@ -1420,7 +1093,7 @@ func (v *definitionFragMediaAudioMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentAudioMedia)
+		b, &v.mediaFragAudioMedia)
 	if err != nil {
 		return err
 	}
@@ -1430,9 +1103,9 @@ func (v *definitionFragMediaAudioMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaAudioMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaAudioMedia) MarshalJSON() ([]byte, error) {
@@ -1447,28 +1120,28 @@ func (v *definitionFragMediaAudioMedia) __premarshalJSON() (*__premarshaldefinit
 	var retval __premarshaldefinitionFragMediaAudioMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentAudioMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentAudioMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragAudioMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragAudioMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaGIFMedia includes the requested fields of the GraphQL type GIFMedia.
 type definitionFragMediaGIFMedia struct {
-	Typename              *string `json:"__typename"`
-	mediaFragmentGIFMedia `json:"-"`
+	Typename          *string `json:"__typename"`
+	mediaFragGIFMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaGIFMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaGIFMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaGIFMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaGIFMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentGIFMedia.PreviewURLs
+func (v *definitionFragMediaGIFMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragGIFMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaGIFMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaGIFMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentGIFMedia.FallbackMedia
+func (v *definitionFragMediaGIFMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragGIFMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaGIFMedia) UnmarshalJSON(b []byte) error {
@@ -1489,7 +1162,7 @@ func (v *definitionFragMediaGIFMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentGIFMedia)
+		b, &v.mediaFragGIFMedia)
 	if err != nil {
 		return err
 	}
@@ -1499,9 +1172,9 @@ func (v *definitionFragMediaGIFMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaGIFMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaGIFMedia) MarshalJSON() ([]byte, error) {
@@ -1516,28 +1189,28 @@ func (v *definitionFragMediaGIFMedia) __premarshalJSON() (*__premarshaldefinitio
 	var retval __premarshaldefinitionFragMediaGIFMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentGIFMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentGIFMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragGIFMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragGIFMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaGltfMedia includes the requested fields of the GraphQL type GltfMedia.
 type definitionFragMediaGltfMedia struct {
-	Typename               *string `json:"__typename"`
-	mediaFragmentGltfMedia `json:"-"`
+	Typename           *string `json:"__typename"`
+	mediaFragGltfMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaGltfMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaGltfMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaGltfMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaGltfMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentGltfMedia.PreviewURLs
+func (v *definitionFragMediaGltfMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragGltfMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaGltfMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaGltfMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentGltfMedia.FallbackMedia
+func (v *definitionFragMediaGltfMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragGltfMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaGltfMedia) UnmarshalJSON(b []byte) error {
@@ -1558,7 +1231,7 @@ func (v *definitionFragMediaGltfMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentGltfMedia)
+		b, &v.mediaFragGltfMedia)
 	if err != nil {
 		return err
 	}
@@ -1568,9 +1241,9 @@ func (v *definitionFragMediaGltfMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaGltfMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaGltfMedia) MarshalJSON() ([]byte, error) {
@@ -1585,28 +1258,28 @@ func (v *definitionFragMediaGltfMedia) __premarshalJSON() (*__premarshaldefiniti
 	var retval __premarshaldefinitionFragMediaGltfMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentGltfMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentGltfMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragGltfMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragGltfMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaHtmlMedia includes the requested fields of the GraphQL type HtmlMedia.
 type definitionFragMediaHtmlMedia struct {
-	Typename               *string `json:"__typename"`
-	mediaFragmentHtmlMedia `json:"-"`
+	Typename           *string `json:"__typename"`
+	mediaFragHtmlMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaHtmlMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaHtmlMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaHtmlMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaHtmlMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentHtmlMedia.PreviewURLs
+func (v *definitionFragMediaHtmlMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragHtmlMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaHtmlMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaHtmlMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentHtmlMedia.FallbackMedia
+func (v *definitionFragMediaHtmlMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragHtmlMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaHtmlMedia) UnmarshalJSON(b []byte) error {
@@ -1627,7 +1300,7 @@ func (v *definitionFragMediaHtmlMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentHtmlMedia)
+		b, &v.mediaFragHtmlMedia)
 	if err != nil {
 		return err
 	}
@@ -1637,9 +1310,9 @@ func (v *definitionFragMediaHtmlMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaHtmlMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaHtmlMedia) MarshalJSON() ([]byte, error) {
@@ -1654,28 +1327,28 @@ func (v *definitionFragMediaHtmlMedia) __premarshalJSON() (*__premarshaldefiniti
 	var retval __premarshaldefinitionFragMediaHtmlMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentHtmlMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentHtmlMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragHtmlMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragHtmlMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaImageMedia includes the requested fields of the GraphQL type ImageMedia.
 type definitionFragMediaImageMedia struct {
-	Typename                *string `json:"__typename"`
-	mediaFragmentImageMedia `json:"-"`
+	Typename            *string `json:"__typename"`
+	mediaFragImageMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaImageMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaImageMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaImageMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaImageMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentImageMedia.PreviewURLs
+func (v *definitionFragMediaImageMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragImageMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaImageMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaImageMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentImageMedia.FallbackMedia
+func (v *definitionFragMediaImageMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragImageMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaImageMedia) UnmarshalJSON(b []byte) error {
@@ -1696,7 +1369,7 @@ func (v *definitionFragMediaImageMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentImageMedia)
+		b, &v.mediaFragImageMedia)
 	if err != nil {
 		return err
 	}
@@ -1706,9 +1379,9 @@ func (v *definitionFragMediaImageMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaImageMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaImageMedia) MarshalJSON() ([]byte, error) {
@@ -1723,28 +1396,28 @@ func (v *definitionFragMediaImageMedia) __premarshalJSON() (*__premarshaldefinit
 	var retval __premarshaldefinitionFragMediaImageMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentImageMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentImageMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragImageMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragImageMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaInvalidMedia includes the requested fields of the GraphQL type InvalidMedia.
 type definitionFragMediaInvalidMedia struct {
-	Typename                  *string `json:"__typename"`
-	mediaFragmentInvalidMedia `json:"-"`
+	Typename              *string `json:"__typename"`
+	mediaFragInvalidMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaInvalidMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaInvalidMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaInvalidMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaInvalidMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentInvalidMedia.PreviewURLs
+func (v *definitionFragMediaInvalidMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragInvalidMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaInvalidMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaInvalidMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentInvalidMedia.FallbackMedia
+func (v *definitionFragMediaInvalidMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragInvalidMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaInvalidMedia) UnmarshalJSON(b []byte) error {
@@ -1765,7 +1438,7 @@ func (v *definitionFragMediaInvalidMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentInvalidMedia)
+		b, &v.mediaFragInvalidMedia)
 	if err != nil {
 		return err
 	}
@@ -1775,9 +1448,9 @@ func (v *definitionFragMediaInvalidMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaInvalidMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaInvalidMedia) MarshalJSON() ([]byte, error) {
@@ -1792,28 +1465,28 @@ func (v *definitionFragMediaInvalidMedia) __premarshalJSON() (*__premarshaldefin
 	var retval __premarshaldefinitionFragMediaInvalidMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentInvalidMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentInvalidMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragInvalidMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragInvalidMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaJsonMedia includes the requested fields of the GraphQL type JsonMedia.
 type definitionFragMediaJsonMedia struct {
-	Typename               *string `json:"__typename"`
-	mediaFragmentJsonMedia `json:"-"`
+	Typename           *string `json:"__typename"`
+	mediaFragJsonMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaJsonMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaJsonMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaJsonMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaJsonMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentJsonMedia.PreviewURLs
+func (v *definitionFragMediaJsonMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragJsonMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaJsonMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaJsonMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentJsonMedia.FallbackMedia
+func (v *definitionFragMediaJsonMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragJsonMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaJsonMedia) UnmarshalJSON(b []byte) error {
@@ -1834,7 +1507,7 @@ func (v *definitionFragMediaJsonMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentJsonMedia)
+		b, &v.mediaFragJsonMedia)
 	if err != nil {
 		return err
 	}
@@ -1844,9 +1517,9 @@ func (v *definitionFragMediaJsonMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaJsonMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaJsonMedia) MarshalJSON() ([]byte, error) {
@@ -1861,8 +1534,8 @@ func (v *definitionFragMediaJsonMedia) __premarshalJSON() (*__premarshaldefiniti
 	var retval __premarshaldefinitionFragMediaJsonMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentJsonMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentJsonMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragJsonMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragJsonMedia.FallbackMedia
 	return &retval, nil
 }
 
@@ -2120,21 +1793,21 @@ func __marshaldefinitionFragMediaMediaSubtype(v *definitionFragMediaMediaSubtype
 
 // definitionFragMediaPdfMedia includes the requested fields of the GraphQL type PdfMedia.
 type definitionFragMediaPdfMedia struct {
-	Typename              *string `json:"__typename"`
-	mediaFragmentPdfMedia `json:"-"`
+	Typename          *string `json:"__typename"`
+	mediaFragPdfMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaPdfMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaPdfMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaPdfMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaPdfMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentPdfMedia.PreviewURLs
+func (v *definitionFragMediaPdfMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragPdfMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaPdfMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaPdfMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentPdfMedia.FallbackMedia
+func (v *definitionFragMediaPdfMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragPdfMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaPdfMedia) UnmarshalJSON(b []byte) error {
@@ -2155,7 +1828,7 @@ func (v *definitionFragMediaPdfMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentPdfMedia)
+		b, &v.mediaFragPdfMedia)
 	if err != nil {
 		return err
 	}
@@ -2165,9 +1838,9 @@ func (v *definitionFragMediaPdfMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaPdfMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaPdfMedia) MarshalJSON() ([]byte, error) {
@@ -2182,28 +1855,28 @@ func (v *definitionFragMediaPdfMedia) __premarshalJSON() (*__premarshaldefinitio
 	var retval __premarshaldefinitionFragMediaPdfMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentPdfMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentPdfMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragPdfMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragPdfMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaSyncingMedia includes the requested fields of the GraphQL type SyncingMedia.
 type definitionFragMediaSyncingMedia struct {
-	Typename                  *string `json:"__typename"`
-	mediaFragmentSyncingMedia `json:"-"`
+	Typename              *string `json:"__typename"`
+	mediaFragSyncingMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaSyncingMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaSyncingMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaSyncingMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaSyncingMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentSyncingMedia.PreviewURLs
+func (v *definitionFragMediaSyncingMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragSyncingMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaSyncingMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaSyncingMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentSyncingMedia.FallbackMedia
+func (v *definitionFragMediaSyncingMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragSyncingMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaSyncingMedia) UnmarshalJSON(b []byte) error {
@@ -2224,7 +1897,7 @@ func (v *definitionFragMediaSyncingMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentSyncingMedia)
+		b, &v.mediaFragSyncingMedia)
 	if err != nil {
 		return err
 	}
@@ -2234,9 +1907,9 @@ func (v *definitionFragMediaSyncingMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaSyncingMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaSyncingMedia) MarshalJSON() ([]byte, error) {
@@ -2251,28 +1924,28 @@ func (v *definitionFragMediaSyncingMedia) __premarshalJSON() (*__premarshaldefin
 	var retval __premarshaldefinitionFragMediaSyncingMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentSyncingMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentSyncingMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragSyncingMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragSyncingMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaTextMedia includes the requested fields of the GraphQL type TextMedia.
 type definitionFragMediaTextMedia struct {
-	Typename               *string `json:"__typename"`
-	mediaFragmentTextMedia `json:"-"`
+	Typename           *string `json:"__typename"`
+	mediaFragTextMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaTextMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaTextMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaTextMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaTextMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentTextMedia.PreviewURLs
+func (v *definitionFragMediaTextMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragTextMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaTextMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaTextMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentTextMedia.FallbackMedia
+func (v *definitionFragMediaTextMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragTextMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaTextMedia) UnmarshalJSON(b []byte) error {
@@ -2293,7 +1966,7 @@ func (v *definitionFragMediaTextMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentTextMedia)
+		b, &v.mediaFragTextMedia)
 	if err != nil {
 		return err
 	}
@@ -2303,9 +1976,9 @@ func (v *definitionFragMediaTextMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaTextMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaTextMedia) MarshalJSON() ([]byte, error) {
@@ -2320,28 +1993,28 @@ func (v *definitionFragMediaTextMedia) __premarshalJSON() (*__premarshaldefiniti
 	var retval __premarshaldefinitionFragMediaTextMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentTextMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentTextMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragTextMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragTextMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaUnknownMedia includes the requested fields of the GraphQL type UnknownMedia.
 type definitionFragMediaUnknownMedia struct {
-	Typename                  *string `json:"__typename"`
-	mediaFragmentUnknownMedia `json:"-"`
+	Typename              *string `json:"__typename"`
+	mediaFragUnknownMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaUnknownMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaUnknownMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaUnknownMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaUnknownMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentUnknownMedia.PreviewURLs
+func (v *definitionFragMediaUnknownMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragUnknownMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaUnknownMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaUnknownMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentUnknownMedia.FallbackMedia
+func (v *definitionFragMediaUnknownMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragUnknownMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaUnknownMedia) UnmarshalJSON(b []byte) error {
@@ -2362,7 +2035,7 @@ func (v *definitionFragMediaUnknownMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentUnknownMedia)
+		b, &v.mediaFragUnknownMedia)
 	if err != nil {
 		return err
 	}
@@ -2372,9 +2045,9 @@ func (v *definitionFragMediaUnknownMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaUnknownMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaUnknownMedia) MarshalJSON() ([]byte, error) {
@@ -2389,28 +2062,28 @@ func (v *definitionFragMediaUnknownMedia) __premarshalJSON() (*__premarshaldefin
 	var retval __premarshaldefinitionFragMediaUnknownMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentUnknownMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentUnknownMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragUnknownMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragUnknownMedia.FallbackMedia
 	return &retval, nil
 }
 
 // definitionFragMediaVideoMedia includes the requested fields of the GraphQL type VideoMedia.
 type definitionFragMediaVideoMedia struct {
-	Typename                *string `json:"__typename"`
-	mediaFragmentVideoMedia `json:"-"`
+	Typename            *string `json:"__typename"`
+	mediaFragVideoMedia `json:"-"`
 }
 
 // GetTypename returns definitionFragMediaVideoMedia.Typename, and is useful for accessing the field via an interface.
 func (v *definitionFragMediaVideoMedia) GetTypename() *string { return v.Typename }
 
 // GetPreviewURLs returns definitionFragMediaVideoMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaVideoMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.mediaFragmentVideoMedia.PreviewURLs
+func (v *definitionFragMediaVideoMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
+	return v.mediaFragVideoMedia.PreviewURLs
 }
 
 // GetFallbackMedia returns definitionFragMediaVideoMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *definitionFragMediaVideoMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.mediaFragmentVideoMedia.FallbackMedia
+func (v *definitionFragMediaVideoMedia) GetFallbackMedia() *mediaFragFallbackMedia {
+	return v.mediaFragVideoMedia.FallbackMedia
 }
 
 func (v *definitionFragMediaVideoMedia) UnmarshalJSON(b []byte) error {
@@ -2431,7 +2104,7 @@ func (v *definitionFragMediaVideoMedia) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(
-		b, &v.mediaFragmentVideoMedia)
+		b, &v.mediaFragVideoMedia)
 	if err != nil {
 		return err
 	}
@@ -2441,9 +2114,9 @@ func (v *definitionFragMediaVideoMedia) UnmarshalJSON(b []byte) error {
 type __premarshaldefinitionFragMediaVideoMedia struct {
 	Typename *string `json:"__typename"`
 
-	PreviewURLs *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
+	PreviewURLs *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
 
-	FallbackMedia *mediaFragmentFallbackMedia `json:"fallbackMedia"`
+	FallbackMedia *mediaFragFallbackMedia `json:"fallbackMedia"`
 }
 
 func (v *definitionFragMediaVideoMedia) MarshalJSON() ([]byte, error) {
@@ -2458,8 +2131,8 @@ func (v *definitionFragMediaVideoMedia) __premarshalJSON() (*__premarshaldefinit
 	var retval __premarshaldefinitionFragMediaVideoMedia
 
 	retval.Typename = v.Typename
-	retval.PreviewURLs = v.mediaFragmentVideoMedia.PreviewURLs
-	retval.FallbackMedia = v.mediaFragmentVideoMedia.FallbackMedia
+	retval.PreviewURLs = v.mediaFragVideoMedia.PreviewURLs
+	retval.FallbackMedia = v.mediaFragVideoMedia.FallbackMedia
 	return &retval, nil
 }
 
@@ -3359,12 +3032,77 @@ func __marshalgalleryDigestEntityQueryGalleryByIdGalleryByIdPayloadOrError(v *ga
 
 // galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser struct {
-	Username *string `json:"username"`
+	userFrag `json:"-"`
 }
 
 // GetUsername returns galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser.Username, and is useful for accessing the field via an interface.
 func (v *galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser) GetUsername() *string {
-	return v.Username
+	return v.userFrag.Username
+}
+
+// GetProfileImage returns galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser.ProfileImage, and is useful for accessing the field via an interface.
+func (v *galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser) GetProfileImage() *userFragProfileImage {
+	return v.userFrag.ProfileImage
+}
+
+func (v *galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.userFrag)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalgalleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser struct {
+	Username *string `json:"username"`
+
+	ProfileImage json.RawMessage `json:"profileImage"`
+}
+
+func (v *galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser) __premarshalJSON() (*__premarshalgalleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser, error) {
+	var retval __premarshalgalleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser
+
+	retval.Username = v.userFrag.Username
+	{
+
+		dst := &retval.ProfileImage
+		src := v.userFrag.ProfileImage
+		if src != nil {
+			var err error
+			*dst, err = __marshaluserFragProfileImage(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal galleryDigestEntityQueryGalleryByIdGalleryOwnerGalleryUser.userFrag.ProfileImage: %w", err)
+			}
+		}
+	}
+	return &retval, nil
 }
 
 // galleryDigestEntityQueryGalleryByIdGalleryTokenPreviewsPreviewURLSet includes the requested fields of the GraphQL type PreviewURLSet.
@@ -3453,43 +3191,43 @@ func (v *galleryDigestEntityQueryResponse) __premarshalJSON() (*__premarshalgall
 	return &retval, nil
 }
 
-// mediaFragment includes the GraphQL fields of Media requested by the fragment mediaFragment.
+// mediaFrag includes the GraphQL fields of Media requested by the fragment mediaFrag.
 //
-// mediaFragment is implemented by the following types:
-// mediaFragmentImageMedia
-// mediaFragmentGIFMedia
-// mediaFragmentVideoMedia
-// mediaFragmentAudioMedia
-// mediaFragmentTextMedia
-// mediaFragmentPdfMedia
-// mediaFragmentHtmlMedia
-// mediaFragmentJsonMedia
-// mediaFragmentGltfMedia
-// mediaFragmentUnknownMedia
-// mediaFragmentSyncingMedia
-// mediaFragmentInvalidMedia
-type mediaFragment interface {
-	implementsGraphQLInterfacemediaFragment()
+// mediaFrag is implemented by the following types:
+// mediaFragImageMedia
+// mediaFragGIFMedia
+// mediaFragVideoMedia
+// mediaFragAudioMedia
+// mediaFragTextMedia
+// mediaFragPdfMedia
+// mediaFragHtmlMedia
+// mediaFragJsonMedia
+// mediaFragGltfMedia
+// mediaFragUnknownMedia
+// mediaFragSyncingMedia
+// mediaFragInvalidMedia
+type mediaFrag interface {
+	implementsGraphQLInterfacemediaFrag()
 	// GetPreviewURLs returns the interface-field "previewURLs" from its implementation.
-	GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet
+	GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet
 	// GetFallbackMedia returns the interface-field "fallbackMedia" from its implementation.
-	GetFallbackMedia() *mediaFragmentFallbackMedia
+	GetFallbackMedia() *mediaFragFallbackMedia
 }
 
-func (v *mediaFragmentImageMedia) implementsGraphQLInterfacemediaFragment()   {}
-func (v *mediaFragmentGIFMedia) implementsGraphQLInterfacemediaFragment()     {}
-func (v *mediaFragmentVideoMedia) implementsGraphQLInterfacemediaFragment()   {}
-func (v *mediaFragmentAudioMedia) implementsGraphQLInterfacemediaFragment()   {}
-func (v *mediaFragmentTextMedia) implementsGraphQLInterfacemediaFragment()    {}
-func (v *mediaFragmentPdfMedia) implementsGraphQLInterfacemediaFragment()     {}
-func (v *mediaFragmentHtmlMedia) implementsGraphQLInterfacemediaFragment()    {}
-func (v *mediaFragmentJsonMedia) implementsGraphQLInterfacemediaFragment()    {}
-func (v *mediaFragmentGltfMedia) implementsGraphQLInterfacemediaFragment()    {}
-func (v *mediaFragmentUnknownMedia) implementsGraphQLInterfacemediaFragment() {}
-func (v *mediaFragmentSyncingMedia) implementsGraphQLInterfacemediaFragment() {}
-func (v *mediaFragmentInvalidMedia) implementsGraphQLInterfacemediaFragment() {}
+func (v *mediaFragImageMedia) implementsGraphQLInterfacemediaFrag()   {}
+func (v *mediaFragGIFMedia) implementsGraphQLInterfacemediaFrag()     {}
+func (v *mediaFragVideoMedia) implementsGraphQLInterfacemediaFrag()   {}
+func (v *mediaFragAudioMedia) implementsGraphQLInterfacemediaFrag()   {}
+func (v *mediaFragTextMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragPdfMedia) implementsGraphQLInterfacemediaFrag()     {}
+func (v *mediaFragHtmlMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragJsonMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragGltfMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragUnknownMedia) implementsGraphQLInterfacemediaFrag() {}
+func (v *mediaFragSyncingMedia) implementsGraphQLInterfacemediaFrag() {}
+func (v *mediaFragInvalidMedia) implementsGraphQLInterfacemediaFrag() {}
 
-func __unmarshalmediaFragment(b []byte, v *mediaFragment) error {
+func __unmarshalmediaFrag(b []byte, v *mediaFrag) error {
 	if string(b) == "null" {
 		return nil
 	}
@@ -3504,365 +3242,337 @@ func __unmarshalmediaFragment(b []byte, v *mediaFragment) error {
 
 	switch tn.TypeName {
 	case "ImageMedia":
-		*v = new(mediaFragmentImageMedia)
+		*v = new(mediaFragImageMedia)
 		return json.Unmarshal(b, *v)
 	case "GIFMedia":
-		*v = new(mediaFragmentGIFMedia)
+		*v = new(mediaFragGIFMedia)
 		return json.Unmarshal(b, *v)
 	case "VideoMedia":
-		*v = new(mediaFragmentVideoMedia)
+		*v = new(mediaFragVideoMedia)
 		return json.Unmarshal(b, *v)
 	case "AudioMedia":
-		*v = new(mediaFragmentAudioMedia)
+		*v = new(mediaFragAudioMedia)
 		return json.Unmarshal(b, *v)
 	case "TextMedia":
-		*v = new(mediaFragmentTextMedia)
+		*v = new(mediaFragTextMedia)
 		return json.Unmarshal(b, *v)
 	case "PdfMedia":
-		*v = new(mediaFragmentPdfMedia)
+		*v = new(mediaFragPdfMedia)
 		return json.Unmarshal(b, *v)
 	case "HtmlMedia":
-		*v = new(mediaFragmentHtmlMedia)
+		*v = new(mediaFragHtmlMedia)
 		return json.Unmarshal(b, *v)
 	case "JsonMedia":
-		*v = new(mediaFragmentJsonMedia)
+		*v = new(mediaFragJsonMedia)
 		return json.Unmarshal(b, *v)
 	case "GltfMedia":
-		*v = new(mediaFragmentGltfMedia)
+		*v = new(mediaFragGltfMedia)
 		return json.Unmarshal(b, *v)
 	case "UnknownMedia":
-		*v = new(mediaFragmentUnknownMedia)
+		*v = new(mediaFragUnknownMedia)
 		return json.Unmarshal(b, *v)
 	case "SyncingMedia":
-		*v = new(mediaFragmentSyncingMedia)
+		*v = new(mediaFragSyncingMedia)
 		return json.Unmarshal(b, *v)
 	case "InvalidMedia":
-		*v = new(mediaFragmentInvalidMedia)
+		*v = new(mediaFragInvalidMedia)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
 			"response was missing Media.__typename")
 	default:
 		return fmt.Errorf(
-			`unexpected concrete type for mediaFragment: "%v"`, tn.TypeName)
+			`unexpected concrete type for mediaFrag: "%v"`, tn.TypeName)
 	}
 }
 
-func __marshalmediaFragment(v *mediaFragment) ([]byte, error) {
+func __marshalmediaFrag(v *mediaFrag) ([]byte, error) {
 
 	var typename string
 	switch v := (*v).(type) {
-	case *mediaFragmentImageMedia:
+	case *mediaFragImageMedia:
 		typename = "ImageMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentImageMedia
+			*mediaFragImageMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentGIFMedia:
+	case *mediaFragGIFMedia:
 		typename = "GIFMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentGIFMedia
+			*mediaFragGIFMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentVideoMedia:
+	case *mediaFragVideoMedia:
 		typename = "VideoMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentVideoMedia
+			*mediaFragVideoMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentAudioMedia:
+	case *mediaFragAudioMedia:
 		typename = "AudioMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentAudioMedia
+			*mediaFragAudioMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentTextMedia:
+	case *mediaFragTextMedia:
 		typename = "TextMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentTextMedia
+			*mediaFragTextMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentPdfMedia:
+	case *mediaFragPdfMedia:
 		typename = "PdfMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentPdfMedia
+			*mediaFragPdfMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentHtmlMedia:
+	case *mediaFragHtmlMedia:
 		typename = "HtmlMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentHtmlMedia
+			*mediaFragHtmlMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentJsonMedia:
+	case *mediaFragJsonMedia:
 		typename = "JsonMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentJsonMedia
+			*mediaFragJsonMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentGltfMedia:
+	case *mediaFragGltfMedia:
 		typename = "GltfMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentGltfMedia
+			*mediaFragGltfMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentUnknownMedia:
+	case *mediaFragUnknownMedia:
 		typename = "UnknownMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentUnknownMedia
+			*mediaFragUnknownMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentSyncingMedia:
+	case *mediaFragSyncingMedia:
 		typename = "SyncingMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentSyncingMedia
+			*mediaFragSyncingMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragmentInvalidMedia:
+	case *mediaFragInvalidMedia:
 		typename = "InvalidMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragmentInvalidMedia
+			*mediaFragInvalidMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
 		return []byte("null"), nil
 	default:
 		return nil, fmt.Errorf(
-			`unexpected concrete type for mediaFragment: "%T"`, v)
+			`unexpected concrete type for mediaFrag: "%T"`, v)
 	}
 }
 
-// mediaFragment includes the GraphQL fields of AudioMedia requested by the fragment mediaFragment.
-type mediaFragmentAudioMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
+// mediaFrag includes the GraphQL fields of AudioMedia requested by the fragment mediaFrag.
+type mediaFragAudioMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// GetPreviewURLs returns mediaFragmentAudioMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentAudioMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragAudioMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragAudioMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentAudioMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentAudioMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
-}
+// GetFallbackMedia returns mediaFragAudioMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragAudioMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
 
-// mediaFragmentFallbackMedia includes the requested fields of the GraphQL type FallbackMedia.
-type mediaFragmentFallbackMedia struct {
+// mediaFragFallbackMedia includes the requested fields of the GraphQL type FallbackMedia.
+type mediaFragFallbackMedia struct {
 	MediaURL *string `json:"mediaURL"`
 }
 
-// GetMediaURL returns mediaFragmentFallbackMedia.MediaURL, and is useful for accessing the field via an interface.
-func (v *mediaFragmentFallbackMedia) GetMediaURL() *string { return v.MediaURL }
+// GetMediaURL returns mediaFragFallbackMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *mediaFragFallbackMedia) GetMediaURL() *string { return v.MediaURL }
 
-// mediaFragment includes the GraphQL fields of GIFMedia requested by the fragment mediaFragment.
-type mediaFragmentGIFMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
+// mediaFrag includes the GraphQL fields of GIFMedia requested by the fragment mediaFrag.
+type mediaFragGIFMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// GetPreviewURLs returns mediaFragmentGIFMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentGIFMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragGIFMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragGIFMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet { return v.PreviewURLs }
+
+// GetFallbackMedia returns mediaFragGIFMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragGIFMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of GltfMedia requested by the fragment mediaFrag.
+type mediaFragGltfMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
+}
+
+// GetPreviewURLs returns mediaFragGltfMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragGltfMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentGIFMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentGIFMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragGltfMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragGltfMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of HtmlMedia requested by the fragment mediaFrag.
+type mediaFragHtmlMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of GltfMedia requested by the fragment mediaFragment.
-type mediaFragmentGltfMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentGltfMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentGltfMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragHtmlMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragHtmlMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentGltfMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentGltfMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragHtmlMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragHtmlMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of ImageMedia requested by the fragment mediaFrag.
+type mediaFragImageMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of HtmlMedia requested by the fragment mediaFragment.
-type mediaFragmentHtmlMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentHtmlMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentHtmlMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragImageMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragImageMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentHtmlMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentHtmlMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragImageMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragImageMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of InvalidMedia requested by the fragment mediaFrag.
+type mediaFragInvalidMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of ImageMedia requested by the fragment mediaFragment.
-type mediaFragmentImageMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentImageMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentImageMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragInvalidMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragInvalidMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentImageMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentImageMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragInvalidMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragInvalidMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of JsonMedia requested by the fragment mediaFrag.
+type mediaFragJsonMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of InvalidMedia requested by the fragment mediaFragment.
-type mediaFragmentInvalidMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentInvalidMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentInvalidMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragJsonMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragJsonMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentInvalidMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentInvalidMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragJsonMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragJsonMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of PdfMedia requested by the fragment mediaFrag.
+type mediaFragPdfMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of JsonMedia requested by the fragment mediaFragment.
-type mediaFragmentJsonMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
+// GetPreviewURLs returns mediaFragPdfMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragPdfMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet { return v.PreviewURLs }
 
-// GetPreviewURLs returns mediaFragmentJsonMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentJsonMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.PreviewURLs
-}
+// GetFallbackMedia returns mediaFragPdfMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragPdfMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
 
-// GetFallbackMedia returns mediaFragmentJsonMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentJsonMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
-}
-
-// mediaFragment includes the GraphQL fields of PdfMedia requested by the fragment mediaFragment.
-type mediaFragmentPdfMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentPdfMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentPdfMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
-	return v.PreviewURLs
-}
-
-// GetFallbackMedia returns mediaFragmentPdfMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentPdfMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
-}
-
-// mediaFragmentPreviewURLsPreviewURLSet includes the requested fields of the GraphQL type PreviewURLSet.
-type mediaFragmentPreviewURLsPreviewURLSet struct {
+// mediaFragPreviewURLsPreviewURLSet includes the requested fields of the GraphQL type PreviewURLSet.
+type mediaFragPreviewURLsPreviewURLSet struct {
 	Small *string `json:"small"`
 }
 
-// GetSmall returns mediaFragmentPreviewURLsPreviewURLSet.Small, and is useful for accessing the field via an interface.
-func (v *mediaFragmentPreviewURLsPreviewURLSet) GetSmall() *string { return v.Small }
+// GetSmall returns mediaFragPreviewURLsPreviewURLSet.Small, and is useful for accessing the field via an interface.
+func (v *mediaFragPreviewURLsPreviewURLSet) GetSmall() *string { return v.Small }
 
-// mediaFragment includes the GraphQL fields of SyncingMedia requested by the fragment mediaFragment.
-type mediaFragmentSyncingMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
+// mediaFrag includes the GraphQL fields of SyncingMedia requested by the fragment mediaFrag.
+type mediaFragSyncingMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// GetPreviewURLs returns mediaFragmentSyncingMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentSyncingMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragSyncingMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragSyncingMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentSyncingMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentSyncingMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragSyncingMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragSyncingMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of TextMedia requested by the fragment mediaFrag.
+type mediaFragTextMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of TextMedia requested by the fragment mediaFragment.
-type mediaFragmentTextMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentTextMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentTextMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragTextMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragTextMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentTextMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentTextMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragTextMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragTextMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of UnknownMedia requested by the fragment mediaFrag.
+type mediaFragUnknownMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of UnknownMedia requested by the fragment mediaFragment.
-type mediaFragmentUnknownMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentUnknownMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentUnknownMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragUnknownMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragUnknownMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentUnknownMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentUnknownMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
+// GetFallbackMedia returns mediaFragUnknownMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragUnknownMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
+
+// mediaFrag includes the GraphQL fields of VideoMedia requested by the fragment mediaFrag.
+type mediaFragVideoMedia struct {
+	PreviewURLs   *mediaFragPreviewURLsPreviewURLSet `json:"previewURLs"`
+	FallbackMedia *mediaFragFallbackMedia            `json:"fallbackMedia"`
 }
 
-// mediaFragment includes the GraphQL fields of VideoMedia requested by the fragment mediaFragment.
-type mediaFragmentVideoMedia struct {
-	PreviewURLs   *mediaFragmentPreviewURLsPreviewURLSet `json:"previewURLs"`
-	FallbackMedia *mediaFragmentFallbackMedia            `json:"fallbackMedia"`
-}
-
-// GetPreviewURLs returns mediaFragmentVideoMedia.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *mediaFragmentVideoMedia) GetPreviewURLs() *mediaFragmentPreviewURLsPreviewURLSet {
+// GetPreviewURLs returns mediaFragVideoMedia.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *mediaFragVideoMedia) GetPreviewURLs() *mediaFragPreviewURLsPreviewURLSet {
 	return v.PreviewURLs
 }
 
-// GetFallbackMedia returns mediaFragmentVideoMedia.FallbackMedia, and is useful for accessing the field via an interface.
-func (v *mediaFragmentVideoMedia) GetFallbackMedia() *mediaFragmentFallbackMedia {
-	return v.FallbackMedia
-}
+// GetFallbackMedia returns mediaFragVideoMedia.FallbackMedia, and is useful for accessing the field via an interface.
+func (v *mediaFragVideoMedia) GetFallbackMedia() *mediaFragFallbackMedia { return v.FallbackMedia }
 
 // postDigestEntityQueryPostByIdErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
 type postDigestEntityQueryPostByIdErrInvalidInput struct {
@@ -4016,16 +3726,17 @@ func (v *postDigestEntityQueryPostByIdPost) GetTokens() []*postDigestEntityQuery
 
 // postDigestEntityQueryPostByIdPostAuthorGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type postDigestEntityQueryPostByIdPostAuthorGalleryUser struct {
-	Username     *string                                                         `json:"username"`
-	ProfileImage *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage `json:"-"`
+	userFrag `json:"-"`
 }
 
 // GetUsername returns postDigestEntityQueryPostByIdPostAuthorGalleryUser.Username, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) GetUsername() *string { return v.Username }
+func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) GetUsername() *string {
+	return v.userFrag.Username
+}
 
 // GetProfileImage returns postDigestEntityQueryPostByIdPostAuthorGalleryUser.ProfileImage, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) GetProfileImage() *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage {
-	return v.ProfileImage
+func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) GetProfileImage() *userFragProfileImage {
+	return v.userFrag.ProfileImage
 }
 
 func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) UnmarshalJSON(b []byte) error {
@@ -4036,7 +3747,6 @@ func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) UnmarshalJSON(b []b
 
 	var firstPass struct {
 		*postDigestEntityQueryPostByIdPostAuthorGalleryUser
-		ProfileImage json.RawMessage `json:"profileImage"`
 		graphql.NoUnmarshalJSON
 	}
 	firstPass.postDigestEntityQueryPostByIdPostAuthorGalleryUser = v
@@ -4046,18 +3756,10 @@ func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) UnmarshalJSON(b []b
 		return err
 	}
 
-	{
-		dst := &v.ProfileImage
-		src := firstPass.ProfileImage
-		if len(src) != 0 && string(src) != "null" {
-			*dst = new(postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage)
-			err = __unmarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage(
-				src, *dst)
-			if err != nil {
-				return fmt.Errorf(
-					"unable to unmarshal postDigestEntityQueryPostByIdPostAuthorGalleryUser.ProfileImage: %w", err)
-			}
-		}
+	err = json.Unmarshal(
+		b, &v.userFrag)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -4079,335 +3781,18 @@ func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) MarshalJSON() ([]by
 func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUser) __premarshalJSON() (*__premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUser, error) {
 	var retval __premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUser
 
-	retval.Username = v.Username
+	retval.Username = v.userFrag.Username
 	{
 
 		dst := &retval.ProfileImage
-		src := v.ProfileImage
+		src := v.userFrag.ProfileImage
 		if src != nil {
 			var err error
-			*dst, err = __marshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage(
+			*dst, err = __marshaluserFragProfileImage(
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"unable to marshal postDigestEntityQueryPostByIdPostAuthorGalleryUser.ProfileImage: %w", err)
-			}
-		}
-	}
-	return &retval, nil
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage includes the requested fields of the GraphQL interface ProfileImage.
-//
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage is implemented by the following types:
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage interface {
-	implementsGraphQLInterfacepostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage()
-	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
-	GetTypename() *string
-}
-
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage) implementsGraphQLInterfacepostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage() {
-}
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage) implementsGraphQLInterfacepostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage() {
-}
-
-func __unmarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage(b []byte, v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage) error {
-	if string(b) == "null" {
-		return nil
-	}
-
-	var tn struct {
-		TypeName string `json:"__typename"`
-	}
-	err := json.Unmarshal(b, &tn)
-	if err != nil {
-		return err
-	}
-
-	switch tn.TypeName {
-	case "EnsProfileImage":
-		*v = new(postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage)
-		return json.Unmarshal(b, *v)
-	case "TokenProfileImage":
-		*v = new(postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage)
-		return json.Unmarshal(b, *v)
-	case "":
-		return fmt.Errorf(
-			"response was missing ProfileImage.__typename")
-	default:
-		return fmt.Errorf(
-			`unexpected concrete type for postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage: "%v"`, tn.TypeName)
-	}
-}
-
-func __marshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage(v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage) ([]byte, error) {
-
-	var typename string
-	switch v := (*v).(type) {
-	case *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage:
-		typename = "EnsProfileImage"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage
-		}{typename, v}
-		return json.Marshal(result)
-	case *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage:
-		typename = "TokenProfileImage"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage
-		}{typename, v}
-		return json.Marshal(result)
-	case nil:
-		return []byte("null"), nil
-	default:
-		return nil, fmt.Errorf(
-			`unexpected concrete type for postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImage: "%T"`, v)
-	}
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage includes the requested fields of the GraphQL type EnsProfileImage.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage struct {
-	Typename *string                                                                                                 `json:"__typename"`
-	EnsToken *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage `json:"ensToken"`
-	PfpToken *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpToken                  `json:"pfpToken"`
-}
-
-// GetTypename returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage.Typename, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage) GetTypename() *string {
-	return v.Typename
-}
-
-// GetEnsToken returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage.EnsToken, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage) GetEnsToken() *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage {
-	return v.EnsToken
-}
-
-// GetPfpToken returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage.PfpToken, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImage) GetPfpToken() *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpToken {
-	return v.PfpToken
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage includes the requested fields of the GraphQL type HTTPSProfileImage.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage struct {
-	PreviewURLs *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet `json:"previewURLs"`
-}
-
-// GetPreviewURLs returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage.PreviewURLs, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImage) GetPreviewURLs() *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet {
-	return v.PreviewURLs
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet includes the requested fields of the GraphQL type PreviewURLSet.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet struct {
-	Small *string `json:"small"`
-}
-
-// GetSmall returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet.Small, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet) GetSmall() *string {
-	return v.Small
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpToken includes the requested fields of the GraphQL type Token.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpToken struct {
-	Definition postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition `json:"definition"`
-}
-
-// GetDefinition returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpToken.Definition, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpToken) GetDefinition() postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition {
-	return v.Definition
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition includes the requested fields of the GraphQL type TokenDefinition.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition struct {
-	definitionFrag `json:"-"`
-}
-
-// GetName returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.Name, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) GetName() *string {
-	return v.definitionFrag.Name
-}
-
-// GetDescription returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.Description, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) GetDescription() *string {
-	return v.definitionFrag.Description
-}
-
-// GetMedia returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.Media, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) GetMedia() *definitionFragMediaMediaSubtype {
-	return v.definitionFrag.Media
-}
-
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) UnmarshalJSON(b []byte) error {
-
-	if string(b) == "null" {
-		return nil
-	}
-
-	var firstPass struct {
-		*postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition
-		graphql.NoUnmarshalJSON
-	}
-	firstPass.postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition = v
-
-	err := json.Unmarshal(b, &firstPass)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(
-		b, &v.definitionFrag)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type __premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition struct {
-	Name *string `json:"name"`
-
-	Description *string `json:"description"`
-
-	Media json.RawMessage `json:"media"`
-}
-
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) MarshalJSON() ([]byte, error) {
-	premarshaled, err := v.__premarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(premarshaled)
-}
-
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition) __premarshalJSON() (*__premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition, error) {
-	var retval __premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition
-
-	retval.Name = v.definitionFrag.Name
-	retval.Description = v.definitionFrag.Description
-	{
-
-		dst := &retval.Media
-		src := v.definitionFrag.Media
-		if src != nil {
-			var err error
-			*dst, err = __marshaldefinitionFragMediaMediaSubtype(
-				src)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"unable to marshal postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageEnsProfileImagePfpTokenDefinition.definitionFrag.Media: %w", err)
-			}
-		}
-	}
-	return &retval, nil
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage includes the requested fields of the GraphQL type TokenProfileImage.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage struct {
-	Typename *string                                                                              `json:"__typename"`
-	Token    postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageToken `json:"token"`
-}
-
-// GetTypename returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage.Typename, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage) GetTypename() *string {
-	return v.Typename
-}
-
-// GetToken returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage.Token, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImage) GetToken() postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageToken {
-	return v.Token
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageToken includes the requested fields of the GraphQL type Token.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageToken struct {
-	Definition postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition `json:"definition"`
-}
-
-// GetDefinition returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageToken.Definition, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageToken) GetDefinition() postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition {
-	return v.Definition
-}
-
-// postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition includes the requested fields of the GraphQL type TokenDefinition.
-type postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition struct {
-	definitionFrag `json:"-"`
-}
-
-// GetName returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition.Name, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition) GetName() *string {
-	return v.definitionFrag.Name
-}
-
-// GetDescription returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition.Description, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition) GetDescription() *string {
-	return v.definitionFrag.Description
-}
-
-// GetMedia returns postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition.Media, and is useful for accessing the field via an interface.
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition) GetMedia() *definitionFragMediaMediaSubtype {
-	return v.definitionFrag.Media
-}
-
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition) UnmarshalJSON(b []byte) error {
-
-	if string(b) == "null" {
-		return nil
-	}
-
-	var firstPass struct {
-		*postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition
-		graphql.NoUnmarshalJSON
-	}
-	firstPass.postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition = v
-
-	err := json.Unmarshal(b, &firstPass)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(
-		b, &v.definitionFrag)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type __premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition struct {
-	Name *string `json:"name"`
-
-	Description *string `json:"description"`
-
-	Media json.RawMessage `json:"media"`
-}
-
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition) MarshalJSON() ([]byte, error) {
-	premarshaled, err := v.__premarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(premarshaled)
-}
-
-func (v *postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition) __premarshalJSON() (*__premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition, error) {
-	var retval __premarshalpostDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition
-
-	retval.Name = v.definitionFrag.Name
-	retval.Description = v.definitionFrag.Description
-	{
-
-		dst := &retval.Media
-		src := v.definitionFrag.Media
-		if src != nil {
-			var err error
-			*dst, err = __marshaldefinitionFragMediaMediaSubtype(
-				src)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"unable to marshal postDigestEntityQueryPostByIdPostAuthorGalleryUserProfileImageTokenProfileImageTokenDefinition.definitionFrag.Media: %w", err)
+					"unable to marshal postDigestEntityQueryPostByIdPostAuthorGalleryUser.userFrag.ProfileImage: %w", err)
 			}
 		}
 	}
@@ -4740,6 +4125,398 @@ func (v *tokenFragDefinitionTokenDefinition) __premarshalJSON() (*__premarshalto
 	return &retval, nil
 }
 
+// userFrag includes the GraphQL fields of GalleryUser requested by the fragment userFrag.
+type userFrag struct {
+	Username     *string               `json:"username"`
+	ProfileImage *userFragProfileImage `json:"-"`
+}
+
+// GetUsername returns userFrag.Username, and is useful for accessing the field via an interface.
+func (v *userFrag) GetUsername() *string { return v.Username }
+
+// GetProfileImage returns userFrag.ProfileImage, and is useful for accessing the field via an interface.
+func (v *userFrag) GetProfileImage() *userFragProfileImage { return v.ProfileImage }
+
+func (v *userFrag) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*userFrag
+		ProfileImage json.RawMessage `json:"profileImage"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.userFrag = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.ProfileImage
+		src := firstPass.ProfileImage
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(userFragProfileImage)
+			err = __unmarshaluserFragProfileImage(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal userFrag.ProfileImage: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaluserFrag struct {
+	Username *string `json:"username"`
+
+	ProfileImage json.RawMessage `json:"profileImage"`
+}
+
+func (v *userFrag) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *userFrag) __premarshalJSON() (*__premarshaluserFrag, error) {
+	var retval __premarshaluserFrag
+
+	retval.Username = v.Username
+	{
+
+		dst := &retval.ProfileImage
+		src := v.ProfileImage
+		if src != nil {
+			var err error
+			*dst, err = __marshaluserFragProfileImage(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal userFrag.ProfileImage: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// userFragProfileImage includes the requested fields of the GraphQL interface ProfileImage.
+//
+// userFragProfileImage is implemented by the following types:
+// userFragProfileImageEnsProfileImage
+// userFragProfileImageTokenProfileImage
+type userFragProfileImage interface {
+	implementsGraphQLInterfaceuserFragProfileImage()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *userFragProfileImageEnsProfileImage) implementsGraphQLInterfaceuserFragProfileImage()   {}
+func (v *userFragProfileImageTokenProfileImage) implementsGraphQLInterfaceuserFragProfileImage() {}
+
+func __unmarshaluserFragProfileImage(b []byte, v *userFragProfileImage) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "EnsProfileImage":
+		*v = new(userFragProfileImageEnsProfileImage)
+		return json.Unmarshal(b, *v)
+	case "TokenProfileImage":
+		*v = new(userFragProfileImageTokenProfileImage)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing ProfileImage.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for userFragProfileImage: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaluserFragProfileImage(v *userFragProfileImage) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *userFragProfileImageEnsProfileImage:
+		typename = "EnsProfileImage"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*userFragProfileImageEnsProfileImage
+		}{typename, v}
+		return json.Marshal(result)
+	case *userFragProfileImageTokenProfileImage:
+		typename = "TokenProfileImage"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*userFragProfileImageTokenProfileImage
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for userFragProfileImage: "%T"`, v)
+	}
+}
+
+// userFragProfileImageEnsProfileImage includes the requested fields of the GraphQL type EnsProfileImage.
+type userFragProfileImageEnsProfileImage struct {
+	Typename *string                                                       `json:"__typename"`
+	EnsToken *userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImage `json:"ensToken"`
+	PfpToken *userFragProfileImageEnsProfileImagePfpToken                  `json:"pfpToken"`
+}
+
+// GetTypename returns userFragProfileImageEnsProfileImage.Typename, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImage) GetTypename() *string { return v.Typename }
+
+// GetEnsToken returns userFragProfileImageEnsProfileImage.EnsToken, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImage) GetEnsToken() *userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImage {
+	return v.EnsToken
+}
+
+// GetPfpToken returns userFragProfileImageEnsProfileImage.PfpToken, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImage) GetPfpToken() *userFragProfileImageEnsProfileImagePfpToken {
+	return v.PfpToken
+}
+
+// userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImage includes the requested fields of the GraphQL type HTTPSProfileImage.
+type userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImage struct {
+	PreviewURLs *userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet `json:"previewURLs"`
+}
+
+// GetPreviewURLs returns userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImage.PreviewURLs, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImage) GetPreviewURLs() *userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet {
+	return v.PreviewURLs
+}
+
+// userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet includes the requested fields of the GraphQL type PreviewURLSet.
+type userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet struct {
+	Small *string `json:"small"`
+}
+
+// GetSmall returns userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet.Small, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImageEnsTokenHTTPSProfileImagePreviewURLsPreviewURLSet) GetSmall() *string {
+	return v.Small
+}
+
+// userFragProfileImageEnsProfileImagePfpToken includes the requested fields of the GraphQL type Token.
+type userFragProfileImageEnsProfileImagePfpToken struct {
+	Definition userFragProfileImageEnsProfileImagePfpTokenDefinition `json:"definition"`
+}
+
+// GetDefinition returns userFragProfileImageEnsProfileImagePfpToken.Definition, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImagePfpToken) GetDefinition() userFragProfileImageEnsProfileImagePfpTokenDefinition {
+	return v.Definition
+}
+
+// userFragProfileImageEnsProfileImagePfpTokenDefinition includes the requested fields of the GraphQL type TokenDefinition.
+type userFragProfileImageEnsProfileImagePfpTokenDefinition struct {
+	definitionFrag `json:"-"`
+}
+
+// GetName returns userFragProfileImageEnsProfileImagePfpTokenDefinition.Name, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImagePfpTokenDefinition) GetName() *string {
+	return v.definitionFrag.Name
+}
+
+// GetDescription returns userFragProfileImageEnsProfileImagePfpTokenDefinition.Description, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImagePfpTokenDefinition) GetDescription() *string {
+	return v.definitionFrag.Description
+}
+
+// GetMedia returns userFragProfileImageEnsProfileImagePfpTokenDefinition.Media, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageEnsProfileImagePfpTokenDefinition) GetMedia() *definitionFragMediaMediaSubtype {
+	return v.definitionFrag.Media
+}
+
+func (v *userFragProfileImageEnsProfileImagePfpTokenDefinition) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*userFragProfileImageEnsProfileImagePfpTokenDefinition
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.userFragProfileImageEnsProfileImagePfpTokenDefinition = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.definitionFrag)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshaluserFragProfileImageEnsProfileImagePfpTokenDefinition struct {
+	Name *string `json:"name"`
+
+	Description *string `json:"description"`
+
+	Media json.RawMessage `json:"media"`
+}
+
+func (v *userFragProfileImageEnsProfileImagePfpTokenDefinition) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *userFragProfileImageEnsProfileImagePfpTokenDefinition) __premarshalJSON() (*__premarshaluserFragProfileImageEnsProfileImagePfpTokenDefinition, error) {
+	var retval __premarshaluserFragProfileImageEnsProfileImagePfpTokenDefinition
+
+	retval.Name = v.definitionFrag.Name
+	retval.Description = v.definitionFrag.Description
+	{
+
+		dst := &retval.Media
+		src := v.definitionFrag.Media
+		if src != nil {
+			var err error
+			*dst, err = __marshaldefinitionFragMediaMediaSubtype(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal userFragProfileImageEnsProfileImagePfpTokenDefinition.definitionFrag.Media: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// userFragProfileImageTokenProfileImage includes the requested fields of the GraphQL type TokenProfileImage.
+type userFragProfileImageTokenProfileImage struct {
+	Typename *string                                    `json:"__typename"`
+	Token    userFragProfileImageTokenProfileImageToken `json:"token"`
+}
+
+// GetTypename returns userFragProfileImageTokenProfileImage.Typename, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageTokenProfileImage) GetTypename() *string { return v.Typename }
+
+// GetToken returns userFragProfileImageTokenProfileImage.Token, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageTokenProfileImage) GetToken() userFragProfileImageTokenProfileImageToken {
+	return v.Token
+}
+
+// userFragProfileImageTokenProfileImageToken includes the requested fields of the GraphQL type Token.
+type userFragProfileImageTokenProfileImageToken struct {
+	Definition userFragProfileImageTokenProfileImageTokenDefinition `json:"definition"`
+}
+
+// GetDefinition returns userFragProfileImageTokenProfileImageToken.Definition, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageTokenProfileImageToken) GetDefinition() userFragProfileImageTokenProfileImageTokenDefinition {
+	return v.Definition
+}
+
+// userFragProfileImageTokenProfileImageTokenDefinition includes the requested fields of the GraphQL type TokenDefinition.
+type userFragProfileImageTokenProfileImageTokenDefinition struct {
+	definitionFrag `json:"-"`
+}
+
+// GetName returns userFragProfileImageTokenProfileImageTokenDefinition.Name, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageTokenProfileImageTokenDefinition) GetName() *string {
+	return v.definitionFrag.Name
+}
+
+// GetDescription returns userFragProfileImageTokenProfileImageTokenDefinition.Description, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageTokenProfileImageTokenDefinition) GetDescription() *string {
+	return v.definitionFrag.Description
+}
+
+// GetMedia returns userFragProfileImageTokenProfileImageTokenDefinition.Media, and is useful for accessing the field via an interface.
+func (v *userFragProfileImageTokenProfileImageTokenDefinition) GetMedia() *definitionFragMediaMediaSubtype {
+	return v.definitionFrag.Media
+}
+
+func (v *userFragProfileImageTokenProfileImageTokenDefinition) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*userFragProfileImageTokenProfileImageTokenDefinition
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.userFragProfileImageTokenProfileImageTokenDefinition = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.definitionFrag)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshaluserFragProfileImageTokenProfileImageTokenDefinition struct {
+	Name *string `json:"name"`
+
+	Description *string `json:"description"`
+
+	Media json.RawMessage `json:"media"`
+}
+
+func (v *userFragProfileImageTokenProfileImageTokenDefinition) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *userFragProfileImageTokenProfileImageTokenDefinition) __premarshalJSON() (*__premarshaluserFragProfileImageTokenProfileImageTokenDefinition, error) {
+	var retval __premarshaluserFragProfileImageTokenProfileImageTokenDefinition
+
+	retval.Name = v.definitionFrag.Name
+	retval.Description = v.definitionFrag.Description
+	{
+
+		dst := &retval.Media
+		src := v.definitionFrag.Media
+		if src != nil {
+			var err error
+			*dst, err = __marshaldefinitionFragMediaMediaSubtype(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal userFragProfileImageTokenProfileImageTokenDefinition.definitionFrag.Media: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 // The query or mutation executed by communityDigestEntityQuery.
 const communityDigestEntityQuery_Operation = `
 query communityDigestEntityQuery ($id: DBID!) {
@@ -4779,29 +4556,7 @@ query communityDigestEntityQuery ($id: DBID!) {
 			creators {
 				__typename
 				... on GalleryUser {
-					username
-					profileImage {
-						__typename
-						... on TokenProfileImage {
-							token {
-								definition {
-									... definitionFrag
-								}
-							}
-						}
-						... on EnsProfileImage {
-							ensToken: profileImage {
-								previewURLs {
-									small
-								}
-							}
-							pfpToken: token {
-								definition {
-									... definitionFrag
-								}
-							}
-						}
-					}
+					... userFrag
 				}
 				... on ChainAddress {
 					address
@@ -4822,13 +4577,28 @@ fragment errorFrag on Error {
 	message
 	__typename
 }
-fragment definitionFrag on TokenDefinition {
-	name
-	description
-	media {
+fragment userFrag on GalleryUser {
+	username
+	profileImage {
 		__typename
-		... on Media {
-			... mediaFragment
+		... on TokenProfileImage {
+			token {
+				definition {
+					... definitionFrag
+				}
+			}
+		}
+		... on EnsProfileImage {
+			ensToken: profileImage {
+				previewURLs {
+					small
+				}
+			}
+			pfpToken: token {
+				definition {
+					... definitionFrag
+				}
+			}
 		}
 	}
 }
@@ -4838,7 +4608,17 @@ fragment tokenFrag on Token {
 		... definitionFrag
 	}
 }
-fragment mediaFragment on Media {
+fragment definitionFrag on TokenDefinition {
+	name
+	description
+	media {
+		__typename
+		... on Media {
+			... mediaFrag
+		}
+	}
+}
+fragment mediaFrag on Media {
 	previewURLs {
 		small
 	}
@@ -4885,7 +4665,7 @@ query galleryDigestEntityQuery ($id: DBID!) {
 		... on Gallery {
 			dbid
 			owner {
-				username
+				... userFrag
 			}
 			name
 			description
@@ -4898,6 +4678,49 @@ query galleryDigestEntityQuery ($id: DBID!) {
 fragment errorFrag on Error {
 	message
 	__typename
+}
+fragment userFrag on GalleryUser {
+	username
+	profileImage {
+		__typename
+		... on TokenProfileImage {
+			token {
+				definition {
+					... definitionFrag
+				}
+			}
+		}
+		... on EnsProfileImage {
+			ensToken: profileImage {
+				previewURLs {
+					small
+				}
+			}
+			pfpToken: token {
+				definition {
+					... definitionFrag
+				}
+			}
+		}
+	}
+}
+fragment definitionFrag on TokenDefinition {
+	name
+	description
+	media {
+		__typename
+		... on Media {
+			... mediaFrag
+		}
+	}
+}
+fragment mediaFrag on Media {
+	previewURLs {
+		small
+	}
+	fallbackMedia {
+		mediaURL
+	}
 }
 `
 
@@ -4939,29 +4762,7 @@ query postDigestEntityQuery ($id: DBID!) {
 			dbid
 			caption
 			author {
-				username
-				profileImage {
-					__typename
-					... on TokenProfileImage {
-						token {
-							definition {
-								... definitionFrag
-							}
-						}
-					}
-					... on EnsProfileImage {
-						ensToken: profileImage {
-							previewURLs {
-								small
-							}
-						}
-						pfpToken: token {
-							definition {
-								... definitionFrag
-							}
-						}
-					}
-				}
+				... userFrag
 			}
 			tokens {
 				... tokenFrag
@@ -4973,13 +4774,28 @@ fragment errorFrag on Error {
 	message
 	__typename
 }
-fragment definitionFrag on TokenDefinition {
-	name
-	description
-	media {
+fragment userFrag on GalleryUser {
+	username
+	profileImage {
 		__typename
-		... on Media {
-			... mediaFragment
+		... on TokenProfileImage {
+			token {
+				definition {
+					... definitionFrag
+				}
+			}
+		}
+		... on EnsProfileImage {
+			ensToken: profileImage {
+				previewURLs {
+					small
+				}
+			}
+			pfpToken: token {
+				definition {
+					... definitionFrag
+				}
+			}
 		}
 	}
 }
@@ -4989,7 +4805,17 @@ fragment tokenFrag on Token {
 		... definitionFrag
 	}
 }
-fragment mediaFragment on Media {
+fragment definitionFrag on TokenDefinition {
+	name
+	description
+	media {
+		__typename
+		... on Media {
+			... mediaFrag
+		}
+	}
+}
+fragment mediaFrag on Media {
 	previewURLs {
 		small
 	}

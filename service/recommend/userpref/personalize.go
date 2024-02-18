@@ -193,12 +193,11 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 	// We don't have personalization data for this user yet
 	_, vOK := p.pM.uL[userID]
 	if !vOK {
-		return 0
+		return 1.
 	}
 
-	// If scoring themselves, return 1 which is the max score
 	if userID == e.ActorID {
-		return 1.0
+		return 1.
 	}
 
 	var relevanceScore float64
@@ -213,7 +212,7 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 	}
 
 	edgeScore, _ := p.scoreEdge(userID, e.ActorID)
-	return (relevanceScore + edgeScore) / 2.0
+	return 1. + (relevanceScore+edgeScore)/2.0
 }
 
 func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
@@ -385,6 +384,9 @@ func overlapIndex(unionAB, cardA, cardB float64) float64 {
 	minCard := cardA
 	if cardB < cardA {
 		minCard = cardB
+	}
+	if minCard == 0. {
+		return 0.
 	}
 	return unionAB / minCard
 }

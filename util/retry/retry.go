@@ -23,7 +23,7 @@ type ErrOutOfRetries struct {
 }
 
 func (e ErrOutOfRetries) Error() string {
-	return fmt.Sprintf("retried %d times: last error: %s", e.Retry.Tries, e.Err.Error())
+	return fmt.Sprintf("retried %d times: last error: %s", e.Retry.Tries, e.Err)
 }
 
 func (e ErrOutOfRetries) Unwrap() error {

@@ -62,8 +62,8 @@ type tokenProcessingJob struct {
 	profileImageKey string
 	// refreshMetadata is an optional flag that indicates that the pipeline should check for new metadata when enabled
 	refreshMetadata bool
-	// defaultMetadata is starting metadata to use to process media from. If empty or refreshMetadata is set, then the pipeline will try to get new metadata.
-	defaultMetadata persist.TokenMetadata
+	// startingMetadata is starting metadata to use to process media from. If empty or refreshMetadata is set, then the pipeline will try to get new metadata.
+	startingMetadata persist.TokenMetadata
 	// isSpamJob indicates that the job is processing a spam token. It's currently used to exclude events from Sentry.
 	isSpamJob bool
 	// isFxhash indicates that the job is processing a fxhash token.
@@ -102,7 +102,7 @@ func (pOpts) WithRefreshMetadata() PipelineOption {
 
 func (pOpts) WithMetadata(t persist.TokenMetadata) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		j.defaultMetadata = t
+		j.startingMetadata = t
 	}
 }
 
@@ -269,45 +269,51 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 
-	metadata := tpj.retrieveMetadata(ctx)
+	var (
+		imgURL     media.ImageURL
+		pfpURL     media.ImageURL
+		animURL    media.AnimationURL
+		metadata   persist.TokenMetadata
+		tokenMedia persist.Media = persist.Media{MediaType: persist.MediaTypeUnknown}
+		err        error
+	)
 
-	imgURL, pfpURL, animURL, err := tpj.urlsToDownload(ctx, metadata)
-	if err != nil {
-		return persist.Media{MediaType: persist.MediaTypeUnknown}, metadata, wrapWithBadTokenErr(err)
+	if !tpj.refreshMetadata {
+		imgURL, pfpURL, animURL, err = tpj.urlsToDownload(ctx, tpj.startingMetadata)
+		if err != nil && !errors.Is(err, media.ErrNoMediaURLs) {
+			return tokenMedia, tpj.startingMetadata, wrapWithBadTokenErr(err)
+		}
 	}
 
-	newMedia, err := tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL, metadata,
+	func() {
+		metadataCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
+		defer metadataCallback()
+
+		metadata, err = tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain)
+		if err != nil {
+			return
+		}
+
+		// try to get URLs from new metadata
+		imgURL, pfpURL, animURL, err = tpj.urlsToDownload(ctx, metadata)
+		if err == nil || (err != nil && !errors.Is(err, media.ErrNoMediaURLs)) {
+			return
+		}
+
+		// use the starting metadata
+		metadata = tpj.startingMetadata
+		imgURL, pfpURL, animURL, err = tpj.urlsToDownload(ctx, metadata)
+	}()
+
+	if err != nil {
+		return tokenMedia, metadata, wrapWithBadTokenErr(err)
+	}
+
+	tokenMedia, err = tpj.cacheMediaFromURLs(ctx, imgURL, pfpURL, animURL, metadata,
 		tpj.requireImage && imgURL != "",
 		tpj.requireFxHashSigned,
 	)
-
-	return newMedia, metadata, err
-}
-
-func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
-	defer traceCallback()
-
-	if len(tpj.defaultMetadata) > 0 && !tpj.refreshMetadata {
-		return tpj.defaultMetadata
-	}
-
-	// metadata is a string, it should not take more than a minute to retrieve
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-
-	newMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain)
-	if err == nil && len(newMetadata) > 0 {
-		return newMetadata
-	}
-
-	if err != nil {
-		logger.For(ctx).Warnf("failed to get metadata: %s", err)
-	}
-
-	// Return the original metadata if we can't get new metadata
-	persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
-	return tpj.defaultMetadata
+	return tokenMedia, metadata, err
 }
 
 func (tpj *tokenProcessingJob) cacheFromURL(ctx context.Context, tids persist.TokenIdentifiers, defaultObjectType objectType, mediaURL string, subMeta *cachePipelineMetadata) chan cacheResult {

@@ -57,7 +57,6 @@ type User struct {
 	Traits             Traits     `json:"traits"`
 	Universal          NullBool   `json:"universal"`
 	PrimaryWalletID    NullString `json:"primary_wallet_id"`
-	EmailVerified      NullInt64  `json:"email_verified"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
@@ -294,6 +293,7 @@ const (
 	RoleAdmin       Role = "ADMIN"
 	RoleBetaTester  Role = "BETA_TESTER"
 	RoleEarlyAccess Role = "EARLY_ACCESS"
+	RoleEmailTester Role = "EMAIL_TESTER"
 )
 
 // Scan implements the database/sql Scanner interface for the DBID type
@@ -328,6 +328,8 @@ func (r *Role) UnmarshalGQL(v interface{}) error {
 		*r = RoleBetaTester
 	case "early_access":
 		*r = RoleEarlyAccess
+	case "email_tester":
+		*r = RoleEmailTester
 	}
 	return nil
 }
@@ -341,6 +343,8 @@ func (r Role) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"BETA_TESTER"`))
 	case RoleEarlyAccess:
 		w.Write([]byte(`"EARLY_ACCESS"`))
+	case RoleEmailTester:
+		w.Write([]byte(`"EMAIL_TESTER"`))
 	}
 }
 
@@ -352,6 +356,67 @@ func (l RoleList) Value() (driver.Value, error) {
 
 func (l *RoleList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
+}
+
+type Persona string
+
+const (
+	PersonaNone      Persona = "none"
+	PersonaCollector Persona = "collector"
+	PersonaCreator   Persona = "creator"
+	PersonaBoth      Persona = "both"
+)
+
+// Scan implements the database/sql Scanner interface for the Persona type
+func (p *Persona) Scan(i interface{}) error {
+	if i == nil {
+		return nil
+	}
+	if it, ok := i.([]uint8); ok {
+		*p = Persona(it)
+		return nil
+	}
+	*p = Persona(i.(string))
+	return nil
+}
+
+// Value implements the database/sql driver Valuer interface for the Persona type
+func (p *Persona) Value() (driver.Value, error) {
+	return p, nil
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (p *Persona) UnmarshalGQL(v interface{}) error {
+	n, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("Persona must be a string")
+	}
+
+	switch strings.ToLower(n) {
+	case "none":
+		*p = PersonaNone
+	case "collector":
+		*p = PersonaCollector
+	case "creator":
+		*p = PersonaCreator
+	case "both":
+		*p = PersonaBoth
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (p Persona) MarshalGQL(w io.Writer) {
+	switch p {
+	case PersonaNone:
+		w.Write([]byte(`"none"`))
+	case PersonaCreator:
+		w.Write([]byte(`"creator"`))
+	case PersonaCollector:
+		w.Write([]byte(`"collector"`))
+	case PersonaBoth:
+		w.Write([]byte(`"both"`))
+	}
 }
 
 type ProfileImageSource string // ProfileImageSource represents the source of a profile image

@@ -327,6 +327,10 @@ type SetCommunityOverrideCreatorPayloadOrError interface {
 	IsSetCommunityOverrideCreatorPayloadOrError()
 }
 
+type SetPersonaPayloadOrError interface {
+	IsSetPersonaPayloadOrError()
+}
+
 type SetProfileImagePayloadOrError interface {
 	IsSetProfileImagePayloadOrError()
 }
@@ -831,6 +835,7 @@ type Community struct {
 	Holders           *TokenHoldersConnection       `json:"holders"`
 	Tokens            *TokensConnection             `json:"tokens"`
 	Posts             *PostsConnection              `json:"posts"`
+	TokensForFrame    []*Token                      `json:"tokensForFrame"`
 	Contract          *Contract                     `json:"contract"`
 	ContractAddress   *persist.ChainAddress         `json:"contractAddress"`
 	Chain             *persist.Chain                `json:"chain"`
@@ -839,6 +844,7 @@ type Community struct {
 	TokensInCommunity *TokensConnection             `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection       `json:"owners"`
 	Galleries         *CommunityGalleriesConnection `json:"galleries"`
+	ViewerIsMember    *bool                         `json:"viewerIsMember"`
 }
 
 func (Community) IsNode()                      {}
@@ -1200,6 +1206,7 @@ func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError()        
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()                        {}
 func (ErrInvalidInput) IsOptInForRolesPayloadOrError()                                   {}
 func (ErrInvalidInput) IsOptOutForRolesPayloadOrError()                                  {}
+func (ErrInvalidInput) IsSetPersonaPayloadOrError()                                      {}
 func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                                     {}
 func (ErrInvalidInput) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {}
 func (ErrInvalidInput) IsCreateGalleryPayloadOrError()                                   {}
@@ -1293,6 +1300,7 @@ func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()                        
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()                             {}
 func (ErrNotAuthorized) IsOptInForRolesPayloadOrError()                                   {}
 func (ErrNotAuthorized) IsOptOutForRolesPayloadOrError()                                  {}
+func (ErrNotAuthorized) IsSetPersonaPayloadOrError()                                      {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()                          {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()                           {}
 func (ErrNotAuthorized) IsSyncCreatedTokensForUsernamePayloadOrError()                    {}
@@ -2169,6 +2177,12 @@ type SetCommunityOverrideCreatorPayload struct {
 
 func (SetCommunityOverrideCreatorPayload) IsSetCommunityOverrideCreatorPayloadOrError() {}
 
+type SetPersonaPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (SetPersonaPayload) IsSetPersonaPayloadOrError() {}
+
 type SetProfileImageInput struct {
 	TokenID       *persist.DBID         `json:"tokenId"`
 	WalletAddress *persist.ChainAddress `json:"walletAddress"`
@@ -2990,6 +3004,7 @@ type Viewer struct {
 	Notifications        *NotificationsConnection `json:"notifications"`
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
 	UserExperiences      []*UserExperience        `json:"userExperiences"`
+	Persona              *persist.Persona         `json:"persona"`
 	SuggestedUsers       *UsersConnection         `json:"suggestedUsers"`
 }
 

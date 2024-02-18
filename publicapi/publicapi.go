@@ -2,10 +2,12 @@ package publicapi
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/service/tracing"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/farcaster"
+	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tracing"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
@@ -62,7 +64,7 @@ type PublicAPI struct {
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	validator := validate.WithCustomValidators()
 	tokenManager := tokenmanage.New(ctx, taskClient, tokenManageCache)
@@ -88,7 +90,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 		Admin:         admin.NewAPI(repos, queries, authRefreshCache, validator, multichainProvider),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
-		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache, httpClient: httpClient, taskClient: taskClient},
+		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache, httpClient: httpClient, taskClient: taskClient, neynarAPI: neynar},
 		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 		Search:        &SearchAPI{queries: queries, loaders: loaders, validator: validator},
 	}

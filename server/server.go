@@ -27,6 +27,7 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -136,7 +137,7 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	recommender.Loop(ctx, time.NewTicker(time.Hour))
 	p.Loop(ctx, time.NewTicker(time.Minute*15))
 
-	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p)
+	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, farcaster.NewNeynarAPI(c.HTTPClient, socialCache))
 }
 
 func newSecretsClient() *secretmanager.Client {

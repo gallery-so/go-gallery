@@ -75,7 +75,7 @@ type FarcasterAuthenticator struct {
 }
 
 func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
-	api := farcaster.NewNeynarAPI(a.HTTPClient)
+	api := farcaster.NewNeynarAPI(a.HTTPClient, nil)
 	user, err := a.Queries.GetUserByAddressAndL1(ctx, coredb.GetUserByAddressAndL1Params{
 		Address: persist.Address(persist.ChainETH.NormalizeAddress(a.Address)),
 		L1Chain: persist.L1Chain(persist.ChainETH),
