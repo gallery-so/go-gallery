@@ -78,30 +78,31 @@ func (api TokenAPI) GetTokenByIdIgnoreDisplayable(ctx context.Context, tokenID p
 	return &r.Token, nil
 }
 
-func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, error) {
+func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, db.TokenDefinition, db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, "required"),
 		"domain": validate.WithTag(domain, "required"),
 	}); err != nil {
-		return db.Token{}, err
+		return db.Token{}, db.TokenDefinition{}, db.TokenMedia{}, err
 	}
 
 	tokenID, err := eth.DeriveTokenID(domain)
 	if err != nil {
-		return db.Token{}, err
+		return db.Token{}, db.TokenDefinition{}, db.TokenMedia{}, err
 	}
 
 	r, err := api.loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.Load(db.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams{
 		OwnerID:         userID,
-		TokenID:         persist.TokenID(tokenID),
+		TokenID:         tokenID,
 		ContractAddress: eth.EnsAddress,
 		Chain:           persist.ChainETH,
 	})
 	if err != nil {
-		return db.Token{}, err
+		return db.Token{}, db.TokenDefinition{}, db.TokenMedia{}, err
 	}
 
-	return r.Token, err
+	return r.Token, r.TokenDefinition, r.TokenMedia, err
 }
 
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {

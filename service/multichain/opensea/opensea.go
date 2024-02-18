@@ -611,8 +611,8 @@ func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, client *http.C
 	setPagingParams(endpoint)
 	paginateAssetsFilter(ctx, client, mustAuthRequest(ctx, endpoint), outCh, func(a Asset) bool {
 		// OS doesn't let you filter by tokenID and owner, so we have to filter for only the token
-		ca := persist.NewChainAddress(persist.Address(contractAddress), chain)
-		if ca.Address() == contractAddress && persist.MustTokenID(a.Identifier) == tokenID {
+		ca := persist.NewChainAddress(persist.Address(a.Contract), chain)
+		if (ca.Address() == contractAddress) && (persist.MustTokenID(a.Identifier) == tokenID) {
 			return true
 		}
 		return false
@@ -742,7 +742,8 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 		if keepAssetFilter == nil {
 			outCh <- assetsReceived{Assets: page.NFTs}
 		} else {
-			outCh <- assetsReceived{Assets: util.Filter(page.NFTs, keepAssetFilter, true)}
+			filtered := util.Filter(page.NFTs, keepAssetFilter, true)
+			outCh <- assetsReceived{Assets: filtered}
 		}
 		if page.Next == "" {
 			return

@@ -18,17 +18,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
-	"github.com/sirupsen/logrus"
-
 	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/sirupsen/logrus"
+
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
@@ -637,7 +636,7 @@ type rasterizeResponse struct {
 	GIF *string `json:"gif"`
 }
 
-func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, httpClient *http.Client, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+func cacheRasterizedSVG(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, httpClient *http.Client, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
 	defer traceCallback()
 
@@ -646,10 +645,17 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		persist.FailStep(subMeta.SVGRasterize)
 		return nil, err
 	}
+
 	idToken, _ := metadata.Get(fmt.Sprintf("instance/service-accounts/default/identity?audience=%s", env.GetString("RASTERIZER_URL")))
 	if idToken != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", idToken))
 	}
+
+	q := req.URL.Query()
+	q.Add("chain", strconv.Itoa(int(tids.Chain)))
+	q.Add("address", tids.ContractAddress.String())
+	q.Add("tokenId", tids.TokenID.Base10String())
+	req.URL.RawQuery = q.Encode()
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -966,9 +972,9 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			result = append(result, liveObj)
 		}
 
-	} else if mediaType == persist.MediaTypeSVG && tids.ContractAddress != eth.PunkAddress {
+	} else if mediaType == persist.MediaTypeSVG {
 		timeBeforeCache := time.Now()
-		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, httpClient, storageClient, subMeta)
+		obj, err := cacheRasterizedSVG(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, httpClient, storageClient, subMeta)
 		if err != nil {
 			logger.For(pCtx).Errorf("could not cache svg rasterization: %s", err)
 			// still return the original object as svg

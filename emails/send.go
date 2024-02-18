@@ -71,12 +71,12 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 			return
 		}
 
-		if userWithPII.PiiEmailAddress.String() == "" {
+		emailAddress := userWithPII.PiiUnverifiedEmailAddress.String()
+		if emailAddress == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID: input.UserID})
 			return
 		}
 
-		emailAddress := userWithPII.PiiEmailAddress.String()
 		j, err := auth.GenerateEmailVerificationToken(c, input.UserID, emailAddress)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -210,7 +210,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.PiiUserView) error {
 
-		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, gidInt, queries, s, 10, 5, sendRealEmails)
+		response, err := sendNotificationEmailToUser(c, u, u.PiiVerifiedEmailAddress, gidInt, queries, s, 10, 5, sendRealEmails)
 		if err != nil {
 			return err
 		}
@@ -238,7 +238,7 @@ func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailR
 		return nil, fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
 	}
 
-	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
+	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiVerifiedEmailAddress.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
 	}
@@ -414,7 +414,7 @@ func sendDigestTestEmail(q *coredb.Queries, s *sendgrid.Client, b *store.BucketS
 			return
 		}
 
-		if input.Email != userWithPII.PiiEmailAddress.String() {
+		if input.Email != userWithPII.PiiVerifiedEmailAddress.String() {
 			util.ErrResponse(ctx, http.StatusBadRequest, errEmailMismatch{userID: user.ID})
 			return
 		}
@@ -425,7 +425,7 @@ func sendDigestTestEmail(q *coredb.Queries, s *sendgrid.Client, b *store.BucketS
 			return
 		}
 
-		r, err := sendDigestEmailToUser(ctx, userWithPII, userWithPII.PiiEmailAddress, gidInt, template, s)
+		r, err := sendDigestEmailToUser(ctx, userWithPII, userWithPII.PiiVerifiedEmailAddress, gidInt, template, s)
 		if err != nil {
 			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
@@ -455,7 +455,7 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeDigest, queries, func(u coredb.PiiUserView) error {
 
-		response, err := sendDigestEmailToUser(c, u, u.PiiEmailAddress, gidInt, v, s)
+		response, err := sendDigestEmailToUser(c, u, u.PiiVerifiedEmailAddress, gidInt, v, s)
 		if err != nil {
 			return err
 		}
@@ -472,7 +472,7 @@ func sendDigestEmailsToAllUsers(c context.Context, v DigestValues, queries *core
 }
 
 func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, unsubscribeGroupID int, digestValues DigestValues, s *sendgrid.Client) (*rest.Response, error) {
-	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
+	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiVerifiedEmailAddress.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
 	}
@@ -529,10 +529,10 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 	// end time seemingly ensures that we don't send emails to users who signed up after the last time we ran this function, but assumes this function could take a day to run.
 	// This could probably just be set to time.Now() and it would be fine but if it ain't broke don't fix it
 	var endTime time.Time = time.Now().Add(24 * time.Hour)
-	requiredStatus := persist.EmailVerificationStatusVerified
+	emailTestersOnly := false
 	if isDevEnv() {
-		// if we are not in production, the only users returned will be those with email status admin verified
-		requiredStatus = persist.EmailVerificationStatusAdmin
+		// if we are not in production, the only users returned will be those with EMAIL_TESTER roles
+		emailTestersOnly = true
 	}
 
 	for {
@@ -543,8 +543,8 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 			CurBeforeTime:       endTime,
 			CurAfterID:          lastID,
 			PagingForward:       true,
-			EmailVerified:       requiredStatus,
 			EmailUnsubscription: emailType.String(),
+			EmailTestersOnly:    emailTestersOnly,
 		})
 		if err != nil {
 			return err

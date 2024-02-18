@@ -36,7 +36,6 @@ var caip19AssetTypeWithAssetID = regexp.MustCompile(
 
 const (
 	EnsAddress        = "0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"
-	PunkAddress       = "0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"
 	ethMainnetChainID = "eip155:1"
 )
 

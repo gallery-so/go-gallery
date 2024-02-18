@@ -361,6 +361,16 @@ func (r *communityResolver) Posts(ctx context.Context, obj *model.Community, bef
 	return resolveCommunityPostsByCommunityID(ctx, obj.Dbid, before, after, first, last)
 }
 
+// TokensForFrame is the resolver for the tokensForFrame field.
+func (r *communityResolver) TokensForFrame(ctx context.Context, obj *model.Community, limit int) ([]*model.Token, error) {
+	tokens, err := publicapi.For(ctx).Community.GetFrameTokensByCommunityID(ctx, obj.Dbid, int32(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *communityResolver) Contract(ctx context.Context, obj *model.Community) (*model.Contract, error) {
 	contractID := obj.HelperCommunityData.Community.ContractID
@@ -480,6 +490,27 @@ func (r *communityResolver) Galleries(ctx context.Context, obj *model.Community,
 	}, nil
 }
 
+// ViewerIsMember is the resolver for the viewerIsMember field.
+func (r *communityResolver) ViewerIsMember(ctx context.Context, obj *model.Community) (*bool, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+
+	isMember, err := api.User.IsMemberOfCommunity(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting membership fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns membership status or nil.
+		return nil, nil
+	}
+
+	return &isMember, nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *contractCommunityResolver) Contract(ctx context.Context, obj *model.ContractCommunity) (*model.Contract, error) {
 	return resolveContractByContractID(ctx, obj.HelperContractCommunityData.Community.ContractID)
@@ -503,10 +534,12 @@ func (r *ensProfileImageResolver) Wallet(ctx context.Context, obj *model.EnsProf
 
 // Token is the resolver for the token field.
 func (r *ensProfileImageResolver) Token(ctx context.Context, obj *model.EnsProfileImage) (*model.Token, error) {
-	if obj.HelperEnsProfileImageData.EnsDomain == "" || obj.HelperEnsProfileImageData.UserID == "" {
+	token, _, _, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, obj.HelperEnsProfileImageData.UserID, obj.HelperEnsProfileImageData.EnsDomain)
+	if err != nil {
+		logger.For(ctx).Warnf("unable to find token for PFP via ENS: %s", err)
 		return nil, nil
 	}
-	return resolveTokenByEnsDomain(ctx, obj.HelperEnsProfileImageData.UserID, obj.HelperEnsProfileImageData.EnsDomain)
+	return tokenToModel(ctx, token, nil), nil
 }
 
 // EventData is the resolver for the eventData field.
@@ -2016,6 +2049,18 @@ func (r *mutationResolver) OptOutForRoles(ctx context.Context, roles []persist.R
 	return payload, nil
 }
 
+// SetPersona is the resolver for the setPersona field.
+func (r *mutationResolver) SetPersona(ctx context.Context, persona persist.Persona) (model.SetPersonaPayloadOrError, error) {
+	err := publicapi.For(ctx).User.SetPersona(ctx, persona)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.SetPersonaPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+}
+
 // AddRolesToUser is the resolver for the addRolesToUser field.
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
@@ -2704,6 +2749,17 @@ func (r *queryResolver) SearchCommunities(ctx context.Context, query string, lim
 	}
 
 	return model.SearchCommunitiesPayload{Results: results}, nil
+}
+
+// IsEmailAddressAvailable is the resolver for the isEmailAddressAvailable field.
+func (r *queryResolver) IsEmailAddressAvailable(ctx context.Context, emailAddress persist.Email) (*bool, error) {
+	exists, err := publicapi.For(ctx).User.VerifiedEmailAddressExists(ctx, emailAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	available := !exists
+	return &available, nil
 }
 
 // UsersByRole is the resolver for the usersByRole field.
@@ -3418,6 +3474,11 @@ func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Vi
 // UserExperiences is the resolver for the userExperiences field.
 func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error) {
 	return resolveViewerExperiencesByUserID(ctx, obj.UserId)
+}
+
+// Persona is the resolver for the persona field.
+func (r *viewerResolver) Persona(ctx context.Context, obj *model.Viewer) (*persist.Persona, error) {
+	return resolveViewerPersonaByUserID(ctx, obj.UserId)
 }
 
 // SuggestedUsers is the resolver for the suggestedUsers field.

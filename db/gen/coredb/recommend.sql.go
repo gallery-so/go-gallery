@@ -88,47 +88,42 @@ func (q *Queries) GetExternalFollowGraphSource(ctx context.Context) ([]GetExtern
 }
 
 const getFeedEntityScores = `-- name: GetFeedEntityScores :many
-with refreshed as (
-  select greatest((select last_updated from feed_entity_scores limit 1), $1::timestamptz) last_updated
-), gallery_user as (
-  select id from users where username_idempotent = 'gallery' and not deleted and not universal
-)
+with refreshed      as ( select greatest((select last_updated from feed_entity_scores limit 1), $2) last_updated )
+     , gallery_user as ( select id from users where username_idempotent = 'gallery' and not deleted and not universal )
+     , t0           as ( select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated from feed_entity_scores where feed_entity_scores.created_at > $2 )
+     , t1           as ( select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated from feed_entity_score_view where created_at > (select last_updated from refreshed limit 1) )
+     , t2           as ( select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated from t0 union select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated from t1 )
+     , t3           as ( select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated, (case when lag(created_at) over (partition by actor_id order by created_at desc) is null then 0
+                                         when extract(epoch from created_at - lag(created_at) over (partition by actor_id order by created_at desc)) > -($3::int) then 0
+                                         else 1 end)::int cume from t2 )
+     , t4           as ( select t3.id, (sum(cume) over (partition by actor_id order by created_at desc))::int group_number from t3 )
 select
-  feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated,
-  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url,
-  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
-from feed_entity_scores
-join posts on feed_entity_scores.id = posts.id
-left join feed_blocklist on posts.actor_id = feed_blocklist.user_id and not feed_blocklist.deleted and feed_blocklist.active
-where feed_entity_scores.created_at > $1::timestamptz
-  and not posts.deleted
-  and (feed_blocklist.user_id is null or $2 = feed_blocklist.user_id)
-union
-select
-  feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated,
-  posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.is_first_post, posts.user_mint_url,
-  coalesce(posts.actor_id = (select id from gallery_user), false)::bool is_gallery_post
-from feed_entity_score_view feed_entity_scores
-join posts on feed_entity_scores.id = posts.id
-left join feed_blocklist on posts.actor_id = feed_blocklist.user_id and not feed_blocklist.deleted and feed_blocklist.active
-where feed_entity_scores.created_at > (select last_updated from refreshed limit 1)
-  and not posts.deleted
-  and (feed_blocklist.user_id is null or $2 = feed_blocklist.user_id)
+  feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated
+  , p.id, p.version, p.token_ids, p.contract_ids, p.actor_id, p.caption, p.created_at, p.last_updated, p.deleted, p.is_first_post, p.user_mint_url
+  , row_number() over (partition by p.actor_id order by (t4.group_number, random() > 0.5)) streak
+  , coalesce(p.actor_id = (select id from gallery_user), false)::bool is_gallery_post
+from t2 feed_entity_scores
+join t4 using(id)
+join posts p on feed_entity_scores.id = p.id and not p.deleted
+left join feed_blocklist fb on p.actor_id = fb.user_id and not fb.deleted and fb.active
+where (fb.user_id is null or $1 = fb.user_id)
 `
 
 type GetFeedEntityScoresParams struct {
-	WindowEnd time.Time    `db:"window_end" json:"window_end"`
 	ViewerID  persist.DBID `db:"viewer_id" json:"viewer_id"`
+	WindowEnd time.Time    `db:"window_end" json:"window_end"`
+	Span      int32        `db:"span" json:"span"`
 }
 
 type GetFeedEntityScoresRow struct {
 	FeedEntityScore FeedEntityScore `db:"feedentityscore" json:"feedentityscore"`
 	Post            Post            `db:"post" json:"post"`
+	Streak          int64           `db:"streak" json:"streak"`
 	IsGalleryPost   bool            `db:"is_gallery_post" json:"is_gallery_post"`
 }
 
 func (q *Queries) GetFeedEntityScores(ctx context.Context, arg GetFeedEntityScoresParams) ([]GetFeedEntityScoresRow, error) {
-	rows, err := q.db.Query(ctx, getFeedEntityScores, arg.WindowEnd, arg.ViewerID)
+	rows, err := q.db.Query(ctx, getFeedEntityScores, arg.ViewerID, arg.WindowEnd, arg.Span)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +151,7 @@ func (q *Queries) GetFeedEntityScores(ctx context.Context, arg GetFeedEntityScor
 			&i.Post.Deleted,
 			&i.Post.IsFirstPost,
 			&i.Post.UserMintUrl,
+			&i.Streak,
 			&i.IsGalleryPost,
 		); err != nil {
 			return nil, err

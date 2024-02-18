@@ -26,6 +26,7 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 type lockKey struct {
@@ -34,10 +35,16 @@ type lockKey struct {
 }
 
 const viewWindow = 24 * time.Hour
-const groupedWindow = 10 * time.Minute
+const defaultGroupedWindow = 10 * time.Minute
 const notificationTimeout = 10 * time.Second
 const maxLockTimeout = 2 * time.Minute
 const NotificationHandlerContextKey = "notification.notificationHandlers"
+
+var notificationTypeToGroupWindow = map[persist.Action]time.Duration{
+	persist.ActionAdmiredComment: 24 * time.Hour,
+	persist.ActionAdmiredPost:    24 * time.Hour,
+	persist.ActionAdmiredToken:   24 * time.Hour,
+}
 
 type NotificationHandlers struct {
 	Notifications            *notificationDispatcher
@@ -380,7 +387,12 @@ func (h ownerGroupedNotificationHandler) Handle(ctx context.Context, notif db.No
 		OnlyForComment:   onlyForComment,
 	})
 
-	if time.Since(curNotif.CreatedAt) < groupedWindow {
+	window, ok := notificationTypeToGroupWindow[notif.Action]
+	if !ok {
+		window = defaultGroupedWindow
+	}
+
+	if time.Since(curNotif.CreatedAt) < window {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
 		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient, h.limiter)
 	}
@@ -411,7 +423,12 @@ func (h tokenIDGroupedNotificationHandler) Handle(ctx context.Context, notif db.
 		OnlyForPost:      onlyForPost,
 	})
 
-	if time.Since(curNotif.CreatedAt) < groupedWindow {
+	window, ok := notificationTypeToGroupWindow[notif.Action]
+	if !ok {
+		window = defaultGroupedWindow
+	}
+
+	if time.Since(curNotif.CreatedAt) < window {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
 		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient, h.limiter)
 	}
@@ -820,6 +837,8 @@ func (u UserFacingNotificationData) String() string {
 	return html.UnescapeString(cur)
 }
 
+var errNameNotAvailable = errors.New("name not available")
+
 func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (UserFacingNotificationData, error) {
 
 	switch n.Action {
@@ -839,7 +858,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				data.Action = "admired your gallery update"
 			}
 		} else if n.Action == persist.ActionAdmiredToken {
-			data.Action = "admired your token"
+			data.Action = "bookmarked your token"
 		} else if n.Action == persist.ActionAdmiredComment {
 			data.Action = "admired your comment"
 		} else {
@@ -1029,10 +1048,39 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			return UserFacingNotificationData{}, err
 		}
 
+		nameFound := td.Name.String != ""
+
+		if !nameFound {
+			// name does not exist yet, the token might still be refreshing so let's try and wait a little bit and retry a few times
+			<-time.After(5 * time.Second)
+			retry.RetryFunc(ctx, func(ctx context.Context) error {
+				td, err = queries.GetTokenDefinitionByTokenDbid(ctx, n.Data.NewTokenID)
+				if err != nil {
+					return err
+				}
+				if td.Name.String == "" {
+					return errNameNotAvailable
+				}
+				nameFound = true
+				return nil
+			}, func(err error) bool {
+				return err == errNameNotAvailable
+			}, retry.Retry{Base: 5, Cap: 30, Tries: 3})
+		}
+
 		name := util.TruncateWithEllipsis(td.Name.String, 40)
 
 		amount := n.Data.NewTokenQuantity
 		i := amount.BigInt().Uint64()
+
+		if !nameFound {
+			// name is still empty, use generic
+			name = "token"
+			if i > 1 {
+				name += "s"
+			}
+		}
+
 		if i > 1 {
 			data.Actor = "You"
 			data.Action = fmt.Sprintf("just collected %d new %s. Tap to share now.", i, name)

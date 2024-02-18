@@ -1158,6 +1158,43 @@ func newGetFollowingByUserIdBatch(
 	return d
 }
 
+// GetFrameTokensByCommunityID batches and caches requests
+type GetFrameTokensByCommunityID struct {
+	generator.Dataloader[coredb.GetFrameTokensByCommunityIDParams, []coredb.GetFrameTokensByCommunityIDRow]
+}
+
+// newGetFrameTokensByCommunityID creates a new GetFrameTokensByCommunityID with the given settings, functions, and options
+func newGetFrameTokensByCommunityID(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetFrameTokensByCommunityID, []coredb.GetFrameTokensByCommunityIDParams) ([][]coredb.GetFrameTokensByCommunityIDRow, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetFrameTokensByCommunityID {
+	d := &GetFrameTokensByCommunityID{}
+
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetFrameTokensByCommunityIDParams) ([][]coredb.GetFrameTokensByCommunityIDRow, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetFrameTokensByCommunityID")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetFrameTokensByCommunityID")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
 // GetGalleriesByUserIdBatch batches and caches requests
 type GetGalleriesByUserIdBatch struct {
 	generator.Dataloader[persist.DBID, []coredb.Gallery]

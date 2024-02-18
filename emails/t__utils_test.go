@@ -17,15 +17,15 @@ import (
 )
 
 var testUser = coredb.PiiUserView{
-	Username:           sql.NullString{String: "test1", Valid: true},
-	UsernameIdempotent: sql.NullString{String: "test1", Valid: true},
-	PiiEmailAddress:    persist.Email("bc@gallery.so"),
+	Username:                sql.NullString{String: "test1", Valid: true},
+	UsernameIdempotent:      sql.NullString{String: "test1", Valid: true},
+	PiiVerifiedEmailAddress: persist.Email("bc@gallery.so"),
 }
 
 var testUser2 = coredb.PiiUserView{
-	Username:           sql.NullString{String: "test2", Valid: true},
-	UsernameIdempotent: sql.NullString{String: "test2", Valid: true},
-	PiiEmailAddress:    persist.Email("bcc@gallery.so"),
+	Username:                sql.NullString{String: "test2", Valid: true},
+	UsernameIdempotent:      sql.NullString{String: "test2", Valid: true},
+	PiiVerifiedEmailAddress: persist.Email("bcc@gallery.so"),
 }
 
 var admireNotif coredb.Notification
@@ -71,13 +71,13 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 
 func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, repos *postgres.Repositories) {
 
-	email := testUser.PiiEmailAddress
+	email := testUser.PiiVerifiedEmailAddress
 	userID, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser.Username.String, Email: &email, ChainAddress: persist.NewChainAddress("0x8914496dc01efcc49a2fa340331fb90969b6f1d2", persist.ChainETH)}, nil)
 	if err != nil {
 		t.Fatalf("failed to create user: %s", err)
 	}
 
-	email2 := testUser2.PiiEmailAddress
+	email2 := testUser2.PiiVerifiedEmailAddress
 	userID2, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser2.Username.String, Email: &email2, ChainAddress: persist.NewChainAddress("0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", persist.ChainETH)}, nil)
 	if err != nil {
 		t.Fatalf("failed to create user: %s", err)

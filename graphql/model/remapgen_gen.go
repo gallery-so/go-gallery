@@ -393,6 +393,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"SetPersonaPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SetPersonaPayloadOrError)
+		return obj, ok
+	},
+
 	"SetProfileImagePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SetProfileImagePayloadOrError)
 		return obj, ok

@@ -1,0 +1,1 @@
+alter table users add column persona text not null default 'none';
