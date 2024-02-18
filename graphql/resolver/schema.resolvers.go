@@ -3407,7 +3407,8 @@ func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model
 func (r *userEmailResolver) EmailNotificationSettings(ctx context.Context, obj *model.UserEmail) (*model.EmailNotificationSettings, error) {
 	unsubs, err := publicapi.For(ctx).User.GetCurrentUserEmailNotificationSettings(ctx)
 	if err != nil {
-		return nil, err
+		logger.For(ctx).Errorf("error getting email notification settings from email service: %s", err)
+		return obj.EmailNotificationSettings, nil
 	}
 
 	return &model.EmailNotificationSettings{
