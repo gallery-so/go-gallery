@@ -39,7 +39,8 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, q *core
 	verificationLimiter := limiters.NewKeyRateLimiter(limiterCtx, limiterCache, "verification", 1, time.Second*5)
 	sendGroup.POST("/verification", middleware.IPRateLimited(verificationLimiter), sendVerificationEmail(loaders, q, s))
 
-	router.POST("/subscriptions", updateSubscriptions(q))
+	router.POST("/unsubscriptions", updateUnsubscriptions(q))
+	router.GET("/unsubscriptions", getUnsubscriptions(q))
 	router.POST("/unsubscribe", unsubscribe(q))
 	router.POST("/resubscribe", resubscribe(q))
 

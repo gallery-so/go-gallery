@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/persist"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -22,15 +24,14 @@ import (
 
 func init() {
 	env.RegisterValidation("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", "required")
+	env.RegisterValidation("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID", "required")
 	env.RegisterValidation("SENDGRID_API_KEY", "required")
 }
 
-var emailTypes = []model.EmailUnsubscriptionType{model.EmailUnsubscriptionTypeAll, model.EmailUnsubscriptionTypeNotifications, model.EmailUnsubscriptionTypeDigest}
-
-func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
+func updateUnsubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input emails.UpdateSubscriptionsTypeInput
+		var input emails.UpdateUnsubscriptionsTypeInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -55,7 +56,7 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 
 		errGroup := new(errgroup.Group)
 
-		for _, emailType := range emailTypes {
+		for _, emailType := range model.AllEmailUnsubscriptionType {
 			switch emailType {
 			case model.EmailUnsubscriptionTypeAll:
 				errGroup.Go(func() error {
@@ -102,6 +103,95 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		c.Status(http.StatusOK)
+	}
+}
+
+func getUnsubscriptions(queries *coredb.Queries) gin.HandlerFunc {
+
+	digestGroupID := env.GetString("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID")
+	notificationsGroupID := env.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")
+
+	dgidInt, err := strconv.Atoi(digestGroupID)
+	if err != nil {
+		panic(err)
+	}
+
+	ngidInt, err := strconv.Atoi(notificationsGroupID)
+	if err != nil {
+		panic(err)
+	}
+
+	return func(c *gin.Context) {
+		var input emails.GetUnsubscriptionsInput
+		err := c.ShouldBindQuery(&input)
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		emailAddress := userWithPII.PiiVerifiedEmailAddress.String()
+		if emailAddress == "" {
+			emailAddress = userWithPII.PiiUnverifiedEmailAddress.String()
+		}
+
+		if emailAddress == "" {
+			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{input.UserID})
+			return
+		}
+
+		unsubs := userWithPII.EmailUnsubscriptions
+
+		sendgridUnsubs, err := getUnsubscriptionsSendgrid(c, emailAddress)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		globalUnsub, err := getGlobalUnsubscriptionSendgrid(c, emailAddress)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		for _, group := range model.AllEmailUnsubscriptionType {
+
+			switch group {
+			case model.EmailUnsubscriptionTypeAll:
+				unsubs.All = persist.NullBool(globalUnsub)
+			case model.EmailUnsubscriptionTypeNotifications:
+				supression, ok := util.FindFirst(sendgridUnsubs.Supressions, func(s sendgridSupressionGroup) bool {
+					return s.ID == ngidInt
+				})
+				unsubs.Notifications = persist.NullBool(ok && supression.Suppressed)
+
+			case model.EmailUnsubscriptionTypeDigest:
+				supression, ok := util.FindFirst(sendgridUnsubs.Supressions, func(s sendgridSupressionGroup) bool {
+					return s.ID == dgidInt
+				})
+				unsubs.Digest = persist.NullBool(ok && supression.Suppressed)
+			default:
+				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", group))
+				return
+			}
+
+		}
+
+		err = queries.UpdateUserEmailUnsubscriptions(c, coredb.UpdateUserEmailUnsubscriptionsParams{
+			ID:                   input.UserID,
+			EmailUnsubscriptions: unsubs,
+		})
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, emails.GetSubscriptionsResponse{
+			Unsubscriptions: unsubs,
+		})
 	}
 }
 
@@ -305,6 +395,95 @@ func unsubscribeSendgrid(ctx context.Context, email string, url string) error {
 
 	return nil
 
+}
+
+/*
+
+description
+string
+The description of the suppression group.
+
+required
+id
+integer
+The id of the suppression group.
+
+required
+is_default
+boolean
+Indicates if the suppression group is set as the default.
+
+required
+name
+string
+The name of the suppression group.
+
+required
+suppressed
+boolean
+Indicates if the given email address is suppressed for this group.
+
+required
+*/
+
+type sendgridSupressionGroup struct {
+	Description string `json:"description"`
+	ID          int    `json:"id"`
+	IsDefault   bool   `json:"is_default"`
+	Name        string `json:"name"`
+	Suppressed  bool   `json:"suppressed"`
+}
+
+type getUnsubscriptionsSendgridResponse struct {
+	Supressions []sendgridSupressionGroup `json:"suppressions"`
+}
+
+func getUnsubscriptionsSendgrid(ctx context.Context, email string) (getUnsubscriptionsSendgridResponse, error) {
+	request := sendgrid.GetRequest(env.GetString("SENDGRID_API_KEY"), fmt.Sprintf("/v3/asm/suppressions/%s", email), "https://api.sendgrid.com")
+	request.Method = "GET"
+
+	response, err := sendgrid.API(request)
+	if err != nil {
+		return getUnsubscriptionsSendgridResponse{}, err
+	}
+
+	if response.StatusCode >= 300 || response.StatusCode < 200 {
+		return getUnsubscriptionsSendgridResponse{}, fmt.Errorf("email unsub addition failed and returned: %+v", response)
+	}
+
+	var unsubs getUnsubscriptionsSendgridResponse
+	err = json.Unmarshal([]byte(response.Body), &unsubs)
+	if err != nil {
+		return getUnsubscriptionsSendgridResponse{}, err
+	}
+
+	return unsubs, nil
+}
+
+type getGlobalUnsubscriptionSendgridResponse struct {
+	RecipientEmail string `json:"recipient_email"`
+}
+
+func getGlobalUnsubscriptionSendgrid(ctx context.Context, email string) (bool, error) {
+	request := sendgrid.GetRequest(env.GetString("SENDGRID_API_KEY"), fmt.Sprintf("/v3/asm/suppressions/global/%s", email), "https://api.sendgrid.com")
+	request.Method = "GET"
+
+	response, err := sendgrid.API(request)
+	if err != nil {
+		return false, err
+	}
+
+	if response.StatusCode >= 300 || response.StatusCode < 200 {
+		return false, fmt.Errorf("email unsub addition failed and returned: %+v", response)
+	}
+
+	var unsub getGlobalUnsubscriptionSendgridResponse
+	err = json.Unmarshal([]byte(response.Body), &unsub)
+	if err != nil {
+		return false, err
+	}
+
+	return unsub.RecipientEmail != "", nil
 }
 
 func removeEmailFromUnsubscribeGroup(ctx context.Context, email string, groupID string) error {

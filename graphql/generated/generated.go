@@ -102,6 +102,7 @@ type ResolverRoot interface {
 	UnfollowUserPayload() UnfollowUserPayloadResolver
 	UpdateCollectionTokensPayload() UpdateCollectionTokensPayloadResolver
 	UserCreatedFeedEventData() UserCreatedFeedEventDataResolver
+	UserEmail() UserEmailResolver
 	UserFollowedUsersFeedEventData() UserFollowedUsersFeedEventDataResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
@@ -2239,6 +2240,9 @@ type UpdateCollectionTokensPayloadResolver interface {
 }
 type UserCreatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error)
+}
+type UserEmailResolver interface {
+	EmailNotificationSettings(ctx context.Context, obj *model.UserEmail) (*model.EmailNotificationSettings, error)
 }
 type UserFollowedUsersFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEventData) (*model.GalleryUser, error)
@@ -10523,19 +10527,19 @@ enum EmailUnsubscriptionType {
 type UserEmail {
   email: Email
   verificationStatus: EmailVerificationStatus
-  emailNotificationSettings: EmailNotificationSettings
+  emailNotificationSettings: EmailNotificationSettings @goField(forceResolver: true)
 }
 
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean!
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean!
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -26353,11 +26357,14 @@ func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromDigest(ct
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(bool)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -63322,7 +63329,7 @@ func (ec *executionContext) _UserEmail_emailNotificationSettings(ctx context.Con
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.EmailNotificationSettings, nil
+		return ec.resolvers.UserEmail().EmailNotificationSettings(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -63340,8 +63347,8 @@ func (ec *executionContext) fieldContext_UserEmail_emailNotificationSettings(ctx
 	fc = &graphql.FieldContext{
 		Object:     "UserEmail",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "unsubscribedFromAll":
@@ -70014,7 +70021,7 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unsubscribedFromDigest"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -77709,6 +77716,9 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 
 			out.Values[i] = ec._EmailNotificationSettings_unsubscribedFromDigest(ctx, field, obj)
 
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -87024,9 +87034,22 @@ func (ec *executionContext) _UserEmail(ctx context.Context, sel ast.SelectionSet
 			out.Values[i] = ec._UserEmail_verificationStatus(ctx, field, obj)
 
 		case "emailNotificationSettings":
+			field := field
 
-			out.Values[i] = ec._UserEmail_emailNotificationSettings(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._UserEmail_emailNotificationSettings(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
