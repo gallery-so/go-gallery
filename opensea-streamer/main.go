@@ -307,6 +307,10 @@ func (m *connectionManager) disconnectRandomConnection() {
 		connectionIDs = append(connectionIDs, id)
 	}
 
+	if len(connectionIDs) == 0 {
+		return
+	}
+	
 	randomID := connectionIDs[rand.Intn(len(connectionIDs))]
 	logger.For(m.ctx).Infof("disconnecting random connection (id=%d)", randomID)
 	m.requestStateChange(randomID, Connecting)
