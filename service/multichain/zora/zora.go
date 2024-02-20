@@ -148,8 +148,8 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return d.getTokens(ctx, url, nil, true)
 }
 
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
-	recCh := make(chan multichain.ProviderPage)
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 	url := fmt.Sprintf("%s/user/%s/tokens?chain_names=ZORA-MAINNET&sort_direction=DESC", zoraRESTURL, addr.String())
 	go func() {
@@ -229,8 +229,8 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 }
 
-func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ProviderPage, <-chan error) {
-	recCh := make(chan multichain.ProviderPage)
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 	url := fmt.Sprintf("%s/tokens/ZORA-MAINNET/%s?&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, addr.String())
 	go func() {
@@ -298,7 +298,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 
 const maxLimit = 1000
 
-func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multichain.ProviderPage, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := 50
 	allTokens := []multichain.ChainAgnosticToken{}
@@ -357,7 +357,7 @@ func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multi
 		}
 
 		if recCh != nil {
-			recCh <- multichain.ProviderPage{
+			recCh <- multichain.ChainAgnosticTokensAndContracts{
 				Tokens:    tokens,
 				Contracts: contracts,
 			}

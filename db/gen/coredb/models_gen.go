@@ -636,7 +636,6 @@ type TokenDefinition struct {
 	ContractID      persist.DBID          `db:"contract_id" json:"contract_id"`
 	TokenMediaID    persist.DBID          `db:"token_media_id" json:"token_media_id"`
 	IsFxhash        bool                  `db:"is_fxhash" json:"is_fxhash"`
-	Providers       []string              `db:"providers" json:"providers"`
 }
 
 type TokenMedia struct {

@@ -95,16 +95,16 @@ with token_definitions_insert as (
   )
   on conflict (chain, contract_id, token_id) where deleted = false
   do update set
-    last_updated = now()
-    , name = excluded.name
-    , description = excluded.description
+    last_updated = excluded.last_updated
+    , name = coalesce(nullif(excluded.name, ''), nullif(token_definitions.name, ''))
+    , description = coalesce(nullif(excluded.description, ''), nullif(token_definitions.description, ''))
     , token_type = excluded.token_type
-    , external_url = excluded.external_url
+    , external_url = coalesce(nullif(excluded.external_url, ''), nullif(token_definitions.external_url, ''))
     , fallback_media = excluded.fallback_media
     , contract_address = excluded.contract_address
     , metadata = excluded.metadata
     , is_fxhash = excluded.is_fxhash
-  returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id, is_fxhash, providers
+  returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id, is_fxhash
 )
 , tokens_insert as (
   insert into tokens
@@ -169,7 +169,7 @@ with token_definitions_insert as (
     , contract_id = excluded.contract_id
   returning id, deleted, version, created_at, last_updated, collectors_note, quantity, block_number, owner_user_id, owned_by_wallets, contract_id, is_user_marked_spam, last_synced, is_creator_token, token_definition_id, is_holder_token, displayable
 )
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, token_definitions.providers, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
 from tokens_insert tokens
 join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id
 join contracts on token_definitions.contract_id = contracts.id
@@ -284,7 +284,6 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
-			&i.TokenDefinition.Providers,
 			&i.Contract.ID,
 			&i.Contract.Deleted,
 			&i.Contract.Version,

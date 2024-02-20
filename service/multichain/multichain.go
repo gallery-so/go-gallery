@@ -77,7 +77,7 @@ type ChainAgnosticContract struct {
 	LatestBlock persist.BlockNumber              `json:"latest_block"`
 }
 
-type ProviderPage struct {
+type ChainAgnosticTokensAndContracts struct {
 	Tokens    []ChainAgnosticToken    `json:"tokens"`
 	Contracts []ChainAgnosticContract `json:"contracts"`
 }
@@ -134,14 +134,14 @@ type TokenIdentifierOwnerFetcher interface {
 // TokensIncrementalOwnerFetcher supports fetching tokens for syncing incrementally
 type TokensIncrementalOwnerFetcher interface {
 	// NOTE: implementation MUST close the rec channel
-	GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan ProviderPage, <-chan error)
+	GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan ChainAgnosticTokensAndContracts, <-chan error)
 }
 
 // TokensIncrementalContractFetcher supports fetching tokens by contract for syncing incrementally
 type TokensIncrementalContractFetcher interface {
 	// NOTE: implementations MUST close the rec channel
 	// maxLimit is not for pagination, it is to make sure we don't fetch a bajilion tokens from an omnibus contract
-	GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan ProviderPage, <-chan error)
+	GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan ChainAgnosticTokensAndContracts, <-chan error)
 }
 
 type ContractFetcher interface {

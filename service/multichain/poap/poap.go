@@ -138,8 +138,8 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return resultTokens, resultContracts, nil
 }
 
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
-	rec := make(chan multichain.ProviderPage)
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errChan := make(chan error)
 	go func() {
 		defer close(rec)
@@ -148,7 +148,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 			errChan <- err
 			return
 		}
-		rec <- multichain.ProviderPage{
+		rec <- multichain.ChainAgnosticTokensAndContracts{
 			Tokens:    tokens,
 			Contracts: contracts,
 		}

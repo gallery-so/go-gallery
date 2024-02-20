@@ -208,8 +208,8 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 }
 
 // GetTokensIncrementallyByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
-	rec := make(chan multichain.ProviderPage)
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errChan := make(chan error)
 
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
@@ -244,7 +244,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 					break outer
 				}
 				cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
-				rec <- multichain.ProviderPage{
+				rec <- multichain.ChainAgnosticTokensAndContracts{
 					Tokens:    cTokens,
 					Contracts: cContracts,
 				}
@@ -256,8 +256,8 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 // GetTokensIncrementallyByContractAddress retrieves tokens incrementaly for a contract address on the Ethereum Blockchain
-func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ProviderPage, <-chan error) {
-	rec := make(chan multichain.ProviderPage)
+func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, limit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errChan := make(chan error)
 
 	url := fmt.Sprintf("%s/getNFTsForCollection?contractAddress=%s&withMetadata=true", d.alchemyAPIURL, addr)
@@ -299,7 +299,7 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 					errChan <- fmt.Errorf("no contract found for contract address %s", addr)
 					return
 				}
-				rec <- multichain.ProviderPage{
+				rec <- multichain.ChainAgnosticTokensAndContracts{
 					Tokens:    cTokens,
 					Contracts: cContracts,
 				}

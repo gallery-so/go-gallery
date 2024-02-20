@@ -17,7 +17,7 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
 on conflict (l1_chain, chain, address) where parent_id is null
 do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.symbol, ''))
   , version = excluded.version
-  , name = excluded.name
+  , name = coalesce(nullif(excluded.name, ''), nullif(contracts.name, ''))
   , owner_address =
       case
           when nullif(contracts.owner_address, '') is null or (@can_overwrite_owner_address::bool and nullif (excluded.owner_address, '') is not null)
@@ -25,8 +25,8 @@ do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.sy
           else
             contracts.owner_address
       end
-  , description = excluded.description
-  , profile_image_url = excluded.profile_image_url
+  , description = coalesce(nullif(excluded.description, ''), nullif(contracts.description, ''))
+  , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(contracts.profile_image_url, ''))
   , deleted = excluded.deleted
   , last_updated = now()
 returning *;

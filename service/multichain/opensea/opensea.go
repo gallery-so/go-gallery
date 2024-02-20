@@ -146,8 +146,8 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 }
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for an address
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
-	recCh := make(chan multichain.ProviderPage, poolSize)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
 	outCh := make(chan assetsReceived, 32)
 	go func() {
@@ -163,8 +163,8 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 }
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for a contract address
-func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ProviderPage, <-chan error) {
-	recCh := make(chan multichain.ProviderPage, poolSize)
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
 	assetsCh := make(chan assetsReceived)
 	go func() {
@@ -280,7 +280,7 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 }
 
 func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, opt *fetchOptions) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
-	recCh := make(chan multichain.ProviderPage, poolSize)
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
@@ -304,7 +304,7 @@ func (p *Provider) streamAssetsToTokens(
 	ctx context.Context,
 	ownerAddress persist.Address,
 	outCh <-chan assetsReceived,
-	recCh chan<- multichain.ProviderPage,
+	recCh chan<- multichain.ChainAgnosticTokensAndContracts,
 	errCh chan<- error,
 	opt *fetchOptions,
 ) {
@@ -348,7 +348,7 @@ func (p *Provider) streamAssetsToTokens(
 				return err
 			}
 
-			var out multichain.ProviderPage
+			var out multichain.ChainAgnosticTokensAndContracts
 
 			for _, a := range page.Assets {
 				contract, ok := contracts.Load(persist.Address(a.Contract))

@@ -199,8 +199,8 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 	return returnTokens, returnContracts
 }
 
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
-	recCh := make(chan multichain.ProviderPage)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
@@ -235,7 +235,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 
 			returnTokens, returnContracts := objktTokensToChainAgnostic(query.Holder[0].Held_Tokens, tzOwnerAddress)
 
-			recCh <- multichain.ProviderPage{
+			recCh <- multichain.ChainAgnosticTokensAndContracts{
 				Tokens:    returnTokens,
 				Contracts: returnContracts,
 			}

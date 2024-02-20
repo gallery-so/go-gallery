@@ -124,8 +124,8 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return p.tzBalanceTokensToTokens(ctx, resultTokens, addr.String())
 }
 
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
-	rec := make(chan multichain.ProviderPage)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errChan := make(chan error)
 	go func() {
 		defer close(rec)
@@ -155,7 +155,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 			logger.For(ctx).Debugf("converted %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
 
 			if len(resultTokens) > 0 || len(resultContracts) > 0 {
-				rec <- multichain.ProviderPage{
+				rec <- multichain.ChainAgnosticTokensAndContracts{
 					Tokens:    resultTokens,
 					Contracts: resultContracts,
 				}
@@ -256,8 +256,8 @@ func (p *Provider) fetchBalancesByContract(ctx context.Context, contractAddress 
 	return tzktBalances, nil
 }
 
-func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, maxLimit int) (<-chan multichain.ProviderPage, <-chan error) {
-	rec := make(chan multichain.ProviderPage)
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, addr persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errChan := make(chan error)
 	go func() {
 		defer close(rec)
@@ -290,7 +290,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 			logger.For(ctx).Debugf("converted %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
 
 			if len(resultTokens) > 0 || len(resultContracts) > 0 {
-				rec <- multichain.ProviderPage{
+				rec <- multichain.ChainAgnosticTokensAndContracts{
 					Tokens:    resultTokens,
 					Contracts: resultContracts,
 				}

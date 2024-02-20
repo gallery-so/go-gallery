@@ -44,13 +44,13 @@ func (w SyncPipelineWrapper) GetTokenByTokenIdentifiersAndOwner(ctx context.Cont
 	return t, c, err
 }
 
-func (w SyncPipelineWrapper) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
+func (w SyncPipelineWrapper) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	recCh, errCh := w.TokensIncrementalOwnerFetcher.GetTokensIncrementallyByWalletAddress(ctx, address)
 	recCh, errCh = w.PlaceholderFetcher.AddToPage(ctx, recCh, errCh)
 	return recCh, errCh
 }
 
-func (w SyncPipelineWrapper) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ProviderPage, <-chan error) {
+func (w SyncPipelineWrapper) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	recCh, errCh := w.TokensIncrementalContractFetcher.GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
 	recCh, errCh = w.PlaceholderFetcher.AddToPage(ctx, recCh, errCh)
 	return recCh, errCh
@@ -146,8 +146,8 @@ func (m MultiProviderWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Con
 	return
 }
 
-func (m MultiProviderWrapper) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ProviderPage, <-chan error) {
-	recCh := make(chan multichain.ProviderPage, 2*10)
+func (m MultiProviderWrapper) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, 2*10)
 	errCh := make(chan error)
 	resultA, errA := m.TokensIncrementalContractFetchers[0].GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
 	resultB, errB := m.TokensIncrementalContractFetchers[1].GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
@@ -155,8 +155,8 @@ func (m MultiProviderWrapper) GetTokensIncrementallyByContractAddress(ctx contex
 	return recCh, errCh
 }
 
-func (m MultiProviderWrapper) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ProviderPage, <-chan error) {
-	recCh := make(chan multichain.ProviderPage, 2*10)
+func (m MultiProviderWrapper) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, 2*10)
 	errCh := make(chan error)
 	resultA, errA := m.TokensIncrementalOwnerFetchers[0].GetTokensIncrementallyByWalletAddress(ctx, address)
 	resultB, errB := m.TokensIncrementalOwnerFetchers[1].GetTokensIncrementallyByWalletAddress(ctx, address)
@@ -164,7 +164,7 @@ func (m MultiProviderWrapper) GetTokensIncrementallyByWalletAddress(ctx context.
 	return recCh, errCh
 }
 
-func fanIn(ctx context.Context, recCh chan<- multichain.ProviderPage, errCh chan<- error, resultA, resultB <-chan multichain.ProviderPage, errA, errB <-chan error) {
+func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndContracts, errCh chan<- error, resultA, resultB <-chan multichain.ChainAgnosticTokensAndContracts, errA, errB <-chan error) {
 	defer close(recCh)
 	defer close(errCh)
 	var closing bool
@@ -233,8 +233,8 @@ func (w *PlaceholderWrapper) AddToToken(ctx context.Context, t multichain.ChainA
 	return t
 }
 
-func (w *PlaceholderWrapper) AddToPage(ctx context.Context, recCh <-chan multichain.ProviderPage, errIn <-chan error) (<-chan multichain.ProviderPage, <-chan error) {
-	outCh := make(chan multichain.ProviderPage, 2*10)
+func (w *PlaceholderWrapper) AddToPage(ctx context.Context, recCh <-chan multichain.ChainAgnosticTokensAndContracts, errIn <-chan error) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	outCh := make(chan multichain.ChainAgnosticTokensAndContracts, 2*10)
 	errOut := make(chan error)
 	w.resultCache = sync.Map{}
 	go func() {
@@ -260,13 +260,13 @@ func (w *PlaceholderWrapper) AddToPage(ctx context.Context, recCh <-chan multich
 	return outCh, errOut
 }
 
-func (w *PlaceholderWrapper) addPage(p multichain.ProviderPage) func() multichain.ProviderPage {
+func (w *PlaceholderWrapper) addPage(p multichain.ChainAgnosticTokensAndContracts) func() multichain.ChainAgnosticTokensAndContracts {
 	thunks := make([]func() (persist.FallbackMedia, error), len(p.Tokens))
 	for i, t := range p.Tokens {
 		thunks[i] = w.addToken(t)
 	}
 
-	return func() multichain.ProviderPage {
+	return func() multichain.ChainAgnosticTokensAndContracts {
 		var err error
 		for i, thunk := range thunks {
 			p.Tokens[i].FallbackMedia, err = thunk()
