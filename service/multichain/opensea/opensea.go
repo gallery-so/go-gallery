@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	// "time"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/eth"
@@ -647,27 +646,34 @@ func paginateAssets(ctx context.Context, client *http.Client, req *http.Request,
 // paginatesAssetsFilter fetches assets from OpenSea and sends them to outCh. An optional keepAssetFilter can be provided to filter out an asset
 // after it is fetched if keepAssetFilter evaluates to false. This is useful for filtering out assets that can't be filtered natively by the API.
 func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Request, outCh chan assetsReceived, keepAssetFilter func(a Asset) bool) {
+	pages := 0
 	for {
 		resp, err := retry.RetryRequest(client, req)
 		if err != nil {
-			outCh <- assetsReceived{Err: wrapRateLimitErr(ctx, err)}
+			err = wrapRateLimitErr(ctx, err)
+			logger.For(ctx).Errorf("failed to get tokens from opensea: %s", err)
+			outCh <- assetsReceived{Err: err}
 			return
 		}
 
 		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusUnauthorized {
+			logger.For(ctx).Errorf("failed to get tokens from opensea: %s", ErrAPIKeyExpired)
 			outCh <- assetsReceived{Err: ErrAPIKeyExpired}
 			return
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			outCh <- assetsReceived{Err: util.BodyAsError(resp)}
+			err := util.BodyAsError(resp)
+			logger.For(ctx).Errorf("failed to get tokens from opensea: %s", err)
+			outCh <- assetsReceived{Err: err}
 			return
 		}
 
 		page := pageResult{}
 		if err := util.UnmarshallBody(&page, resp.Body); err != nil {
+			logger.For(ctx).Errorf("failed to get tokens from opensea: %s", err)
 			outCh <- assetsReceived{Err: err}
 			return
 		}
@@ -676,25 +682,30 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 		if page.NFT.Identifier != "" {
 			if keepAssetFilter != nil {
 				if keepAssetFilter(page.NFT) {
+					logger.For(ctx).Infof("got target token from page=%d from opensea", pages)
 					outCh <- assetsReceived{Assets: []Asset{page.NFT}}
 				}
 				return
 			}
+			logger.For(ctx).Infof("got target tokens from page=%dfrom opensea", pages)
 			outCh <- assetsReceived{Assets: []Asset{page.NFT}}
 			return
 		}
 
 		// Otherwise, we're paginating a collection or contract
 		if keepAssetFilter == nil {
+			logger.For(ctx).Infof("got %d tokens from page=%d from opensea", len(page.NFTs), pages)
 			outCh <- assetsReceived{Assets: page.NFTs}
 		} else {
 			filtered := util.Filter(page.NFTs, keepAssetFilter, true)
+			logger.For(ctx).Infof("got %d tokens after filtering from page=%d from opensea", len(page.NFTs), pages)
 			outCh <- assetsReceived{Assets: filtered}
 		}
 		if page.Next == "" {
 			return
 		}
 		setNext(req.URL, page.Next)
+		pages++
 	}
 }
 
