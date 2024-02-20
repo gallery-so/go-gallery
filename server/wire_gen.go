@@ -18,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
-	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
 	"github.com/mikeydub/go-gallery/service/multichain/wrapper"
@@ -412,10 +411,10 @@ func zoraTokensIncrementalOwnerFetcherInjector(openseaProvider *opensea.Provider
 func baseInjector(contextContext context.Context, client *http.Client) *multichain.BaseProvider {
 	chain := _wireChainValue4
 	provider := opensea.NewProvider(client, chain)
-	reservoirProvider := reservoir.NewProvider(client, chain)
-	syncPipelineWrapper := baseSyncPipelineInjector(contextContext, client, chain, provider, reservoirProvider)
-	tokenDescriptorsFetcher := baseTokenDescriptorFetcherInjector(provider, reservoirProvider)
-	tokenMetadataFetcher := baseTokenMetadataFetcherInjector(provider, reservoirProvider)
+	alchemyProvider := alchemy.NewProvider(client, chain)
+	syncPipelineWrapper := baseSyncPipelineInjector(contextContext, client, chain, provider, alchemyProvider)
+	tokenDescriptorsFetcher := baseTokenDescriptorFetcherInjector(provider, alchemyProvider)
+	tokenMetadataFetcher := baseTokenMetadataFetcherInjector(provider, alchemyProvider)
 	baseProvider := baseProvidersInjector(syncPipelineWrapper, tokenDescriptorsFetcher, tokenMetadataFetcher)
 	return baseProvider
 }
@@ -435,10 +434,10 @@ func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDescr
 	return baseProvider
 }
 
-func baseSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, reservoirProvider *reservoir.Provider) *wrapper.SyncPipelineWrapper {
-	tokenIdentifierOwnerFetcher := baseTokenIdentifierOwnerFetcherInjector(provider, reservoirProvider)
-	tokensIncrementalOwnerFetcher := baseTokensIncrementalOwnerFetcherInjector(provider, reservoirProvider)
-	tokensIncrementalContractFetcher := baseTokensContractFetcherInjector(provider, reservoirProvider)
+func baseSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+	tokenIdentifierOwnerFetcher := baseTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
+	tokensIncrementalOwnerFetcher := baseTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
+	tokensIncrementalContractFetcher := baseTokensContractFetcherInjector(provider, alchemyProvider)
 	placeholderWrapper := wrapper.NewPlaceholderWrapper(contextContext, client, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
@@ -449,28 +448,28 @@ func baseSyncPipelineInjector(contextContext context.Context, client *http.Clien
 	return syncPipelineWrapper
 }
 
-func baseTokenMetadataFetcherInjector(openseaProvider *opensea.Provider, reservoirProvider *reservoir.Provider) multichain.TokenMetadataFetcher {
-	tokenMetadataFetcher := multiTokenMetadataFetcherProvider(openseaProvider, reservoirProvider)
+func baseTokenMetadataFetcherInjector(openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) multichain.TokenMetadataFetcher {
+	tokenMetadataFetcher := multiTokenMetadataFetcherProvider(openseaProvider, alchemyProvider)
 	return tokenMetadataFetcher
 }
 
-func baseTokenDescriptorFetcherInjector(openseaProvider *opensea.Provider, reservoirProvider *reservoir.Provider) multichain.TokenDescriptorsFetcher {
-	tokenDescriptorsFetcher := multiTokenDescriptorsFetcherProvider(openseaProvider, reservoirProvider)
+func baseTokenDescriptorFetcherInjector(openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) multichain.TokenDescriptorsFetcher {
+	tokenDescriptorsFetcher := multiTokenDescriptorsFetcherProvider(openseaProvider, alchemyProvider)
 	return tokenDescriptorsFetcher
 }
 
-func baseTokensContractFetcherInjector(openseaProvider *opensea.Provider, reservoirProvider *reservoir.Provider) multichain.TokensIncrementalContractFetcher {
-	tokensIncrementalContractFetcher := multiTokensIncrementalContractFetcherProvider(openseaProvider, reservoirProvider)
+func baseTokensContractFetcherInjector(openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) multichain.TokensIncrementalContractFetcher {
+	tokensIncrementalContractFetcher := multiTokensIncrementalContractFetcherProvider(openseaProvider, alchemyProvider)
 	return tokensIncrementalContractFetcher
 }
 
-func baseTokenIdentifierOwnerFetcherInjector(openseaProvider *opensea.Provider, reservoirProvider *reservoir.Provider) multichain.TokenIdentifierOwnerFetcher {
-	tokenIdentifierOwnerFetcher := multiTokenIdentifierOwnerFetcherProvider(openseaProvider, reservoirProvider)
+func baseTokenIdentifierOwnerFetcherInjector(openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) multichain.TokenIdentifierOwnerFetcher {
+	tokenIdentifierOwnerFetcher := multiTokenIdentifierOwnerFetcherProvider(openseaProvider, alchemyProvider)
 	return tokenIdentifierOwnerFetcher
 }
 
-func baseTokensIncrementalOwnerFetcherInjector(openseaProvider *opensea.Provider, reservoirProvider *reservoir.Provider) multichain.TokensIncrementalOwnerFetcher {
-	tokensIncrementalOwnerFetcher := multiTokensIncrementalOwnerFetcherProvider(openseaProvider, reservoirProvider)
+func baseTokensIncrementalOwnerFetcherInjector(openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) multichain.TokensIncrementalOwnerFetcher {
+	tokensIncrementalOwnerFetcher := multiTokensIncrementalOwnerFetcherProvider(openseaProvider, alchemyProvider)
 	return tokensIncrementalOwnerFetcher
 }
 

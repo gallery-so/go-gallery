@@ -179,6 +179,8 @@ func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
 		apiURL = env.GetString("ALCHEMY_POLYGON_API_URL")
 	case persist.ChainArbitrum:
 		apiURL = env.GetString("ALCHEMY_ARBITRUM_API_URL")
+	case persist.ChainBase:
+		apiURL = env.GetString("ALCHEMY_BASE_API_URL")
 	}
 
 	if apiURL == "" {

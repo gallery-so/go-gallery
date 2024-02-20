@@ -310,7 +310,6 @@ func (p *Provider) streamAssetsToTokens(
 	contracts := &sync.Map{}                            // used to avoid duplicate contract fetches
 	contractsL := make(map[persist.Address]*sync.Mutex) // contract job locks
 	mu := sync.RWMutex{}                                // manages access to contract locks
-	wp := newPool(ctx, 4)                               // pool to process pages
 
 	for page := range outCh {
 		page := page
@@ -324,53 +323,37 @@ func (p *Provider) streamAssetsToTokens(
 			continue
 		}
 
-		wp.Go(func(ctx context.Context) error {
-			// fetch contracts
-			addresses := util.MapWithoutError(page.Assets, func(a Asset) persist.Address { return persist.Address(a.Contract) })
-			addresses = util.Dedupe(addresses, true)
+		// fetch contracts
+		addresses := util.MapWithoutError(page.Assets, func(a Asset) persist.Address { return persist.Address(a.Contract) })
+		addresses = util.Dedupe(addresses, true)
 
-			s := len(addresses)
-			if s > 24 {
-				s = 24
+		for _, a := range addresses {
+			err := p.getChainAgnosticContract(ctx, a, contracts, contractsL, &mu)
+			if err != nil {
+				errCh <- err
+				return
+			}
+		}
+
+		var out multichain.ChainAgnosticTokensAndContracts
+
+		for _, a := range page.Assets {
+			contract, ok := contracts.Load(persist.Address(a.Contract))
+			if !ok {
+				panic("contract should have been loaded")
 			}
 
-			contractPool := newPool(ctx, s)
-
-			for _, a := range addresses {
-				a := a
-				contractPool.Go(func(ctx context.Context) error {
-					return p.getChainAgnosticContract(ctx, a, contracts, contractsL, &mu)
-				})
+			tokens, err := p.assetToChainAgnosticTokens(ctx, ownerAddress, a)
+			if err != nil {
+				errCh <- err
+				return
 			}
 
-			if err := contractPool.Wait(); err != nil {
-				return err
-			}
+			out.Tokens = append(out.Tokens, tokens...)
+			out.Contracts = append(out.Contracts, contract.(multichain.ChainAgnosticContract))
+		}
 
-			var out multichain.ChainAgnosticTokensAndContracts
-
-			for _, a := range page.Assets {
-				contract, ok := contracts.Load(persist.Address(a.Contract))
-				if !ok {
-					panic("contract should have been loaded")
-				}
-
-				tokens, err := p.assetToChainAgnosticTokens(ctx, ownerAddress, a)
-				if err != nil {
-					return err
-				}
-
-				out.Tokens = append(out.Tokens, tokens...)
-				out.Contracts = append(out.Contracts, contract.(multichain.ChainAgnosticContract))
-			}
-
-			recCh <- out
-			return nil
-		})
-	}
-
-	if err := wp.Wait(); err != nil {
-		errCh <- err
+		recCh <- out
 	}
 }
 

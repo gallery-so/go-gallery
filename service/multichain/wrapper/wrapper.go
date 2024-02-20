@@ -148,7 +148,7 @@ func (m MultiProviderWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Con
 
 func (m MultiProviderWrapper) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, 2*10)
-	errCh := make(chan error)
+	errCh := make(chan error, 2)
 	resultA, errA := m.TokensIncrementalContractFetchers[0].GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
 	resultB, errB := m.TokensIncrementalContractFetchers[1].GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
 	go func() { fanIn(ctx, recCh, errCh, resultA, resultB, errA, errB) }()
@@ -157,7 +157,7 @@ func (m MultiProviderWrapper) GetTokensIncrementallyByContractAddress(ctx contex
 
 func (m MultiProviderWrapper) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, 2*10)
-	errCh := make(chan error)
+	errCh := make(chan error, 2)
 	resultA, errA := m.TokensIncrementalOwnerFetchers[0].GetTokensIncrementallyByWalletAddress(ctx, address)
 	resultB, errB := m.TokensIncrementalOwnerFetchers[1].GetTokensIncrementallyByWalletAddress(ctx, address)
 	go func() { fanIn(ctx, recCh, errCh, resultA, resultB, errA, errB) }()
@@ -246,14 +246,14 @@ func (w *PlaceholderWrapper) AddToPage(ctx context.Context, recCh <-chan multich
 					return
 				}
 				outCh <- w.addPage(page)()
-			case <-ctx.Done():
-				errOut <- ctx.Err()
-				return
 			case err, ok := <-errIn:
 				if ok {
 					errOut <- err
 					return
 				}
+			case <-ctx.Done():
+				errOut <- ctx.Err()
+				return
 			}
 		}
 	}()
