@@ -81,7 +81,6 @@ func main() {
 	queries := coredb.New(pgx)
 
 	ctx := context.Background()
-	taskClient := task.NewClient(ctx)
 
 	err := generateBloomFilter(ctx, queries)
 	if err != nil {
@@ -116,8 +115,9 @@ func main() {
 		}
 	}()
 
-	cm := newConnectionManager(ctx, taskClient, numConcurrentConnections, numConcurrentSubscribers)
-	go cm.start()
+	// TODO: Uncomment to re-enable optimistic syncing
+	//cm := newConnectionManager(ctx, task.NewClient(ctx), numConcurrentConnections, numConcurrentSubscribers)
+	//go cm.start()
 
 	err = router.Run(":3000")
 	if err != nil {
@@ -310,7 +310,7 @@ func (m *connectionManager) disconnectRandomConnection() {
 	if len(connectionIDs) == 0 {
 		return
 	}
-	
+
 	randomID := connectionIDs[rand.Intn(len(connectionIDs))]
 	logger.For(m.ctx).Infof("disconnecting random connection (id=%d)", randomID)
 	m.requestStateChange(randomID, Connecting)
