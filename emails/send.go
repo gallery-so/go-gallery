@@ -306,7 +306,6 @@ outer:
 		p.AddTos(to)
 		asm := mail.NewASM()
 		asm.SetGroupID(unsubscribeGroupID)
-		asm.AddGroupsToDisplay(unsubscribeGroupID)
 		m.SetASM(asm)
 
 		response, err := s.Send(m)
@@ -512,7 +511,6 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 	p.AddTos(to)
 	asm := mail.NewASM()
 	asm.SetGroupID(unsubscribeGroupID)
-	asm.AddGroupsToDisplay(unsubscribeGroupID)
 	m.SetASM(asm)
 
 	response, err := s.Send(m)
