@@ -320,7 +320,7 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 					c := contract
 
 					f := func() {
-						logger.For(ctx).Infof("syncing chain=%d; user=%s; contract=%s", chain, user.Username.String(), addr)
+						logger.For(ctx).Infof("syncing chain=%d; user=%s; contract=%s", chain, user.Username.String(), c.Address.String())
 
 						pageCh, pageErrCh := tokenFetcher.GetTokensIncrementallyByContractAddress(ctx, c.Address, maxCommunitySize)
 						for {
