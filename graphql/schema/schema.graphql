@@ -21,9 +21,7 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 # Add @basicAuth to any field that should be secured by a basic auth token. For example, some fields
 # should only be usable by Retool, so they'd use @basicAuth(allowed: [Retool]). Other fields might be
 # accessible by both Retool and Monitoring, so they'd use @basicAuth(allowed: [Retool, Monitoring]).
-directive @basicAuth(
-  allowed: [BasicAuthType!]!
-) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+directive @basicAuth(allowed: [BasicAuthType!]!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
@@ -3105,8 +3103,10 @@ type Mutation {
   setPersona(persona: Persona!): SetPersonaPayloadOrError @authRequired
 
   # Retool Specific Mutations
-  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @basicAuth(allowed: [Retool])
-  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @basicAuth(allowed: [Retool])
+  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError
+    @basicAuth(allowed: [Retool])
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError
+    @basicAuth(allowed: [Retool])
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
     @basicAuth(allowed: [Retool])
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
@@ -3121,7 +3121,8 @@ type Mutation {
   ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @basicAuth(allowed: [Retool])
   banUserFromFeed(username: String!, reason: ReportReason!): BanUserFromFeedPayloadOrError
     @basicAuth(allowed: [Retool])
-  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @basicAuth(allowed: [Retool])
+  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError
+    @basicAuth(allowed: [Retool])
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @basicAuth(allowed: [Retool])
