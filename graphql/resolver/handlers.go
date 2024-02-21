@@ -150,7 +150,7 @@ func BasicAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next
 		}
 
 		return model.ErrNotAuthorized{
-			Message: err.Error(),
+			Message: "not authorized",
 			Cause:   model.ErrInvalidToken{Message: "Basic auth: not authorized"},
 		}, nil
 	}
