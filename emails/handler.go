@@ -48,14 +48,14 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, q *core
 	router.GET("/preverify", middleware.IPRateLimited(preverifyLimiter), preverifyEmail())
 
 	digestGroup := router.Group("/digest")
-	digestGroup.GET("/values", middleware.RetoolMiddleware, getDigestValues(q, b, gql))
-	digestGroup.POST("/values", middleware.RetoolMiddleware, updateDigestValues(b))
+	digestGroup.GET("/values", middleware.RetoolAuthRequired, getDigestValues(q, b, gql))
+	digestGroup.POST("/values", middleware.RetoolAuthRequired, updateDigestValues(b))
 	digestGroup.POST("/send", middleware.CloudSchedulerMiddleware, sendDigestEmails(q, s, r, b, gql))
-	digestGroup.POST("/send-test", middleware.RetoolMiddleware, sendDigestTestEmail(q, s, b, gql))
+	digestGroup.POST("/send-test", middleware.RetoolAuthRequired, sendDigestTestEmail(q, s, b, gql))
 
 	notificationsGroup := router.Group("/notifications")
 	notificationsGroup.GET("/send", middleware.CloudSchedulerMiddleware, sendNotificationEmails(q, s, r))
-	notificationsGroup.POST("/announcement", middleware.RetoolMiddleware, useEventHandler(q, psub, t, notifLock), sendAnnouncementNotification(q))
+	notificationsGroup.POST("/announcement", middleware.RetoolAuthRequired, useEventHandler(q, psub, t, notifLock), sendAnnouncementNotification(q))
 
 	return router
 }

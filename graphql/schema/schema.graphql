@@ -18,7 +18,10 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
-directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+# Add @basicAuth to any field that should be secured by a basic auth token. For example, some fields
+# should only be usable by Retool, so they'd use @basicAuth(allowed: [Retool]). Other fields might be
+# accessible by both Retool and Monitoring, so they'd use @basicAuth(allowed: [Retool, Monitoring]).
+directive @basicAuth(allowed: [BasicAuthType!]!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
@@ -54,6 +57,11 @@ scalar PubKey
 scalar DBID
 scalar Email
 scalar TokenId
+
+enum BasicAuthType {
+  Retool
+  Monitoring
+}
 
 interface Node {
   id: ID!
@@ -1507,7 +1515,7 @@ type Query {
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
-    @retoolAuth
+    @basicAuth(allowed: [Retool])
 
   socialConnections(
     socialAccountType: SocialAccountType!
@@ -3095,30 +3103,33 @@ type Mutation {
   setPersona(persona: Persona!): SetPersonaPayloadOrError @authRequired
 
   # Retool Specific Mutations
-  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
-  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
+  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError
+    @basicAuth(allowed: [Retool])
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError
+    @basicAuth(allowed: [Retool])
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
-    @retoolAuth
+    @basicAuth(allowed: [Retool])
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
-    @retoolAuth
+    @basicAuth(allowed: [Retool, Monitoring])
   syncCreatedTokensForUsername(
     username: String!
     chains: [Chain!]!
-  ): SyncCreatedTokensForUsernamePayloadOrError @retoolAuth
+  ): SyncCreatedTokensForUsernamePayloadOrError @basicAuth(allowed: [Retool])
   syncCreatedTokensForUsernameAndExistingContract(
     username: String!
     chainAddress: ChainAddressInput!
-  ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
+  ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @basicAuth(allowed: [Retool])
   banUserFromFeed(username: String!, reason: ReportReason!): BanUserFromFeedPayloadOrError
-    @retoolAuth
-  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
+    @basicAuth(allowed: [Retool])
+  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError
+    @basicAuth(allowed: [Retool])
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
-  ): MintPremiumCardToWalletPayloadOrError @retoolAuth
+  ): MintPremiumCardToWalletPayloadOrError @basicAuth(allowed: [Retool])
   setCommunityOverrideCreator(
     communityID: DBID!
     creatorUserID: DBID
-  ): SetCommunityOverrideCreatorPayloadOrError @retoolAuth
+  ): SetCommunityOverrideCreatorPayloadOrError @basicAuth(allowed: [Retool])
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError

@@ -53,9 +53,9 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger(), useEventHandler(queries, pub, tc, lock))
 	router.POST("/calculate_activity_badges", middleware.CloudSchedulerMiddleware, autoCalculateTopActivityBadges(queries, stg, pgx))
-	router.POST("/recalculate_activity_badges", middleware.RetoolMiddleware, recalculateTopActivityBadges(queries, stg, pgx))
-	router.POST("/update_top_conf", middleware.RetoolMiddleware, updateTopActivityConfiguration(stg))
-	router.GET("/get_top_conf", middleware.RetoolMiddleware, getTopActivityConfiguration(stg))
+	router.POST("/recalculate_activity_badges", middleware.RetoolAuthRequired, recalculateTopActivityBadges(queries, stg, pgx))
+	router.POST("/update_top_conf", middleware.RetoolAuthRequired, updateTopActivityConfiguration(stg))
+	router.GET("/get_top_conf", middleware.RetoolAuthRequired, getTopActivityConfiguration(stg))
 
 	return router
 }
@@ -74,7 +74,8 @@ func setDefaults() {
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("CONFIGURATION_BUCKET", "gallery-dev-configurations")
 	viper.SetDefault("SCHEDULER_AUDIENCE", "")
-	viper.SetDefault("RETOOL_AUTH_TOKEN", "")
+	viper.SetDefault("BASIC_AUTH_TOKEN_RETOOL", "")
+	viper.SetDefault("BASIC_AUTH_TOKEN_MONITORING", "")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
 	viper.SetDefault("PUBSUB_EMULATOR_HOST", "[::1]:8085")
 	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")

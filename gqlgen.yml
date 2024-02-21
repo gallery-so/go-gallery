@@ -124,6 +124,10 @@ models:
   Persona:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Persona
+  BasicAuthType:
+    model:
+      - github.com/mikeydub/go-gallery/service/auth/basicauth.AuthTokenType
+
 directives:
   goGqlId:
     skip_runtime: true
