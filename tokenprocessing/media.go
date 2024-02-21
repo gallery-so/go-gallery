@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -115,7 +116,7 @@ func createUncachedMedia(ctx context.Context, job *tokenProcessingJob, url strin
 }
 
 func mustCreateMediaFromErr(ctx context.Context, err error, job *tokenProcessingJob) persist.Media {
-	if bErr, ok := err.(ErrBadToken); ok {
+	if bErr, ok := util.ErrorAs[tokenmanage.ErrBadToken](err); ok {
 		return mustCreateMediaFromErr(ctx, bErr.Unwrap(), job)
 	}
 	if util.ErrorIs[errInvalidMedia](err) {

@@ -17,10 +17,10 @@ import (
 	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -33,10 +33,9 @@ type tokenProcessor struct {
 	arweaveClient *goar.Client
 	stg           *storage.Client
 	tokenBucket   string
-	mr            metric.MetricReporter
 }
 
-func NewTokenProcessor(queries *db.Queries, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, mr metric.MetricReporter) *tokenProcessor {
+func NewTokenProcessor(queries *db.Queries, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
 		mc:            mc,
@@ -45,7 +44,6 @@ func NewTokenProcessor(queries *db.Queries, httpClient *http.Client, mc *multich
 		arweaveClient: arweaveClient,
 		stg:           stg,
 		tokenBucket:   tokenBucket,
-		mr:            mr,
 	}
 }
 
@@ -165,12 +163,6 @@ func (e ErrImageResultRequired) Error() string {
 	return msg
 }
 
-// ErrBadToken is an error indicating that there is an issue with the token itself
-type ErrBadToken struct{ Err error }
-
-func (e ErrBadToken) Unwrap() error { return e.Err }
-func (m ErrBadToken) Error() string { return fmt.Sprintf("issue with token: %s", m.Err) }
-
 // ErrRequiredSignedToken indicates that the token isn't signed
 var ErrRequiredSignedToken = errors.New("token isn't signed")
 
@@ -202,9 +194,7 @@ func (tp *tokenProcessor) ProcessToken(ctx context.Context, token persist.TokenI
 		job.animKeywords = k
 	}
 
-	startTime := time.Now()
 	media, err := job.Run(ctx)
-	recordPipelineEndState(ctx, tp.mr, job.token.Chain, media, err, time.Since(startTime), cause)
 
 	if err != nil {
 		reportJobError(ctx, err, *job)
@@ -235,7 +225,7 @@ func (tpj *tokenProcessingJob) Run(ctx context.Context) (db.TokenMedia, error) {
 
 func wrapWithBadTokenErr(err error) error {
 	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorIs[errInvalidMedia](err) || util.ErrorIs[errNoDataFromReader](err) || errors.Is(err, ErrRequiredSignedToken) {
-		err = ErrBadToken{Err: err}
+		err = tokenmanage.ErrBadToken{Err: err}
 	}
 	return err
 }
@@ -537,60 +527,4 @@ func (tpj *tokenProcessingJob) persistResults(ctx context.Context, media persist
 
 	r, err := tpj.tp.queries.InsertTokenPipelineResults(ctx, params)
 	return r.TokenMedia, err
-}
-
-const (
-	// Metrics emitted by the pipeline
-	metricPipelineCompleted = "pipeline_completed"
-	metricPipelineDuration  = "pipeline_duration"
-	metricPipelineErrored   = "pipeline_errored"
-	metricPipelineTimedOut  = "pipeline_timedout"
-)
-
-func pipelineDurationMetric(d time.Duration) metric.Measure {
-	return metric.Measure{Name: metricPipelineDuration, Value: d.Seconds()}
-}
-
-func pipelineTimedOutMetric() metric.Measure {
-	return metric.Measure{Name: metricPipelineTimedOut}
-}
-
-func pipelineCompletedMetric() metric.Measure {
-	return metric.Measure{Name: metricPipelineCompleted}
-}
-
-func pipelineErroredMetric() metric.Measure {
-	return metric.Measure{Name: metricPipelineErrored}
-}
-
-func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, tokenMedia db.TokenMedia, err error, d time.Duration, cause persist.ProcessingCause) {
-	baseOpts := append([]any{}, metric.LogOptions.WithTags(map[string]string{
-		"chain":      fmt.Sprintf("%d", chain),
-		"mediaType":  tokenMedia.Media.MediaType.String(),
-		"cause":      cause.String(),
-		"isBadToken": fmt.Sprintf("%t", isBadTokenErr(err)),
-	}))
-
-	if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) {
-		mr.Record(ctx, pipelineTimedOutMetric(), append(baseOpts,
-			metric.LogOptions.WithLogMessage("pipeline timed out"),
-		)...)
-		return
-	}
-
-	mr.Record(ctx, pipelineDurationMetric(d), append(baseOpts,
-		metric.LogOptions.WithLogMessage(fmt.Sprintf("pipeline finished (took: %s)", d)),
-	)...)
-
-	if err != nil {
-		mr.Record(ctx, pipelineErroredMetric(), append(baseOpts,
-			metric.LogOptions.WithLevel(logrus.ErrorLevel),
-			metric.LogOptions.WithLogMessage("pipeline completed with error: "+err.Error()),
-		)...)
-		return
-	}
-
-	mr.Record(ctx, pipelineCompletedMetric(), append(baseOpts,
-		metric.LogOptions.WithLogMessage("pipeline completed successfully"),
-	)...)
 }

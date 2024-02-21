@@ -18,13 +18,13 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -66,7 +66,7 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-	tp := NewTokenProcessor(clients.Queries, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), metric.NewLogMetricReporter())
+	tp := NewTokenProcessor(clients.Queries, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
 
 	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient, redis.NewCache(redis.TokenManageCache))
 }
@@ -210,11 +210,6 @@ func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 	scope.SetTag("log", "go/tokenruns/"+runID.String())
 }
 
-// isBadTokenErr returns true if the error is a bad token error.
-func isBadTokenErr(err error) bool {
-	return util.ErrorIs[ErrBadToken](err)
-}
-
 // excludeTokenSpamEvents excludes events for tokens marked as spam.
 func excludeTokenSpamEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	isSpam, ok := event.Contexts[sentryTokenContextName]["IsSpam"].(bool)
@@ -226,7 +221,7 @@ func excludeTokenSpamEvents(event *sentry.Event, hint *sentry.EventHint) *sentry
 
 // excludeBadTokenEvents excludes events for bad tokens.
 func excludeBadTokenEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if isBadTokenErr(hint.OriginalException) {
+	if util.ErrorIs[tokenmanage.ErrBadToken](hint.OriginalException) {
 		return nil
 	}
 	return event
