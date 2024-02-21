@@ -617,6 +617,10 @@ type pageResult struct {
 	NFT  Asset   `json:"nft"`
 }
 
+type errorResult struct {
+	Errors []string `json:"errors"`
+}
+
 type assetsReceived struct {
 	Assets []Asset
 	Err    error
@@ -647,16 +651,36 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 			return
 		}
 
-		if resp.StatusCode != http.StatusOK {
-			err := util.BodyAsError(resp)
-			logger.For(ctx).Errorf("failed to get tokens from opensea: %s", err)
-			outCh <- assetsReceived{Err: err}
-			return
+		if resp.StatusCode >= http.StatusInternalServerError {
+			logger.For(ctx).Errorf("internal server error from opensea: %s", util.BodyAsError(resp))
+			outCh <- assetsReceived{Err: util.ErrHTTP{
+				URL:    req.URL.String(),
+				Status: resp.StatusCode,
+				Err:    util.BodyAsError(resp),
+			}}
+		}
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			var errResp errorResult
+
+			if err := util.UnmarshallBody(&errResp, resp.Body); err != nil {
+				logger.For(ctx).Errorf("failed to read response from opensea: %s", err)
+				outCh <- assetsReceived{Err: err}
+				return
+			}
+
+			if len(errResp.Errors) > 0 {
+				err := fmt.Errorf(errResp.Errors[0])
+				logger.For(ctx).Warnf("unable to find tokens from opensea: %s", err)
+				outCh <- assetsReceived{Err: err}
+				return
+			}
 		}
 
 		page := pageResult{}
+
 		if err := util.UnmarshallBody(&page, resp.Body); err != nil {
-			logger.For(ctx).Errorf("failed to get tokens from opensea: %s", err)
+			logger.For(ctx).Errorf("failed to read response from opensea: %s", err)
 			outCh <- assetsReceived{Err: err}
 			return
 		}
