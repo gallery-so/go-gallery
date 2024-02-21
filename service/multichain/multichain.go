@@ -491,9 +491,9 @@ func (p *Provider) SyncCreatedTokensForExistingContract(ctx context.Context, use
 	errCh := make(chan error)
 
 	go func() {
-		pageCh, pageErrCh := f.GetTokensIncrementallyByContractAddress(ctx, contract.Address, maxCommunitySize)
 		defer close(recCh)
 		defer close(errCh)
+		pageCh, pageErrCh := f.GetTokensIncrementallyByContractAddress(ctx, contract.Address, maxCommunitySize)
 		for {
 			select {
 			case page, ok := <-pageCh:
@@ -1330,6 +1330,7 @@ func chainContractsToUpsertableContracts(chain persist.Chain, contracts []ChainA
 		result[c.Address] = mergeContracts(result[c.Address], db.Contract{
 			Symbol:               util.ToSQLNullString(&c.Descriptors.Symbol),
 			Name:                 util.ToSQLNullString(&c.Descriptors.Name),
+			OwnerAddress:         c.Descriptors.OwnerAddress,
 			ProfileImageUrl:      util.ToSQLNullString(&c.Descriptors.ProfileImageURL),
 			Description:          util.ToSQLNullString(&c.Descriptors.Description),
 			IsProviderMarkedSpam: util.FromPointer(c.IsSpam),
