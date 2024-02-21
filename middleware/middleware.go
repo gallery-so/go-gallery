@@ -91,6 +91,10 @@ func BasicHeaderAuthRequired(password string, options ...BasicAuthOption) gin.Ha
 	}
 }
 
+func RetoolAuthRequired(ctx *gin.Context) {
+	BasicHeaderAuthRequired(env.GetString("BASIC_AUTH_TOKEN_RETOOL"))(ctx)
+}
+
 // TaskRequired checks that the request comes from Cloud Tasks.
 // Returns a 200 status to remove the message from the queue if it is a bad request.
 func TaskRequired() gin.HandlerFunc {
@@ -331,12 +335,4 @@ func getServiceAccountEmail() (string, error) {
 	}
 
 	return string(body), nil
-}
-
-func RetoolMiddleware(ctx *gin.Context) {
-	if err := auth.RetoolAuthorized(ctx); err != nil {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-	ctx.Next()
 }
