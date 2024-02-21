@@ -10,6 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 var (
@@ -167,7 +168,13 @@ func (m MultiProviderWrapper) GetTokensIncrementallyByWalletAddress(ctx context.
 func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndContracts, errCh chan<- error, resultA, resultB <-chan multichain.ChainAgnosticTokensAndContracts, errA, errB <-chan error) {
 	defer close(recCh)
 	defer close(errCh)
+
 	var closing bool
+
+	// It's possible for one provider to not have a contract that the other does. We won't
+	// stop pulling data unless neither provider has the contract.
+	missing := make(map[persist.ContractIdentifiers]bool)
+
 	for {
 		select {
 		case page, ok := <-resultA:
@@ -189,15 +196,39 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndCo
 			}
 			closing = true
 		case err, ok := <-errA:
-			if ok {
-				errCh <- err
+			if !ok {
 				return
 			}
+
+			if err, ok := util.ErrorAs[multichain.ErrProviderContractNotFound](err); ok {
+				logger.For(ctx).Warnf("primary provider could not find contract: %s", err)
+				c := persist.NewContractIdentifiers(err.Contract, err.Chain)
+				if missing[c] {
+					errCh <- err
+					return
+				}
+				missing[c] = true
+				continue
+			}
+
+			errCh <- err
 		case err, ok := <-errB:
-			if ok {
-				errCh <- err
+			if !ok {
 				return
 			}
+
+			if err, ok := util.ErrorAs[multichain.ErrProviderContractNotFound](err); ok {
+				logger.For(ctx).Warnf("secondary provider could not find contract: %s", err)
+				c := persist.NewContractIdentifiers(err.Contract, err.Chain)
+				if missing[c] {
+					errCh <- err
+					return
+				}
+				missing[c] = true
+				continue
+			}
+
+			errCh <- err
 		case <-ctx.Done():
 			errCh <- ctx.Err()
 			return

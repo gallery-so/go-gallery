@@ -232,6 +232,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 
 	go func() {
 		defer close(rec)
+		defer close(errChan)
 	outer:
 		for {
 			select {
@@ -280,6 +281,7 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 
 	go func() {
 		defer close(rec)
+		defer close(errChan)
 		for {
 			select {
 			case err := <-subErrChan:

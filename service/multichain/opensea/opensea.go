@@ -1,9 +1,12 @@
 package opensea
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -60,13 +63,6 @@ type ErrOpenseaRateLimited struct{ Err error }
 func (e ErrOpenseaRateLimited) Unwrap() error { return e.Err }
 func (e ErrOpenseaRateLimited) Error() string {
 	return fmt.Sprintf("rate limited by opensea: %s", e.Err)
-}
-
-type fetchOptions struct {
-	// Skip fetching fallback media from reservoir.
-	// This is useful in certain contexts where fallback media isn't needed
-	// such as fetching a token's metadata or its descriptors
-	ExcludeFallbackMedia bool
 }
 
 // Asset is an NFT from OpenSea
@@ -141,7 +137,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 		defer close(outCh)
 		streamAssetsForWallet(ctx, p.httpClient, p.Chain, ownerAddress, outCh)
 	}()
-	return p.assetsToTokens(ctx, ownerAddress, outCh, nil)
+	return p.assetsToTokens(ctx, ownerAddress, outCh)
 }
 
 // GetTokensIncrementallyByWalletAddress returns a list of tokens for an address
@@ -156,7 +152,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh, nil)
+		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh)
 	}()
 	return recCh, errCh
 }
@@ -173,7 +169,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		p.streamAssetsToTokens(ctx, address, assetsCh, recCh, errCh, nil)
+		p.streamAssetsToTokens(ctx, address, assetsCh, recCh, errCh)
 	}()
 	return recCh, errCh
 }
@@ -185,7 +181,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		defer close(outCh)
 		streamAssetsForContract(ctx, p.httpClient, p.Chain, contractAddress, outCh)
 	}()
-	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh, nil)
+	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -197,18 +193,13 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return p.GetTokensByTokenIdentifiersOptions(ctx, ti, nil)
-}
-
-// GetTokensByTokenIdentifiersOptions supports configuring options for fetching tokens
-func (p *Provider) GetTokensByTokenIdentifiersOptions(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, opt *fetchOptions) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	outCh := make(chan assetsReceived)
 	go func() {
 		defer close(outCh)
 		streamAssetsForToken(ctx, p.httpClient, p.Chain, ti.ContractAddress, ti.TokenID, outCh)
 	}()
-	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh, opt)
+	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -226,7 +217,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 		streamAssetsForTokenIdentifiersAndOwner(ctx, p.httpClient, p.Chain, ownerAddress, ti.ContractAddress, ti.TokenID, outCh)
 	}()
 
-	tokens, contracts, err := p.assetsToTokens(ctx, ownerAddress, outCh, nil)
+	tokens, contracts, err := p.assetsToTokens(ctx, ownerAddress, outCh)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -244,7 +235,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	tokens, _, err := p.GetTokensByTokenIdentifiersOptions(ctx, ti, &fetchOptions{ExcludeFallbackMedia: true})
+	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, ti)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +248,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 }
 
 func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
-	tokens, contract, err := p.GetTokensByTokenIdentifiersOptions(ctx, ti, &fetchOptions{ExcludeFallbackMedia: true})
+	tokens, contract, err := p.GetTokensByTokenIdentifiers(ctx, ti)
 	if err != nil {
 		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
 	}
@@ -278,13 +269,13 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 	return contractToChainAgnosticContract(cc.Contract, cc.Collection), nil
 }
 
-func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived, opt *fetchOptions) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
+func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
 	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, poolSize)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh, opt)
+		p.streamAssetsToTokens(ctx, ownerAddress, outCh, recCh, errCh)
 	}()
 
 	if err = <-errCh; err != nil {
@@ -305,7 +296,6 @@ func (p *Provider) streamAssetsToTokens(
 	outCh <-chan assetsReceived,
 	recCh chan<- multichain.ChainAgnosticTokensAndContracts,
 	errCh chan<- error,
-	opt *fetchOptions,
 ) {
 	contracts := &sync.Map{}                            // used to avoid duplicate contract fetches
 	contractsL := make(map[persist.Address]*sync.Mutex) // contract job locks
@@ -315,7 +305,7 @@ func (p *Provider) streamAssetsToTokens(
 		page := page
 
 		if page.Err != nil {
-			errCh <- page.Err
+			errCh <- wrapMissingContractErr(p.Chain, page.Err)
 			return
 		}
 
@@ -626,6 +616,46 @@ type assetsReceived struct {
 	Err    error
 }
 
+func wrapMissingContractErr(chain persist.Chain, err error) error {
+	errMsg := err.Error()
+	if strings.HasPrefix(errMsg, "Contract") && strings.HasSuffix(errMsg, "not found") {
+		a := strings.TrimPrefix(errMsg, "Contract ")
+		a = strings.TrimSuffix(a, " not found")
+		a = strings.TrimSpace(a)
+		return multichain.ErrProviderContractNotFound{
+			Chain:    chain,
+			Contract: persist.Address(a),
+			Err:      err,
+		}
+	}
+	return err
+}
+
+func readErrBody(ctx context.Context, body io.Reader) error {
+	b := new(bytes.Buffer)
+
+	_, err := b.ReadFrom(body)
+	if err != nil {
+		return err
+	}
+
+	byt := b.Bytes()
+
+	var errResp errorResult
+
+	err = json.Unmarshal(byt, &errResp)
+	if err != nil {
+		return err
+	}
+
+	if len(errResp.Errors) > 0 {
+		err = fmt.Errorf(errResp.Errors[0])
+		return err
+	}
+
+	return fmt.Errorf(string(byt))
+}
+
 func paginateAssets(ctx context.Context, client *http.Client, req *http.Request, outCh chan assetsReceived) {
 	paginateAssetsFilter(ctx, client, req, outCh, nil)
 }
@@ -661,20 +691,10 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 		}
 
 		if resp.StatusCode >= http.StatusBadRequest {
-			var errResp errorResult
-
-			if err := util.UnmarshallBody(&errResp, resp.Body); err != nil {
-				logger.For(ctx).Errorf("failed to read response from opensea: %s", err)
-				outCh <- assetsReceived{Err: err}
-				return
-			}
-
-			if len(errResp.Errors) > 0 {
-				err := fmt.Errorf(errResp.Errors[0])
-				logger.For(ctx).Warnf("unable to find tokens from opensea: %s", err)
-				outCh <- assetsReceived{Err: err}
-				return
-			}
+			err = readErrBody(ctx, resp.Body)
+			logger.For(ctx).Errorf("unexpected status code (%d) from opensea: %s", resp.StatusCode, err)
+			outCh <- assetsReceived{Err: err}
+			return
 		}
 
 		page := pageResult{}
