@@ -121,7 +121,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm
 		_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(c))
 
 		if err != nil {
-			if util.ErrorIs[ErrBadToken](err) {
+			if util.ErrorIs[tokenmanage.ErrBadToken](err) {
 				util.ErrResponse(ctx, http.StatusUnprocessableEntity, err)
 				return
 			}
@@ -850,7 +850,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	})
 	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
 	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
-	closing, err := tm.StartProcessing(ctx, td.ID, tID, attempts)
+	closing, err := tm.StartProcessing(ctx, td.ID, tID, attempts, cause)
 	if err != nil {
 		return db.TokenMedia{}, err
 	}
@@ -863,7 +863,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	runOpts = append(runOpts, PipelineOpts.WithPlaceholderImageURL(td.FallbackMedia.ImageURL.String()))
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessToken(ctx, tID, cID, cause, runOpts...)
-	defer closing(err)
+	defer closing(media, err)
 	return media, err
 }
 
