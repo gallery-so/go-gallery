@@ -166,7 +166,9 @@ func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, 
 	}
 
 	if nowFlaky {
-		logger.For(ctx).Warnf("processing of chain=%d; contract=%s is paused for %s because of too many errors", tID.Chain, tID.ContractAddress, time.Hour*3)
+		err := fmt.Errorf("processing of chain=%d; contract=%s is paused for %s because of too many errors", tID.Chain, tID.ContractAddress, time.Hour*3)
+		logger.For(ctx).Warnf(err.Error())
+		sentryutil.ReportError(ctx, err)
 	}
 }
 
