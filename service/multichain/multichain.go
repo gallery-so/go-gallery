@@ -106,12 +106,21 @@ func (t ChainAgnosticIdentifiers) String() string {
 	return fmt.Sprintf("token(address=%s; id=%s)", t.ContractAddress, t.TokenID)
 }
 
-type ErrProviderFailed struct {
-	Err error
-}
+type ErrProviderFailed struct{ Err error }
 
 func (e ErrProviderFailed) Unwrap() error { return e.Err }
 func (e ErrProviderFailed) Error() string { return fmt.Sprintf("calling provider failed: %s", e.Err) }
+
+type ErrProviderContractNotFound struct {
+	Contract persist.Address
+	Chain    persist.Chain
+	Err      error
+}
+
+func (e ErrProviderContractNotFound) Unwrap() error { return e.Err }
+func (e ErrProviderContractNotFound) Error() string {
+	return fmt.Sprintf("provider did not find contract: %s", e.Contract.String())
+}
 
 type communityInfo interface {
 	GetKey() persist.CommunityKey

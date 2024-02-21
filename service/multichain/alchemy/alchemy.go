@@ -232,6 +232,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 
 	go func() {
 		defer close(rec)
+		defer close(errChan)
 	outer:
 		for {
 			select {
@@ -280,6 +281,7 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 
 	go func() {
 		defer close(rec)
+		defer close(errChan)
 		for {
 			select {
 			case err := <-subErrChan:
@@ -298,7 +300,7 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 					return
 				}
 				if len(cContracts) == 0 {
-					errChan <- fmt.Errorf("no contract found for contract address %s", addr)
+					errChan <- multichain.ErrProviderContractNotFound{Contract: addr, Chain: d.chain}
 					return
 				}
 				rec <- multichain.ChainAgnosticTokensAndContracts{
@@ -501,8 +503,9 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
+
 	if len(cContracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for contract address %s", contractAddress)
+		return nil, multichain.ChainAgnosticContract{}, multichain.ErrProviderContractNotFound{Contract: contractAddress, Chain: d.chain}
 	}
 
 	return cTokens, cContracts[0], nil
