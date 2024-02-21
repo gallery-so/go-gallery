@@ -663,8 +663,8 @@ func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 			Chain    persist.Chain
 			Endpoint string
 		}{
-			{persist.ChainETH, env.GetString("ALCHEMY_ETH_NFT_API_URL")},
-			{persist.ChainPolygon, env.GetString("ALCHEMY_POLYGON_NFT_API_URL")},
+			{persist.ChainETH, env.GetString("ALCHEMY_API_URL")},
+			{persist.ChainPolygon, env.GetString("ALCHEMY_POLYGON_API_URL")},
 		} {
 			url, err := url.Parse(source.Endpoint)
 			if err != nil {

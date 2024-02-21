@@ -12,7 +12,6 @@ import (
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -43,14 +42,6 @@ type Provider struct {
 func NewProvider(httpClient *http.Client) *Provider {
 	return &Provider{
 		tzDomainsGQL: mgql.NewClient(tezDomainsApiURL, mgql.WithHTTPClient(httpClient)),
-	}
-}
-
-func (p *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      persist.ChainTezos,
-		ChainID:    0,
-		ProviderID: "tezos",
 	}
 }
 

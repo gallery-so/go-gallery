@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -79,10 +78,6 @@ type mediaPrediction struct {
 
 // PredictMediaType guesses the media type of the given URL.
 func PredictMediaType(ctx context.Context, url string) (persist.MediaType, string, *int64, error) {
-	// predicting is not critical, so we can afford to give it a timeout
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	f := func() (persist.MediaType, string, *int64, error) {
 		spl := strings.Split(url, ".")
 		if len(spl) > 1 {
@@ -251,10 +246,25 @@ func MediaFromContentType(contentType string) persist.MediaType {
 	}
 }
 
-// FindImageAndAnimationURLs will attempt to find the image and animation URLs for a given token
-func FindImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords []string, animKeywords []string) (imgURL ImageURL, animURL AnimationURL, err error) {
+// PredictMediaURLs finds the image and animation URLs from a token's metadata and accesses them to predict the true URLs
+func PredictMediaURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords []string, animKeywords []string) (imgURL ImageURL, animURL AnimationURL, err error) {
+	imgURL, animURL, err = FindMediaURLs(metadata, imgKeywords, animKeywords)
+	if err != nil {
+		return
+	}
+	imgURL, animURL = predictTrueURLs(ctx, imgURL, animURL)
+	return imgURL, animURL, nil
+}
+
+// FindMediaURLsChain finds the image and animation URLs from a token's metadata, using the chain's base keywords
+func FindMediaURLsChain(metadata persist.TokenMetadata, chain persist.Chain) (imgURL ImageURL, animURL AnimationURL, err error) {
+	imgK, animK := chain.BaseKeywords()
+	return FindMediaURLs(metadata, imgK, animK)
+}
+
+// FindMediaURLs finds the image and animation URLs from a token's metadata
+func FindMediaURLs(metadata persist.TokenMetadata, imgKeywords []string, animKeywords []string) (imgURL ImageURL, animURL AnimationURL, err error) {
 	if metaMedia, ok := metadata["media"].(map[string]any); ok {
-		logger.For(ctx).Debugf("found media metadata: %s", metaMedia)
 		var mediaType persist.MediaType
 
 		if mime, ok := metaMedia["mimeType"].(string); ok {
@@ -272,7 +282,6 @@ func FindImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetada
 
 	for _, keyword := range imgKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
-			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
 			imgURL = ImageURL(it)
 			break
 		}
@@ -280,7 +289,6 @@ func FindImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetada
 
 	for _, keyword := range animKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && AnimationURL(it) != animURL {
-			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
 			animURL = AnimationURL(it)
 			break
 		}
@@ -290,7 +298,6 @@ func FindImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetada
 		return "", "", ErrNoMediaURLs
 	}
 
-	imgURL, animURL = predictTrueURLs(ctx, imgURL, animURL)
 	return imgURL, animURL, nil
 }
 
