@@ -53,9 +53,16 @@ type ResubInput struct {
 	Resubs []model.EmailUnsubscriptionType `json:"resubscriptions" binding:"required"`
 }
 
-type UpdateSubscriptionsTypeInput struct {
+type UpdateUnsubscriptionsTypeInput struct {
 	UserID persist.DBID                 `json:"user_id" binding:"required"`
 	Unsubs persist.EmailUnsubscriptions `json:"unsubscriptions" binding:"required"`
+}
+
+type GetUnsubscriptionsInput struct {
+	UserID persist.DBID `form:"user_id" binding:"required"`
+}
+type GetSubscriptionsResponse struct {
+	Unsubscriptions persist.EmailUnsubscriptions `json:"unsubscriptions"`
 }
 
 type VerificationEmailInput struct {
@@ -158,7 +165,7 @@ func UnsubscribeByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailU
 }
 
 func UpdateUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID, unsubTypes persist.EmailUnsubscriptions) error {
-	input := UpdateSubscriptionsTypeInput{
+	input := UpdateUnsubscriptionsTypeInput{
 		UserID: userID,
 		Unsubs: unsubTypes,
 	}
@@ -170,7 +177,7 @@ func UpdateUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID, uns
 
 	buf := bytes.NewBuffer(body)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/subscriptions", env.GetString("EMAILS_HOST")), buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/unsubscriptions", env.GetString("EMAILS_HOST")), buf)
 	if err != nil {
 		return err
 	}
@@ -187,6 +194,33 @@ func UpdateUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID, uns
 	}
 
 	return nil
+}
+
+func GetCurrentUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID) (persist.EmailUnsubscriptions, error) {
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/unsubscriptions?user_id=%s", env.GetString("EMAILS_HOST"), userID), nil)
+	if err != nil {
+		return persist.EmailUnsubscriptions{}, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return persist.EmailUnsubscriptions{}, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return persist.EmailUnsubscriptions{}, util.GetErrFromResp(resp)
+	}
+
+	var output GetSubscriptionsResponse
+	err = json.NewDecoder(resp.Body).Decode(&output)
+	if err != nil {
+		return persist.EmailUnsubscriptions{}, err
+	}
+
+	return output.Unsubscriptions, nil
 }
 
 func RequestVerificationEmail(ctx context.Context, userID persist.DBID) error {

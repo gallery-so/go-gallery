@@ -729,6 +729,19 @@ func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, sett
 
 }
 
+func (api UserAPI) GetCurrentUserEmailNotificationSettings(ctx context.Context) (persist.EmailUnsubscriptions, error) {
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return persist.EmailUnsubscriptions{}, err
+	}
+
+	// update unsubscriptions
+
+	return emails.GetCurrentUnsubscriptionsByUserID(ctx, userID)
+
+}
+
 func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
 
 	userID, err := getAuthenticatedUserID(ctx)

@@ -3403,6 +3403,21 @@ func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
+// EmailNotificationSettings is the resolver for the emailNotificationSettings field.
+func (r *userEmailResolver) EmailNotificationSettings(ctx context.Context, obj *model.UserEmail) (*model.EmailNotificationSettings, error) {
+	unsubs, err := publicapi.For(ctx).User.GetCurrentUserEmailNotificationSettings(ctx)
+	if err != nil {
+		logger.For(ctx).Errorf("error getting email notification settings from email service: %s", err)
+		return obj.EmailNotificationSettings, nil
+	}
+
+	return &model.EmailNotificationSettings{
+		UnsubscribedFromAll:           unsubs.All.Bool(),
+		UnsubscribedFromNotifications: unsubs.Notifications.Bool(),
+		UnsubscribedFromDigest:        unsubs.Digest.Bool(),
+	}, nil
+}
+
 // Owner is the resolver for the owner field.
 func (r *userFollowedUsersFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
@@ -3788,6 +3803,9 @@ func (r *Resolver) UserCreatedFeedEventData() generated.UserCreatedFeedEventData
 	return &userCreatedFeedEventDataResolver{r}
 }
 
+// UserEmail returns generated.UserEmailResolver implementation.
+func (r *Resolver) UserEmail() generated.UserEmailResolver { return &userEmailResolver{r} }
+
 // UserFollowedUsersFeedEventData returns generated.UserFollowedUsersFeedEventDataResolver implementation.
 func (r *Resolver) UserFollowedUsersFeedEventData() generated.UserFollowedUsersFeedEventDataResolver {
 	return &userFollowedUsersFeedEventDataResolver{r}
@@ -3870,6 +3888,7 @@ type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
 type updateCollectionTokensPayloadResolver struct{ *Resolver }
 type userCreatedFeedEventDataResolver struct{ *Resolver }
+type userEmailResolver struct{ *Resolver }
 type userFollowedUsersFeedEventDataResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
