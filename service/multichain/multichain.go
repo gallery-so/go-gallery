@@ -516,7 +516,7 @@ func (p *Provider) SyncCreatedTokensForExistingContract(ctx context.Context, use
 				}
 			case err, ok := <-pageErrCh:
 				if !ok {
-					return
+					continue
 				}
 				errCh <- ErrProviderFailed{Err: err}
 				return
