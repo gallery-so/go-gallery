@@ -37,17 +37,14 @@ func (e ErrContractPaused) Error() string {
 	return fmt.Sprintf("processing for chain=%d; contract=%s is paused", e.Chain, e.Contract)
 }
 
-// NumRetryF is a function that returns the number of times a token can be re-enqueued before it is not retried again
-type NumRetryF func() int
-
 type Manager struct {
 	cache           *redis.Cache
 	processRegistry *registry
 	taskClient      *task.Client
 	throttle        *throttle.Locker
-	taskDelayer     *limiters.KeyRateLimiter
 	errorCounter    *limiters.KeyRateLimiter
 	numRetryF       NumRetryF
+	delayF          TaskDelayF
 	metricReporter  metric.MetricReporter
 }
 
@@ -62,10 +59,16 @@ func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Mana
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, numRetryF NumRetryF) *Manager {
+// NumRetryF returns the max number of times a token can be retried
+type NumRetryF func() int
+
+// TaskDelayF returns the delay period between retries
+type TaskDelayF func() (time.Duration, error)
+
+func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, numRetryF NumRetryF, delayF TaskDelayF) *Manager {
 	m := New(ctx, taskClient, cache)
 	m.numRetryF = numRetryF
-	m.taskDelayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
+	m.delayF = delayF
 	return m
 }
 
@@ -140,6 +143,7 @@ func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, tID p
 }
 
 func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, err error) {
+	// Don't penalize non-token related errors e.g. errors related to the pipeline
 	if err == nil || !util.ErrorIs[ErrBadToken](err) {
 		return
 	}
@@ -173,6 +177,12 @@ func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, 
 }
 
 func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, err error, attempts int) error {
+	// Only retry intermittent errors related to the token e.g. missing metadata
+	if !util.ErrorIs[ErrBadToken](err) {
+		m.processRegistry.finish(ctx, tDefID)
+		return nil
+	}
+
 	if m.Paused(ctx, tID) {
 		m.processRegistry.finish(ctx, tDefID)
 		return nil
@@ -183,8 +193,9 @@ func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.
 		return nil
 	}
 
-	_, delay, err := m.taskDelayer.ForKey(ctx, tDefID.String())
+	delay, err := m.delayF()
 	if err != nil {
+		logger.For(ctx).Errorf("failed to get retry delay, not retrying: %s", err)
 		m.processRegistry.finish(ctx, tDefID)
 		return err
 	}

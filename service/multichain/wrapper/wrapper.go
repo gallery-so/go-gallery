@@ -2,6 +2,7 @@ package wrapper
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -264,9 +265,11 @@ func (w *FillInWrapper) AddToToken(ctx context.Context, t multichain.ChainAgnost
 		return t
 	}
 	if !t.FallbackMedia.IsServable() {
+		fmt.Println("filling in fallback media!")
 		t.FallbackMedia = f.FallbackMedia
 	}
 	if _, _, err := media.FindMediaURLsChain(t.TokenMetadata, w.chain); err != nil {
+		fmt.Println("filling in tokenmedata!")
 		t.TokenMetadata = f.TokenMetadata
 	}
 	return t
@@ -325,6 +328,16 @@ func (w *FillInWrapper) addToken(t multichain.ChainAgnosticToken) func() (multic
 		Chain:           w.chain,
 	}
 
+	if v, ok := w.resultCache.Load(ti); ok {
+		fmt.Println("loading from cache!")
+		return func() (multichain.ChainAgnosticToken, error) { return v.(multichain.ChainAgnosticToken), nil }
+	}
+
+	if _, _, err := media.FindMediaURLsChain(t.TokenMetadata, w.chain); err == nil && t.FallbackMedia.IsServable() {
+		fmt.Println("token is already filled!")
+		return func() (multichain.ChainAgnosticToken, error) { return t, nil }
+	}
+
 	w.mu.Lock()
 
 	if w.batch == nil {
@@ -335,14 +348,6 @@ func (w *FillInWrapper) addToken(t multichain.ChainAgnosticToken) func() (multic
 	pos := b.addToBatch(w, ti)
 
 	w.mu.Unlock()
-
-	if v, ok := w.resultCache.Load(ti); ok {
-		return func() (multichain.ChainAgnosticToken, error) { return v.(multichain.ChainAgnosticToken), nil }
-	}
-
-	if _, _, err := media.FindMediaURLsChain(t.TokenMetadata, w.chain); err != nil && t.FallbackMedia.IsServable() {
-		return func() (multichain.ChainAgnosticToken, error) { return t, nil }
-	}
 
 	return func() (multichain.ChainAgnosticToken, error) {
 		<-b.done
