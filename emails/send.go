@@ -42,9 +42,8 @@ func init() {
 const emailsAtATime = 10_000
 
 type sendNotificationEmailHttpInput struct {
-	UserID         persist.DBID  `json:"user_id" binding:"required"`
-	ToEmail        persist.Email `json:"to_email" binding:"required"`
-	SendRealEmails bool          `json:"send_real_emails"`
+	UserID  persist.DBID  `json:"user_id" binding:"required"`
+	ToEmail persist.Email `json:"to_email" binding:"required"`
 }
 
 type errNoEmailSet struct {
@@ -137,7 +136,7 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 			return
 		}
 
-		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, gidInt, queries, s, 10, 5, input.SendRealEmails); err != nil {
+		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, gidInt, queries, s, 10, 5); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -148,12 +147,14 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 
 func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		l, _ := r.Get(ctx, "send-notification-emails")
-		if len(l) > 0 {
-			logger.For(ctx).Infof("notification emails already being sent")
-			return
+		if env.GetString("ENV") == "production" {
+			l, _ := r.Get(ctx, "send-notification-emails")
+			if len(l) > 0 {
+				logger.For(ctx).Infof("notification emails already being sent")
+				return
+			}
+			r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
 		}
-		r.Set(ctx, "send-notification-emails", []byte("sending"), 1*time.Hour)
 		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
@@ -210,7 +211,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.PiiUserView) error {
 
-		response, err := sendNotificationEmailToUser(c, u, u.PiiVerifiedEmailAddress, gidInt, queries, s, 10, 5, sendRealEmails)
+		response, err := sendNotificationEmailToUser(c, u, u.PiiVerifiedEmailAddress, gidInt, queries, s, 10, 5)
 		if err != nil {
 			return err
 		}
@@ -226,7 +227,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	})
 }
 
-func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, unsubscribeGroupID int, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
+func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, unsubscribeGroupID int, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int) (*rest.Response, error) {
 
 	// generate notification data for user
 	notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
@@ -248,19 +249,25 @@ func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailR
 		Username:         u.Username.String,
 		UnsubscribeToken: j,
 	}
-	notifTemplates := make(chan notifications.UserFacingNotificationData)
+	notifTemplates := make(chan *notifications.UserFacingNotificationData)
 	errChan := make(chan error)
 
 	for _, n := range notifs {
+
 		notif := n
 		go func() {
+			// don't send viewed gallery notifications
+			if notif.Action == persist.ActionViewedGallery {
+				notifTemplates <- nil
+				return
+			}
 			// notifTemplate, err := notifToTemplateData(c, queries, notif)
 			notifTemplate, err := notifications.NotificationToUserFacingData(c, queries, notif)
 			if err != nil {
 				errChan <- err
 				return
 			}
-			notifTemplates <- notifTemplate
+			notifTemplates <- &notifTemplate
 		}()
 	}
 
@@ -270,7 +277,10 @@ outer:
 		case err := <-errChan:
 			logger.For(c).Errorf("failed to get notification template data: %v", err)
 		case notifTemplate := <-notifTemplates:
-			data.Notifications = append(data.Notifications, notifTemplate)
+			if notifTemplate == nil {
+				continue
+			}
+			data.Notifications = append(data.Notifications, *notifTemplate)
 			if len(data.Notifications) >= resultLimit {
 				break outer
 			}
@@ -293,31 +303,26 @@ outer:
 		return nil, err
 	}
 
-	if sendRealEmail {
-		// send email
-		from := mail.NewEmail("Gallery", env.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(u.Username.String, emailRecipient.String())
-		m := mail.NewV3Mail()
-		m.SetFrom(from)
-		p := mail.NewPersonalization()
-		m.SetTemplateID(env.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
-		p.DynamicTemplateData = asMap
-		m.AddPersonalizations(p)
-		p.AddTos(to)
-		asm := mail.NewASM()
-		asm.SetGroupID(unsubscribeGroupID)
-		m.SetASM(asm)
+	// send email
+	from := mail.NewEmail("Gallery", env.GetString("FROM_EMAIL"))
+	to := mail.NewEmail(u.Username.String, emailRecipient.String())
+	m := mail.NewV3Mail()
+	m.SetFrom(from)
+	p := mail.NewPersonalization()
+	m.SetTemplateID(env.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
+	p.DynamicTemplateData = asMap
+	m.AddPersonalizations(p)
+	m.AddCategories("weekly_notifications")
+	p.AddTos(to)
+	asm := mail.NewASM()
+	asm.SetGroupID(unsubscribeGroupID)
+	m.SetASM(asm)
 
-		response, err := s.Send(m)
-		if err != nil {
-			return nil, err
-		}
-		return response, nil
+	response, err := s.Send(m)
+	if err != nil {
+		return nil, err
 	}
-
-	logger.For(c).Infof("would have sent email to %s (username: %s): %s", u.ID, u.Username.String, string(asJSON))
-
-	return &rest.Response{StatusCode: 200, Body: "not sending real emails", Headers: map[string][]string{}}, nil
+	return response, nil
 }
 
 type digestEmailDynamicTemplateData struct {
@@ -547,6 +552,8 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 		if err != nil {
 			return err
 		}
+
+		logger.For(ctx).Infof("got %d users with notifications on for email type %s", len(users), emailType)
 
 		for _, user := range users {
 			u := user
