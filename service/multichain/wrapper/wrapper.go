@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -21,7 +22,7 @@ type SyncPipelineWrapper struct {
 	TokenIdentifierOwnerFetcher      multichain.TokenIdentifierOwnerFetcher
 	TokensIncrementalOwnerFetcher    multichain.TokensIncrementalOwnerFetcher
 	TokensIncrementalContractFetcher multichain.TokensIncrementalContractFetcher
-	PlaceholderFetcher               *PlaceholderWrapper
+	FillInWrapper                    *FillInWrapper
 }
 
 func NewSyncPipelineWrapper(
@@ -29,31 +30,31 @@ func NewSyncPipelineWrapper(
 	tokenIdentifierOwnerFetcher multichain.TokenIdentifierOwnerFetcher,
 	tokensIncrementalOwnerFetcher multichain.TokensIncrementalOwnerFetcher,
 	tokensIncrementalContractFetcher multichain.TokensIncrementalContractFetcher,
-	placeholderWrapper *PlaceholderWrapper,
+	fillInWrapper *FillInWrapper,
 ) *SyncPipelineWrapper {
 	return &SyncPipelineWrapper{
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		PlaceholderFetcher:               placeholderWrapper,
+		FillInWrapper:                    fillInWrapper,
 	}
 }
 
 func (w SyncPipelineWrapper) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, address persist.Address) (t multichain.ChainAgnosticToken, c multichain.ChainAgnosticContract, err error) {
 	t, c, err = w.TokenIdentifierOwnerFetcher.GetTokenByTokenIdentifiersAndOwner(ctx, ti, address)
-	t = w.PlaceholderFetcher.AddToToken(ctx, t)
+	t = w.FillInWrapper.AddToToken(ctx, t)
 	return t, c, err
 }
 
 func (w SyncPipelineWrapper) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	recCh, errCh := w.TokensIncrementalOwnerFetcher.GetTokensIncrementallyByWalletAddress(ctx, address)
-	recCh, errCh = w.PlaceholderFetcher.AddToPage(ctx, recCh, errCh)
+	recCh, errCh = w.FillInWrapper.AddToPage(ctx, recCh, errCh)
 	return recCh, errCh
 }
 
 func (w SyncPipelineWrapper) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	recCh, errCh := w.TokensIncrementalContractFetcher.GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
-	recCh, errCh = w.PlaceholderFetcher.AddToPage(ctx, recCh, errCh)
+	recCh, errCh = w.FillInWrapper.AddToPage(ctx, recCh, errCh)
 	return recCh, errCh
 }
 
@@ -234,9 +235,9 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndCo
 	}
 }
 
-// PlaceholderWrapper is a service for adding placeholder media to tokens.
+// FillInWrapper is a service for adding missing data to tokens.
 // Batching pattern adapted from dataloaden (https://github.com/vektah/dataloaden)
-type PlaceholderWrapper struct {
+type FillInWrapper struct {
 	chain             persist.Chain
 	reservoirProvider *reservoir.Provider
 	ctx               context.Context
@@ -247,8 +248,8 @@ type PlaceholderWrapper struct {
 	resultCache       sync.Map
 }
 
-func NewPlaceholderWrapper(ctx context.Context, httpClient *http.Client, chain persist.Chain) *PlaceholderWrapper {
-	return &PlaceholderWrapper{
+func NewFillInWrapper(ctx context.Context, httpClient *http.Client, chain persist.Chain) *FillInWrapper {
+	return &FillInWrapper{
 		chain:             chain,
 		reservoirProvider: reservoir.NewProvider(httpClient, chain),
 		ctx:               ctx,
@@ -257,12 +258,21 @@ func NewPlaceholderWrapper(ctx context.Context, httpClient *http.Client, chain p
 	}
 }
 
-func (w *PlaceholderWrapper) AddToToken(ctx context.Context, t multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
-	t.FallbackMedia, _ = w.addToken(t)()
+func (w *FillInWrapper) AddToToken(ctx context.Context, t multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
+	f, err := w.addToken(t)()
+	if err != nil {
+		return t
+	}
+	if !t.FallbackMedia.IsServable() {
+		t.FallbackMedia = f.FallbackMedia
+	}
+	if _, _, err := media.FindMediaURLsChain(t.TokenMetadata, w.chain); err != nil {
+		t.TokenMetadata = f.TokenMetadata
+	}
 	return t
 }
 
-func (w *PlaceholderWrapper) AddToPage(ctx context.Context, recCh <-chan multichain.ChainAgnosticTokensAndContracts, errIn <-chan error) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+func (w *FillInWrapper) AddToPage(ctx context.Context, recCh <-chan multichain.ChainAgnosticTokensAndContracts, errIn <-chan error) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
 	outCh := make(chan multichain.ChainAgnosticTokensAndContracts, 2*10)
 	errOut := make(chan error)
 	w.resultCache = sync.Map{}
@@ -290,8 +300,8 @@ func (w *PlaceholderWrapper) AddToPage(ctx context.Context, recCh <-chan multich
 	return outCh, errOut
 }
 
-func (w *PlaceholderWrapper) addPage(p multichain.ChainAgnosticTokensAndContracts) func() multichain.ChainAgnosticTokensAndContracts {
-	thunks := make([]func() (persist.FallbackMedia, error), len(p.Tokens))
+func (w *FillInWrapper) addPage(p multichain.ChainAgnosticTokensAndContracts) func() multichain.ChainAgnosticTokensAndContracts {
+	thunks := make([]func() (multichain.ChainAgnosticToken, error), len(p.Tokens))
 	for i, t := range p.Tokens {
 		thunks[i] = w.addToken(t)
 	}
@@ -299,7 +309,7 @@ func (w *PlaceholderWrapper) addPage(p multichain.ChainAgnosticTokensAndContract
 	return func() multichain.ChainAgnosticTokensAndContracts {
 		var err error
 		for i, thunk := range thunks {
-			p.Tokens[i].FallbackMedia, err = thunk()
+			p.Tokens[i], err = thunk()
 			if err != nil {
 				logger.For(w.ctx).Warnf("failed to get fallbacks for page: %s", err)
 			}
@@ -308,7 +318,7 @@ func (w *PlaceholderWrapper) addPage(p multichain.ChainAgnosticTokensAndContract
 	}
 }
 
-func (w *PlaceholderWrapper) addToken(t multichain.ChainAgnosticToken) func() (persist.FallbackMedia, error) {
+func (w *FillInWrapper) addToken(t multichain.ChainAgnosticToken) func() (multichain.ChainAgnosticToken, error) {
 	ti := persist.TokenIdentifiers{
 		TokenID:         t.TokenID,
 		ContractAddress: t.ContractAddress,
@@ -327,21 +337,17 @@ func (w *PlaceholderWrapper) addToken(t multichain.ChainAgnosticToken) func() (p
 	w.mu.Unlock()
 
 	if v, ok := w.resultCache.Load(ti); ok {
-		return func() (persist.FallbackMedia, error) {
-			return v.(persist.FallbackMedia), nil
-		}
+		return func() (multichain.ChainAgnosticToken, error) { return v.(multichain.ChainAgnosticToken), nil }
 	}
 
-	if t.FallbackMedia.IsServable() {
-		return func() (persist.FallbackMedia, error) {
-			return t.FallbackMedia, nil
-		}
+	if _, _, err := media.FindMediaURLsChain(t.TokenMetadata, w.chain); err != nil && t.FallbackMedia.IsServable() {
+		return func() (multichain.ChainAgnosticToken, error) { return t, nil }
 	}
 
-	return func() (persist.FallbackMedia, error) {
+	return func() (multichain.ChainAgnosticToken, error) {
 		<-b.done
 		if b.err != nil {
-			return persist.FallbackMedia{}, b.err
+			return multichain.ChainAgnosticToken{}, b.err
 		}
 		return b.results[pos], nil
 	}
@@ -350,12 +356,12 @@ func (w *PlaceholderWrapper) addToken(t multichain.ChainAgnosticToken) func() (p
 type batch struct {
 	tokens  []persist.TokenIdentifiers
 	err     error
-	results []persist.FallbackMedia
+	results []multichain.ChainAgnosticToken
 	closing bool
 	done    chan struct{}
 }
 
-func (b *batch) addToBatch(w *PlaceholderWrapper, t persist.TokenIdentifiers) int {
+func (b *batch) addToBatch(w *FillInWrapper, t persist.TokenIdentifiers) int {
 	pos := len(b.tokens)
 	b.tokens = append(b.tokens, t)
 	if pos == 0 {
@@ -373,7 +379,7 @@ func (b *batch) addToBatch(w *PlaceholderWrapper, t persist.TokenIdentifiers) in
 	return pos
 }
 
-func (b *batch) startTimer(w *PlaceholderWrapper) {
+func (b *batch) startTimer(w *FillInWrapper) {
 	time.Sleep(w.wait)
 	w.mu.Lock()
 
@@ -389,10 +395,10 @@ func (b *batch) startTimer(w *PlaceholderWrapper) {
 	b.end(w)
 }
 
-func (b *batch) end(w *PlaceholderWrapper) {
+func (b *batch) end(w *FillInWrapper) {
 	ctx, cancel := context.WithTimeout(w.ctx, 10*time.Second)
 	defer cancel()
-	b.results, b.err = w.reservoirProvider.GetFallbackMediaBatch(ctx, b.tokens)
+	b.results, b.err = w.reservoirProvider.GetTokensByTokenIdentifiersBatch(ctx, b.tokens)
 	if b.err == nil {
 		for i := range b.results {
 			w.resultCache.Store(b.tokens[i], b.results[i])

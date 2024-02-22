@@ -714,7 +714,7 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 				}
 				return
 			}
-			logger.For(ctx).Infof("got target tokens from page=%dfrom opensea", pages)
+			logger.For(ctx).Infof("got target tokens from page=%d from opensea", pages)
 			outCh <- assetsReceived{Assets: []Asset{page.NFT}}
 			return
 		}

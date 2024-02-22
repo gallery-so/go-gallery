@@ -129,12 +129,12 @@ func ethSyncPipelineInjector(contextContext context.Context, client *http.Client
 	tokenIdentifierOwnerFetcher := ethTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalOwnerFetcher := ethTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalContractFetcher := ethTokensContractFetcherInjector(provider, alchemyProvider)
-	placeholderWrapper := wrapper.NewPlaceholderWrapper(contextContext, client, chain)
+	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		PlaceholderFetcher:               placeholderWrapper,
+		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
 }
@@ -219,12 +219,12 @@ func optimismSyncPipelineInjector(contextContext context.Context, client *http.C
 	tokenIdentifierOwnerFetcher := optimismTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalOwnerFetcher := optimismTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalContractFetcher := optimismTokensContractFetcherInjector(provider, alchemyProvider)
-	placeholderWrapper := wrapper.NewPlaceholderWrapper(contextContext, client, chain)
+	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		PlaceholderFetcher:               placeholderWrapper,
+		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
 }
@@ -284,12 +284,12 @@ func arbitrumSyncPipelineInjector(contextContext context.Context, client *http.C
 	tokenIdentifierOwnerFetcher := arbitrumTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalOwnerFetcher := arbitrumTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalContractFetcher := arbitrumTokensContractFetcherInjector(provider, alchemyProvider)
-	placeholderWrapper := wrapper.NewPlaceholderWrapper(contextContext, client, chain)
+	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		PlaceholderFetcher:               placeholderWrapper,
+		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
 }
@@ -383,12 +383,12 @@ func zoraSyncPipelineInjector(contextContext context.Context, client *http.Clien
 	tokenIdentifierOwnerFetcher := zoraTokenIdentifierOwnerFetcherInjector(provider, zoraProvider)
 	tokensIncrementalOwnerFetcher := zoraTokensIncrementalOwnerFetcherInjector(provider, zoraProvider)
 	tokensIncrementalContractFetcher := zoraTokensContractFetcherInjector(provider, zoraProvider)
-	placeholderWrapper := wrapper.NewPlaceholderWrapper(contextContext, client, chain)
+	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		PlaceholderFetcher:               placeholderWrapper,
+		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
 }
@@ -438,12 +438,12 @@ func baseSyncPipelineInjector(contextContext context.Context, client *http.Clien
 	tokenIdentifierOwnerFetcher := baseTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalOwnerFetcher := baseTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalContractFetcher := baseTokensContractFetcherInjector(provider, alchemyProvider)
-	placeholderWrapper := wrapper.NewPlaceholderWrapper(contextContext, client, chain)
+	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		PlaceholderFetcher:               placeholderWrapper,
+		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
 }
@@ -492,12 +492,12 @@ func polygonSyncPipelineInjector(contextContext context.Context, client *http.Cl
 	tokenIdentifierOwnerFetcher := polygonTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalOwnerFetcher := polygonTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
 	tokensIncrementalContractFetcher := polygonTokensContractFetcherInjector(provider, alchemyProvider)
-	placeholderWrapper := wrapper.NewPlaceholderWrapper(contextContext, client, chain)
+	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		PlaceholderFetcher:               placeholderWrapper,
+		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
 }

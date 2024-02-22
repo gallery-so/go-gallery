@@ -198,7 +198,7 @@ func ethSyncPipelineInjector(context.Context, *http.Client, persist.Chain, *open
 		ethTokenIdentifierOwnerFetcherInjector,
 		ethTokensIncrementalOwnerFetcherInjector,
 		ethTokensContractFetcherInjector,
-		wrapper.NewPlaceholderWrapper,
+		wrapper.NewFillInWrapper,
 	))
 }
 
@@ -303,7 +303,7 @@ func optimismSyncPipelineInjector(context.Context, *http.Client, persist.Chain, 
 		optimismTokenIdentifierOwnerFetcherInjector,
 		optimismTokensIncrementalOwnerFetcherInjector,
 		optimismTokensContractFetcherInjector,
-		wrapper.NewPlaceholderWrapper,
+		wrapper.NewFillInWrapper,
 	))
 }
 
@@ -378,7 +378,7 @@ func arbitrumSyncPipelineInjector(context.Context, *http.Client, persist.Chain, 
 		arbitrumTokenIdentifierOwnerFetcherInjector,
 		arbitrumTokensIncrementalOwnerFetcherInjector,
 		arbitrumTokensContractFetcherInjector,
-		wrapper.NewPlaceholderWrapper,
+		wrapper.NewFillInWrapper,
 	))
 }
 
@@ -498,7 +498,7 @@ func zoraSyncPipelineInjector(context.Context, *http.Client, persist.Chain, *ope
 		zoraTokenIdentifierOwnerFetcherInjector,
 		zoraTokensIncrementalOwnerFetcherInjector,
 		zoraTokensContractFetcherInjector,
-		wrapper.NewPlaceholderWrapper,
+		wrapper.NewFillInWrapper,
 	))
 }
 
@@ -557,7 +557,7 @@ func baseSyncPipelineInjector(context.Context, *http.Client, persist.Chain, *ope
 		baseTokenIdentifierOwnerFetcherInjector,
 		baseTokensIncrementalOwnerFetcherInjector,
 		baseTokensContractFetcherInjector,
-		wrapper.NewPlaceholderWrapper,
+		wrapper.NewFillInWrapper,
 	))
 }
 
@@ -619,7 +619,7 @@ func polygonSyncPipelineInjector(context.Context, *http.Client, persist.Chain, *
 		polygonTokenIdentifierOwnerFetcherInjector,
 		polygonTokensIncrementalOwnerFetcherInjector,
 		polygonTokensContractFetcherInjector,
-		wrapper.NewPlaceholderWrapper,
+		wrapper.NewFillInWrapper,
 	))
 }
 

@@ -70,8 +70,7 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td))
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0,
-					addIsSpamJobOption(c),
+				_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSync, 0,
 					PipelineOpts.WithRequireProhibitionimage(c), // Require image to be processed if Prohibition token
 					PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
 				)
@@ -118,7 +117,9 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm
 			return
 		}
 
-		_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(c))
+		_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseRefresh, 0,
+			PipelineOpts.WithRefreshMetadata(), // Refresh metadata
+		)
 
 		if err != nil {
 			if util.ErrorIs[tokenmanage.ErrBadToken](err) {
@@ -168,7 +169,9 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskCl
 
 		tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
 
-		runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(c))
+		runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSyncRetry, input.Attempts,
+			PipelineOpts.WithRefreshMetadata(), // Refresh metadata
+		)
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
 		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -808,8 +811,8 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 
 			tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
 
-			runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
-				addIsSpamJobOption(c),
+			runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCausePostPreflight, 0,
+				PipelineOpts.WithRefreshMetadata(),          // Refresh metadata
 				PipelineOpts.WithRequireImage(),             // Require an image if token is Prohibition token
 				PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
 			)
@@ -838,7 +841,7 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 	}
 }
 
-func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
+func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, c db.Contract, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDefinitionDBID": td.ID,
 		"contractDBID":        td.ContractID,
@@ -859,8 +862,8 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
 	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
 	runOpts = append(runOpts, PipelineOpts.WithIsFxhash(td.IsFxhash))
-	runOpts = append(runOpts, PipelineOpts.WithRefreshMetadata())
 	runOpts = append(runOpts, PipelineOpts.WithPlaceholderImageURL(td.FallbackMedia.ImageURL.String()))
+	runOpts = append(runOpts, PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam))
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessToken(ctx, tID, cID, cause, runOpts...)
 	defer closing(media, err)
@@ -873,10 +876,6 @@ func addContractRunOptions(contract persist.ContractIdentifiers) (opts []Pipelin
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
-}
-
-func addIsSpamJobOption(c db.Contract) PipelineOption {
-	return PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam)
 }
 
 // numRetriesF returns a function that when called, returns the number of retries allotted for a token and contract

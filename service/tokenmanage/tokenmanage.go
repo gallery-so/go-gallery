@@ -86,9 +86,9 @@ func (m Manager) SubmitBatch(ctx context.Context, tDefIDs []persist.DBID) error 
 	return m.taskClient.CreateTaskForTokenProcessing(ctx, message)
 }
 
-// IsPaused returns true if run of this token are paused.
-func (m Manager) IsPaused(ctx context.Context, tID persist.TokenIdentifiers) bool {
-	p, _ := m.processRegistry.isPausedContract(ctx, tID.Chain, tID.ContractAddress)
+// IsPaused returns true if runs of this token are paused.
+func (m Manager) Paused(ctx context.Context, tID persist.TokenIdentifiers) bool {
+	p, _ := m.processRegistry.pausedContract(ctx, tID.Chain, tID.ContractAddress)
 	return p
 }
 
@@ -96,7 +96,7 @@ func (m Manager) IsPaused(ctx context.Context, tID persist.TokenIdentifiers) boo
 // it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attemps is ignored when MaxRetries
 // is set to the default value of 0.
 func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, attempts int, cause persist.ProcessingCause) (func(db.TokenMedia, error) error, error) {
-	if m.IsPaused(ctx, tID) {
+	if m.Paused(ctx, tID) {
 		recordPipelinePaused(ctx, m.metricReporter, tID.Chain, tID.ContractAddress, cause)
 		return nil, ErrContractPaused{Chain: tID.Chain, Contract: tID.ContractAddress}
 	}
@@ -144,7 +144,7 @@ func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, 
 		return
 	}
 
-	if paused, _ := m.processRegistry.isPausedContract(ctx, tID.Chain, tID.ContractAddress); paused {
+	if paused, _ := m.processRegistry.pausedContract(ctx, tID.Chain, tID.ContractAddress); paused {
 		return
 	}
 
@@ -173,7 +173,7 @@ func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, 
 }
 
 func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, err error, attempts int) error {
-	if m.IsPaused(ctx, tID) {
+	if m.Paused(ctx, tID) {
 		m.processRegistry.finish(ctx, tDefID)
 		return nil
 	}
@@ -218,7 +218,7 @@ func (r registry) setManyEnqueue(ctx context.Context, tDefIDs []persist.DBID) er
 	return r.c.MSetWithTTL(ctx, keyValues, time.Hour)
 }
 
-func (r registry) isPausedContract(ctx context.Context, chain persist.Chain, address persist.Address) (bool, error) {
+func (r registry) pausedContract(ctx context.Context, chain persist.Chain, address persist.Address) (bool, error) {
 	_, err := r.c.Get(ctx, pauseContractKey(chain, address))
 	return err == nil, err
 }
