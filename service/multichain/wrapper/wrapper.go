@@ -169,7 +169,8 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndCo
 	defer close(recCh)
 	defer close(errCh)
 
-	var closing bool
+	var closingA bool
+	var closingB bool
 
 	// It's possible for one provider to not have a contract that the other does. We won't
 	// stop pulling data unless neither provider has the contract.
@@ -182,22 +183,22 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndCo
 				recCh <- page
 				continue
 			}
-			if closing {
+			if closingB {
 				return
 			}
-			closing = true
+			closingA = true
 		case page, ok := <-resultB:
 			if ok {
 				recCh <- page
 				continue
 			}
-			if closing {
+			if closingA {
 				return
 			}
-			closing = true
+			closingB = true
 		case err, ok := <-errA:
 			if !ok {
-				return
+				continue
 			}
 
 			if err, ok := util.ErrorAs[multichain.ErrProviderContractNotFound](err); ok {
@@ -205,16 +206,16 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndCo
 				c := persist.NewContractIdentifiers(err.Contract, err.Chain)
 				if missing[c] {
 					errCh <- err
-					return
+				} else {
+					missing[c] = true
 				}
-				missing[c] = true
 				continue
 			}
 
 			errCh <- err
 		case err, ok := <-errB:
 			if !ok {
-				return
+				continue
 			}
 
 			if err, ok := util.ErrorAs[multichain.ErrProviderContractNotFound](err); ok {
@@ -222,16 +223,13 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndCo
 				c := persist.NewContractIdentifiers(err.Contract, err.Chain)
 				if missing[c] {
 					errCh <- err
-					return
+				} else {
+					missing[c] = true
 				}
-				missing[c] = true
 				continue
 			}
 
 			errCh <- err
-		case <-ctx.Done():
-			errCh <- ctx.Err()
-			return
 		}
 	}
 }
@@ -287,6 +285,7 @@ func (w *PlaceholderWrapper) AddToPage(ctx context.Context, recCh <-chan multich
 				return
 			}
 		}
+		logger.For(ctx).Info("closing out channel")
 	}()
 	return outCh, errOut
 }
