@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -296,7 +295,7 @@ func (e EnsTokenRecord) TokenID() (persist.TokenID, error) {
 	if e.ChainID != ethMainnetChainID {
 		return "", ErrChainNotSupported
 	}
-	return asTokenID(e.AssetID)
+	return persist.MustTokenID(e.AssetID), nil
 }
 
 func (e EnsTokenRecord) Address() (persist.Address, error) {
@@ -304,13 +303,4 @@ func (e EnsTokenRecord) Address() (persist.Address, error) {
 		return "", ErrChainNotSupported
 	}
 	return persist.Address(e.AssetReference), nil
-}
-
-// asTokenID converts a decimal string to a token ID
-func asTokenID(s string) (persist.TokenID, error) {
-	i, err := strconv.ParseInt(s, 10, 0)
-	if err != nil {
-		return "", err
-	}
-	return persist.TokenID(fmt.Sprintf("%x", i)), nil
 }
