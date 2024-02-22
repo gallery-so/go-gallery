@@ -17,6 +17,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/introspection"
 	"github.com/99designs/gqlgen/plugin/federation/fedruntime"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -102,6 +103,7 @@ type ResolverRoot interface {
 	UnfollowUserPayload() UnfollowUserPayloadResolver
 	UpdateCollectionTokensPayload() UpdateCollectionTokensPayloadResolver
 	UserCreatedFeedEventData() UserCreatedFeedEventDataResolver
+	UserEmail() UserEmailResolver
 	UserFollowedUsersFeedEventData() UserFollowedUsersFeedEventDataResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
@@ -111,10 +113,10 @@ type ResolverRoot interface {
 
 type DirectiveRoot struct {
 	AuthRequired        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	BasicAuth           func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []basicauth.AuthTokenType) (res interface{}, err error)
 	Experimental        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 	FrontendBuildAuth   func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 	RestrictEnvironment func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
-	RetoolAuth          func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -2239,6 +2241,9 @@ type UpdateCollectionTokensPayloadResolver interface {
 }
 type UserCreatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error)
+}
+type UserEmailResolver interface {
+	EmailNotificationSettings(ctx context.Context, obj *model.UserEmail) (*model.EmailNotificationSettings, error)
 }
 type UserFollowedUsersFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEventData) (*model.GalleryUser, error)
@@ -9677,7 +9682,12 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
-directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+# Add @basicAuth to any field that should be secured by a basic auth token. For example, some fields
+# should only be usable by Retool, so they'd use @basicAuth(allowed: [Retool]). Other fields might be
+# accessible by both Retool and Monitoring, so they'd use @basicAuth(allowed: [Retool, Monitoring]).
+directive @basicAuth(
+  allowed: [BasicAuthType!]!
+) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
@@ -9713,6 +9723,11 @@ scalar PubKey
 scalar DBID
 scalar Email
 scalar TokenId
+
+enum BasicAuthType {
+  Retool
+  Monitoring
+}
 
 interface Node {
   id: ID!
@@ -10523,19 +10538,19 @@ enum EmailUnsubscriptionType {
 type UserEmail {
   email: Email
   verificationStatus: EmailVerificationStatus
-  emailNotificationSettings: EmailNotificationSettings
+  emailNotificationSettings: EmailNotificationSettings @goField(forceResolver: true)
 }
 
 type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean!
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
-  unsubscribedFromDigest: Boolean # TODO make this non-nullable
+  unsubscribedFromDigest: Boolean!
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -11166,7 +11181,7 @@ type Query {
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
-    @retoolAuth
+    @basicAuth(allowed: [Retool])
 
   socialConnections(
     socialAccountType: SocialAccountType!
@@ -12754,30 +12769,30 @@ type Mutation {
   setPersona(persona: Persona!): SetPersonaPayloadOrError @authRequired
 
   # Retool Specific Mutations
-  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
-  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
+  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @basicAuth(allowed: [Retool])
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @basicAuth(allowed: [Retool])
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
-    @retoolAuth
+    @basicAuth(allowed: [Retool])
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
-    @retoolAuth
+    @basicAuth(allowed: [Retool, Monitoring])
   syncCreatedTokensForUsername(
     username: String!
     chains: [Chain!]!
-  ): SyncCreatedTokensForUsernamePayloadOrError @retoolAuth
+  ): SyncCreatedTokensForUsernamePayloadOrError @basicAuth(allowed: [Retool])
   syncCreatedTokensForUsernameAndExistingContract(
     username: String!
     chainAddress: ChainAddressInput!
-  ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
+  ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @basicAuth(allowed: [Retool])
   banUserFromFeed(username: String!, reason: ReportReason!): BanUserFromFeedPayloadOrError
-    @retoolAuth
-  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
+    @basicAuth(allowed: [Retool])
+  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @basicAuth(allowed: [Retool])
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
-  ): MintPremiumCardToWalletPayloadOrError @retoolAuth
+  ): MintPremiumCardToWalletPayloadOrError @basicAuth(allowed: [Retool])
   setCommunityOverrideCreator(
     communityID: DBID!
     creatorUserID: DBID
-  ): SetCommunityOverrideCreatorPayloadOrError @retoolAuth
+  ): SetCommunityOverrideCreatorPayloadOrError @basicAuth(allowed: [Retool])
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
@@ -12841,6 +12856,21 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) dir_basicAuth_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []basicauth.AuthTokenType
+	if tmp, ok := rawArgs["allowed"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("allowed"))
+		arg0, err = ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["allowed"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -26353,11 +26383,14 @@ func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromDigest(ct
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(bool)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedFromDigest(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -41690,10 +41723,14 @@ func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field 
 			return ec.resolvers.Mutation().AddRolesToUser(rctx, fc.Args["username"].(string), fc.Args["roles"].([]*persist.Role))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -41762,10 +41799,14 @@ func (ec *executionContext) _Mutation_addWalletToUserUnchecked(ctx context.Conte
 			return ec.resolvers.Mutation().AddWalletToUserUnchecked(rctx, fc.Args["input"].(model.AdminAddWalletInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -41834,10 +41875,14 @@ func (ec *executionContext) _Mutation_revokeRolesFromUser(ctx context.Context, f
 			return ec.resolvers.Mutation().RevokeRolesFromUser(rctx, fc.Args["username"].(string), fc.Args["roles"].([]*persist.Role))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -41906,10 +41951,14 @@ func (ec *executionContext) _Mutation_syncTokensForUsername(ctx context.Context,
 			return ec.resolvers.Mutation().SyncTokensForUsername(rctx, fc.Args["username"].(string), fc.Args["chains"].([]persist.Chain))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool", "Monitoring"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -41978,10 +42027,14 @@ func (ec *executionContext) _Mutation_syncCreatedTokensForUsername(ctx context.C
 			return ec.resolvers.Mutation().SyncCreatedTokensForUsername(rctx, fc.Args["username"].(string), fc.Args["chains"].([]persist.Chain))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -42050,10 +42103,14 @@ func (ec *executionContext) _Mutation_syncCreatedTokensForUsernameAndExistingCon
 			return ec.resolvers.Mutation().SyncCreatedTokensForUsernameAndExistingContract(rctx, fc.Args["username"].(string), fc.Args["chainAddress"].(persist.ChainAddress))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -42122,10 +42179,14 @@ func (ec *executionContext) _Mutation_banUserFromFeed(ctx context.Context, field
 			return ec.resolvers.Mutation().BanUserFromFeed(rctx, fc.Args["username"].(string), fc.Args["reason"].(persist.ReportReason))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -42194,10 +42255,14 @@ func (ec *executionContext) _Mutation_unbanUserFromFeed(ctx context.Context, fie
 			return ec.resolvers.Mutation().UnbanUserFromFeed(rctx, fc.Args["username"].(string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -42266,10 +42331,14 @@ func (ec *executionContext) _Mutation_mintPremiumCardToWallet(ctx context.Contex
 			return ec.resolvers.Mutation().MintPremiumCardToWallet(rctx, fc.Args["input"].(model.MintPremiumCardToWalletInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -42338,10 +42407,14 @@ func (ec *executionContext) _Mutation_setCommunityOverrideCreator(ctx context.Co
 			return ec.resolvers.Mutation().SetCommunityOverrideCreator(rctx, fc.Args["communityID"].(persist.DBID), fc.Args["creatorUserID"].(*persist.DBID))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -48050,10 +48123,14 @@ func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphq
 			return ec.resolvers.Query().UsersByRole(rctx, fc.Args["role"].(persist.Role), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
+			allowed, err := ec.unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx, []interface{}{"Retool"})
+			if err != nil {
+				return nil, err
 			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
+			if ec.directives.BasicAuth == nil {
+				return nil, errors.New("directive basicAuth is not implemented")
+			}
+			return ec.directives.BasicAuth(ctx, nil, directive0, allowed)
 		}
 
 		tmp, err := directive1(rctx)
@@ -63322,7 +63399,7 @@ func (ec *executionContext) _UserEmail_emailNotificationSettings(ctx context.Con
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.EmailNotificationSettings, nil
+		return ec.resolvers.UserEmail().EmailNotificationSettings(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -63340,8 +63417,8 @@ func (ec *executionContext) fieldContext_UserEmail_emailNotificationSettings(ctx
 	fc = &graphql.FieldContext{
 		Object:     "UserEmail",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "unsubscribedFromAll":
@@ -70014,7 +70091,7 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unsubscribedFromDigest"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -77709,6 +77786,9 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 
 			out.Values[i] = ec._EmailNotificationSettings_unsubscribedFromDigest(ctx, field, obj)
 
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -87024,9 +87104,22 @@ func (ec *executionContext) _UserEmail(ctx context.Context, sel ast.SelectionSet
 			out.Values[i] = ec._UserEmail_verificationStatus(ctx, field, obj)
 
 		case "emailNotificationSettings":
+			field := field
 
-			out.Values[i] = ec._UserEmail_emailNotificationSettings(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._UserEmail_emailNotificationSettings(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -88091,6 +88184,83 @@ func (ec *executionContext) marshalNAuthorizationError2githubᚗcomᚋmikeydub�
 		return graphql.Null
 	}
 	return ec._AuthorizationError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNBasicAuthType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenType(ctx context.Context, v interface{}) (basicauth.AuthTokenType, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := basicauth.AuthTokenType(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNBasicAuthType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenType(ctx context.Context, sel ast.SelectionSet, v basicauth.AuthTokenType) graphql.Marshaler {
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx context.Context, v interface{}) ([]basicauth.AuthTokenType, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]basicauth.AuthTokenType, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNBasicAuthType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenType(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNBasicAuthType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []basicauth.AuthTokenType) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNBasicAuthType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋauthᚋbasicauthᚐAuthTokenType(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {

@@ -39,7 +39,8 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, q *core
 	verificationLimiter := limiters.NewKeyRateLimiter(limiterCtx, limiterCache, "verification", 1, time.Second*5)
 	sendGroup.POST("/verification", middleware.IPRateLimited(verificationLimiter), sendVerificationEmail(loaders, q, s))
 
-	router.POST("/subscriptions", updateSubscriptions(q))
+	router.POST("/unsubscriptions", updateUnsubscriptions(q))
+	router.GET("/unsubscriptions", getUnsubscriptions(q))
 	router.POST("/unsubscribe", unsubscribe(q))
 	router.POST("/resubscribe", resubscribe(q))
 
@@ -48,14 +49,14 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, q *core
 	router.GET("/preverify", middleware.IPRateLimited(preverifyLimiter), preverifyEmail())
 
 	digestGroup := router.Group("/digest")
-	digestGroup.GET("/values", middleware.RetoolMiddleware, getDigestValues(q, b, gql))
-	digestGroup.POST("/values", middleware.RetoolMiddleware, updateDigestValues(b))
+	digestGroup.GET("/values", middleware.RetoolAuthRequired, getDigestValues(q, b, gql))
+	digestGroup.POST("/values", middleware.RetoolAuthRequired, updateDigestValues(b))
 	digestGroup.POST("/send", middleware.CloudSchedulerMiddleware, sendDigestEmails(q, s, r, b, gql))
-	digestGroup.POST("/send-test", middleware.RetoolMiddleware, sendDigestTestEmail(q, s, b, gql))
+	digestGroup.POST("/send-test", middleware.RetoolAuthRequired, sendDigestTestEmail(q, s, b, gql))
 
 	notificationsGroup := router.Group("/notifications")
 	notificationsGroup.POST("/send", middleware.CloudSchedulerMiddleware, sendNotificationEmails(q, s, r))
-	notificationsGroup.POST("/announcement", middleware.RetoolMiddleware, useEventHandler(q, psub, t, notifLock), sendAnnouncementNotification(q))
+	notificationsGroup.POST("/announcement", middleware.RetoolAuthRequired, useEventHandler(q, psub, t, notifLock), sendAnnouncementNotification(q))
 
 	return router
 }

@@ -21,7 +21,7 @@ func init() {
 	env.RegisterValidation("RESERVOIR_API_KEY", "required")
 }
 
-var (
+const (
 	ethMainnetBaseURL = "https://api.reservoir.tools"
 	optimismBaseURL   = "https://api-optimism.reservoir.tools"
 	polygonBaseURL    = "https://api-polygon.reservoir.tools"
@@ -30,20 +30,11 @@ var (
 	baseBaseURL       = "https://api-base.reservoir.tools"
 )
 
-var (
+const (
 	userTokensEndpointTemplate  = "%s/users/%s/tokens/v7"
 	tokensEndpointTemplate      = "%s/tokens/v7"
 	collectionsEndpointTemplate = "%s/collections/v7"
 )
-
-var chainToBaseURL = map[persist.Chain]string{
-	persist.ChainETH:      ethMainnetBaseURL,
-	persist.ChainOptimism: optimismBaseURL,
-	persist.ChainPolygon:  polygonBaseURL,
-	persist.ChainArbitrum: arbitrumBaseURL,
-	persist.ChainZora:     zoraBaseURL,
-	persist.ChainBase:     baseBaseURL,
-}
 
 func checkURL(s string) *url.URL {
 	u, err := url.Parse(s)
@@ -141,7 +132,14 @@ type Provider struct {
 
 // NewProvider creates a new Reservoir provider
 func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
-	apiURL := chainToBaseURL[chain]
+	apiURL := map[persist.Chain]string{
+		persist.ChainETH:      ethMainnetBaseURL,
+		persist.ChainOptimism: optimismBaseURL,
+		persist.ChainPolygon:  polygonBaseURL,
+		persist.ChainArbitrum: arbitrumBaseURL,
+		persist.ChainZora:     zoraBaseURL,
+		persist.ChainBase:     baseBaseURL,
+	}[chain]
 	if apiURL == "" {
 		panic(fmt.Sprintf("no reservoir api url set for chain %d", chain))
 	}
@@ -164,14 +162,6 @@ func NewProviderContractFetcher(httpClient *http.Client, chain persist.Chain, cF
 	p := NewProvider(httpClient, chain)
 	p.cFetcher = cFetcher
 	return p
-}
-
-func (p *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      p.chain,
-		ChainID:    persist.MustChainToChainID(p.chain),
-		ProviderID: "reservoir",
-	}
 }
 
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {

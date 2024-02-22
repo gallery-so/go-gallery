@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -115,7 +116,7 @@ func createUncachedMedia(ctx context.Context, job *tokenProcessingJob, url strin
 }
 
 func mustCreateMediaFromErr(ctx context.Context, err error, job *tokenProcessingJob) persist.Media {
-	if bErr, ok := err.(ErrBadToken); ok {
+	if bErr, ok := util.ErrorAs[tokenmanage.ErrBadToken](err); ok {
 		return mustCreateMediaFromErr(ctx, bErr.Unwrap(), job)
 	}
 	if util.ErrorIs[errInvalidMedia](err) {
@@ -402,14 +403,15 @@ func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, err
 }
 
 func findImageAndAnimationURLs(ctx context.Context, metadata persist.TokenMetadata, imgKeywords, animKeywords []string, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
+	// predicting is not critical, so we can afford to give it a timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
-
-	imgURL, vURL, err := media.FindImageAndAnimationURLs(ctx, metadata, imgKeywords, animKeywords)
+	imgURL, vURL, err := media.PredictMediaURLs(ctx, metadata, imgKeywords, animKeywords)
 	if err != nil {
 		persist.FailStep(&pMeta.MediaURLsRetrieval)
 	}
-
 	return imgURL, vURL, err
 }
 

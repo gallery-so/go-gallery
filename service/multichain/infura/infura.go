@@ -125,14 +125,6 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-func (p *Provider) ProviderInfo() multichain.ProviderInfo {
-	return multichain.ProviderInfo{
-		Chain:      persist.ChainETH,
-		ChainID:    persist.MustChainToChainID(persist.ChainETH),
-		ProviderID: "infura",
-	}
-}
-
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tokens, err := getNFTsPaginate(ctx, fmt.Sprintf("%s/accounts/%s/assets/nfts", baseURL, address), "", p.httpClient, p.apiKey, p.apiSecret, &getNFTsForOwnerResponse{})
 	if err != nil {

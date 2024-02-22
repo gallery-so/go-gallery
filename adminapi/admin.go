@@ -2,6 +2,8 @@ package adminapi
 
 import (
 	"context"
+	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/redis"
 
@@ -152,8 +154,12 @@ func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username stri
 }
 
 func requireRetoolAuthorized(ctx context.Context) {
-	if err := auth.RetoolAuthorized(ctx); err != nil {
-		panic(err)
+	requireBasicAuth(ctx, []basicauth.AuthTokenType{basicauth.AuthTokenTypeRetool})
+}
+
+func requireBasicAuth(ctx context.Context, allowedTypes []basicauth.AuthTokenType) {
+	if !basicauth.AuthorizeHeaderForAllowedTypes(ctx, allowedTypes) {
+		panic(fmt.Errorf("basic auth: not authorized for allowedTypes: %v", allowedTypes))
 	}
 }
 

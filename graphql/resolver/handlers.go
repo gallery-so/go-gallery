@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 
 	"reflect"
 
@@ -142,15 +143,16 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 	return res, err
 }
 
-func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
-	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
-		if err := auth.RetoolAuthorized(ctx); err != nil {
-			return model.ErrNotAuthorized{
-				Message: err.Error(),
-				Cause:   model.ErrInvalidToken{Message: "Retool: not authorized"},
-			}, nil
+func BasicAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []basicauth.AuthTokenType) (res interface{}, err error) {
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []basicauth.AuthTokenType) (res interface{}, err error) {
+		if basicauth.AuthorizeHeaderForAllowedTypes(ctx, allowed) {
+			return next(ctx)
 		}
-		return next(ctx)
+
+		return model.ErrNotAuthorized{
+			Message: "not authorized",
+			Cause:   model.ErrInvalidToken{Message: "Basic auth: not authorized"},
+		}, nil
 	}
 }
 

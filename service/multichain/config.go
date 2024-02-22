@@ -23,10 +23,9 @@ type EthereumProvider struct {
 	ContractsOwnerFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
 	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 	Verifier
 }
 
@@ -34,35 +33,33 @@ type TezosProvider struct {
 	ContractsOwnerFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
 	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 	Verifier
 }
 
 type OptimismProvider struct {
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
+	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 }
 
 type ArbitrumProvider struct {
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
+	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 }
 
 type PoapProvider struct {
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 }
 
 type ZoraProvider struct {
@@ -70,24 +67,23 @@ type ZoraProvider struct {
 	ContractsOwnerFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
 	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 }
 
 type BaseProvider struct {
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
+	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 }
 
 type PolygonProvider struct {
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
-	TokensContractFetcher
+	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
-	TokensOwnerFetcher
+	TokenIdentifierOwnerFetcher
 }

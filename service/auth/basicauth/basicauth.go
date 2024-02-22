@@ -4,7 +4,16 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/base64"
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
+)
+
+type AuthTokenType string
+
+const (
+	AuthTokenTypeRetool     AuthTokenType = "Retool"
+	AuthTokenTypeMonitoring AuthTokenType = "Monitoring"
 )
 
 // AuthorizeHeader checks if the request has a Basic Auth header matching the specified
@@ -29,6 +38,29 @@ func AuthorizeHeader(ctx context.Context, username *string, password string) boo
 	}
 
 	return true
+}
+
+// AuthorizeHeaderForAllowedTypes checks whether the request has a Basic Auth header matching one of the
+// known token types. If the request has a valid token, it returns true. Otherwise, it returns false.
+func AuthorizeHeaderForAllowedTypes(ctx context.Context, allowedTypes []AuthTokenType) bool {
+	authTokens := map[AuthTokenType]string{
+		AuthTokenTypeRetool:     env.GetString("BASIC_AUTH_TOKEN_RETOOL"),
+		AuthTokenTypeMonitoring: env.GetString("BASIC_AUTH_TOKEN_MONITORING"),
+	}
+
+	for _, authType := range allowedTypes {
+		authToken, ok := authTokens[authType]
+		if !ok {
+			logger.For(ctx).Errorf("Basic auth: unknown type %s", authType)
+			continue
+		}
+
+		if AuthorizeHeader(ctx, nil, authToken) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // MakeHeader takes a password and an optional username and base64 encodes them in the

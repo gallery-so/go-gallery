@@ -729,6 +729,19 @@ func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, sett
 
 }
 
+func (api UserAPI) GetCurrentUserEmailNotificationSettings(ctx context.Context) (persist.EmailUnsubscriptions, error) {
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return persist.EmailUnsubscriptions{}, err
+	}
+
+	// update unsubscriptions
+
+	return emails.GetCurrentUnsubscriptionsByUserID(ctx, userID)
+
+}
+
 func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
 
 	userID, err := getAuthenticatedUserID(ctx)
@@ -1836,9 +1849,7 @@ func uriFromEnsTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.E
 		return "", err
 	}
 
-	imgK, animK := chain.BaseKeywords()
-
-	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, metadata, imgK, animK)
+	imageURL, _, err := media.FindMediaURLsChain(metadata, chain)
 	if err != nil {
 		if errors.Is(err, media.ErrNoMediaURLs) {
 			return "", nil

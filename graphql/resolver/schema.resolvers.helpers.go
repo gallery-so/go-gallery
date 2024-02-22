@@ -594,7 +594,7 @@ func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
 			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
-			UnsubscribedFromDigest:        user.EmailUnsubscriptions.Digest.BoolPointer(),
+			UnsubscribedFromDigest:        user.EmailUnsubscriptions.Digest.Bool(),
 		},
 	}
 
@@ -1415,7 +1415,7 @@ func updateUserEmailNotificationSettings(ctx context.Context, input model.Update
 	err := publicapi.For(ctx).User.UpdateUserEmailNotificationSettings(ctx, persist.EmailUnsubscriptions{
 		All:           persist.NullBool(input.UnsubscribedFromAll),
 		Notifications: persist.NullBool(input.UnsubscribedFromNotifications),
-		Digest:        persist.NullBool(util.FromPointer(input.UnsubscribedFromDigest)),
+		Digest:        persist.NullBool(input.UnsubscribedFromDigest),
 	})
 	if err != nil {
 		return nil, err

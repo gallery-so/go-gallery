@@ -1020,9 +1020,9 @@ type DisconnectSocialAccountPayload struct {
 func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
 
 type EmailNotificationSettings struct {
-	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
-	UnsubscribedFromDigest        *bool `json:"unsubscribedFromDigest"`
+	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
 }
 
 type EnsProfileImage struct {
@@ -2753,9 +2753,9 @@ type UpdateEmailInput struct {
 }
 
 type UpdateEmailNotificationSettingsInput struct {
-	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
-	UnsubscribedFromDigest        *bool `json:"unsubscribedFromDigest"`
+	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
 }
 
 type UpdateEmailNotificationSettingsPayload struct {
