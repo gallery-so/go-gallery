@@ -29,7 +29,7 @@ func init() {
 }
 
 const (
-	pageSize = 50
+	pageSize = 100
 	poolSize = 12
 )
 

@@ -36,8 +36,9 @@ func (m *MetadataFinder) add(ctx context.Context, t persist.TokenIdentifiers) fu
 
 	if m.batch == nil {
 		m.batch = &batch{
-			tokens: make(map[persist.Chain][]persist.TokenIdentifiers),
-			done:   make(chan struct{}),
+			tokens:  make(map[persist.Chain][]persist.TokenIdentifiers),
+			results: make(map[persist.Chain][]persist.TokenMetadata),
+			done:    make(chan struct{}),
 		}
 	}
 
@@ -106,4 +107,5 @@ func (b *batch) end(m *MetadataFinder) {
 		}
 		b.results[c] = metadata
 	}
+	close(b.done)
 }

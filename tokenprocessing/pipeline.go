@@ -255,9 +255,6 @@ func (tpj *tokenProcessingJob) urlsToDownload(ctx context.Context, metadata pers
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist.Media, persist.TokenMetadata, error) {
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
-	defer traceCallback()
-
 	var (
 		imgURL     media.ImageURL
 		pfpURL     media.ImageURL
@@ -414,6 +411,9 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 		"requireSigned": requireSigned,
 	})
 
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
+	defer traceCallback()
+
 	imgResult, pfpResult, animResult := tpj.cacheMediaFromOriginalURLs(ctx, imgURL, pfpURL, animURL)
 
 	if (!requireImg && animResult.IsSuccess()) || imgResult.IsSuccess() {
@@ -435,7 +435,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
+	traceCallback, ctx = persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
 	defer traceCallback()
 
 	// At this point we don't have a way to make media so we return an error

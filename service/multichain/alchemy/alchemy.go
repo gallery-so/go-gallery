@@ -1,6 +1,7 @@
 package alchemy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -632,7 +633,82 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error) {
-	panic("not implemented")
+	type tokenRequest struct {
+		ContractAddress string `json:"contractAddress"`
+		TokenID         string `json:"tokenId"`
+	}
+
+	type batchRequest struct {
+		Tokens       []tokenRequest `json:"tokens"`
+		RefreshCache bool           `json:"refreshCache"`
+	}
+
+	type batchResponse []struct {
+		Metadata any `json:"metadata"`
+	}
+
+	chunkSize := 100
+	chunks := util.ChunkBy(tIDs, chunkSize)
+	metadatas := make([]persist.TokenMetadata, len(tIDs))
+
+	u, err := url.Parse(fmt.Sprintf("%s/getNFTMetadataBatch", d.alchemyAPIURL))
+	if err != nil {
+		return nil, err
+	}
+
+	for i, c := range chunks {
+		body := batchRequest{RefreshCache: true}
+		for _, t := range c {
+			body.Tokens = append(body.Tokens, tokenRequest{
+				ContractAddress: t.ContractAddress.String(),
+				TokenID:         t.TokenID.Base10String(),
+			})
+		}
+
+		byt, err := json.Marshal(body)
+		if err != nil {
+			return metadatas, err
+		}
+
+		logger.For(ctx).Infof("handling metadata batch=%d of %d", i, len(chunks))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(byt))
+		if err != nil {
+			return metadatas, err
+		}
+
+		resp, err := d.httpClient.Do(req)
+		if err != nil {
+			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", i, err)
+			continue
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			err := fmt.Errorf("unexpected status code: %d; err: %s", resp.StatusCode, util.BodyAsError(resp))
+			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", i, err)
+			continue
+		}
+
+		var batchResp batchResponse
+
+		err = util.UnmarshallBody(&batchResp, resp.Body)
+		if err != nil {
+			logger.For(ctx).Errorf("failed to read alchemy metadata batch body: %s", err)
+			return metadatas, err
+		}
+
+		if len(batchResp) != len(c) {
+			panic(fmt.Sprintf("expected response to be equal in length to batch; got %d; expected %d", len(batchResp), len(c)))
+		}
+
+		for j, m := range batchResp {
+			metadatas[i*chunkSize+j] = alchemyMetadataToMetadata(m.Metadata)
+		}
+	}
+
+	logger.For(ctx).Info("finished metadata batch")
+	return metadatas, nil
 }
 
 func alchemyTokensToChainAgnosticTokensForOwner(owner persist.EthereumAddress, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
@@ -712,6 +788,17 @@ func (d *Provider) getOwnersForToken(ctx context.Context, token Token) ([]persis
 	return owners.Owners, nil
 }
 
+func alchemyMetadataToMetadata(m any) persist.TokenMetadata {
+	var metadata persist.TokenMetadata
+	switch typ := m.(type) {
+	case map[string]any:
+		metadata = persist.TokenMetadata(typ)
+	default:
+		metadata = persist.TokenMetadata{}
+	}
+	return metadata
+}
+
 func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract) {
 
 	var tokenType persist.TokenType
@@ -727,15 +814,7 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		bal = big.NewInt(1)
 	}
 
-	var metadata persist.TokenMetadata
-
-	switch typ := token.Metadata.(type) {
-	case map[string]any:
-		metadata = persist.TokenMetadata(typ)
-	default:
-		metadata = persist.TokenMetadata{}
-	}
-
+	metadata := alchemyMetadataToMetadata(token.Metadata)
 	externalURL, _ := metadata["external_url"].(string)
 
 	t := multichain.ChainAgnosticToken{

@@ -83,7 +83,7 @@ func BodyAsError(res *http.Response) error {
 	}
 
 	if len(body) == 0 {
-		return fmt.Errorf("empty body")
+		return fmt.Errorf("empty response body")
 	}
 
 	// Otherwise, return the entire body as an error

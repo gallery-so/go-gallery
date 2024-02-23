@@ -321,9 +321,7 @@ func (w *FillInWrapper) LoadMetadataAll(tokens []multichain.ChainAgnosticToken) 
 	thunks := make([]func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken, len(tokens))
 	for i, t := range tokens {
 		if hasMediaURLs(t.TokenMetadata, w.chain) {
-			thunks = append(thunks, func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
-				return t
-			})
+			thunks[i] = func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken { return t }
 			continue
 		}
 		thunks[i] = w.addTokenToBatch(t)
