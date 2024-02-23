@@ -319,7 +319,7 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 		wg.Wait()
 	}()
 
-	_, _, _, err = p.replaceCreatorTokensForUser(ctx, user, chains, recCh, errCh)
+	_, _, _, err = p.addCreatorTokensForUser(ctx, user, chains, recCh, errCh)
 	if err != nil {
 		return err
 	}
@@ -524,7 +524,7 @@ func (p *Provider) SyncCreatedTokensForExistingContract(ctx context.Context, use
 		}
 	}()
 
-	_, _, _, err = p.replaceCreatorTokensForUser(ctx, user, []persist.Chain{contract.Chain}, recCh, errCh)
+	_, _, _, err = p.addCreatorTokensForUser(ctx, user, []persist.Chain{contract.Chain}, recCh, errCh)
 	return err
 }
 
@@ -706,7 +706,18 @@ func (p *Provider) addHolderTokensForUser(ctx context.Context, user persist.User
 	return p.receiveProviderData(ctx, user, recCh, errCh, p.addHolderTokensToUser)
 }
 
-func (p *Provider) replaceCreatorTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, recCh <-chan chainTokensAndContracts, errCh <-chan error) (
+func (p *Provider) addCreatorTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, recCh <-chan chainTokensAndContracts, errCh <-chan error) (
+	currentTokens []op.TokenFullDetails,
+	newTokens []op.TokenFullDetails,
+	currentContracts []db.Contract,
+	err error,
+) {
+	return p.receiveProviderData(ctx, user, recCh, errCh, p.addCreatorTokensOfContractsToUser)
+}
+
+// replaceCreatorTokensForUser adds new creator tokens to a user and deletes old creator tokens. If onlyForContractIDs is not empty,
+// only tokens for the specified contracts will be deleted.
+func (p *Provider) replaceCreatorTokensForUser(ctx context.Context, user persist.User, onlyForContractIDs []persist.DBID, chains []persist.Chain, recCh <-chan chainTokensAndContracts, errCh <-chan error) (
 	currentTokens []op.TokenFullDetails,
 	newTokens []op.TokenFullDetails,
 	currentContracts []db.Contract,
@@ -717,11 +728,19 @@ func (p *Provider) replaceCreatorTokensForUser(ctx context.Context, user persist
 	if err != nil {
 		return
 	}
+
+	var contractIDs []string
+	if len(onlyForContractIDs) > 0 {
+		contractIDs = util.MapWithoutError(onlyForContractIDs, func(id persist.DBID) string { return id.String() })
+	} else {
+		contractIDs = util.MapWithoutError(currentContracts, func(c db.Contract) string { return c.ID.String() })
+	}
+
 	_, err = p.Queries.DeleteTokensBeforeTimestamp(ctx, db.DeleteTokensBeforeTimestampParams{
 		RemoveHolderStatus:  false,
 		RemoveCreatorStatus: true,
 		OnlyFromUserID:      util.ToNullString(user.ID.String(), true),
-		OnlyFromContractIds: util.MapWithoutError(currentContracts, func(c db.Contract) string { return c.ID.String() }),
+		OnlyFromContractIds: contractIDs,
 		OnlyFromChains:      util.MapWithoutError(chains, func(c persist.Chain) int32 { return int32(c) }),
 		Timestamp:           now,
 	})
