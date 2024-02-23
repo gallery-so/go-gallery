@@ -296,6 +296,7 @@ func optimismProviderInjector(
 		wire.Bind(new(multichain.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
+		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 	))
 }
 
@@ -372,6 +373,7 @@ func arbitrumProviderInjector(
 		wire.Bind(new(multichain.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
+		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 	))
 }
 
@@ -469,6 +471,7 @@ func zoraProviderInjector(
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 	))
 }
 
@@ -553,6 +556,7 @@ func baseProvidersInjector(
 		wire.Bind(new(multichain.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
+		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 	))
 }
 
@@ -680,6 +684,7 @@ func polygonProvidersInjector(
 		wire.Bind(new(multichain.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
+		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 	))
 }
 

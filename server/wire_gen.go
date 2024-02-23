@@ -213,6 +213,7 @@ func optimismProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDe
 		TokensIncrementalContractFetcher: syncPipeline,
 		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
+		TokenMetadataBatcher:             syncPipeline,
 	}
 	return optimismProvider
 }
@@ -279,6 +280,7 @@ func arbitrumProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDe
 		TokensIncrementalContractFetcher: syncPipeline,
 		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
+		TokenMetadataBatcher:             syncPipeline,
 	}
 	return arbitrumProvider
 }
@@ -364,6 +366,7 @@ func zoraProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, zoraProvide
 		TokensIncrementalContractFetcher: syncPipeline,
 		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
+		TokenMetadataBatcher:             syncPipeline,
 	}
 	return multichainZoraProvider
 }
@@ -435,6 +438,7 @@ func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDescr
 		TokensIncrementalContractFetcher: syncPipeline,
 		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
+		TokenMetadataBatcher:             syncPipeline,
 	}
 	return baseProvider
 }
@@ -541,6 +545,7 @@ func polygonProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDe
 		TokensIncrementalContractFetcher: syncPipeline,
 		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
+		TokenMetadataBatcher:             syncPipeline,
 	}
 	return polygonProvider
 }

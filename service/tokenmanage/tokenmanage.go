@@ -37,6 +37,7 @@ func (e ErrContractPaused) Error() string {
 	return fmt.Sprintf("processing for chain=%d; contract=%s is paused", e.Chain, e.Contract)
 }
 
+// ErrContractFlaking indicates that runs of this contract are frequently failing
 type ErrContractFlaking struct {
 	Chain    persist.Chain
 	Contract persist.Address
