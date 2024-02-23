@@ -631,6 +631,10 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 	return cTokens, cContracts[0], nil
 }
 
+func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error) {
+	panic("not implemented")
+}
+
 func alchemyTokensToChainAgnosticTokensForOwner(owner persist.EthereumAddress, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	chainAgnosticTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
 	chainAgnosticContracts := make([]multichain.ChainAgnosticContract, 0, len(tokens))

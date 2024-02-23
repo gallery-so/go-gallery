@@ -120,20 +120,22 @@ func ethProviderInjector(ctx context.Context, indexerProvider *indexer.Provider,
 		TokensIncrementalContractFetcher: syncPipeline,
 		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
+		TokenMetadataBatcher:             syncPipeline,
 		Verifier:                         indexerProvider,
 	}
 	return ethereumProvider
 }
 
-func ethSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
-	tokenIdentifierOwnerFetcher := ethTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalOwnerFetcher := ethTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalContractFetcher := ethTokensContractFetcherInjector(provider, alchemyProvider)
-	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
+func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+	tokenIdentifierOwnerFetcher := ethTokenIdentifierOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalOwnerFetcher := ethTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalContractFetcher := ethTokensContractFetcherInjector(openseaProvider, alchemyProvider)
+	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
+		TokenMetadataBatcher:             alchemyProvider,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -215,15 +217,16 @@ func optimismProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDe
 	return optimismProvider
 }
 
-func optimismSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
-	tokenIdentifierOwnerFetcher := optimismTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalOwnerFetcher := optimismTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalContractFetcher := optimismTokensContractFetcherInjector(provider, alchemyProvider)
-	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
+func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+	tokenIdentifierOwnerFetcher := optimismTokenIdentifierOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalOwnerFetcher := optimismTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalContractFetcher := optimismTokensContractFetcherInjector(openseaProvider, alchemyProvider)
+	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
+		TokenMetadataBatcher:             alchemyProvider,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -280,15 +283,16 @@ func arbitrumProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDe
 	return arbitrumProvider
 }
 
-func arbitrumSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
-	tokenIdentifierOwnerFetcher := arbitrumTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalOwnerFetcher := arbitrumTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalContractFetcher := arbitrumTokensContractFetcherInjector(provider, alchemyProvider)
-	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
+func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+	tokenIdentifierOwnerFetcher := arbitrumTokenIdentifierOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalOwnerFetcher := arbitrumTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalContractFetcher := arbitrumTokensContractFetcherInjector(openseaProvider, alchemyProvider)
+	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
+		TokenMetadataBatcher:             alchemyProvider,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -379,15 +383,16 @@ func zoraContractFetcherInjector(openseaProvider *opensea.Provider, zoraProvider
 	return contractFetcher
 }
 
-func zoraSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, zoraProvider *zora.Provider) *wrapper.SyncPipelineWrapper {
-	tokenIdentifierOwnerFetcher := zoraTokenIdentifierOwnerFetcherInjector(provider, zoraProvider)
-	tokensIncrementalOwnerFetcher := zoraTokensIncrementalOwnerFetcherInjector(provider, zoraProvider)
-	tokensIncrementalContractFetcher := zoraTokensContractFetcherInjector(provider, zoraProvider)
-	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
+func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, zoraProvider *zora.Provider) *wrapper.SyncPipelineWrapper {
+	tokenIdentifierOwnerFetcher := zoraTokenIdentifierOwnerFetcherInjector(openseaProvider, zoraProvider)
+	tokensIncrementalOwnerFetcher := zoraTokensIncrementalOwnerFetcherInjector(openseaProvider, zoraProvider)
+	tokensIncrementalContractFetcher := zoraTokensContractFetcherInjector(openseaProvider, zoraProvider)
+	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
+		TokenMetadataBatcher:             zoraProvider,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -434,15 +439,16 @@ func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, tokenDescr
 	return baseProvider
 }
 
-func baseSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
-	tokenIdentifierOwnerFetcher := baseTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalOwnerFetcher := baseTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalContractFetcher := baseTokensContractFetcherInjector(provider, alchemyProvider)
-	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
+func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+	tokenIdentifierOwnerFetcher := baseTokenIdentifierOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalOwnerFetcher := baseTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalContractFetcher := baseTokensContractFetcherInjector(openseaProvider, alchemyProvider)
+	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
+		TokenMetadataBatcher:             alchemyProvider,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -488,15 +494,16 @@ var (
 	_wireChainValue5 = persist.ChainPolygon
 )
 
-func polygonSyncPipelineInjector(contextContext context.Context, client *http.Client, chain persist.Chain, provider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
-	tokenIdentifierOwnerFetcher := polygonTokenIdentifierOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalOwnerFetcher := polygonTokensIncrementalOwnerFetcherInjector(provider, alchemyProvider)
-	tokensIncrementalContractFetcher := polygonTokensContractFetcherInjector(provider, alchemyProvider)
-	fillInWrapper := wrapper.NewFillInWrapper(contextContext, client, chain)
+func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+	tokenIdentifierOwnerFetcher := polygonTokenIdentifierOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalOwnerFetcher := polygonTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
+	tokensIncrementalContractFetcher := polygonTokensContractFetcherInjector(openseaProvider, alchemyProvider)
+	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
+		TokenMetadataBatcher:             alchemyProvider,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper

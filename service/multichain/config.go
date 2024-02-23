@@ -26,6 +26,7 @@ type EthereumProvider struct {
 	TokensIncrementalContractFetcher
 	TokensIncrementalOwnerFetcher
 	TokenIdentifierOwnerFetcher
+	TokenMetadataBatcher
 	Verifier
 }
 

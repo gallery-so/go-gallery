@@ -37,6 +37,18 @@ func (e ErrContractPaused) Error() string {
 	return fmt.Sprintf("processing for chain=%d; contract=%s is paused", e.Chain, e.Contract)
 }
 
+type ErrContractFlaking struct {
+	Chain    persist.Chain
+	Contract persist.Address
+	Err      error
+	Duration time.Duration
+}
+
+func (e ErrContractFlaking) Unwrap() error { return e.Err }
+func (e ErrContractFlaking) Error() string {
+	return fmt.Sprintf("processing of chain=%d; contract=%s is paused for %s because of too many errors; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
+}
+
 type Manager struct {
 	cache           *redis.Cache
 	processRegistry *registry
@@ -170,7 +182,7 @@ func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, 
 	}
 
 	if nowFlaky {
-		err := fmt.Errorf("processing of chain=%d; contract=%s is paused for %s because of too many errors", tID.Chain, tID.ContractAddress, time.Hour*3)
+		err := ErrContractFlaking{Chain: tID.Chain, Contract: tID.ContractAddress, Err: err, Duration: time.Hour * 3}
 		logger.For(ctx).Warnf(err.Error())
 		sentryutil.ReportError(ctx, err)
 	}
