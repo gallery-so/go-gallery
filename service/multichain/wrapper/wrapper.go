@@ -188,7 +188,7 @@ func (m MultiProviderWrapper) GetTokensIncrementallyByContractAddress(ctx contex
 }
 
 func (m MultiProviderWrapper) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts, 2*10)
+	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error, 2)
 	resultA, errA := m.TokensIncrementalOwnerFetchers[0].GetTokensIncrementallyByWalletAddress(ctx, address)
 	resultB, errB := m.TokensIncrementalOwnerFetchers[1].GetTokensIncrementallyByWalletAddress(ctx, address)

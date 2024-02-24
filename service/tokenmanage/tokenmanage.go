@@ -47,7 +47,7 @@ type ErrContractFlaking struct {
 
 func (e ErrContractFlaking) Unwrap() error { return e.Err }
 func (e ErrContractFlaking) Error() string {
-	return fmt.Sprintf("processing of chain=%d; contract=%s is paused for %s because of too many errors; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
+	return fmt.Sprintf("runs of chain=%d; contract=%s are paused for %s because of too many failures; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
 }
 
 type Manager struct {
