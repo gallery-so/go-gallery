@@ -38,6 +38,7 @@ func (m *MetadataFinder) add(ctx context.Context, t persist.TokenIdentifiers) fu
 		m.batch = &batch{
 			tokens:  make(map[persist.Chain][]persist.TokenIdentifiers),
 			results: make(map[persist.Chain][]persist.TokenMetadata),
+			errors:  make(map[persist.Chain]error),
 			done:    make(chan struct{}),
 		}
 	}
@@ -67,6 +68,7 @@ type batch struct {
 
 func (b *batch) addToBatch(m *MetadataFinder, t persist.TokenIdentifiers) int {
 	tot := b.total
+	pos := len(b.tokens[t.Chain])
 	b.tokens[t.Chain] = append(b.tokens[t.Chain], t)
 	b.total++
 	if tot == 0 {
@@ -79,7 +81,7 @@ func (b *batch) addToBatch(m *MetadataFinder, t persist.TokenIdentifiers) int {
 			go b.end(m)
 		}
 	}
-	return len(b.tokens[t.Chain]) - 1
+	return pos
 }
 
 func (b *batch) startTimer(m *MetadataFinder) {
@@ -103,9 +105,10 @@ func (b *batch) end(m *MetadataFinder) {
 		metadata, err := m.mc.Chains[c].(multichain.TokenMetadataBatcher).GetTokenMetadataByTokenIdentifiersBatch(m.ctx, t)
 		if err != nil {
 			logger.For(m.ctx).Errorf("failed to load batch of metadata for chain=%d: %s", c, err)
-			continue
+			b.errors[c] = err
+		} else {
+			b.results[c] = metadata
 		}
-		b.results[c] = metadata
 	}
 	close(b.done)
 }

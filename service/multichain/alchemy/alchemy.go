@@ -645,6 +645,12 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 
 	type batchResponse []struct {
 		Metadata any `json:"metadata"`
+		Contract struct {
+			Address string `json:"address"`
+		} `json:"contract"`
+		Id struct {
+			TokenId string `json:"tokenId"`
+		} `json:"id"`
 	}
 
 	chunkSize := 100
@@ -656,13 +662,18 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 		return nil, err
 	}
 
+	// alchemy unfortunately doesn't return tokens in the same order as the input so we need to create a lookup
+	lookup := make(map[persist.TokenIdentifiers]persist.TokenMetadata)
+
 	for i, c := range chunks {
-		body := batchRequest{RefreshCache: true}
-		for _, t := range c {
-			body.Tokens = append(body.Tokens, tokenRequest{
+		batchID := i + 1
+		body := batchRequest{Tokens: make([]tokenRequest, len(c)), RefreshCache: true}
+
+		for i, t := range c {
+			body.Tokens[i] = tokenRequest{
 				ContractAddress: t.ContractAddress.String(),
 				TokenID:         t.TokenID.Base10String(),
-			})
+			}
 		}
 
 		byt, err := json.Marshal(body)
@@ -670,7 +681,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 			return metadatas, err
 		}
 
-		logger.For(ctx).Infof("handling metadata batch=%d of %d", i, len(chunks))
+		logger.For(ctx).Infof("handling metadata batch=%d of %d", batchID, len(chunks))
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(byt))
 		if err != nil {
 			return metadatas, err
@@ -678,7 +689,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 
 		resp, err := d.httpClient.Do(req)
 		if err != nil {
-			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", i, err)
+			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", batchID, err)
 			continue
 		}
 
@@ -686,7 +697,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 
 		if resp.StatusCode != http.StatusOK {
 			err := fmt.Errorf("unexpected status code: %d; err: %s", resp.StatusCode, util.BodyAsError(resp))
-			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", i, err)
+			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", batchID, err)
 			continue
 		}
 
@@ -694,20 +705,26 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 
 		err = util.UnmarshallBody(&batchResp, resp.Body)
 		if err != nil {
-			logger.For(ctx).Errorf("failed to read alchemy metadata batch body: %s", err)
+			logger.For(ctx).Errorf("failed to read alchemy metadata batch=%d body: %s", batchID, err)
 			return metadatas, err
 		}
 
 		if len(batchResp) != len(c) {
-			panic(fmt.Sprintf("expected response to be equal in length to batch; got %d; expected %d", len(batchResp), len(c)))
+			panic(fmt.Sprintf("expected response to be equal in length to batch=%d; got %d; expected %d", batchID, len(batchResp), len(c)))
 		}
 
-		for j, m := range batchResp {
-			metadatas[i*chunkSize+j] = alchemyMetadataToMetadata(m.Metadata)
+		// alchemy doesn't return data in the same order as the input, so we need to create a lookup
+		for _, m := range batchResp {
+			tID := persist.NewTokenIdentifiers(persist.Address(m.Contract.Address), persist.MustTokenID(m.Id.TokenId), d.chain)
+			lookup[tID] = alchemyMetadataToMetadata(m.Metadata)
 		}
 	}
 
-	logger.For(ctx).Info("finished metadata batch")
+	for i, tID := range tIDs {
+		metadatas[i] = lookup[tID]
+	}
+
+	logger.For(ctx).Info("finished alchemy metadata batch")
 	return metadatas, nil
 }
 

@@ -2,6 +2,7 @@ package wrapper
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -68,15 +69,21 @@ func (w SyncPipelineWrapper) GetTokenMetadataByTokenIdentifiersBatch(ctx context
 		logger.For(ctx).Errorf("error fetching metadata for batch: %s", err)
 		sentryutil.ReportError(ctx, err)
 	}
+
+	if len(metadatas) != len(tIDs) {
+		panic(fmt.Sprintf("expected length to the the same: %d %d", len(metadatas), len(tIDs)))
+	}
+
 	// Convert metadatas to tokens so they can be passed to FillInWrapper
 	asTokens := make([]multichain.ChainAgnosticToken, len(metadatas))
 	for i, m := range metadatas {
 		asTokens[i] = multichain.ChainAgnosticToken{
-			TokenMetadata:   m,
 			TokenID:         tIDs[i].TokenID,
 			ContractAddress: tIDs[i].ContractAddress,
+			TokenMetadata:   m,
 		}
 	}
+
 	metadatas = w.FillInWrapper.LoadMetadataAll(asTokens)
 	return metadatas, nil
 }
@@ -284,7 +291,7 @@ func NewFillInWrapper(ctx context.Context, httpClient *http.Client, chain persis
 
 // AddToToken adds missing data to a token.
 func (w *FillInWrapper) AddToToken(ctx context.Context, t multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
-	return w.addToken(t)(t)
+	return w.addToken(t)()
 }
 
 // AddToPage adds missing data to each token of a provider page.
@@ -318,59 +325,44 @@ func (w *FillInWrapper) AddToPage(ctx context.Context, recCh <-chan multichain.C
 
 // LoadMetadataAll fills in missing metadata for a slice of tokens.
 func (w *FillInWrapper) LoadMetadataAll(tokens []multichain.ChainAgnosticToken) []persist.TokenMetadata {
-	thunks := make([]func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken, len(tokens))
+	thunks := make([]func() multichain.ChainAgnosticToken, len(tokens))
 	for i, t := range tokens {
+		t := t
 		if hasMediaURLs(t.TokenMetadata, w.chain) {
-			thunks[i] = func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken { return t }
-			continue
+			thunks[i] = func() multichain.ChainAgnosticToken { return t }
+		} else {
+			thunks[i] = w.addTokenToBatch(t)
 		}
-		thunks[i] = w.addTokenToBatch(t)
 	}
+	result := make([]persist.TokenMetadata, len(tokens))
 	for i, thunk := range thunks {
-		tokens[i] = thunk(tokens[i])
+		r := thunk()
+		result[i] = r.TokenMetadata
 	}
-	return util.MapWithoutError(tokens, func(t multichain.ChainAgnosticToken) persist.TokenMetadata { return t.TokenMetadata })
-}
-
-// LoadFallbackAll fills in missing fallback media for a slice of tokens.
-func (w *FillInWrapper) LoadFallbackAll(tokens []multichain.ChainAgnosticToken) []multichain.ChainAgnosticToken {
-	thunks := make([]func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken, len(tokens))
-	for i, t := range tokens {
-		if t.FallbackMedia.IsServable() {
-			thunks = append(thunks, func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
-				return t
-			})
-			continue
-		}
-		thunks[i] = w.addTokenToBatch(t)
-	}
-	for i, thunk := range thunks {
-		tokens[i] = thunk(tokens[i])
-	}
-	return tokens
+	return result
 }
 
 func (w *FillInWrapper) addPage(p multichain.ChainAgnosticTokensAndContracts) func() multichain.ChainAgnosticTokensAndContracts {
-	thunks := make([]func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken, len(p.Tokens))
+	thunks := make([]func() multichain.ChainAgnosticToken, len(p.Tokens))
 	for i, t := range p.Tokens {
 		thunks[i] = w.addToken(t)
 	}
 	return func() multichain.ChainAgnosticTokensAndContracts {
 		for i, thunk := range thunks {
-			p.Tokens[i] = thunk(p.Tokens[i])
+			p.Tokens[i] = thunk()
 		}
 		return p
 	}
 }
 
-func (w *FillInWrapper) addToken(t multichain.ChainAgnosticToken) func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
+func (w *FillInWrapper) addToken(t multichain.ChainAgnosticToken) func() multichain.ChainAgnosticToken {
 	if hasMediaURLs(t.TokenMetadata, w.chain) && t.FallbackMedia.IsServable() {
-		return func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken { return t }
+		return func() multichain.ChainAgnosticToken { return t }
 	}
 	return w.addTokenToBatch(t)
 }
 
-func (w *FillInWrapper) addTokenToBatch(t multichain.ChainAgnosticToken) func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
+func (w *FillInWrapper) addTokenToBatch(t multichain.ChainAgnosticToken) func() multichain.ChainAgnosticToken {
 	ti := persist.TokenIdentifiers{
 		TokenID:         t.TokenID,
 		ContractAddress: t.ContractAddress,
@@ -378,7 +370,7 @@ func (w *FillInWrapper) addTokenToBatch(t multichain.ChainAgnosticToken) func(mu
 	}
 
 	if v, ok := w.resultCache.Load(ti); ok {
-		return func(multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
+		return func() multichain.ChainAgnosticToken {
 			return v.(multichain.ChainAgnosticToken)
 		}
 	}
@@ -391,7 +383,7 @@ func (w *FillInWrapper) addTokenToBatch(t multichain.ChainAgnosticToken) func(mu
 	pos := b.addToBatch(w, ti)
 	w.mu.Unlock()
 
-	return func(t multichain.ChainAgnosticToken) multichain.ChainAgnosticToken {
+	return func() multichain.ChainAgnosticToken {
 		<-b.done
 		if b.err != nil {
 			return t
