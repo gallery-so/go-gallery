@@ -172,7 +172,7 @@ func ethTokenDescriptorsFetcherInjector(openseaProvider *opensea.Provider, alche
 }
 
 func tezosInjector(serverEnvInit envInit, client *http.Client) *multichain.TezosProvider {
-	provider := tezos.NewProvider(client)
+	provider := tezos.NewProvider()
 	tzktProvider := tzkt.NewProvider(client)
 	tezosProvider := tezosProviderInjector(provider, tzktProvider)
 	return tezosProvider

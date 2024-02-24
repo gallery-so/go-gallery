@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 	"strings"
 
 	tezospkg "blockwatch.cc/tzgo/tezos"
-	mgql "github.com/machinebox/graphql"
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -35,14 +33,10 @@ func ToAddress(address persist.Address) (persist.Address, error) {
 	return persist.Address(key.Address().String()), nil
 }
 
-type Provider struct {
-	tzDomainsGQL *mgql.Client
-}
+type Provider struct{}
 
-func NewProvider(httpClient *http.Client) *Provider {
-	return &Provider{
-		tzDomainsGQL: mgql.NewClient(tezDomainsApiURL, mgql.WithHTTPClient(httpClient)),
-	}
+func NewProvider() *Provider {
+	return &Provider{}
 }
 
 // VerifySignature will verify a signature using the ed25519 algorithm

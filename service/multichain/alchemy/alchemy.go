@@ -662,7 +662,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 		return nil, err
 	}
 
-	// alchemy unfortunately doesn't return tokens in the same order as the input so we need to create a lookup
+	// alchemy doesn't return tokens in the same order as the input
 	lookup := make(map[persist.TokenIdentifiers]persist.TokenMetadata)
 
 	for i, c := range chunks {
@@ -684,7 +684,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 		logger.For(ctx).Infof("handling metadata batch=%d of %d", batchID, len(chunks))
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(byt))
 		if err != nil {
-			return metadatas, err
+			return nil, err
 		}
 
 		resp, err := d.httpClient.Do(req)
@@ -706,7 +706,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 		err = util.UnmarshallBody(&batchResp, resp.Body)
 		if err != nil {
 			logger.For(ctx).Errorf("failed to read alchemy metadata batch=%d body: %s", batchID, err)
-			return metadatas, err
+			return nil, err
 		}
 
 		if len(batchResp) != len(c) {
