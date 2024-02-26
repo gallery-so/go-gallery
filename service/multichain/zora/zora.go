@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/machinebox/graphql"
+
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -18,13 +19,17 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-var zoraRESTURL = "https://api.zora.co/discover"
-var goldskyURL = "https://api.goldsky.com/api/public/project_clhk16b61ay9t49vm6ntn4mkz/subgraphs/zora-create-zora-mainnet/stable/gn"
+const (
+	zoraRESTURL = "https://api.zora.co/discover"
+	zoraGraphQL = "https://api.zora.co/graphql"
+	goldskyURL  = "https://api.goldsky.com/api/public/project_clhk16b61ay9t49vm6ntn4mkz/subgraphs/zora-create-zora-mainnet/stable/gn"
+)
 
 // Provider is an the struct for retrieving data from the zora blockchain
 type Provider struct {
 	httpClient *http.Client
-	ggql       *graphql.Client
+	goldskyQL  *graphql.Client
+	zoraQL     *graphql.Client
 }
 
 type tokenID string
@@ -127,7 +132,8 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 
 	return &Provider{
-		ggql:       graphql.NewClient(goldskyURL, graphql.WithHTTPClient(httpClient)),
+		goldskyQL:  graphql.NewClient(goldskyURL, graphql.WithHTTPClient(httpClient)),
+		zoraQL:     graphql.NewClient(zoraGraphQL, graphql.WithHTTPClient(httpClient)),
 		httpClient: zoraClient,
 	}
 }
@@ -270,7 +276,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	req.Var("creator", addr.String())
 
 	resp := getZoraCreateContractsResponse{}
-	err := d.ggql.Run(ctx, req, &resp)
+	err := d.goldskyQL.Run(ctx, req, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -294,6 +300,78 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	}
 
 	return result, nil
+}
+
+func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error) {
+	chunkSize := 50
+	chunks := util.ChunkBy(tIDs, chunkSize)
+	metadatas := make([]persist.TokenMetadata, len(tIDs))
+
+	req := graphql.NewRequest(`query tokenBatch($tokens: [TokenInput!], $limit: Int!) {
+   tokens( networks: [ { network: ZORA chain: ZORA_MAINNET } ], pagination: {limit: $limit} where: { tokens: $tokens } ) {
+     nodes { token { tokenId collectionAddress metadata } }
+     pageInfo { limit hasNextPage endCursor }
+   }
+ }`)
+
+	type tokenInput struct {
+		Address string `json:"address"`
+		TokenID string `json:"tokenId"`
+	}
+
+	type tokenBatchResponse struct {
+		Tokens struct {
+			Nodes []struct {
+				Token struct {
+					TokenID           string         `json:"tokenId"`
+					CollectionAddress string         `json:"collectionAddress"`
+					Metadata          map[string]any `json:"metadata"`
+				} `json:"token"`
+			} `json:"nodes"`
+		} `json:"tokens"`
+	}
+
+	// zora doesn't return tokens in the same order as the input
+	lookup := make(map[persist.TokenIdentifiers]persist.TokenMetadata)
+
+	for i, chunk := range chunks {
+		batchID := i + 1
+
+		tokenQuery := make([]tokenInput, len(chunk))
+
+		for j, token := range chunk {
+			tokenQuery[j] = tokenInput{
+				Address: token.ContractAddress.String(),
+				TokenID: token.TokenID.Base10String(),
+			}
+		}
+
+		req.Var("limit", chunkSize)
+		req.Var("tokens", tokenQuery)
+
+		logger.For(ctx).Infof("handling metadata batch=%d of %d", batchID, len(chunks))
+
+		var batchResp tokenBatchResponse
+
+		err := d.zoraQL.Run(ctx, req, &batchResp)
+
+		if err != nil {
+			logger.For(ctx).Errorf("error handling zora batch=%d request: %s", batchID, err)
+			return nil, err
+		}
+
+		for _, token := range batchResp.Tokens.Nodes {
+			tID := persist.NewTokenIdentifiers(persist.Address(token.Token.CollectionAddress), persist.MustTokenID(token.Token.TokenID), persist.ChainZora)
+			lookup[tID] = persist.TokenMetadata(token.Token.Metadata)
+		}
+	}
+
+	for i, tID := range tIDs {
+		metadatas[i] = lookup[tID]
+	}
+
+	logger.For(ctx).Infof("finished zora metadata batch of %d tokens", len(tIDs))
+	return metadatas, nil
 }
 
 const maxLimit = 1000

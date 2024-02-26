@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/metric"
@@ -37,41 +38,61 @@ func (e ErrContractPaused) Error() string {
 	return fmt.Sprintf("processing for chain=%d; contract=%s is paused", e.Chain, e.Contract)
 }
 
-// NumRetryF is a function that returns the number of times a token can be re-enqueued before it is not retried again
-type NumRetryF func() int
+// ErrContractFlaking indicates that runs of this contract are frequently failing
+type ErrContractFlaking struct {
+	Chain    persist.Chain
+	Contract persist.Address
+	Err      error
+	Duration time.Duration
+}
+
+func (e ErrContractFlaking) Unwrap() error { return e.Err }
+func (e ErrContractFlaking) Error() string {
+	return fmt.Sprintf("runs of chain=%d; contract=%s are paused for %s because of too many failed runs; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
+}
 
 type Manager struct {
-	cache           *redis.Cache
-	processRegistry *registry
+	ProcessRegistry *Registry
 	taskClient      *task.Client
 	throttle        *throttle.Locker
-	taskDelayer     *limiters.KeyRateLimiter
 	errorCounter    *limiters.KeyRateLimiter
-	numRetryF       NumRetryF
+	enableRetries   bool
+	markTokenRan    func(db.TokenDefinition) (time.Duration, error)
 	metricReporter  metric.MetricReporter
 }
 
 func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Manager {
+	slowRetry := limiters.NewKeyRateLimiter(ctx, cache, "retrySlow", 1, 5*time.Minute)
+	fastRetry := limiters.NewKeyRateLimiter(ctx, cache, "retryFast", 1, 30*time.Second)
+
+	markTokenRan := func(td db.TokenDefinition) (time.Duration, error) {
+		if shareToGalleryEnabled(td) {
+			_, delay, err := fastRetry.ForKey(ctx, td.ID.String())
+			return delay, err
+		}
+		_, delay, err := slowRetry.ForKey(ctx, td.ID.String())
+		return delay, err
+	}
+
 	return &Manager{
-		cache:           cache,
-		processRegistry: &registry{cache},
+		ProcessRegistry: &Registry{cache},
 		taskClient:      taskClient,
 		throttle:        throttle.NewThrottleLocker(cache, 30*time.Minute),
 		metricReporter:  metric.NewLogMetricReporter(),
 		errorCounter:    limiters.NewKeyRateLimiter(ctx, cache, "errorCount", 100, 3*time.Hour),
+		markTokenRan:    markTokenRan,
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, numRetryF NumRetryF) *Manager {
+func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Manager {
 	m := New(ctx, taskClient, cache)
-	m.numRetryF = numRetryF
-	m.taskDelayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
+	m.enableRetries = true
 	return m
 }
 
 // Processing returns true if the token is processing or enqueued.
 func (m Manager) Processing(ctx context.Context, tDefID persist.DBID) bool {
-	p, _ := m.processRegistry.processing(ctx, tDefID)
+	p, _ := m.ProcessRegistry.processing(ctx, tDefID)
 	return p
 }
 
@@ -80,28 +101,28 @@ func (m Manager) SubmitBatch(ctx context.Context, tDefIDs []persist.DBID) error 
 	if len(tDefIDs) == 0 {
 		return nil
 	}
-	m.processRegistry.setManyEnqueue(ctx, tDefIDs)
+	m.ProcessRegistry.setManyEnqueue(ctx, tDefIDs)
 	message := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
 	logger.For(ctx).WithField("batchID", message.BatchID).Infof("enqueued batch: %s (size=%d)", message.BatchID, len(tDefIDs))
 	return m.taskClient.CreateTaskForTokenProcessing(ctx, message)
 }
 
-// IsPaused returns true if run of this token are paused.
-func (m Manager) IsPaused(ctx context.Context, tID persist.TokenIdentifiers) bool {
-	p, _ := m.processRegistry.isPausedContract(ctx, tID.Chain, tID.ContractAddress)
+// IsPaused returns true if runs of this token are paused.
+func (m Manager) Paused(ctx context.Context, td db.TokenDefinition) bool {
+	p, _ := m.ProcessRegistry.pausedContract(ctx, td.Chain, td.ContractAddress)
 	return p
 }
 
 // StartProcessing marks a token as processing. It returns a callback that must be called when work on the token is finished in order to mark
 // it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attemps is ignored when MaxRetries
 // is set to the default value of 0.
-func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, attempts int, cause persist.ProcessingCause) (func(db.TokenMedia, error) error, error) {
-	if m.IsPaused(ctx, tID) {
-		recordPipelinePaused(ctx, m.metricReporter, tID.Chain, tID.ContractAddress, cause)
-		return nil, ErrContractPaused{Chain: tID.Chain, Contract: tID.ContractAddress}
+func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, attempts int, cause persist.ProcessingCause) (func(db.TokenMedia, error) error, error) {
+	if m.Paused(ctx, td) {
+		recordPipelinePaused(ctx, m.metricReporter, td.Chain, td.ContractAddress, cause)
+		return nil, ErrContractPaused{Chain: td.Chain, Contract: td.ContractAddress}
 	}
 
-	err := m.throttle.Lock(ctx, "lock:"+tDefID.String())
+	err := m.throttle.Lock(ctx, "lock:"+td.ID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +133,11 @@ func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, tID p
 
 	go func() {
 		defer tick.Stop()
-		m.processRegistry.keepAlive(ctx, tDefID)
+		m.ProcessRegistry.keepAlive(ctx, td.ID)
 		for {
 			select {
 			case <-tick.C:
-				m.processRegistry.keepAlive(ctx, tDefID)
+				m.ProcessRegistry.keepAlive(ctx, td.ID)
 			case <-stop:
 				close(done)
 				return
@@ -129,26 +150,39 @@ func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, tID p
 	callback := func(tm db.TokenMedia, err error) error {
 		close(stop)
 		<-done
-		m.recordError(ctx, tID, err)
-		m.tryRetry(ctx, tDefID, tID, err, attempts)
-		m.throttle.Unlock(ctx, "lock:"+tDefID.String())
-		recordPipelineResults(ctx, m.metricReporter, tID.Chain, tm.Media.MediaType, err, time.Since(start), cause)
+		m.markTokenRan(td) // mark that the token ran so if an error occured tryRetry delays the next run appropriately
+		m.recordError(ctx, td, err)
+		m.tryRetry(ctx, td, err, attempts)
+		m.throttle.Unlock(ctx, "lock:"+td.ID.String())
+		recordMetrics(ctx, m.metricReporter, td.Chain, tm.Media.MediaType, err, time.Since(start), cause)
 		return nil
 	}
 
 	return callback, err
 }
 
-func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, err error) {
+func shareToGalleryEnabled(td db.TokenDefinition) bool {
+	return platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash
+}
+
+func maxRetriesFor(td db.TokenDefinition) int {
+	if shareToGalleryEnabled(td) {
+		return 24
+	}
+	return 2
+}
+
+func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, err error) {
+	// Don't penalize non-token related errors e.g. errors related to the pipeline
 	if err == nil || !util.ErrorIs[ErrBadToken](err) {
 		return
 	}
 
-	if paused, _ := m.processRegistry.isPausedContract(ctx, tID.Chain, tID.ContractAddress); paused {
+	if paused, _ := m.ProcessRegistry.pausedContract(ctx, td.Chain, td.ContractAddress); paused {
 		return
 	}
 
-	canRetry, _, err := m.errorCounter.ForKey(ctx, fmt.Sprintf("%d:%s", tID.Chain, tID.ContractAddress))
+	canRetry, _, err := m.errorCounter.ForKey(ctx, fmt.Sprintf("%d:%s", td.Chain, td.ContractAddress))
 	if err != nil {
 		logger.For(ctx).Errorf("failed to track error: %s", err)
 		sentryutil.ReportError(ctx, err)
@@ -158,7 +192,7 @@ func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, 
 		return
 	}
 
-	nowFlaky, err := m.processRegistry.pauseContract(ctx, tID.Chain, tID.ContractAddress, time.Hour*3)
+	nowFlaky, err := m.ProcessRegistry.pauseContract(ctx, td.Chain, td.ContractAddress, time.Hour*3)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to pause contract:%s", err)
 		sentryutil.ReportError(ctx, err)
@@ -166,71 +200,78 @@ func (m Manager) recordError(ctx context.Context, tID persist.TokenIdentifiers, 
 	}
 
 	if nowFlaky {
-		err := fmt.Errorf("processing of chain=%d; contract=%s is paused for %s because of too many errors", tID.Chain, tID.ContractAddress, time.Hour*3)
+		err := ErrContractFlaking{Chain: td.Chain, Contract: td.ContractAddress, Err: err, Duration: time.Hour * 3}
 		logger.For(ctx).Warnf(err.Error())
 		sentryutil.ReportError(ctx, err)
 	}
 }
 
-func (m Manager) tryRetry(ctx context.Context, tDefID persist.DBID, tID persist.TokenIdentifiers, err error, attempts int) error {
-	if m.IsPaused(ctx, tID) {
-		m.processRegistry.finish(ctx, tDefID)
+func (m Manager) tryRetry(ctx context.Context, td db.TokenDefinition, err error, attempts int) error {
+	// Only retry intermittent errors related to the token e.g. missing metadata
+	if !util.ErrorIs[ErrBadToken](err) {
+		m.ProcessRegistry.finish(ctx, td.ID)
 		return nil
 	}
 
-	if err == nil || m.numRetryF == nil || attempts >= m.numRetryF() {
-		m.processRegistry.finish(ctx, tDefID)
+	if m.Paused(ctx, td) {
+		m.ProcessRegistry.finish(ctx, td.ID)
 		return nil
 	}
 
-	_, delay, err := m.taskDelayer.ForKey(ctx, tDefID.String())
+	if err == nil || !m.enableRetries || attempts >= maxRetriesFor(td) {
+		m.ProcessRegistry.finish(ctx, td.ID)
+		return nil
+	}
+
+	delay, err := m.markTokenRan(td)
 	if err != nil {
-		m.processRegistry.finish(ctx, tDefID)
+		logger.For(ctx).Errorf("failed to get retry delay, not retrying: %s", err)
+		m.ProcessRegistry.finish(ctx, td.ID)
 		return err
 	}
 
-	m.processRegistry.setEnqueue(ctx, tDefID)
-	message := task.TokenProcessingTokenMessage{TokenDefinitionID: tDefID, Attempts: attempts + 1}
+	m.ProcessRegistry.setEnqueue(ctx, td.ID)
+	message := task.TokenProcessingTokenMessage{TokenDefinitionID: td.ID, Attempts: attempts + 1}
 	return m.taskClient.CreateTaskForTokenTokenProcessing(ctx, message, delay)
 }
 
-// registry handles the storing of object state managed by Manager
-type registry struct{ c *redis.Cache }
+// Registry handles the storing of object state managed by Manager
+type Registry struct{ Cache *redis.Cache }
 
-func (r registry) processing(ctx context.Context, tDefID persist.DBID) (bool, error) {
-	_, err := r.c.Get(ctx, processingKey(tDefID))
+func (r Registry) processing(ctx context.Context, tDefID persist.DBID) (bool, error) {
+	_, err := r.Cache.Get(ctx, processingKey(tDefID))
 	return err == nil, err
 }
 
-func (r registry) finish(ctx context.Context, tDefID persist.DBID) error {
-	return r.c.Delete(ctx, processingKey(tDefID))
+func (r Registry) finish(ctx context.Context, tDefID persist.DBID) error {
+	return r.Cache.Delete(ctx, processingKey(tDefID))
 }
 
-func (r registry) setEnqueue(ctx context.Context, tDefID persist.DBID) error {
+func (r Registry) setEnqueue(ctx context.Context, tDefID persist.DBID) error {
 	return r.setManyEnqueue(ctx, []persist.DBID{tDefID})
 }
 
-func (r registry) setManyEnqueue(ctx context.Context, tDefIDs []persist.DBID) error {
+func (r Registry) setManyEnqueue(ctx context.Context, tDefIDs []persist.DBID) error {
 	keyValues := make(map[string]any, len(tDefIDs))
 	for _, id := range tDefIDs {
 		keyValues[processingKey(id)] = []byte("enqueued")
 	}
-	return r.c.MSetWithTTL(ctx, keyValues, time.Hour)
+	return r.Cache.MSetWithTTL(ctx, keyValues, time.Hour)
 }
 
-func (r registry) isPausedContract(ctx context.Context, chain persist.Chain, address persist.Address) (bool, error) {
-	_, err := r.c.Get(ctx, pauseContractKey(chain, address))
+func (r Registry) pausedContract(ctx context.Context, chain persist.Chain, address persist.Address) (bool, error) {
+	_, err := r.Cache.Get(ctx, pauseContractKey(chain, address))
 	return err == nil, err
 }
 
-func (r registry) pauseContract(ctx context.Context, chain persist.Chain, address persist.Address, ttl time.Duration) (bool, error) {
+func (r Registry) pauseContract(ctx context.Context, chain persist.Chain, address persist.Address, ttl time.Duration) (bool, error) {
 	b := make([]byte, 64)
 	binary.BigEndian.PutUint64(b, uint64(time.Now().UnixMilli()))
-	return r.c.SetNX(ctx, pauseContractKey(chain, address), b, ttl)
+	return r.Cache.SetNX(ctx, pauseContractKey(chain, address), b, ttl)
 }
 
-func (r registry) keepAlive(ctx context.Context, tDefID persist.DBID) error {
-	return r.c.Set(ctx, processingKey(tDefID), []byte("processing"), time.Minute)
+func (r Registry) keepAlive(ctx context.Context, tDefID persist.DBID) error {
+	return r.Cache.Set(ctx, processingKey(tDefID), []byte("processing"), time.Minute)
 }
 
 func processingKey(id persist.DBID) string { return "inflight:" + id.String() }
@@ -279,7 +320,7 @@ func recordPipelinePaused(ctx context.Context, mr metric.MetricReporter, chain p
 	)...)
 }
 
-func recordPipelineResults(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, mediaType persist.MediaType, err error, d time.Duration, cause persist.ProcessingCause) {
+func recordMetrics(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, mediaType persist.MediaType, err error, d time.Duration, cause persist.ProcessingCause) {
 	baseOpts := append([]any{}, metric.LogOptions.WithTags(map[string]string{
 		"chain":      fmt.Sprintf("%d", chain),
 		"mediaType":  mediaType.String(),

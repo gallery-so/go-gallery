@@ -1,6 +1,7 @@
 package alchemy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -631,6 +632,97 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 	return cTokens, cContracts[0], nil
 }
 
+func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error) {
+	type tokenRequest struct {
+		ContractAddress string `json:"contractAddress"`
+		TokenID         string `json:"tokenId"`
+	}
+
+	type batchRequest struct {
+		Tokens       []tokenRequest `json:"tokens"`
+		RefreshCache bool           `json:"refreshCache"`
+	}
+
+	type batchResponse []struct {
+		Metadata any `json:"metadata"`
+		Contract struct {
+			Address string `json:"address"`
+		} `json:"contract"`
+		Id struct {
+			TokenId string `json:"tokenId"`
+		} `json:"id"`
+	}
+
+	chunkSize := 100
+	chunks := util.ChunkBy(tIDs, chunkSize)
+	metadatas := make([]persist.TokenMetadata, len(tIDs))
+
+	u, err := url.Parse(fmt.Sprintf("%s/getNFTMetadataBatch", d.alchemyAPIURL))
+	if err != nil {
+		return nil, err
+	}
+
+	// alchemy doesn't return tokens in the same order as the input
+	lookup := make(map[persist.TokenIdentifiers]persist.TokenMetadata)
+
+	for i, c := range chunks {
+		batchID := i + 1
+		body := batchRequest{Tokens: make([]tokenRequest, len(c)), RefreshCache: true}
+
+		for i, t := range c {
+			body.Tokens[i] = tokenRequest{
+				ContractAddress: t.ContractAddress.String(),
+				TokenID:         t.TokenID.Base10String(),
+			}
+		}
+
+		byt, err := json.Marshal(body)
+		if err != nil {
+			return metadatas, err
+		}
+
+		logger.For(ctx).Infof("handling metadata batch=%d of %d", batchID, len(chunks))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(byt))
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := d.httpClient.Do(req)
+		if err != nil {
+			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", batchID, err)
+			continue
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			err := fmt.Errorf("unexpected status code: %d; err: %s", resp.StatusCode, util.BodyAsError(resp))
+			logger.For(ctx).Errorf("failed to handle metadata batch=%d: %s", batchID, err)
+			continue
+		}
+
+		var batchResp batchResponse
+
+		err = util.UnmarshallBody(&batchResp, resp.Body)
+		if err != nil {
+			logger.For(ctx).Errorf("failed to read alchemy metadata batch=%d body: %s", batchID, err)
+			return nil, err
+		}
+
+		for _, m := range batchResp {
+			tID := persist.NewTokenIdentifiers(persist.Address(m.Contract.Address), persist.MustTokenID(m.Id.TokenId), d.chain)
+			lookup[tID] = alchemyMetadataToMetadata(m.Metadata)
+		}
+	}
+
+	for i, tID := range tIDs {
+		metadatas[i] = lookup[tID]
+	}
+
+	logger.For(ctx).Infof("finished alchemy metadata batch of %d tokens", len(tIDs))
+	return metadatas, nil
+}
+
 func alchemyTokensToChainAgnosticTokensForOwner(owner persist.EthereumAddress, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	chainAgnosticTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
 	chainAgnosticContracts := make([]multichain.ChainAgnosticContract, 0, len(tokens))
@@ -708,6 +800,17 @@ func (d *Provider) getOwnersForToken(ctx context.Context, token Token) ([]persis
 	return owners.Owners, nil
 }
 
+func alchemyMetadataToMetadata(m any) persist.TokenMetadata {
+	var metadata persist.TokenMetadata
+	switch typ := m.(type) {
+	case map[string]any:
+		metadata = persist.TokenMetadata(typ)
+	default:
+		metadata = persist.TokenMetadata{}
+	}
+	return metadata
+}
+
 func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract) {
 
 	var tokenType persist.TokenType
@@ -723,15 +826,7 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		bal = big.NewInt(1)
 	}
 
-	var metadata persist.TokenMetadata
-
-	switch typ := token.Metadata.(type) {
-	case map[string]any:
-		metadata = persist.TokenMetadata(typ)
-	default:
-		metadata = persist.TokenMetadata{}
-	}
-
+	metadata := alchemyMetadataToMetadata(token.Metadata)
 	externalURL, _ := metadata["external_url"].(string)
 
 	t := multichain.ChainAgnosticToken{

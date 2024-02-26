@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sourcegraph/conc/pool"
+
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -21,7 +23,6 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
-	"github.com/sourcegraph/conc/pool"
 )
 
 func init() {
@@ -29,13 +30,9 @@ func init() {
 }
 
 const (
-	pageSize = 50
+	pageSize = 100
 	poolSize = 12
 )
-
-var newPool = func(ctx context.Context, s int) *pool.ContextPool {
-	return pool.New().WithMaxGoroutines(s).WithContext(ctx)
-}
 
 var ErrAPIKeyExpired = errors.New("opensea api key expired")
 
@@ -86,6 +83,7 @@ type Owner struct {
 
 // Collection is a collection from OpenSea
 type Collection struct {
+	Name        string `json:"name"`
 	Description string `json:"description"`
 	Owner       string `json:"owner"`
 	ImageURL    string `json:"image_url"`
@@ -266,7 +264,7 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
-	return contractToChainAgnosticContract(cc.Contract, cc.Collection), nil
+	return collectionToChainAgnosticContract(contractAddress, cc.Collection), nil
 }
 
 func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
@@ -297,12 +295,13 @@ func (p *Provider) streamAssetsToTokens(
 	recCh chan<- multichain.ChainAgnosticTokensAndContracts,
 	errCh chan<- error,
 ) {
-	contracts := &sync.Map{}                            // used to avoid duplicate contract fetches
+	cachedContracts := &sync.Map{}                      // used to avoid duplicate contract fetches
 	contractsL := make(map[persist.Address]*sync.Mutex) // contract job locks
 	mu := sync.RWMutex{}                                // manages access to contract locks
 
 	for page := range outCh {
 		page := page
+		wp := pool.New().WithContext(ctx).WithMaxGoroutines(1) // bump this back up when rate limits are increased
 
 		if page.Err != nil {
 			errCh <- wrapMissingContractErr(p.Chain, page.Err)
@@ -313,27 +312,32 @@ func (p *Provider) streamAssetsToTokens(
 			continue
 		}
 
-		// fetch contracts
-		addresses := util.MapWithoutError(page.Assets, func(a Asset) persist.Address { return persist.Address(a.Contract) })
-		addresses = util.Dedupe(addresses, true)
-
-		for _, a := range addresses {
-			err := p.getChainAgnosticContract(ctx, a, contracts, contractsL, &mu)
-			if err != nil {
-				errCh <- err
-				return
-			}
-		}
-
 		var out multichain.ChainAgnosticTokensAndContracts
 
-		for _, a := range page.Assets {
-			contract, ok := contracts.Load(persist.Address(a.Contract))
+		// fetch contracts
+		addresses := make([]persist.Address, len(page.Assets))
+		for i, asset := range page.Assets {
+			addr := persist.Address(asset.Contract)
+			addresses[i] = addr
+			wp.Go(func(context.Context) error {
+				return p.getChainAgnosticContract(ctx, addr, asset.Collection, cachedContracts, contractsL, &mu)
+			})
+		}
+
+		err := wp.Wait()
+		if err != nil {
+			errCh <- err
+			return
+		}
+
+		for _, asset := range page.Assets {
+			addr := persist.Address(asset.Contract)
+			contract, ok := cachedContracts.Load(addr)
 			if !ok {
 				panic("contract should have been loaded")
 			}
 
-			tokens, err := p.assetToChainAgnosticTokens(ctx, ownerAddress, a)
+			tokens, err := p.assetToChainAgnosticTokens(ownerAddress, asset)
 			if err != nil {
 				errCh <- err
 				return
@@ -342,7 +346,6 @@ func (p *Provider) streamAssetsToTokens(
 			out.Tokens = append(out.Tokens, tokens...)
 			out.Contracts = append(out.Contracts, contract.(multichain.ChainAgnosticContract))
 		}
-
 		recCh <- out
 	}
 }
@@ -352,8 +355,8 @@ type contractCollection struct {
 	Collection Collection
 }
 
-func (p *Provider) getChainAgnosticContract(ctx context.Context, address persist.Address, seenContracts *sync.Map, contractLocks map[persist.Address]*sync.Mutex, mu *sync.RWMutex) error {
-	_, ok := seenContracts.Load(address)
+func (p *Provider) getChainAgnosticContract(ctx context.Context, contractAddress persist.Address, collectionSlug string, seenContracts *sync.Map, contractLocks map[persist.Address]*sync.Mutex, mu *sync.RWMutex) error {
+	_, ok := seenContracts.Load(contractAddress)
 	// already have the contract
 	if ok {
 		return nil
@@ -361,14 +364,14 @@ func (p *Provider) getChainAgnosticContract(ctx context.Context, address persist
 
 	// If we don't have a lock yet, create one
 	mu.Lock()
-	if _, hasJobLock := contractLocks[address]; !hasJobLock {
-		contractLocks[address] = &sync.Mutex{}
+	if _, hasJobLock := contractLocks[contractAddress]; !hasJobLock {
+		contractLocks[contractAddress] = &sync.Mutex{}
 	}
 	mu.Unlock()
 
 	// Acquire a lock for the job
 	mu.RLock()
-	jobMu := contractLocks[address]
+	jobMu := contractLocks[contractAddress]
 	mu.RUnlock()
 
 	// Process the contract
@@ -376,21 +379,21 @@ func (p *Provider) getChainAgnosticContract(ctx context.Context, address persist
 	defer jobMu.Unlock()
 
 	// Check again if we've seen the contract, since another job may have processed it while we were waiting for the lock
-	_, ok = seenContracts.Load(address)
+	_, ok = seenContracts.Load(contractAddress)
 	if ok {
 		return nil
 	}
 
-	c, err := fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, address)
+	collection, err := fetchCollectionBySlug(ctx, p.httpClient, p.Chain, collectionSlug)
 	if err != nil {
 		return err
 	}
 
-	seenContracts.Store(address, contractToChainAgnosticContract(c.Contract, c.Collection))
+	seenContracts.Store(contractAddress, collectionToChainAgnosticContract(contractAddress, collection))
 	return nil
 }
 
-func (p *Provider) assetToChainAgnosticTokens(ctx context.Context, ownerAddress persist.Address, asset Asset) ([]multichain.ChainAgnosticToken, error) {
+func (p *Provider) assetToChainAgnosticTokens(ownerAddress persist.Address, asset Asset) ([]multichain.ChainAgnosticToken, error) {
 	typ, err := tokenTypeFromAsset(asset)
 	if err != nil {
 		return nil, err
@@ -549,18 +552,18 @@ func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {
 	}
 }
 
-func contractToChainAgnosticContract(contract Contract, collection Collection) multichain.ChainAgnosticContract {
+func collectionToChainAgnosticContract(address persist.Address, collection Collection) multichain.ChainAgnosticContract {
 	desc := multichain.ChainAgnosticContractDescriptors{
 		Symbol:          "", // OpenSea doesn't provide this, but it isn't exposed in the schema anyway
-		Name:            contract.Name,
+		Name:            collection.Name,
 		OwnerAddress:    persist.Address(collection.Owner),
 		Description:     collection.Description,
 		ProfileImageURL: collection.ImageURL,
 	}
 	return multichain.ChainAgnosticContract{
-		Address:     persist.Address(contract.Address.String()),
+		Address:     address,
 		Descriptors: desc,
-		IsSpam:      util.ToPointer(contractNameIsSpam(contract.Name)),
+		IsSpam:      util.ToPointer(collectionNameIsSpam(collection.Name)),
 	}
 }
 
@@ -714,7 +717,7 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 				}
 				return
 			}
-			logger.For(ctx).Infof("got target tokens from page=%dfrom opensea", pages)
+			logger.For(ctx).Infof("got target tokens from page=%d from opensea", pages)
 			outCh <- assetsReceived{Assets: []Asset{page.NFT}}
 			return
 		}
@@ -748,7 +751,7 @@ func setPagingParams(url *url.URL) {
 	url.RawQuery = query.Encode()
 }
 
-func contractNameIsSpam(name string) bool {
+func collectionNameIsSpam(name string) bool {
 	return strings.HasSuffix(strings.ToLower(name), ".lens-follower")
 }
 

@@ -303,9 +303,9 @@ func (p Provider) GetContractByAddress(ctx context.Context, chain persist.Chain,
 	return collectionToAgnosticContract(ctx, chain, p.cFetcher, c, contractAddress)
 }
 
-// GetFallbackMediaBatch returns a list of fallback media from a list of token identifiers
-// Fallback media is returned in the same order as the input. If a token is not found, the zero-value is used instead.
-func (p Provider) GetFallbackMediaBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.FallbackMedia, error) {
+// GetTokensByTokenIdentifiersBatch returns a slice tokens from a list of token identifiers
+// Data is returned in the same order as the input. If a token is not found, the zero-value is used instead.
+func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, error) {
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
@@ -316,21 +316,21 @@ func (p Provider) GetFallbackMediaBatch(ctx context.Context, tIDs []persist.Toke
 		return nil, err
 	}
 
-	tokenFallbacks := make(map[persist.TokenIdentifiers]persist.FallbackMedia)
+	lookup := make(map[persist.TokenIdentifiers]multichain.ChainAgnosticToken)
 	for _, t := range tokens {
-		tokenFallbacks[persist.TokenIdentifiers{
+		lookup[persist.TokenIdentifiers{
 			TokenID:         t.TokenID,
 			ContractAddress: t.ContractAddress,
 			Chain:           p.chain,
-		}] = t.FallbackMedia
+		}] = t
 	}
 
-	fallbacks := make([]persist.FallbackMedia, len(tIDs))
+	t := make([]multichain.ChainAgnosticToken, len(tIDs))
 	for i, tID := range tIDs {
-		fallbacks[i] = tokenFallbacks[tID]
+		t[i] = lookup[tID]
 	}
 
-	return fallbacks, nil
+	return t, nil
 }
 
 func paginateTokens(ctx context.Context, client *http.Client, req *http.Request, outCh chan<- pageResult) {

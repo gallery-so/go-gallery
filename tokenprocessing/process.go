@@ -25,7 +25,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
@@ -39,7 +38,7 @@ type ProcessMediaForTokenInput struct {
 	Chain           persist.Chain   `json:"chain"`
 }
 
-func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
+func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingBatchMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -67,11 +66,8 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 					return err
 				}
 
-				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td))
-
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSync, 0,
-					addIsSpamJobOption(c),
+				_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSync, 0,
 					PipelineOpts.WithRequireProhibitionimage(c), // Require image to be processed if Prohibition token
 					PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
 				)
@@ -118,7 +114,9 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm
 			return
 		}
 
-		_, err = runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(c))
+		_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseRefresh, 0,
+			PipelineOpts.WithRefreshMetadata(), // Refresh metadata
+		)
 
 		if err != nil {
 			if util.ErrorIs[tokenmanage.ErrBadToken](err) {
@@ -134,7 +132,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm
 }
 
 // processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
-func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
+func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var input task.TokenProcessingTokenMessage
 
@@ -166,9 +164,9 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskCl
 			return
 		}
 
-		tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
-
-		runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(c))
+		runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSyncRetry, input.Attempts,
+			PipelineOpts.WithRefreshMetadata(), // Refresh metadata
+		)
 
 		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
 		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -766,7 +764,7 @@ func processWalletRemoval(queries *db.Queries) gin.HandlerFunc {
 	}
 }
 
-func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo *postgres.UserRepository, taskClient *task.Client, cache *redis.Cache) gin.HandlerFunc {
+func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo *postgres.UserRepository, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var input task.PostPreflightMessage
 
@@ -806,10 +804,8 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 				return
 			}
 
-			tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td))
-
-			runManagedPipeline(ctx, tp, tm, td, persist.ProcessingCausePostPreflight, 0,
-				addIsSpamJobOption(c),
+			runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCausePostPreflight, 0,
+				PipelineOpts.WithRefreshMetadata(),          // Refresh metadata
 				PipelineOpts.WithRequireImage(),             // Require an image if token is Prohibition token
 				PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
 			)
@@ -838,7 +834,7 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 	}
 }
 
-func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
+func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, c db.Contract, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDefinitionDBID": td.ID,
 		"contractDBID":        td.ContractID,
@@ -850,7 +846,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	})
 	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
 	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
-	closing, err := tm.StartProcessing(ctx, td.ID, tID, attempts, cause)
+	closing, err := tm.StartProcessing(ctx, td, attempts, cause)
 	if err != nil {
 		return db.TokenMedia{}, err
 	}
@@ -859,8 +855,8 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
 	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
 	runOpts = append(runOpts, PipelineOpts.WithIsFxhash(td.IsFxhash))
-	runOpts = append(runOpts, PipelineOpts.WithRefreshMetadata())
 	runOpts = append(runOpts, PipelineOpts.WithPlaceholderImageURL(td.FallbackMedia.ImageURL.String()))
+	runOpts = append(runOpts, PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam))
 	runOpts = append(runOpts, opts...)
 	media, err := tp.ProcessToken(ctx, tID, cID, cause, runOpts...)
 	defer closing(media, err)
@@ -873,18 +869,4 @@ func addContractRunOptions(contract persist.ContractIdentifiers) (opts []Pipelin
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
-}
-
-func addIsSpamJobOption(c db.Contract) PipelineOption {
-	return PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam)
-}
-
-// numRetriesF returns a function that when called, returns the number of retries allotted for a token and contract
-func numRetriesF(td db.TokenDefinition) tokenmanage.NumRetryF {
-	return func() int {
-		if platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash {
-			return 24
-		}
-		return 4
-	}
 }

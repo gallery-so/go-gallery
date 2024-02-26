@@ -17,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
@@ -26,24 +25,24 @@ import (
 )
 
 type tokenProcessor struct {
-	queries       *db.Queries
-	httpClient    *http.Client
-	mc            *multichain.Provider
-	ipfsClient    *shell.Shell
-	arweaveClient *goar.Client
-	stg           *storage.Client
-	tokenBucket   string
+	queries        *db.Queries
+	httpClient     *http.Client
+	metadataFinder *MetadataFinder
+	ipfsClient     *shell.Shell
+	arweaveClient  *goar.Client
+	stg            *storage.Client
+	tokenBucket    string
 }
 
-func NewTokenProcessor(queries *db.Queries, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) *tokenProcessor {
+func NewTokenProcessor(queries *db.Queries, httpClient *http.Client, metadataFinder *MetadataFinder, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) *tokenProcessor {
 	return &tokenProcessor{
-		queries:       queries,
-		mc:            mc,
-		httpClient:    httpClient,
-		ipfsClient:    ipfsClient,
-		arweaveClient: arweaveClient,
-		stg:           stg,
-		tokenBucket:   tokenBucket,
+		queries:        queries,
+		metadataFinder: metadataFinder,
+		httpClient:     httpClient,
+		ipfsClient:     ipfsClient,
+		arweaveClient:  arweaveClient,
+		stg:            stg,
+		tokenBucket:    tokenBucket,
 	}
 }
 
@@ -256,9 +255,6 @@ func (tpj *tokenProcessingJob) urlsToDownload(ctx context.Context, metadata pers
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist.Media, persist.TokenMetadata, error) {
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
-	defer traceCallback()
-
 	var (
 		imgURL     media.ImageURL
 		pfpURL     media.ImageURL
@@ -279,7 +275,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (persist
 		metadataCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
 		defer metadataCallback()
 
-		metadata, err = tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain)
+		metadata, err = tpj.tp.metadataFinder.GetMetadata(ctx, tpj.token)
 		if err != nil {
 			return
 		}
@@ -415,6 +411,9 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 		"requireSigned": requireSigned,
 	})
 
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
+	defer traceCallback()
+
 	imgResult, pfpResult, animResult := tpj.cacheMediaFromOriginalURLs(ctx, imgURL, pfpURL, animURL)
 
 	if (!requireImg && animResult.IsSuccess()) || imgResult.IsSuccess() {
@@ -436,7 +435,7 @@ func (tpj *tokenProcessingJob) cacheMediaFromURLs(ctx context.Context, imgURL, p
 		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), err
 	}
 
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
+	traceCallback, ctx = persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
 	defer traceCallback()
 
 	// At this point we don't have a way to make media so we return an error
