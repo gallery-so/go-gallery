@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -20,19 +19,17 @@ import (
 )
 
 func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *task.Client, tokenManageCache *redis.Cache) *gin.Engine {
-	fastRetryLimit := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "retryFast", 2, 1*time.Minute)
-	slowRetryLimit := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "retrySlow", 1, 5*time.Minute)
-
+	managerWithRetries := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache)
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/process", func(c *gin.Context) {
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8, true))
 		}
-		processBatch(tp, mc.Queries, taskClient, tokenManageCache, fastRetryLimit, slowRetryLimit)(c)
+		processBatch(tp, mc.Queries, taskClient, managerWithRetries)(c)
 	})
 	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, tokenmanage.New(ctx, taskClient, tokenManageCache)))
-	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, taskClient, tokenManageCache, fastRetryLimit, slowRetryLimit))
-	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, mc, repos.UserRepository, taskClient, tokenManageCache, fastRetryLimit, slowRetryLimit))
+	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, taskClient, managerWithRetries))
+	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, mc, repos.UserRepository, taskClient, managerWithRetries))
 
 	authOpts := middleware.BasicAuthOptionBuilder{}
 	ownersGroup := router.Group("/owners")

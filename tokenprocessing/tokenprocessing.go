@@ -66,7 +66,7 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-	metadataFetcher := MetadataFinder{mc: mc, ctx: ctx, wait: 3 * time.Second, maxBatch: 100}
+	metadataFetcher := MetadataFinder{mc: mc, ctx: ctx, wait: 5 * time.Second, maxBatch: 100}
 	tp := NewTokenProcessor(clients.Queries, clients.HTTPClient, &metadataFetcher, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
 
 	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient, redis.NewCache(redis.TokenManageCache))

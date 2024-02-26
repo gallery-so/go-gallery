@@ -295,10 +295,9 @@ func (p *Provider) streamAssetsToTokens(
 	recCh chan<- multichain.ChainAgnosticTokensAndContracts,
 	errCh chan<- error,
 ) {
-	cachedContracts := &sync.Map{}                           // used to avoid duplicate contract fetches
-	contractsL := make(map[persist.Address]*sync.Mutex)      // contract job locks
-	contractToCollection := make(map[persist.Address]string) // lookup of contract address to collection slug
-	mu := sync.RWMutex{}                                     // manages access to contract locks
+	cachedContracts := &sync.Map{}                      // used to avoid duplicate contract fetches
+	contractsL := make(map[persist.Address]*sync.Mutex) // contract job locks
+	mu := sync.RWMutex{}                                // manages access to contract locks
 
 	for page := range outCh {
 		page := page
@@ -320,10 +319,8 @@ func (p *Provider) streamAssetsToTokens(
 		for i, asset := range page.Assets {
 			addr := persist.Address(asset.Contract)
 			addresses[i] = addr
-			contractToCollection[addr] = asset.Collection
-
 			wp.Go(func(context.Context) error {
-				return p.getChainAgnosticContract(ctx, addr, contractToCollection[addr], cachedContracts, contractsL, &mu)
+				return p.getChainAgnosticContract(ctx, addr, asset.Collection, cachedContracts, contractsL, &mu)
 			})
 		}
 

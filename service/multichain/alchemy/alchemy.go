@@ -709,11 +709,6 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 			return nil, err
 		}
 
-		if len(batchResp) != len(c) {
-			panic(fmt.Sprintf("expected response to be equal in length to batch=%d; got %d; expected %d", batchID, len(batchResp), len(c)))
-		}
-
-		// alchemy doesn't return data in the same order as the input, so we need to create a lookup
 		for _, m := range batchResp {
 			tID := persist.NewTokenIdentifiers(persist.Address(m.Contract.Address), persist.MustTokenID(m.Id.TokenId), d.chain)
 			lookup[tID] = alchemyMetadataToMetadata(m.Metadata)
@@ -724,7 +719,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 		metadatas[i] = lookup[tID]
 	}
 
-	logger.For(ctx).Info("finished alchemy metadata batch")
+	logger.For(ctx).Infof("finished alchemy metadata batch of %d tokens", len(tIDs))
 	return metadatas, nil
 }
 

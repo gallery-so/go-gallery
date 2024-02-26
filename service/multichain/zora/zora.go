@@ -308,11 +308,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 	metadatas := make([]persist.TokenMetadata, len(tIDs))
 
 	req := graphql.NewRequest(`query tokenBatch($tokens: [TokenInput!], $limit: Int!) {
-   tokens(
-     networks: [ { network: ZORA chain: ZORA_MAINNET } ],
-     pagination: {limit: $limit}
-     where: { tokens: $tokens }
-   ) {
+   tokens( networks: [ { network: ZORA chain: ZORA_MAINNET } ], pagination: {limit: $limit} where: { tokens: $tokens } ) {
      nodes { token { tokenId collectionAddress metadata } }
      pageInfo { limit hasNextPage endCursor }
    }
@@ -374,7 +370,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 		metadatas[i] = lookup[tID]
 	}
 
-	logger.For(ctx).Info("finished zora metadata batch")
+	logger.For(ctx).Infof("finished zora metadata batch of %d tokens", len(tIDs))
 	return metadatas, nil
 }
 

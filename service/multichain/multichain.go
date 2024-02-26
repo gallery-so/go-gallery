@@ -897,8 +897,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 
-	// url := fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL"))
-	url := fmt.Sprintf("%s/media/process/token", "http://localhost:6500")
+	url := fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL"))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {

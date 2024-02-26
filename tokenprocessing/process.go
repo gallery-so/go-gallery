@@ -21,12 +21,10 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/platform"
-	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
@@ -40,7 +38,7 @@ type ProcessMediaForTokenInput struct {
 	Chain           persist.Chain   `json:"chain"`
 }
 
-func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache, fastRetryLimit, slowRetryLimit *limiters.KeyRateLimiter) gin.HandlerFunc {
+func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingBatchMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -67,8 +65,6 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 				if err != nil {
 					return err
 				}
-
-				tm := tokenmanage.NewWithRetries(reqCtx, taskClient, cache, numRetriesF(td), delayF(reqCtx, fastRetryLimit, slowRetryLimit, td))
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
 				_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSync, 0,
@@ -136,7 +132,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm
 }
 
 // processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
-func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, cache *redis.Cache, fastRetryLimit, slowRetryLimit *limiters.KeyRateLimiter) gin.HandlerFunc {
+func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var input task.TokenProcessingTokenMessage
 
@@ -167,8 +163,6 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskCl
 			util.ErrResponse(ctx, http.StatusInternalServerError, err)
 			return
 		}
-
-		tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td), delayF(ctx, fastRetryLimit, slowRetryLimit, td))
 
 		runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSyncRetry, input.Attempts,
 			PipelineOpts.WithRefreshMetadata(), // Refresh metadata
@@ -770,7 +764,7 @@ func processWalletRemoval(queries *db.Queries) gin.HandlerFunc {
 	}
 }
 
-func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo *postgres.UserRepository, taskClient *task.Client, cache *redis.Cache, fastRetryLimit, slowRetryLimit *limiters.KeyRateLimiter) gin.HandlerFunc {
+func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo *postgres.UserRepository, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var input task.PostPreflightMessage
 
@@ -809,8 +803,6 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
-
-			tm := tokenmanage.NewWithRetries(ctx, taskClient, cache, numRetriesF(td), delayF(ctx, fastRetryLimit, slowRetryLimit, td))
 
 			runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCausePostPreflight, 0,
 				PipelineOpts.WithRefreshMetadata(),          // Refresh metadata
@@ -854,7 +846,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	})
 	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
 	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
-	closing, err := tm.StartProcessing(ctx, td.ID, tID, attempts, cause)
+	closing, err := tm.StartProcessing(ctx, td, attempts, cause)
 	if err != nil {
 		return db.TokenMedia{}, err
 	}
@@ -877,30 +869,4 @@ func addContractRunOptions(contract persist.ContractIdentifiers) (opts []Pipelin
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
-}
-
-func shareToGalleryEnabled(td db.TokenDefinition) bool {
-	return platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash
-}
-
-// numRetriesF returns a function that when called, returns the number of retries allotted for a token
-func numRetriesF(td db.TokenDefinition) tokenmanage.NumRetryF {
-	return func() int {
-		if shareToGalleryEnabled(td) {
-			return 24
-		}
-		return 4
-	}
-}
-
-// delayF returns a function that when called, returns the time delay between retries for a token
-func delayF(ctx context.Context, fast, slow *limiters.KeyRateLimiter, td db.TokenDefinition) tokenmanage.TaskDelayF {
-	l := slow
-	if shareToGalleryEnabled(td) {
-		l = fast
-	}
-	return func() (time.Duration, error) {
-		_, delay, err := l.ForKey(ctx, td.ID.String())
-		return delay, err
-	}
 }

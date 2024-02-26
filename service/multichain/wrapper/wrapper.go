@@ -71,7 +71,7 @@ func (w SyncPipelineWrapper) GetTokenMetadataByTokenIdentifiersBatch(ctx context
 	}
 
 	if len(metadatas) != len(tIDs) {
-		panic(fmt.Sprintf("expected length to the the same: %d %d", len(metadatas), len(tIDs)))
+		panic(fmt.Sprintf("expected length to the the same; expected=%d; got=%d", len(tIDs), len(metadatas)))
 	}
 
 	// Convert metadatas to tokens so they can be passed to FillInWrapper
@@ -268,8 +268,7 @@ func fanIn(ctx context.Context, recCh chan<- multichain.ChainAgnosticTokensAndCo
 // FillInWrapper is a service for adding missing data to tokens.
 // Batching pattern adapted from dataloaden (https://github.com/vektah/dataloaden)
 type FillInWrapper struct {
-	chain persist.Chain
-	// May want to use an interface instread so it can be used for other chains
+	chain             persist.Chain
 	reservoirProvider *reservoir.Provider
 	ctx               context.Context
 	mu                sync.Mutex
@@ -376,11 +375,13 @@ func (w *FillInWrapper) addTokenToBatch(t multichain.ChainAgnosticToken) func() 
 	}
 
 	w.mu.Lock()
+
 	if w.batch == nil {
 		w.batch = &batch{done: make(chan struct{})}
 	}
 	b := w.batch
 	pos := b.addToBatch(w, ti)
+
 	w.mu.Unlock()
 
 	return func() multichain.ChainAgnosticToken {
