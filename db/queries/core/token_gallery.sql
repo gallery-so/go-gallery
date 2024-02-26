@@ -96,7 +96,9 @@ with token_definitions_insert as (
         , unnest(@token_chain::int[]) as chain
         , unnest(@token_contract_id::varchar[]) as contract_id
     ) bulk_upsert
-    join token_definitions_insert on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions_insert.chain, token_definitions_insert.contract_address, token_definitions_insert.token_id)
+    join token_definitions_insert on
+      (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions_insert.chain, token_definitions_insert.contract_address, token_definitions_insert.token_id)
+      and not token_definitions_insert.deleted
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
