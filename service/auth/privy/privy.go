@@ -85,7 +85,7 @@ func (a PrivyAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 func NewPrivyClient(httpClient *http.Client) *Client {
 	appID := env.GetString("PRIVY_APP_ID")
 	appSecret := env.GetString("PRIVY_APP_SECRET")
-	jwtPublicKey := env.GetString("PRIVY_VERIFICATION_PUBLIC_KEY")
+	jwtPublicKey := env.GetString("PRIVY_APP_VERIFICATION_PUBLIC_KEY")
 
 	return &Client{
 		httpClient:   httpClient,
