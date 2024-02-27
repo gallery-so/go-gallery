@@ -305,15 +305,23 @@ func (p Provider) GetContractByAddress(ctx context.Context, chain persist.Chain,
 
 // GetTokensByTokenIdentifiersBatch returns a slice tokens from a list of token identifiers
 // Data is returned in the same order as the input. If a token is not found, the zero-value is used instead.
-func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, error) {
+func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, []error) {
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
 		p.streamAssetsForTokens(ctx, tIDs, outCh)
 	}()
+
+	ret := make([]multichain.ChainAgnosticToken, len(tIDs))
+	errs := make([]error, len(tIDs))
+
 	tokens, _, err := assetsToTokens(ctx, p.chain, nil, "", outCh)
 	if err != nil {
-		return nil, err
+		// fill with the same error
+		for i := range tIDs {
+			errs[i] = err
+		}
+		return nil, errs
 	}
 
 	lookup := make(map[persist.TokenIdentifiers]multichain.ChainAgnosticToken)
@@ -325,12 +333,15 @@ func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []p
 		}] = t
 	}
 
-	t := make([]multichain.ChainAgnosticToken, len(tIDs))
 	for i, tID := range tIDs {
-		t[i] = lookup[tID]
+		if r, ok := lookup[tID]; !ok {
+			errs[i] = fmt.Errorf("reservoir unable to find token(chain=%d, contract=%s, tokenId=%s)", tID.Chain, tID.ContractAddress, tID.TokenID)
+		} else {
+			ret[i] = r
+		}
 	}
 
-	return t, nil
+	return ret, errs
 }
 
 func paginateTokens(ctx context.Context, client *http.Client, req *http.Request, outCh chan<- pageResult) {
