@@ -1977,15 +1977,6 @@ order by case when @paging_forward::bool then (cg.user_id != @relative_to_user_i
          case when not @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
 limit sqlc.arg('limit');
 
-create index community_galleries_community_id_gallery_relevance_test_idx
-    on public.community_galleries (user_id, community_id, gallery_relevance, gallery_id);
-
-
-
-select * from users where username_idempotent = 'robin';
-
-select * from communities where name = 'Art Blocks';
-
 -- name: CountGalleriesDisplayingCommunityIDBatch :batchone
 select count(*) from community_galleries cg
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
