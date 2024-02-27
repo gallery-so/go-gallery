@@ -489,6 +489,15 @@ type Post struct {
 	UserMintUrl sql.NullString   `db:"user_mint_url" json:"user_mint_url"`
 }
 
+type PrivyUser struct {
+	ID          persist.DBID `db:"id" json:"id"`
+	PrivyDid    string       `db:"privy_did" json:"privy_did"`
+	UserID      persist.DBID `db:"user_id" json:"user_id"`
+	CreatedAt   time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated time.Time    `db:"last_updated" json:"last_updated"`
+	Deleted     bool         `db:"deleted" json:"deleted"`
+}
+
 type ProfileImage struct {
 	ID           persist.DBID               `db:"id" json:"id"`
 	UserID       persist.DBID               `db:"user_id" json:"user_id"`

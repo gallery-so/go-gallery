@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/auth/privy"
 	"net/http"
 	"time"
 
@@ -68,6 +69,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	validator := validate.WithCustomValidators()
 	tokenManager := tokenmanage.New(ctx, taskClient, tokenManageCache)
+	privyClient := privy.NewPrivyClient(httpClient)
 
 	return &PublicAPI{
 		repos:     repos,
@@ -76,7 +78,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		validator: validator,
 		APQ:       apq,
 
-		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient, oneTimeLoginCache: oneTimeLoginCache, authRefreshCache: authRefreshCache},
+		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient, oneTimeLoginCache: oneTimeLoginCache, authRefreshCache: authRefreshCache, privyClient: privyClient},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient, multichainProvider: multichainProvider, taskClient: taskClient, cache: socialCache},

@@ -9554,6 +9554,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputPostComposerDraftDetailsInput,
 		ec.unmarshalInputPostTokensInput,
 		ec.unmarshalInputPreverifyEmailInput,
+		ec.unmarshalInputPrivyAuth,
 		ec.unmarshalInputPublishGalleryInput,
 		ec.unmarshalInputRedeemMerchInput,
 		ec.unmarshalInputReferralPostPreflightInput,
@@ -9685,9 +9686,7 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 # Add @basicAuth to any field that should be secured by a basic auth token. For example, some fields
 # should only be usable by Retool, so they'd use @basicAuth(allowed: [Retool]). Other fields might be
 # accessible by both Retool and Monitoring, so they'd use @basicAuth(allowed: [Retool, Monitoring]).
-directive @basicAuth(
-  allowed: [BasicAuthType!]!
-) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+directive @basicAuth(allowed: [BasicAuthType!]!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
@@ -11557,6 +11556,7 @@ input AuthMechanism {
   debug: DebugAuth
   magicLink: MagicLinkAuth
   oneTimeLoginToken: OneTimeLoginTokenAuth
+  privy: PrivyAuth
 }
 
 input EoaAuth {
@@ -11597,6 +11597,10 @@ input MagicLinkAuth {
 }
 
 input OneTimeLoginTokenAuth {
+  token: String!
+}
+
+input PrivyAuth {
   token: String!
 }
 
@@ -12769,8 +12773,10 @@ type Mutation {
   setPersona(persona: Persona!): SetPersonaPayloadOrError @authRequired
 
   # Retool Specific Mutations
-  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @basicAuth(allowed: [Retool])
-  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @basicAuth(allowed: [Retool])
+  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError
+    @basicAuth(allowed: [Retool])
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError
+    @basicAuth(allowed: [Retool])
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
     @basicAuth(allowed: [Retool])
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
@@ -12785,7 +12791,8 @@ type Mutation {
   ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @basicAuth(allowed: [Retool])
   banUserFromFeed(username: String!, reason: ReportReason!): BanUserFromFeedPayloadOrError
     @basicAuth(allowed: [Retool])
-  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @basicAuth(allowed: [Retool])
+  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError
+    @basicAuth(allowed: [Retool])
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @basicAuth(allowed: [Retool])
@@ -67777,7 +67784,7 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink", "oneTimeLoginToken"}
+	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink", "oneTimeLoginToken", "privy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -67850,6 +67857,15 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 				return it, err
 			}
 			it.OneTimeLoginToken = data
+		case "privy":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privy"))
+			data, err := ec.unmarshalOPrivyAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPrivyAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Privy = data
 		}
 	}
 
@@ -69292,6 +69308,35 @@ func (ec *executionContext) unmarshalInputPreverifyEmailInput(ctx context.Contex
 				return it, err
 			}
 			it.Email = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputPrivyAuth(ctx context.Context, obj interface{}) (model.PrivyAuth, error) {
+	var it model.PrivyAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Token = data
 		}
 	}
 
@@ -92391,6 +92436,14 @@ func (ec *executionContext) marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._PreviewURLSet(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOPrivyAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPrivyAuth(ctx context.Context, v interface{}) (*model.PrivyAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputPrivyAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐProfileImage(ctx context.Context, sel ast.SelectionSet, v model.ProfileImage) graphql.Marshaler {

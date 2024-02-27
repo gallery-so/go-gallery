@@ -95,6 +95,7 @@ type CreateUserInput struct {
 	WalletType                 WalletType
 	Universal                  bool
 	EmailNotificationsSettings EmailUnsubscriptions
+	PrivyDID                   *string
 }
 
 // UserRepository represents the interface for interacting with the persisted state of users

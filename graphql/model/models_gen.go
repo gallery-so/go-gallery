@@ -606,6 +606,7 @@ type AuthMechanism struct {
 	Debug             *DebugAuth             `json:"debug"`
 	MagicLink         *MagicLinkAuth         `json:"magicLink"`
 	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
+	Privy             *PrivyAuth             `json:"privy"`
 }
 
 type AuthNonce struct {
@@ -2039,6 +2040,10 @@ type PreviewURLSet struct {
 	SrcSet     *string `json:"srcSet"`
 	LiveRender *string `json:"liveRender"`
 	Blurhash   *string `json:"blurhash"`
+}
+
+type PrivyAuth struct {
+	Token string `json:"token"`
 }
 
 type PublishGalleryInput struct {

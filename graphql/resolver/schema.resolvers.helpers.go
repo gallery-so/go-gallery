@@ -209,6 +209,10 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 		return authApi.NewOneTimeLoginTokenAuthenticator(m.OneTimeLoginToken.Token), nil
 	}
 
+	if m.Privy != nil && m.Privy.Token != "" {
+		return authApi.NewPrivyAuthenticator(m.Privy.Token), nil
+	}
+
 	return nil, errNoAuthMechanismFound
 }
 

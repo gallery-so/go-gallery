@@ -1891,6 +1891,7 @@ input AuthMechanism {
   debug: DebugAuth
   magicLink: MagicLinkAuth
   oneTimeLoginToken: OneTimeLoginTokenAuth
+  privy: PrivyAuth
 }
 
 input EoaAuth {
@@ -1931,6 +1932,10 @@ input MagicLinkAuth {
 }
 
 input OneTimeLoginTokenAuth {
+  token: String!
+}
+
+input PrivyAuth {
   token: String!
 }
 

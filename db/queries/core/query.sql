@@ -1977,15 +1977,6 @@ order by case when @paging_forward::bool then (cg.user_id != @relative_to_user_i
          case when not @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
 limit sqlc.arg('limit');
 
-create index community_galleries_community_id_gallery_relevance_test_idx
-    on public.community_galleries (user_id, community_id, gallery_relevance, gallery_id);
-
-
-
-select * from users where username_idempotent = 'robin';
-
-select * from communities where name = 'Art Blocks';
-
 -- name: CountGalleriesDisplayingCommunityIDBatch :batchone
 select count(*) from community_galleries cg
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
@@ -1993,3 +1984,16 @@ where cg.community_id = @community_id;
 
 -- name: SetPersonaByUserID :exec
 update users set persona = @persona where id = @user_id and not deleted;
+
+-- name: GetUserByPrivyDID :one
+select u.* from
+    privy_users p
+        join users u on p.user_id = u.id and not u.deleted
+where
+    p.privy_did = @privy_did
+    and not p.deleted;
+
+-- name: SetPrivyDIDForUser :exec
+insert into privy_users (id, user_id, privy_did)
+    values (@id, @user_id, @privy_did)
+    on conflict (user_id) where not deleted do update set privy_did = excluded.privy_did, last_updated = now();

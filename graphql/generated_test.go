@@ -28,6 +28,7 @@ type AuthMechanism struct {
 	Debug             *DebugAuth             `json:"debug"`
 	MagicLink         *MagicLinkAuth         `json:"magicLink"`
 	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
+	Privy             *PrivyAuth             `json:"privy"`
 }
 
 // GetEoa returns AuthMechanism.Eoa, and is useful for accessing the field via an interface.
@@ -44,6 +45,9 @@ func (v *AuthMechanism) GetMagicLink() *MagicLinkAuth { return v.MagicLink }
 
 // GetOneTimeLoginToken returns AuthMechanism.OneTimeLoginToken, and is useful for accessing the field via an interface.
 func (v *AuthMechanism) GetOneTimeLoginToken() *OneTimeLoginTokenAuth { return v.OneTimeLoginToken }
+
+// GetPrivy returns AuthMechanism.Privy, and is useful for accessing the field via an interface.
+func (v *AuthMechanism) GetPrivy() *PrivyAuth { return v.Privy }
 
 type Chain string
 
@@ -387,6 +391,13 @@ func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
 
 // GetMintURL returns PostTokensInput.MintURL, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetMintURL() *string { return v.MintURL }
+
+type PrivyAuth struct {
+	Token string `json:"token"`
+}
+
+// GetToken returns PrivyAuth.Token, and is useful for accessing the field via an interface.
+func (v *PrivyAuth) GetToken() string { return v.Token }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`
