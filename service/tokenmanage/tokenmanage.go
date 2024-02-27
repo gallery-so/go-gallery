@@ -172,9 +172,9 @@ func maxRetriesFor(td db.TokenDefinition) int {
 	return 2
 }
 
-func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, err error) {
+func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, originalErr error) {
 	// Don't penalize non-token related errors e.g. errors related to the pipeline
-	if err == nil || !util.ErrorIs[ErrBadToken](err) {
+	if originalErr == nil || !util.ErrorIs[ErrBadToken](originalErr) {
 		return
 	}
 
@@ -200,7 +200,7 @@ func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, err err
 	}
 
 	if nowFlaky {
-		err := ErrContractFlaking{Chain: td.Chain, Contract: td.ContractAddress, Err: err, Duration: time.Hour * 3}
+		err := ErrContractFlaking{Chain: td.Chain, Contract: td.ContractAddress, Err: originalErr, Duration: time.Hour * 3}
 		logger.For(ctx).Warnf(err.Error())
 		sentryutil.ReportError(ctx, err)
 	}

@@ -370,7 +370,14 @@ func (w *FillInWrapper) addTokenToBatch(t multichain.ChainAgnosticToken) func() 
 
 	if v, ok := w.resultCache.Load(ti); ok {
 		return func() multichain.ChainAgnosticToken {
-			return v.(multichain.ChainAgnosticToken)
+			f := v.(multichain.ChainAgnosticToken)
+			if !t.FallbackMedia.IsServable() {
+				t.FallbackMedia = f.FallbackMedia
+			}
+			if !hasMediaURLs(t.TokenMetadata, w.chain) {
+				t.TokenMetadata = f.TokenMetadata
+			}
+			return t
 		}
 	}
 
