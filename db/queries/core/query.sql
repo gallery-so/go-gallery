@@ -1984,3 +1984,16 @@ where cg.community_id = @community_id;
 
 -- name: SetPersonaByUserID :exec
 update users set persona = @persona where id = @user_id and not deleted;
+
+-- name: GetUserByPrivyDID :one
+select u.* from
+    privy_users p
+        join users u on p.user_id = u.id and not u.deleted
+where
+    p.privy_did = @privy_did
+    and not p.deleted;
+
+-- name: SetPrivyDIDForUser :exec
+insert into privy_users (id, user_id, privy_did)
+    values (@id, @user_id, @privy_did)
+    on conflict (user_id) where not deleted do update set privy_did = excluded.privy_did, last_updated = now();

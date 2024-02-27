@@ -1900,6 +1900,7 @@ func createNewUserParamsWithAuth(ctx context.Context, authenticator auth.Authent
 		EmailStatus:  persist.EmailVerificationStatusUnverified,
 		ChainAddress: wallet.ChainAddress,
 		WalletType:   wallet.WalletType,
+		PrivyDID:     authResult.PrivyDID,
 	}
 
 	// Override input email with verified email if available

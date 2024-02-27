@@ -268,6 +268,17 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		return "", err
 	}
 
+	if pUser.PrivyDID != nil {
+		err := queries.SetPrivyDIDForUser(pCtx, db.SetPrivyDIDForUserParams{
+			ID:       persist.GenerateID(),
+			UserID:   userID,
+			PrivyDid: *pUser.PrivyDID,
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
 	if pUser.ChainAddress.Address() != "" {
 		_, err = u.createWalletWithTx(pCtx, queries, pUser.ChainAddress, pUser.WalletType, userID)
 		if err != nil {

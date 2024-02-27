@@ -102,6 +102,7 @@ type AuthResult struct {
 	User      *persist.User
 	Addresses []AuthenticatedAddress
 	Email     *persist.Email
+	PrivyDID  *string
 }
 
 func (a *AuthResult) GetAuthenticatedAddress(chainAddress persist.ChainAddress) (AuthenticatedAddress, bool) {

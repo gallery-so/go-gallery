@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth/privy"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"time"
@@ -32,6 +33,7 @@ type AuthAPI struct {
 	magicLinkClient    *magicclient.API
 	oneTimeLoginCache  *redis.Cache
 	authRefreshCache   *redis.Cache
+	privyClient        *privy.Client
 }
 
 func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
@@ -118,6 +120,10 @@ func (api AuthAPI) NewOneTimeLoginTokenAuthenticator(loginToken string) auth.Aut
 		LoginToken:         loginToken,
 	}
 	return authenticator
+}
+
+func (api AuthAPI) NewPrivyAuthenticator(authToken string) auth.Authenticator {
+	return privy.NewAuthenticator(api.repos.UserRepository, api.queries, api.privyClient, authToken)
 }
 
 func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {

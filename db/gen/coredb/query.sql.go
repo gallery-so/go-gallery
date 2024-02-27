@@ -4827,6 +4827,41 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 	return i, err
 }
 
+const getUserByPrivyDID = `-- name: GetUserByPrivyDID :one
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from
+    privy_users p
+        join users u on p.user_id = u.id and not u.deleted
+where
+    p.privy_did = $1
+    and not p.deleted
+`
+
+func (q *Queries) GetUserByPrivyDID(ctx context.Context, privyDid string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByPrivyDID, privyDid)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+		&i.NotificationSettings,
+		&i.EmailUnsubscriptions,
+		&i.FeaturedGallery,
+		&i.PrimaryWalletID,
+		&i.UserExperiences,
+		&i.ProfileImageID,
+		&i.Persona,
+	)
+	return i, err
+}
+
 const getUserByUsername = `-- name: GetUserByUsername :one
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona from users where username_idempotent = lower($1) and deleted = false and universal = false
 `
@@ -6708,6 +6743,23 @@ type SetPersonaByUserIDParams struct {
 
 func (q *Queries) SetPersonaByUserID(ctx context.Context, arg SetPersonaByUserIDParams) error {
 	_, err := q.db.Exec(ctx, setPersonaByUserID, arg.Persona, arg.UserID)
+	return err
+}
+
+const setPrivyDIDForUser = `-- name: SetPrivyDIDForUser :exec
+insert into privy_users (id, user_id, privy_did)
+    values ($1, $2, $3)
+    on conflict (user_id) where not deleted do update set privy_did = excluded.privy_did, last_updated = now()
+`
+
+type SetPrivyDIDForUserParams struct {
+	ID       persist.DBID `db:"id" json:"id"`
+	UserID   persist.DBID `db:"user_id" json:"user_id"`
+	PrivyDid string       `db:"privy_did" json:"privy_did"`
+}
+
+func (q *Queries) SetPrivyDIDForUser(ctx context.Context, arg SetPrivyDIDForUserParams) error {
+	_, err := q.db.Exec(ctx, setPrivyDIDForUser, arg.ID, arg.UserID, arg.PrivyDid)
 	return err
 }
 
