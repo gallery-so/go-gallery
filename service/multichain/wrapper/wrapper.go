@@ -386,7 +386,7 @@ func (w *FillInWrapper) addTokenToBatch(t multichain.ChainAgnosticToken) func() 
 
 	return func() multichain.ChainAgnosticToken {
 		<-b.done
-		if b.err != nil {
+		if b.errors[pos] != nil {
 			return t
 		}
 		if !t.FallbackMedia.IsServable() {
@@ -406,7 +406,7 @@ func hasMediaURLs(metadata persist.TokenMetadata, chain persist.Chain) bool {
 
 type batch struct {
 	tokens  []persist.TokenIdentifiers
-	err     error
+	errors  []error
 	results []multichain.ChainAgnosticToken
 	closing bool
 	done    chan struct{}
@@ -449,9 +449,9 @@ func (b *batch) startTimer(w *FillInWrapper) {
 func (b *batch) end(w *FillInWrapper) {
 	ctx, cancel := context.WithTimeout(w.ctx, 10*time.Second)
 	defer cancel()
-	b.results, b.err = w.reservoirProvider.GetTokensByTokenIdentifiersBatch(ctx, b.tokens)
-	if b.err == nil {
-		for i := range b.results {
+	b.results, b.errors = w.reservoirProvider.GetTokensByTokenIdentifiersBatch(ctx, b.tokens)
+	for i := range b.results {
+		if b.errors[i] == nil {
 			w.resultCache.Store(b.tokens[i], b.results[i])
 		}
 	}
