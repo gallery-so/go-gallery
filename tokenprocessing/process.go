@@ -592,12 +592,15 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 
 		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "user_address": incomingToken.ToAccount.Address})
 		l.Infof("Processing: %s - Processing Opensea User Tokens Refresh", user.ID)
-		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, user.ID, []persist.TokenUniqueIdentifiers{{
+		tokenToAdd := persist.TokenUniqueIdentifiers{
 			Chain:           incomingToken.Item.NFTID.Chain,
 			ContractAddress: incomingToken.Item.NFTID.ContractAddress,
 			TokenID:         incomingToken.Item.NFTID.TokenID,
 			OwnerAddress:    persist.Address(incomingToken.ToAccount.Address.String()),
-		}})
+		}
+		newQuantity := persist.MustHexString(fmt.Sprintf("%x", incomingToken.Quantity))
+		newQuantity = newQuantity.Add(beforeBalance)
+		newTokens, err := mc.AddTokensToUserUnchecked(c, user.ID, []persist.TokenUniqueIdentifiers{tokenToAdd}, []persist.HexString{newQuantity})
 		if err != nil {
 			l.Errorf("error syncing tokens: %s", err)
 			util.ErrResponse(c, http.StatusInternalServerError, err)

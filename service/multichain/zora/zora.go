@@ -374,6 +374,10 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 	return metadatas, nil
 }
 
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	panic("not implemented")
+}
+
 const maxLimit = 1000
 
 func (d *Provider) getTokens(ctx context.Context, url string, recCh chan<- multichain.ChainAgnosticTokensAndContracts, balance bool) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {

@@ -20,11 +20,15 @@ var (
 	MultiProviderWapperOptions MultiProviderWrapperOpts
 )
 
+// SyncPipelineWrapper makes a best effort to fetch tokens requested by a sync.
+// Specifically, it searches every configured provider to find tokens and enriches
+// the token data with a supplemental provider.
 type SyncPipelineWrapper struct {
 	TokenIdentifierOwnerFetcher      multichain.TokenIdentifierOwnerFetcher
 	TokensIncrementalOwnerFetcher    multichain.TokensIncrementalOwnerFetcher
 	TokensIncrementalContractFetcher multichain.TokensIncrementalContractFetcher
 	TokenMetadataBatcher             multichain.TokenMetadataBatcher
+	TokensByTokenIdentifiersFetcher  multichain.TokensByTokenIdentifiersFetcher
 	FillInWrapper                    *FillInWrapper
 }
 
@@ -61,6 +65,15 @@ func (w SyncPipelineWrapper) GetTokensIncrementallyByContractAddress(ctx context
 	recCh, errCh := w.TokensIncrementalContractFetcher.GetTokensIncrementallyByContractAddress(ctx, address, maxLimit)
 	recCh, errCh = w.FillInWrapper.AddToPage(ctx, recCh, errCh)
 	return recCh, errCh
+}
+
+func (w SyncPipelineWrapper) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	t, c, err := w.TokensByTokenIdentifiersFetcher.GetTokensByTokenIdentifiers(ctx, ti)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	t = w.FillInWrapper.LoadAll(t)
+	return t, c, nil
 }
 
 func (w SyncPipelineWrapper) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error) {
@@ -123,6 +136,12 @@ func (o MultiProviderWrapperOpts) WithTokensIncrementalContractFetchers(a, b mul
 	}
 }
 
+func (o MultiProviderWrapperOpts) WithTokenByTokenIdentifiersFetchers(a, b multichain.TokensByTokenIdentifiersFetcher) func(*MultiProviderWrapper) {
+	return func(m *MultiProviderWrapper) {
+		m.TokensByTokenIdentifiersFetchers = [2]multichain.TokensByTokenIdentifiersFetcher{a, b}
+	}
+}
+
 // MultiProviderWrapper handles calling into multiple providers. Depending on the calling context, providers are called in parallel or in series.
 // In some cases, the first provider to return a result is used, in others, the results are combined.
 type MultiProviderWrapper struct {
@@ -132,6 +151,7 @@ type MultiProviderWrapper struct {
 	TokenMetadataFetchers             [2]multichain.TokenMetadataFetcher
 	ContractFetchers                  [2]multichain.ContractFetcher
 	TokenIdentifierOwnerFetchers      [2]multichain.TokenIdentifierOwnerFetcher
+	TokensByTokenIdentifiersFetchers  [2]multichain.TokensByTokenIdentifiersFetcher
 }
 
 func NewMultiProviderWrapper(opts ...func(*MultiProviderWrapper)) *MultiProviderWrapper {
@@ -172,6 +192,15 @@ func (m MultiProviderWrapper) GetTokenDescriptorsByTokenIdentifiers(ctx context.
 func (m MultiProviderWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (tm persist.TokenMetadata, err error) {
 	for _, f := range m.TokenMetadataFetchers {
 		if tm, err = f.GetTokenMetadataByTokenIdentifiers(ctx, ti); err == nil {
+			return
+		}
+	}
+	return
+}
+
+func (m MultiProviderWrapper) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (t []multichain.ChainAgnosticToken, c multichain.ChainAgnosticContract, err error) {
+	for _, f := range m.TokensByTokenIdentifiersFetchers {
+		if t, c, err = f.GetTokensByTokenIdentifiers(ctx, ti); err == nil {
 			return
 		}
 	}
@@ -322,7 +351,21 @@ func (w *FillInWrapper) AddToPage(ctx context.Context, recCh <-chan multichain.C
 	return outCh, errOut
 }
 
-// LoadMetadataAll fills in missing metadata for a slice of tokens.
+// LoaddAll fills in missing data for a slice of tokens.
+func (w *FillInWrapper) LoadAll(tokens []multichain.ChainAgnosticToken) []multichain.ChainAgnosticToken {
+	thunks := make([]func() multichain.ChainAgnosticToken, len(tokens))
+	for i, t := range tokens {
+		t := t
+		thunks[i] = w.addTokenToBatch(t)
+	}
+	result := make([]multichain.ChainAgnosticToken, len(tokens))
+	for i, thunk := range thunks {
+		result[i] = thunk()
+	}
+	return result
+}
+
+// LoadMetadataAll returns missing metadata for a slice of tokens.
 func (w *FillInWrapper) LoadMetadataAll(tokens []multichain.ChainAgnosticToken) []persist.TokenMetadata {
 	thunks := make([]func() multichain.ChainAgnosticToken, len(tokens))
 	for i, t := range tokens {
@@ -337,6 +380,25 @@ func (w *FillInWrapper) LoadMetadataAll(tokens []multichain.ChainAgnosticToken) 
 	for i, thunk := range thunks {
 		r := thunk()
 		result[i] = r.TokenMetadata
+	}
+	return result
+}
+
+// LoadFallbackAll returns missing fallback media for a slice of tokens.
+func (w *FillInWrapper) LoadFallbackAll(tokens []multichain.ChainAgnosticToken) []persist.FallbackMedia {
+	thunks := make([]func() multichain.ChainAgnosticToken, len(tokens))
+	for i, t := range tokens {
+		t := t
+		if t.FallbackMedia.IsServable() {
+			thunks[i] = func() multichain.ChainAgnosticToken { return t }
+		} else {
+			thunks[i] = w.addTokenToBatch(t)
+		}
+	}
+	result := make([]persist.FallbackMedia, len(tokens))
+	for i, thunk := range thunks {
+		r := thunk()
+		result[i] = r.FallbackMedia
 	}
 	return result
 }

@@ -72,6 +72,7 @@ var bannedUsernames = map[string]bool{
 }
 
 var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile(`^[\w.]*$`)
+var DefaultValidator = WithCustomValidators()
 
 // SanitizationPolicy is a policy for sanitizing user input
 var SanitizationPolicy = bluemonday.UGCPolicy()
@@ -92,6 +93,9 @@ func WithTag(v any, t string) ValWithTags {
 }
 
 type ValidationMap map[string]ValWithTags
+
+// Validate validates input fields with the default validator
+func Validate(fields ValidationMap) error { return ValidateFields(DefaultValidator, fields) }
 
 // ValidateFields validates input fields based on a set of predefined validation tags
 func ValidateFields(validator *validator.Validate, fields ValidationMap) error {

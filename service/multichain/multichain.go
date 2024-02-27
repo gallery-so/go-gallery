@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 func init() {
@@ -164,6 +166,10 @@ type ContractsOwnerFetcher interface {
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
 	RefreshContract(context.Context, persist.Address) error
+}
+
+type TokensByTokenIdentifiersFetcher interface {
+	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
 // TokenMetadataFetcher supports fetching token metadata
@@ -332,6 +338,126 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 	return p.Queries.RemoveStaleCreatorStatusFromTokens(ctx, userID)
 }
 
+// AddTokensToUserUnchecked adds tokens to a user with the requested quantities. AddTokensToUserUnchecked does not validate that the user owns the tokens, it only checks that the tokens exist.
+// If a token in the batch does not exist, then the entire batch is rejected and no tokens are added to the user.
+func (p *Provider) AddTokensToUserUnchecked(ctx context.Context, userID persist.DBID, tIDs []persist.TokenUniqueIdentifiers, newQuantities []persist.HexString) ([]op.TokenFullDetails, error) {
+	// Validate
+	err := validate.Validate(validate.ValidationMap{
+		"userID":        validate.WithTag(userID, "required"),
+		"tokensToAdd":   validate.WithTag(tIDs, "required,gt=0,unique"),
+		"newQuantities": validate.WithTag(newQuantities, fmt.Sprintf("len=%d,dive,gt=0", len(tIDs))),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort both inputs by chain for grouping, newQuantities must be sorted first to preserve order
+	sortKey := func(t persist.TokenUniqueIdentifiers) string {
+		return fmt.Sprintf("%d:%s:%s:%s", t.Chain, t.ContractAddress, t.TokenID, t.OwnerAddress)
+	}
+	sort.SliceStable(newQuantities, func(i, j int) bool { return sortKey(tIDs[i]) < sortKey(tIDs[j]) })
+	sort.SliceStable(tIDs, func(i, j int) bool { return sortKey(tIDs[i]) < sortKey(tIDs[j]) })
+
+	// Group tokens by chain
+	chainIndexes := make(map[persist.Chain][2]int)
+	resultChainPages := make(map[persist.Chain]chainTokensAndContracts)
+	curChain := tIDs[0].Chain
+	chainIndexes[curChain] = [2]int{}
+
+outer:
+	for i, t := range tIDs {
+		// Validate that the chain is supported
+		_, ok := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher)
+		if !ok {
+			err = fmt.Errorf("multichain is not configured to fetch unchecked tokens for chain=%d", t.Chain)
+			logger.For(ctx).Error(err)
+			return nil, err
+		}
+		// Collect the start and end input ranges of each chain
+		if t.Chain != curChain {
+			chainIndexes[curChain] = [2]int{chainIndexes[curChain][0], i}
+			curChain = t.Chain
+			chainIndexes[curChain] = [2]int{i, 0}
+		}
+		// Validate that the requested owner address is a wallet owned by the user
+		for _, w := range user.Wallets {
+			if (w.Address == t.OwnerAddress) && (w.Chain.L1Chain() == t.Chain.L1Chain()) {
+				if _, ok := resultChainPages[t.Chain]; !ok {
+					resultChainPages[t.Chain] = chainTokensAndContracts{
+						Chain:     t.Chain,
+						Tokens:    make([]ChainAgnosticToken, 0),
+						Contracts: make([]ChainAgnosticContract, 0),
+					}
+				}
+				continue outer
+			}
+		}
+		err := fmt.Errorf("token(chain=%d, contract=%s; tokenID=%s) requested owner address=%s, but address is not owned by user", t.Chain, t.ContractAddress, t.TokenID, t.OwnerAddress)
+		logger.For(ctx).Error(err)
+		return nil, err
+	}
+	chainIndexes[curChain] = [2]int{chainIndexes[curChain][0], len(tIDs)}
+
+	for c, startEnd := range chainIndexes {
+		tokensToAdd := tIDs[startEnd[0]:startEnd[1]]
+		fetchedTokens := make([]ChainAgnosticToken, len(tokensToAdd))
+		fetchedContracts := make([]ChainAgnosticContract, len(tokensToAdd))
+
+		tokensWithAnyOwner := util.MapWithoutError(tokensToAdd, func(t persist.TokenUniqueIdentifiers) persist.TokenIdentifiers {
+			return persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, t.Chain)
+		})
+
+		for i, t := range tokensWithAnyOwner {
+			tokens, contract, err := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher).GetTokensByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID})
+			if err != nil {
+				err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s): %s", t.Chain, t.ContractAddress, t.TokenID, err)
+				logger.For(ctx).Error(err)
+				return nil, err
+			}
+			if len(tokens) == 0 {
+				err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID)
+				logger.For(ctx).Error(err)
+				return nil, err
+			}
+			fetchedTokens[i] = tokens[0]
+			fetchedContracts[i] = contract
+		}
+		// Override fetched token with input owner and quantity
+		for i, t := range fetchedTokens {
+			t.OwnerAddress = tIDs[startEnd[0]+i].OwnerAddress // Override the owner with the requested owner
+			t.Quantity = newQuantities[startEnd[0]+i]         // Override the quantity
+			if t.TokenType == persist.TokenTypeERC721 {       // Ignore the requested quantity for ERC721s
+				t.Quantity = persist.MustHexString("1")
+			}
+			fetchedTokens[i] = t
+		}
+		cur := resultChainPages[c]
+		cur.Tokens = fetchedTokens
+		cur.Contracts = fetchedContracts
+		resultChainPages[c] = cur
+	}
+
+	// Add the tokens to the user
+	recCh := make(chan chainTokensAndContracts, len(resultChainPages))
+	errCh := make(chan error)
+	go func() {
+		defer close(recCh)
+		defer close(errCh)
+		for c, page := range resultChainPages {
+			logger.For(ctx).Infof("adding %d unchecked tokens to chain=%d for user=%s", len(page.Tokens), c, userID)
+			recCh <- page
+		}
+	}()
+
+	_, newTokens, _, err := p.addHolderTokensForUser(ctx, user, util.MapKeys(resultChainPages), recCh, errCh)
+	return newTokens, err
+}
+
 // SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
 func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, userID persist.DBID, tokenIdentifiers []persist.TokenUniqueIdentifiers) ([]op.TokenFullDetails, error) {
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
@@ -451,9 +577,6 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 		if err != nil && !util.ErrorIs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
 			return err
 		}
-		// Try to sync the token from each wallet. This treats SyncTokensByUserIDAndTokenIdentifiers as a black box: it runs each
-		// wallet in parallel and waits for each wallet to finish. We then check if a token exists in the database at the end and return
-		// if it does. Otherwise, we retry until a token is found or the retry limit is reached.
 		wg := sync.WaitGroup{}
 		for _, w := range p.matchingWalletsChain(user.Wallets, t.Chain) {
 			w := w
