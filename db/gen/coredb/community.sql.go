@@ -147,7 +147,7 @@ with keys as (
          , unnest ($5::varchar[]) as key4
          , generate_subscripts($1::varchar[], 1) as batch_key_index
 )
-select k.batch_key_index, c.id, c.version, c.community_type, c.key1, c.key2, c.key3, c.key4, c.name, c.override_name, c.description, c.override_description, c.profile_image_url, c.override_profile_image_url, c.badge_url, c.override_badge_url, c.contract_id, c.created_at, c.last_updated, c.deleted, c.website_url, c.override_website_url from keys k
+select k.batch_key_index, c.id, c.version, c.community_type, c.key1, c.key2, c.key3, c.key4, c.name, c.override_name, c.description, c.override_description, c.profile_image_url, c.override_profile_image_url, c.badge_url, c.override_badge_url, c.contract_id, c.created_at, c.last_updated, c.deleted, c.website_url, c.override_website_url, c.mint_url, c.override_mint_url from keys k
     join communities c on
         k.type = c.community_type
         and k.key1 = c.key1
@@ -210,6 +210,8 @@ func (q *Queries) GetCommunitiesByKeys(ctx context.Context, arg GetCommunitiesBy
 			&i.Community.Deleted,
 			&i.Community.WebsiteUrl,
 			&i.Community.OverrideWebsiteUrl,
+			&i.Community.MintUrl,
+			&i.Community.OverrideMintUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -222,7 +224,7 @@ func (q *Queries) GetCommunitiesByKeys(ctx context.Context, arg GetCommunitiesBy
 }
 
 const getCommunityByID = `-- name: GetCommunityByID :one
-select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url from communities
+select id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url, mint_url, override_mint_url from communities
     where id = $1
         and not deleted
 `
@@ -252,6 +254,8 @@ func (q *Queries) GetCommunityByID(ctx context.Context, id persist.DBID) (Commun
 		&i.Deleted,
 		&i.WebsiteUrl,
 		&i.OverrideWebsiteUrl,
+		&i.MintUrl,
+		&i.OverrideMintUrl,
 	)
 	return i, err
 }
@@ -367,7 +371,7 @@ on conflict (community_type, key1, key2, key3, key4) where not deleted
                 , contract_id = coalesce(nullif(excluded.contract_id, ''), nullif(communities.contract_id, ''))
                 , last_updated = now()
                 , deleted = excluded.deleted
-returning id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url
+returning id, version, community_type, key1, key2, key3, key4, name, override_name, description, override_description, profile_image_url, override_profile_image_url, badge_url, override_badge_url, contract_id, created_at, last_updated, deleted, website_url, override_website_url, mint_url, override_mint_url
 `
 
 type UpsertCommunitiesParams struct {
@@ -431,6 +435,8 @@ func (q *Queries) UpsertCommunities(ctx context.Context, arg UpsertCommunitiesPa
 			&i.Deleted,
 			&i.WebsiteUrl,
 			&i.OverrideWebsiteUrl,
+			&i.MintUrl,
+			&i.OverrideMintUrl,
 		); err != nil {
 			return nil, err
 		}
