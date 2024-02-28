@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -338,8 +337,7 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 	return p.Queries.RemoveStaleCreatorStatusFromTokens(ctx, userID)
 }
 
-// AddTokensToUserUnchecked adds tokens to a user with the requested quantities. AddTokensToUserUnchecked does not validate that the user owns the tokens, it only checks that the tokens exist.
-// If a token in the batch does not exist, then the entire batch is rejected and no tokens are added to the user.
+// AddTokensToUserUnchecked adds tokens to a user with the requested quantities. AddTokensToUserUnchecked does not validate that the user owns the tokens, only that the tokens exist.
 func (p *Provider) AddTokensToUserUnchecked(ctx context.Context, userID persist.DBID, tIDs []persist.TokenUniqueIdentifiers, newQuantities []persist.HexString) ([]op.TokenFullDetails, error) {
 	// Validate
 	err := validate.Validate(validate.ValidationMap{
@@ -356,21 +354,11 @@ func (p *Provider) AddTokensToUserUnchecked(ctx context.Context, userID persist.
 		return nil, err
 	}
 
-	// Sort both inputs by chain for grouping, newQuantities must be sorted first to preserve order
-	sortKey := func(t persist.TokenUniqueIdentifiers) string {
-		return fmt.Sprintf("%d:%s:%s:%s", t.Chain, t.ContractAddress, t.TokenID, t.OwnerAddress)
-	}
-	sort.SliceStable(newQuantities, func(i, j int) bool { return sortKey(tIDs[i]) < sortKey(tIDs[j]) })
-	sort.SliceStable(tIDs, func(i, j int) bool { return sortKey(tIDs[i]) < sortKey(tIDs[j]) })
-
 	// Group tokens by chain
-	chainIndexes := make(map[persist.Chain][2]int)
-	resultChainPages := make(map[persist.Chain]chainTokensAndContracts)
-	curChain := tIDs[0].Chain
-	chainIndexes[curChain] = [2]int{}
+	chainPages := make(map[persist.Chain]chainTokensAndContracts)
 
 outer:
-	for i, t := range tIDs {
+	for _, t := range tIDs {
 		// Validate that the chain is supported
 		_, ok := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher)
 		if !ok {
@@ -378,17 +366,11 @@ outer:
 			logger.For(ctx).Error(err)
 			return nil, err
 		}
-		// Collect the start and end input ranges of each chain
-		if t.Chain != curChain {
-			chainIndexes[curChain] = [2]int{chainIndexes[curChain][0], i}
-			curChain = t.Chain
-			chainIndexes[curChain] = [2]int{i, 0}
-		}
 		// Validate that the requested owner address is a wallet owned by the user
 		for _, w := range user.Wallets {
 			if (w.Address == t.OwnerAddress) && (w.Chain.L1Chain() == t.Chain.L1Chain()) {
-				if _, ok := resultChainPages[t.Chain]; !ok {
-					resultChainPages[t.Chain] = chainTokensAndContracts{
+				if _, ok := chainPages[t.Chain]; !ok {
+					chainPages[t.Chain] = chainTokensAndContracts{
 						Chain:     t.Chain,
 						Tokens:    make([]ChainAgnosticToken, 0),
 						Contracts: make([]ChainAgnosticContract, 0),
@@ -397,64 +379,51 @@ outer:
 				continue outer
 			}
 		}
+		// Return an error if the requested owner address is not owned by the user
 		err := fmt.Errorf("token(chain=%d, contract=%s; tokenID=%s) requested owner address=%s, but address is not owned by user", t.Chain, t.ContractAddress, t.TokenID, t.OwnerAddress)
 		logger.For(ctx).Error(err)
 		return nil, err
 	}
-	chainIndexes[curChain] = [2]int{chainIndexes[curChain][0], len(tIDs)}
 
-	for c, startEnd := range chainIndexes {
-		tokensToAdd := tIDs[startEnd[0]:startEnd[1]]
-		fetchedTokens := make([]ChainAgnosticToken, len(tokensToAdd))
-		fetchedContracts := make([]ChainAgnosticContract, len(tokensToAdd))
-
-		tokensWithAnyOwner := util.MapWithoutError(tokensToAdd, func(t persist.TokenUniqueIdentifiers) persist.TokenIdentifiers {
-			return persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, t.Chain)
-		})
-
-		for i, t := range tokensWithAnyOwner {
-			tokens, contract, err := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher).GetTokensByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID})
-			if err != nil {
-				err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s): %s", t.Chain, t.ContractAddress, t.TokenID, err)
-				logger.For(ctx).Error(err)
-				return nil, err
-			}
-			if len(tokens) == 0 {
-				err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID)
-				logger.For(ctx).Error(err)
-				return nil, err
-			}
-			fetchedTokens[i] = tokens[0]
-			fetchedContracts[i] = contract
+	for i, t := range tIDs {
+		tokenNoOwner := ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
+		tokens, contract, err := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher).GetTokensByTokenIdentifiers(ctx, tokenNoOwner)
+		if err != nil {
+			err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s): %s", t.Chain, t.ContractAddress, t.TokenID, err)
+			logger.For(ctx).Error(err)
+			return nil, err
 		}
-		// Override fetched token with input owner and quantity
-		for i, t := range fetchedTokens {
-			t.OwnerAddress = tIDs[startEnd[0]+i].OwnerAddress // Override the owner with the requested owner
-			t.Quantity = newQuantities[startEnd[0]+i]         // Override the quantity
-			if t.TokenType == persist.TokenTypeERC721 {       // Ignore the requested quantity for ERC721s
-				t.Quantity = persist.MustHexString("1")
-			}
-			fetchedTokens[i] = t
+		if len(tokens) == 0 {
+			err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID)
+			logger.For(ctx).Error(err)
+			return nil, err
 		}
-		cur := resultChainPages[c]
-		cur.Tokens = fetchedTokens
-		cur.Contracts = fetchedContracts
-		resultChainPages[c] = cur
+		token := tokens[0]
+		// Handle overrides
+		token.OwnerAddress = tIDs[i].OwnerAddress       // Override the owner with the requested owner
+		token.Quantity = newQuantities[i]               // Override the quantity
+		if token.TokenType == persist.TokenTypeERC721 { // Ignore the requested quantity for ERC721s
+			token.Quantity = persist.MustHexString("1")
+		}
+		chainPage := chainPages[t.Chain]
+		chainPage.Tokens = append(chainPage.Tokens, token)
+		chainPage.Contracts = append(chainPage.Contracts, contract)
+		chainPages[t.Chain] = chainPage
 	}
 
 	// Add the tokens to the user
-	recCh := make(chan chainTokensAndContracts, len(resultChainPages))
+	recCh := make(chan chainTokensAndContracts, len(chainPages))
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
 		defer close(errCh)
-		for c, page := range resultChainPages {
+		for c, page := range chainPages {
 			logger.For(ctx).Infof("adding %d unchecked tokens to chain=%d for user=%s", len(page.Tokens), c, userID)
 			recCh <- page
 		}
 	}()
 
-	_, newTokens, _, err := p.addHolderTokensForUser(ctx, user, util.MapKeys(resultChainPages), recCh, errCh)
+	_, newTokens, _, err := p.addHolderTokensForUser(ctx, user, util.MapKeys(chainPages), recCh, errCh)
 	return newTokens, err
 }
 

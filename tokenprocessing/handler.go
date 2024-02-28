@@ -32,14 +32,12 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, mc, repos.UserRepository, taskClient, managerWithRetries))
 
 	authOpts := middleware.BasicAuthOptionBuilder{}
-	ownersGroup := router.Group("/owners")
 
+	ownersGroup := router.Group("/owners")
 	// Return 200 on auth failures to prevent task/job retries
 	ownersGroup.POST("/process/opensea", middleware.BasicHeaderAuthRequired(env.GetString("OPENSEA_WEBHOOK_SECRET"), authOpts.WithFailureStatus(http.StatusOK)), processOwnersForOpenseaTokens(mc, mc.Queries))
-
-	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))
-	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))
+
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.POST("/detect-spam", detectSpamContracts(mc.Queries))
 

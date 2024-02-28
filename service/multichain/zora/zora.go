@@ -374,8 +374,13 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 	return metadatas, nil
 }
 
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	panic("not implemented")
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	url := fmt.Sprintf("%s/contract/ZORA-MAINNET/%s?token_id=%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
+	token, contract, err := d.getToken(ctx, "", url)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	return []multichain.ChainAgnosticToken{token}, contract, nil
 }
 
 const maxLimit = 1000
