@@ -21,7 +21,7 @@ community_key_weights as (
     select $5::float4 / 1000000000 as poap_weight,
            $6::float4 / 1000000000 as provider_weight
 )
-select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url from communities left join community_relevance on community_relevance.id = communities.id,
+select communities.id, communities.version, communities.community_type, communities.key1, communities.key2, communities.key3, communities.key4, communities.name, communities.override_name, communities.description, communities.override_description, communities.profile_image_url, communities.override_profile_image_url, communities.badge_url, communities.override_badge_url, communities.contract_id, communities.created_at, communities.last_updated, communities.deleted, communities.website_url, communities.override_website_url, communities.mint_url, communities.override_mint_url from communities left join community_relevance on community_relevance.id = communities.id,
      to_tsquery('simple', websearch_to_tsquery('simple', $1)::text || ':*') simple_partial_query,
      websearch_to_tsquery('simple', $1) simple_full_query,
      websearch_to_tsquery('english', $1) english_full_query,
@@ -90,6 +90,8 @@ func (q *Queries) SearchCommunities(ctx context.Context, arg SearchCommunitiesPa
 			&i.Deleted,
 			&i.WebsiteUrl,
 			&i.OverrideWebsiteUrl,
+			&i.MintUrl,
+			&i.OverrideMintUrl,
 		); err != nil {
 			return nil, err
 		}

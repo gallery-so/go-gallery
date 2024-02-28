@@ -314,7 +314,14 @@ func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *
 
 // MintURL is the resolver for the mintURL field.
 func (r *communityResolver) MintURL(ctx context.Context, obj *model.Community) (*string, error) {
-	// TODO: Check community.mint_url and community.override_mint_url once we add them.
+	if obj.Community.OverrideMintUrl.Valid {
+		return &obj.Community.OverrideMintUrl.String, nil
+	}
+
+	if obj.Community.MintUrl.Valid {
+		return &obj.Community.MintUrl.String, nil
+	}
+
 	if obj.Community.ContractID == "" {
 		return nil, nil
 	}
@@ -3317,6 +3324,21 @@ func (r *tokenDefinitionResolver) Communities(ctx context.Context, obj *model.To
 
 // MintURL is the resolver for the mintUrl field.
 func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenDefinition) (*string, error) {
+	communityModel, err := resolveCommunityByTokenDefinitionID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := publicapi.For(ctx).Community.GetCommunityByID(ctx, communityModel.Dbid)
+
+	if community.OverrideMintUrl.Valid {
+		return &community.OverrideMintUrl.String, nil
+	}
+
+	if community.MintUrl.Valid {
+		return &community.MintUrl.String, nil
+	}
+
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.HelperTokenDefinitionData.Definition.ContractID)
 	if err != nil {
 		return nil, err

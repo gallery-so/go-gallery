@@ -86,6 +86,8 @@ type Community struct {
 	Deleted                 bool                  `db:"deleted" json:"deleted"`
 	WebsiteUrl              sql.NullString        `db:"website_url" json:"website_url"`
 	OverrideWebsiteUrl      sql.NullString        `db:"override_website_url" json:"override_website_url"`
+	MintUrl                 sql.NullString        `db:"mint_url" json:"mint_url"`
+	OverrideMintUrl         sql.NullString        `db:"override_mint_url" json:"override_mint_url"`
 }
 
 type CommunityContractProvider struct {
