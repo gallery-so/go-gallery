@@ -39,6 +39,7 @@ var lookbackWindow time.Duration = time.Duration(7 * 24 * time.Hour)
 type DigestValues struct {
 	Date           string           `json:"date"`
 	IntroText      *string          `json:"intro_text"`
+	Subject        *string          `json:"subject"`
 	Posts          IncludedSelected `json:"posts"`
 	Communities    IncludedSelected `json:"communities"`
 	Galleries      IncludedSelected `json:"galleries"`
@@ -63,6 +64,7 @@ type DigestValueOverrides struct {
 	IncludeTopCommunities *bool          `json:"include_top_communities,omitempty"`
 	IncludeTopGalleries   *bool          `json:"include_top_galleries,omitempty"`
 	IntroText             *string        `json:"intro_text,omitempty"`
+	Subject               *string        `json:"subject,omitempty"`
 }
 
 type TokenDigestEntity struct {
@@ -209,6 +211,7 @@ func buildDigestTemplate(ctx context.Context, b *store.BucketStorer, q *db.Queri
 	return DigestValues{
 		Date:           time.Now().Format("2 January 2006"),
 		IntroText:      overrides.IntroText,
+		Subject:        overrides.Subject,
 		PostCount:      postCount,
 		CommunityCount: communityCount,
 		GalleryCount:   galleryCount,
