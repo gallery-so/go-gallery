@@ -805,29 +805,29 @@ WHERE
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    AND (last_updated, id) < (@cur_before_time, @cur_before_id)
+    AND (last_updated, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (last_updated, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (last_updated, id) END DESC
     LIMIT $2;
 
 -- name: GetUserUnseenNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    AND (last_updated, id) < (@cur_before_time, @cur_before_id)
+    AND (last_updated, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (last_updated, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (last_updated, id) END DESC
     LIMIT $2;
 
 -- name: GetRecentUnseenNotifications :many
-SELECT * FROM notifications WHERE owner_id = @owner_id AND deleted = false AND seen = false and created_at > @created_after order by created_at desc limit @lim;
+SELECT * FROM notifications WHERE owner_id = @owner_id AND deleted = false AND seen = false and created_at > @created_after order by last_updated desc limit @lim;
 
 -- name: GetUserNotificationsBatch :batchmany
 SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    AND (last_updated, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (last_updated, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (last_updated, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (last_updated, id) END DESC
     LIMIT sqlc.arg('limit');
 
 -- name: CountUserNotifications :one

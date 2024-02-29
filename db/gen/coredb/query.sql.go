@@ -3534,7 +3534,7 @@ func (q *Queries) GetPushTokensByUserID(ctx context.Context, userID persist.DBID
 }
 
 const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by last_updated desc limit $3
 `
 
 type GetRecentUnseenNotificationsParams struct {
@@ -4979,10 +4979,10 @@ func (q *Queries) GetUserIsBlockedFromFeed(ctx context.Context, userID persist.D
 
 const getUserNotifications = `-- name: GetUserNotifications :many
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id FROM notifications WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < ($3, $4)
-    AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    AND (last_updated, id) < ($3, $4)
+    AND (last_updated, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (last_updated, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (last_updated, id) END DESC
     LIMIT $2
 `
 
@@ -5099,10 +5099,10 @@ func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUs
 
 const getUserUnseenNotifications = `-- name: GetUserUnseenNotifications :many
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
-    AND (created_at, id) < ($3, $4)
-    AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    AND (last_updated, id) < ($3, $4)
+    AND (last_updated, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (last_updated, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (last_updated, id) END DESC
     LIMIT $2
 `
 

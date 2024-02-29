@@ -4633,10 +4633,10 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 
 const getUserNotificationsBatch = `-- name: GetUserNotificationsBatch :batchmany
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id FROM notifications WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < ($2, $3)
-    AND (created_at, id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+    AND (last_updated, id) < ($2, $3)
+    AND (last_updated, id) > ($4, $5)
+    ORDER BY CASE WHEN $6::bool THEN (last_updated, id) END ASC,
+             CASE WHEN NOT $6::bool THEN (last_updated, id) END DESC
     LIMIT $7
 `
 
