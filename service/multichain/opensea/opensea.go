@@ -712,12 +712,12 @@ func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Re
 		if page.NFT.Identifier != "" {
 			if keepAssetFilter != nil {
 				if keepAssetFilter(page.NFT) {
-					logger.For(ctx).Infof("got target token from page=%d of opensea", pages)
+					logger.For(ctx).Info("got target token from opensea")
 					outCh <- assetsReceived{Assets: []Asset{page.NFT}}
 				}
 				return
 			}
-			logger.For(ctx).Infof("got target tokens from page=%d of opensea", pages)
+			logger.For(ctx).Info("got target token from opensea")
 			outCh <- assetsReceived{Assets: []Asset{page.NFT}}
 			return
 		}

@@ -21,8 +21,8 @@ var (
 )
 
 // SyncPipelineWrapper makes a best effort to fetch tokens requested by a sync.
-// Specifically, it searches every configured provider to find tokens and enriches
-// the token data with a supplemental provider.
+// Specifically, SyncPipelineWrapper searches every applicable provider to find tokens and
+// fills missing token fields with data from a supplemental provider.
 type SyncPipelineWrapper struct {
 	TokenIdentifierOwnerFetcher      multichain.TokenIdentifierOwnerFetcher
 	TokensIncrementalOwnerFetcher    multichain.TokensIncrementalOwnerFetcher

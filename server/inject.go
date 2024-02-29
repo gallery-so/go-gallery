@@ -119,7 +119,7 @@ func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
 	}
 }
 
-// This is a workaround for wire because wire doesn't know how to inject args of the same type
+// This is a workaround for wire because wire wouldn't know which value to inject for args of the same type
 type (
 	contractFetcherA                  multichain.ContractFetcher
 	contractFetcherB                  multichain.ContractFetcher

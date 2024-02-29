@@ -337,7 +337,9 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 	return p.Queries.RemoveStaleCreatorStatusFromTokens(ctx, userID)
 }
 
-// AddTokensToUserUnchecked adds tokens to a user with the requested quantities. AddTokensToUserUnchecked does not validate that the user owns the tokens, only that the tokens exist.
+// AddTokensToUserUnchecked adds tokens to a user with the requested quantities. AddTokensToUserUnchecked does not make any effort to validate
+// that the user owns the tokens, only that the tokens exist and are fetchable on chain. This is useful for adding tokens to a user when it's
+// already known beforehand that the user owns the token via a trusted source, skipping the potentially expensive operation of fetching a token by owner.
 func (p *Provider) AddTokensToUserUnchecked(ctx context.Context, userID persist.DBID, tIDs []persist.TokenUniqueIdentifiers, newQuantities []persist.HexString) ([]op.TokenFullDetails, error) {
 	// Validate
 	err := validate.Validate(validate.ValidationMap{
@@ -387,31 +389,36 @@ outer:
 
 	for i, t := range tIDs {
 		tokenNoOwner := ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
+
 		tokens, contract, err := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher).GetTokensByTokenIdentifiers(ctx, tokenNoOwner)
+		// Exit early if a token in the batch is not found
 		if err != nil {
 			err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s): %s", t.Chain, t.ContractAddress, t.TokenID, err)
 			logger.For(ctx).Error(err)
 			return nil, err
 		}
+
 		if len(tokens) == 0 {
 			err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID)
 			logger.For(ctx).Error(err)
 			return nil, err
 		}
-		token := tokens[0]
+
 		// Handle overrides
+		token := tokens[0]
 		token.OwnerAddress = tIDs[i].OwnerAddress       // Override the owner with the requested owner
 		token.Quantity = newQuantities[i]               // Override the quantity
 		if token.TokenType == persist.TokenTypeERC721 { // Ignore the requested quantity for ERC721s
 			token.Quantity = persist.MustHexString("1")
 		}
+
 		chainPage := chainPages[t.Chain]
 		chainPage.Tokens = append(chainPage.Tokens, token)
 		chainPage.Contracts = append(chainPage.Contracts, contract)
 		chainPages[t.Chain] = chainPage
 	}
 
-	// Add the tokens to the user
+	// Add tokens to the user
 	recCh := make(chan chainTokensAndContracts, len(chainPages))
 	errCh := make(chan error)
 	go func() {
