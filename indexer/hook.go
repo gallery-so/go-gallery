@@ -12,7 +12,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 )
 
@@ -82,22 +81,6 @@ func newTokenHooks(tasks *task.Client, bQueries *coredb.Queries) []DBHook[persis
 					}] = t.Quantity
 
 					tokensForUser[u] = cur
-				}
-			}
-
-			logger.For(ctx).Infof("submitting %d tasks to process tokens for users", len(tokensForUser))
-			for userID, tids := range tokensForUser {
-				for t, q := range tids {
-					logger.For(ctx).WithFields(logrus.Fields{"user_id": userID, "token_id": t.TokenID, "quantity": q}).Debug("token for user")
-				}
-				// send each token grouped by user ID to the task queue
-				logger.For(ctx).WithFields(logrus.Fields{"user_id": userID, "token_count": len(tids)}).Infof("submitting task for user %s with %d tokens", userID, len(tids))
-				err = tasks.CreateTaskForUserTokenProcessing(ctx, task.TokenProcessingUserTokensMessage{
-					UserID:           userID,
-					TokenIdentifiers: tids,
-				})
-				if err != nil {
-					return err
 				}
 			}
 

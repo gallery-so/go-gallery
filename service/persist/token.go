@@ -123,7 +123,7 @@ func MustHexString(s string) HexString {
 
 	v, ok := new(big.Int).SetString(s, base)
 	if !ok {
-		panic(fmt.Sprintf("failed to convert %s to a number", s))
+		panic(fmt.Sprintf("failed to convert '%s' to a number", s))
 	}
 
 	return HexString(v.Text(16))

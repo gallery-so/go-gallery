@@ -47,8 +47,10 @@ const (
 // TODO add more chains here
 // https://docs.opensea.io/reference/supported-chains#mainnets
 var enabledChains = map[string]bool{
-	"base": true,
-	"zora": true,
+	"base":     true,
+	"zora":     true,
+	"ethereum": true,
+	"arbitrum": true,
 }
 
 type phoenixEvent struct {
@@ -115,9 +117,8 @@ func main() {
 		}
 	}()
 
-	// TODO: Uncomment to re-enable optimistic syncing
-	//cm := newConnectionManager(ctx, task.NewClient(ctx), numConcurrentConnections, numConcurrentSubscribers)
-	//go cm.start()
+	cm := newConnectionManager(ctx, task.NewClient(ctx), numConcurrentConnections, numConcurrentSubscribers)
+	go cm.start()
 
 	err = router.Run(":3000")
 	if err != nil {
