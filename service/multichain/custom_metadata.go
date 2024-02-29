@@ -1,15 +1,15 @@
-package media
+package multichain
 
 import (
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"image/color"
 	"math"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -23,57 +23,122 @@ import (
 
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 )
 
-var ErrNoCustomMetadataHandler = errors.New("no custom metadata handler")
-
 var (
-	AutoglyphContract  = persist.ContractIdentifiers{ContractAddress: "0xd4e4078ca3495de5b1d4db434bebc5a986197782", Chain: persist.ChainETH}
-	ColorglyphContract = persist.ContractIdentifiers{ContractAddress: "0x60f3680350f65beb2752788cb48abfce84a4759e", Chain: persist.ChainETH}
-	EnsContract        = persist.ContractIdentifiers{ContractAddress: eth.EnsAddress, Chain: persist.ChainETH}
-	CryptopunkContract = persist.ContractIdentifiers{ContractAddress: "0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb", Chain: persist.ChainETH}
-	ZoraContract       = persist.ContractIdentifiers{ContractAddress: "0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7", Chain: persist.ChainETH}
+	AutoglyphContract               = persist.ContractIdentifiers{ContractAddress: "0xd4e4078ca3495de5b1d4db434bebc5a986197782", Chain: persist.ChainETH}
+	ColorglyphContract              = persist.ContractIdentifiers{ContractAddress: "0x60f3680350f65beb2752788cb48abfce84a4759e", Chain: persist.ChainETH}
+	EnsContract                     = persist.ContractIdentifiers{ContractAddress: eth.EnsAddress, Chain: persist.ChainETH}
+	CryptopunkContract              = persist.ContractIdentifiers{ContractAddress: "0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb", Chain: persist.ChainETH}
+	ZoraContract                    = persist.ContractIdentifiers{ContractAddress: "0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7", Chain: persist.ChainETH}
+	OpenseaSharedStorefrontContract = persist.ContractIdentifiers{ContractAddress: "0x495f947276749ce646f68ac8c248420045cb7b5e", Chain: persist.ChainETH}
 )
 
 type metadataHandler func(context.Context, persist.TokenIdentifiers) (persist.TokenMetadata, error)
 
 type CustomMetadataHandlers struct {
-	AutoglyphHandler  metadataHandler
-	ColorglyphHandler metadataHandler
-	EnsHandler        metadataHandler
-	CryptopunkHandler metadataHandler
-	ZoraHandler       metadataHandler
+	AutoglyphHandler               metadataHandler
+	ColorglyphHandler              metadataHandler
+	EnsHandler                     metadataHandler
+	CryptopunkHandler              metadataHandler
+	ZoraHandler                    metadataHandler
+	OpenseaSharedStorefrontHandler metadataHandler
 }
 
-func NewCustomMetadataHandlers(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) *CustomMetadataHandlers {
+func NewCustomMetadataHandlers(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, openseaMetadataFetcher TokenMetadataFetcher) *CustomMetadataHandlers {
 	return &CustomMetadataHandlers{
-		AutoglyphHandler:  newAutoglyphHandler(ethClient),
-		ColorglyphHandler: newColorglyphHandler(ethClient),
-		EnsHandler:        newEnsHandler(),
-		CryptopunkHandler: newCryptopunkHandler(ethClient),
-		ZoraHandler:       newZoraHandler(ethClient, ipfsClient, arweaveClient),
+		AutoglyphHandler:               newAutoglyphHandler(ethClient),
+		ColorglyphHandler:              newColorglyphHandler(ethClient),
+		EnsHandler:                     newEnsHandler(),
+		CryptopunkHandler:              newCryptopunkHandler(ethClient),
+		ZoraHandler:                    newZoraHandler(ethClient, ipfsClient, arweaveClient),
+		OpenseaSharedStorefrontHandler: newOpenseaSharedStorefrontHandler(openseaMetadataFetcher),
 	}
 }
 
-func (c *CustomMetadataHandlers) GetTokenMetadataByTokenIdentifiers(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
+func (c *CustomMetadataHandlers) HandlerFor(t persist.TokenIdentifiers) metadataHandler {
 	cID := persist.ContractIdentifiers{ContractAddress: t.ContractAddress, Chain: t.Chain}
 	switch cID {
 	case AutoglyphContract:
-		return c.AutoglyphHandler(ctx, t)
+		return c.AutoglyphHandler
 	case ColorglyphContract:
-		return c.ColorglyphHandler(ctx, t)
+		return c.ColorglyphHandler
 	case EnsContract:
-		return c.EnsHandler(ctx, t)
+		return c.EnsHandler
 	case CryptopunkContract:
-		return c.CryptopunkHandler(ctx, t)
+		return c.CryptopunkHandler
 	case ZoraContract:
-		return c.ZoraHandler(ctx, t)
+		return c.ZoraHandler
+	case OpenseaSharedStorefrontContract:
+		return c.OpenseaSharedStorefrontHandler
 	default:
-		return persist.TokenMetadata{}, ErrNoCustomMetadataHandler
+		return nil
 	}
+}
+
+func (c *CustomMetadataHandlers) AddToToken(ctx context.Context, chain persist.Chain, t ChainAgnosticToken) ChainAgnosticToken {
+	tID := ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
+	m := c.Load(ctx, chain, tID)
+	t.TokenMetadata = m
+	return t
+}
+
+func (c *CustomMetadataHandlers) AddToPage(ctx context.Context, chain persist.Chain, recCh <-chan ChainAgnosticTokensAndContracts, errIn <-chan error) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
+	outCh := make(chan ChainAgnosticTokensAndContracts, 2*10)
+	errOut := make(chan error)
+	go func() {
+		defer close(outCh)
+		for {
+			select {
+			case page, ok := <-recCh:
+				if !ok {
+					return
+				}
+				page.Tokens = c.LoadAll(ctx, chain, page.Tokens)
+				outCh <- page
+			case err, ok := <-errIn:
+				if ok {
+					errOut <- err
+				}
+			case <-ctx.Done():
+				errOut <- ctx.Err()
+				return
+			}
+		}
+	}()
+	logger.For(ctx).Info("finished applying custom metadata to page")
+	return outCh, errOut
+}
+
+func (c *CustomMetadataHandlers) Load(ctx context.Context, chain persist.Chain, t ChainAgnosticIdentifiers) persist.TokenMetadata {
+	tID := persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, chain)
+	h := c.HandlerFor(tID)
+	if h == nil {
+		return persist.TokenMetadata{}
+	}
+	m, err := h(ctx, tID)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to get custom metadata for token(chain=%d, contract=%s, tokenID=%s): %s", chain, t.ContractAddress, t.TokenID, err)
+		return nil
+	}
+	return m
+}
+
+func (c *CustomMetadataHandlers) LoadMetadataAll(ctx context.Context, chain persist.Chain, tokens []ChainAgnosticToken) []persist.TokenMetadata {
+	tokens = c.LoadAll(ctx, chain, tokens)
+	return util.MapWithoutError(tokens, func(t ChainAgnosticToken) persist.TokenMetadata { return t.TokenMetadata })
+}
+
+func (c *CustomMetadataHandlers) LoadAll(ctx context.Context, chain persist.Chain, tokens []ChainAgnosticToken) []ChainAgnosticToken {
+	for i, t := range tokens {
+		tokens[i] = c.AddToToken(ctx, chain, t)
+	}
+	return tokens
 }
 
 func newAutoglyphHandler(ethClient *ethclient.Client) metadataHandler {
@@ -391,42 +456,58 @@ func parseHexColor(s string) (c color.RGBA, err error) {
 	return color.RGBA{r, g, b, 255}, nil
 }
 
-type ensDomain struct {
-	LabelName string `json:"labelName"`
-}
-
-type ensDomains struct {
-	Domains []ensDomain `json:"domains"`
-}
-
-type graphResponse struct {
-	Data   ensDomains `json:"data"`
-	Errors []struct {
-		Message string `json:"message"`
-	} `json:"errors"`
-}
-
 func newEnsHandler() metadataHandler {
+	type ensDomain struct {
+		LabelName string `json:"labelName"`
+	}
+
+	type ensDomains struct {
+		Domains []ensDomain `json:"domains"`
+	}
+
+	type graphResponse struct {
+		Data   ensDomains `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
 	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
 		// The TokenID type removes leading zeros, but we want the zeros for ENS because the token ID
-		// is a hash that is used to look up a label. Here, we convert the token ID to decimal then back to
-		// hexadecimal to get back the padding.
+		// is a hash that is used to look up a label. We convert the token ID to decimal then back to
+		// hexadecimal to get back the padding. Some tokenIDs are stored as decimal in the database, so we
+		// need to check both the hex and decimal representations of the token ID.
+		var resp *http.Response
+		var err error
 		labelHash := fmt.Sprintf("0x%x", t.TokenID.BigInt())
 
-		gql := fmt.Sprintf(`{ domains(first:1, where:{labelhash:"%s"}){ labelName }}`, labelHash)
-		marshaled, _ := json.Marshal(map[string]any{"query": gql})
+		for i := 0; i < 2; i++ {
+			gql := fmt.Sprintf(`{ domains(first:1, where:{labelhash:"%s"}){ labelName }}`, labelHash)
+			marshaled, _ := json.Marshal(map[string]any{"query": gql})
 
-		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.thegraph.com/subgraphs/name/ensdomains/ens", bytes.NewBuffer(marshaled))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.thegraph.com/subgraphs/name/ensdomains/ens", bytes.NewBuffer(marshaled))
+			if err != nil {
+				return persist.TokenMetadata{}, err
+			}
+
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err = http.DefaultClient.Do(req)
+			if err != nil {
+				// Try again assuming decimal token ID
+				labelHash = fmt.Sprintf("0x%x", persist.MustTokenID(t.TokenID.String()).BigInt())
+				continue
+			}
+
+			defer resp.Body.Close()
+			if err == nil {
+				break
+			}
+		}
+
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}
-
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return persist.TokenMetadata{}, err
-		}
-		defer resp.Body.Close()
 
 		var gr graphResponse
 
@@ -528,9 +609,9 @@ func newZoraHandler(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweav
 		contentType, ok := util.FindFirstFieldFromMap(tokenMetadata, "mimeType", "contentType", "content-type", "type").(string)
 		var mediaType persist.MediaType
 		if ok {
-			mediaType = MediaFromContentType(contentType)
+			mediaType = media.MediaFromContentType(contentType)
 		} else {
-			mediaType, _, _, _ = PredictMediaType(ctx, mediaURI)
+			mediaType, _, _, _ = media.PredictMediaType(ctx, mediaURI)
 		}
 		switch mediaType {
 		case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
@@ -550,5 +631,48 @@ func newZoraHandler(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweav
 		}
 
 		return resultMetadata, nil
+	}
+}
+
+func newOpenseaSharedStorefrontHandler(f TokenMetadataFetcher) metadataHandler {
+	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
+		m, err := f.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID})
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		imgKey, imgURL, _, _, err := media.FindMediaURLsKeysChain(m, t.Chain)
+
+		// If there is no image, return the metadata as is
+		if err != nil {
+			return m, nil
+		}
+
+		u, err := url.Parse(string(imgURL))
+		if err != nil {
+			return m, nil
+		}
+
+		query := u.Query()
+
+		// Opensea uses imgix for image resizing. We add a width query parameter with the
+		// maximum width to get the highest resolution image.
+		if u.Hostname() == "i.seadn.io" {
+			for k := range query {
+				if k == "w" {
+					query.Set("w", "8120")
+					u.RawQuery = query.Encode()
+					m[imgKey] = u.String()
+					return m, nil
+				}
+			}
+			// If there is no width, add it
+			query.Set("w", "8120")
+			u.RawQuery = query.Encode()
+			m[imgKey] = u.String()
+			return m, nil
+		}
+
+		return m, nil
 	}
 }

@@ -302,7 +302,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	return result, nil
 }
 
-func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error) {
+func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []multichain.ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
 	chunkSize := 50
 	chunks := util.ChunkBy(tIDs, chunkSize)
 	metadatas := make([]persist.TokenMetadata, len(tIDs))
@@ -332,7 +332,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 	}
 
 	// zora doesn't return tokens in the same order as the input
-	lookup := make(map[persist.TokenIdentifiers]persist.TokenMetadata)
+	lookup := make(map[multichain.ChainAgnosticIdentifiers]persist.TokenMetadata)
 
 	for i, chunk := range chunks {
 		batchID := i + 1
@@ -360,9 +360,9 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 			return nil, err
 		}
 
-		for _, token := range batchResp.Tokens.Nodes {
-			tID := persist.NewTokenIdentifiers(persist.Address(token.Token.CollectionAddress), persist.MustTokenID(token.Token.TokenID), persist.ChainZora)
-			lookup[tID] = persist.TokenMetadata(token.Token.Metadata)
+		for _, t := range batchResp.Tokens.Nodes {
+			tID := multichain.ChainAgnosticIdentifiers{ContractAddress: persist.Address(t.Token.CollectionAddress), TokenID: persist.MustTokenID(t.Token.TokenID)}
+			lookup[tID] = persist.TokenMetadata(t.Token.Metadata)
 		}
 	}
 

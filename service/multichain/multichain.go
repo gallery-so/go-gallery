@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -47,11 +46,10 @@ const maxCommunitySize = 1000
 type SubmitTokensF func(ctx context.Context, tDefIDs []persist.DBID) error
 
 type Provider struct {
-	Repos                  *postgres.Repositories
-	Queries                *db.Queries
-	SubmitTokens           SubmitTokensF
-	Chains                 ProviderLookup
-	CustomMetadataHandlers *media.CustomMetadataHandlers
+	Repos        *postgres.Repositories
+	Queries      *db.Queries
+	SubmitTokens SubmitTokensF
+	Chains       ProviderLookup
 }
 
 // ChainAgnosticToken is a token that is agnostic to the chain it is on
@@ -177,7 +175,7 @@ type TokenMetadataFetcher interface {
 }
 
 type TokenMetadataBatcher interface {
-	GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error)
+	GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error)
 }
 
 type TokenDescriptorsFetcher interface {
@@ -339,7 +337,7 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 
 // AddTokensToUserUnchecked adds tokens to a user with the requested quantities. AddTokensToUserUnchecked does not make any effort to validate
 // that the user owns the tokens, only that the tokens exist and are fetchable on chain. This is useful for adding tokens to a user when it's
-// already known beforehand that the user owns the token via a trusted source, skipping the potentially expensive operation of fetching a token by owner.
+// already known beforehand that the user owns the token via a trusted source, skipping the potentially expensive operation of fetching a token by its owner.
 func (p *Provider) AddTokensToUserUnchecked(ctx context.Context, userID persist.DBID, tIDs []persist.TokenUniqueIdentifiers, newQuantities []persist.HexString) ([]op.TokenFullDetails, error) {
 	// Validate
 	err := validate.Validate(validate.ValidationMap{
@@ -954,20 +952,15 @@ outer:
 	return tokens, nil
 }
 
-// GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain) (persist.TokenMetadata, error) {
-	metadata, err := p.CustomMetadataHandlers.GetTokenMetadataByTokenIdentifiers(ctx, persist.TokenIdentifiers{
-		TokenID:         tokenID,
-		ContractAddress: contractAddress,
-		Chain:           chain,
-	})
-	if err == nil {
-		return metadata, nil
+func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, chain persist.Chain, tIDs []ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
+	f, ok := p.Chains[chain].(TokenMetadataBatcher)
+	if !ok {
+		return nil, fmt.Errorf("no metadata batchers for chain %d", chain)
 	}
-	if err != nil && !errors.Is(err, media.ErrNoCustomMetadataHandler) {
-		return persist.TokenMetadata{}, err
-	}
+	return f.GetTokenMetadataByTokenIdentifiersBatch(ctx, tIDs)
+}
 
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain) (persist.TokenMetadata, error) {
 	fetcher, ok := p.Chains[chain].(TokenMetadataFetcher)
 	if !ok {
 		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)

@@ -264,6 +264,18 @@ func FindMediaURLsChain(metadata persist.TokenMetadata, chain persist.Chain) (im
 
 // FindMediaURLs finds the image and animation URLs from a token's metadata
 func FindMediaURLs(metadata persist.TokenMetadata, imgKeywords []string, animKeywords []string) (imgURL ImageURL, animURL AnimationURL, err error) {
+	_, imgURL, _, animURL, err = FindMediaURLsKeys(metadata, imgKeywords, animKeywords)
+	return imgURL, animURL, err
+}
+
+// FindMediaURLsKeysChain finds the image and animation URLs and corresponding keywords from a token's metadata, using the chain's base keywords
+func FindMediaURLsKeysChain(metadata persist.TokenMetadata, chain persist.Chain) (imgKey string, imgURL ImageURL, animKey string, animURL AnimationURL, err error) {
+	imgK, animK := chain.BaseKeywords()
+	return FindMediaURLsKeys(metadata, imgK, animK)
+}
+
+// FindMediaURLsKeys finds the image and animation URLs and corresponding keywords from a token's metadata
+func FindMediaURLsKeys(metadata persist.TokenMetadata, imgKeywords []string, animKeywords []string) (imgKey string, imgURL ImageURL, animKey string, animURL AnimationURL, err error) {
 	if metaMedia, ok := metadata["media"].(map[string]any); ok {
 		var mediaType persist.MediaType
 
@@ -283,6 +295,7 @@ func FindMediaURLs(metadata persist.TokenMetadata, imgKeywords []string, animKey
 	for _, keyword := range imgKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			imgURL = ImageURL(it)
+			imgKey = keyword
 			break
 		}
 	}
@@ -290,15 +303,16 @@ func FindMediaURLs(metadata persist.TokenMetadata, imgKeywords []string, animKey
 	for _, keyword := range animKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && AnimationURL(it) != animURL {
 			animURL = AnimationURL(it)
+			animKey = keyword
 			break
 		}
 	}
 
 	if imgURL == "" && animURL == "" {
-		return "", "", ErrNoMediaURLs
+		return "", "", "", "", ErrNoMediaURLs
 	}
 
-	return imgURL, animURL, nil
+	return imgKey, imgURL, animKey, animURL, nil
 }
 
 func predictTrueURLs(ctx context.Context, curImg ImageURL, curV AnimationURL) (ImageURL, AnimationURL) {

@@ -12,7 +12,6 @@ import (
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
@@ -78,18 +77,21 @@ func multichainProviderInjector(contextContext context.Context, repositories *po
 	manager := tokenmanage.New(contextContext, client, cache)
 	submitTokensF := newSubmitBatch(manager)
 	providerLookup := newProviderLookup(chainProvider)
-	ethclientClient := rpc.NewEthClient()
-	shell := ipfs.NewShell()
-	goarClient := arweave.NewClient()
-	customMetadataHandlers := media.NewCustomMetadataHandlers(ethclientClient, shell, goarClient)
 	provider := &multichain.Provider{
-		Repos:                  repositories,
-		Queries:                queries,
-		SubmitTokens:           submitTokensF,
-		Chains:                 providerLookup,
-		CustomMetadataHandlers: customMetadataHandlers,
+		Repos:        repositories,
+		Queries:      queries,
+		SubmitTokens: submitTokensF,
+		Chains:       providerLookup,
 	}
 	return provider
+}
+
+func customMetadataHandlersInjector(openseaProvider *opensea.Provider) *multichain.CustomMetadataHandlers {
+	client := rpc.NewEthClient()
+	shell := ipfs.NewShell()
+	goarClient := arweave.NewClient()
+	customMetadataHandlers := multichain.NewCustomMetadataHandlers(client, shell, goarClient, openseaProvider)
+	return customMetadataHandlers
 }
 
 func ethInjector(serverEnvInit envInit, contextContext context.Context, client *http.Client) *multichain.EthereumProvider {
@@ -132,13 +134,16 @@ func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain
 	tokensIncrementalOwnerFetcher := ethTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
 	tokensIncrementalContractFetcher := ethTokensContractFetcherInjector(openseaProvider, alchemyProvider)
 	tokensByTokenIdentifiersFetcher := ethTokenByTokenIdentifiersFetcherInjector(openseaProvider, alchemyProvider)
+	customMetadataHandlers := customMetadataHandlersInjector(openseaProvider)
 	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
+		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
 		TokenMetadataBatcher:             alchemyProvider,
 		TokensByTokenIdentifiersFetcher:  tokensByTokenIdentifiersFetcher,
+		CustomMetadataWrapper:            customMetadataHandlers,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -232,13 +237,16 @@ func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 	tokensIncrementalOwnerFetcher := optimismTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
 	tokensIncrementalContractFetcher := optimismTokensContractFetcherInjector(openseaProvider, alchemyProvider)
 	tokensByTokenIdentifiersFetcher := optmismTokenByTokenIdentifiersFetcherInjector(openseaProvider, alchemyProvider)
+	customMetadataHandlers := customMetadataHandlersInjector(openseaProvider)
 	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
+		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
 		TokenMetadataBatcher:             alchemyProvider,
 		TokensByTokenIdentifiersFetcher:  tokensByTokenIdentifiersFetcher,
+		CustomMetadataWrapper:            customMetadataHandlers,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -307,13 +315,16 @@ func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 	tokensIncrementalOwnerFetcher := arbitrumTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
 	tokensIncrementalContractFetcher := arbitrumTokensContractFetcherInjector(openseaProvider, alchemyProvider)
 	tokensByTokenIdentifiersFetcher := arbitrumTokenByTokenIdentifiersFetcherInjector(openseaProvider, alchemyProvider)
+	customMetadataHandlers := customMetadataHandlersInjector(openseaProvider)
 	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
+		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
 		TokenMetadataBatcher:             alchemyProvider,
 		TokensByTokenIdentifiersFetcher:  tokensByTokenIdentifiersFetcher,
+		CustomMetadataWrapper:            customMetadataHandlers,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -416,13 +427,16 @@ func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 	tokensIncrementalOwnerFetcher := zoraTokensIncrementalOwnerFetcherInjector(openseaProvider, zoraProvider)
 	tokensIncrementalContractFetcher := zoraTokensContractFetcherInjector(openseaProvider, zoraProvider)
 	tokensByTokenIdentifiersFetcher := zoraTokenByTokenIdentifiersFetcherInjector(openseaProvider, zoraProvider)
+	customMetadataHandlers := customMetadataHandlersInjector(openseaProvider)
 	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
+		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
 		TokenMetadataBatcher:             zoraProvider,
 		TokensByTokenIdentifiersFetcher:  tokensByTokenIdentifiersFetcher,
+		CustomMetadataWrapper:            customMetadataHandlers,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -481,13 +495,16 @@ func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 	tokensIncrementalOwnerFetcher := baseTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
 	tokensIncrementalContractFetcher := baseTokensContractFetcherInjector(openseaProvider, alchemyProvider)
 	tokensByTokenIdentifiersFetcher := baseTokenByTokenIdentifiersFetcherInjector(openseaProvider, alchemyProvider)
+	customMetadataHandlers := customMetadataHandlersInjector(openseaProvider)
 	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
+		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
 		TokenMetadataBatcher:             alchemyProvider,
 		TokensByTokenIdentifiersFetcher:  tokensByTokenIdentifiersFetcher,
+		CustomMetadataWrapper:            customMetadataHandlers,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -543,13 +560,16 @@ func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, c
 	tokensIncrementalOwnerFetcher := polygonTokensIncrementalOwnerFetcherInjector(openseaProvider, alchemyProvider)
 	tokensIncrementalContractFetcher := polygonTokensContractFetcherInjector(openseaProvider, alchemyProvider)
 	tokensByTokenIdentifiersFetcher := polygonTokenByTokenIdentifiersFetcherInjector(openseaProvider, alchemyProvider)
+	customMetadataHandlers := customMetadataHandlersInjector(openseaProvider)
 	fillInWrapper := wrapper.NewFillInWrapper(ctx, httpClient, chain)
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
+		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
 		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
 		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
 		TokenMetadataBatcher:             alchemyProvider,
 		TokensByTokenIdentifiersFetcher:  tokensByTokenIdentifiersFetcher,
+		CustomMetadataWrapper:            customMetadataHandlers,
 		FillInWrapper:                    fillInWrapper,
 	}
 	return syncPipelineWrapper
@@ -605,9 +625,6 @@ func polygonTokenByTokenIdentifiersFetcherInjector(openseaProvider *opensea.Prov
 // to calling the provider
 type envInit struct{}
 
-// customMetadataHandlerSet is a wire provider set for initializing custom metadata handlers
-var customMetadataHandlerSet = wire.NewSet(rpc.NewEthClient, ipfs.NewShell, arweave.NewClient, media.NewCustomMetadataHandlers)
-
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(
 	newPqClient,
@@ -638,7 +655,7 @@ func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
 	return multichain.ProviderLookup{persist.ChainETH: p.Ethereum, persist.ChainTezos: p.Tezos, persist.ChainOptimism: p.Optimism, persist.ChainArbitrum: p.Arbitrum, persist.ChainPOAP: p.Poap, persist.ChainZora: p.Zora, persist.ChainBase: p.Base, persist.ChainPolygon: p.Polygon}
 }
 
-// This is a workaround for wire because wire doesn't know how to inject args of the same type
+// This is a workaround for wire because wire wouldn't know which value to inject for args of the same type
 type (
 	contractFetcherA                  multichain.ContractFetcher
 	contractFetcherB                  multichain.ContractFetcher
