@@ -20,6 +20,8 @@ const (
 	EmailTypeNotifications EmailType = "notifications"
 	EmailTypeAdmin         EmailType = "admin"
 	EmailTypeDigest        EmailType = "digest"
+	EmailTypeMarketing     EmailType = "marketing"
+	EmailTypeMembersClub   EmailType = "members_club"
 )
 
 const (
@@ -33,6 +35,8 @@ type EmailUnsubscriptions struct {
 	All           NullBool `json:"all"`
 	Notifications NullBool `json:"notifications"`
 	Digest        NullBool `json:"digest"`
+	Marketing     NullBool `json:"marketing"`
+	MembersClub   NullBool `json:"members_club"`
 }
 
 func (e EmailUnsubscriptions) Value() (driver.Value, error) {

@@ -92,6 +92,8 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_DIGEST_TEMPLATE_ID", "d-0b9b6b0b0b5e4b6e9b0b0b5e4b6e9b0b")
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_DIGEST_GROUP_ID", 46079)
+	viper.SetDefault("SENDGRID_UNSUBSCRIBE_MARKETING_GROUP_ID", 22420)
+	viper.SetDefault("SENDGRID_UNSUBSCRIBE_MEMBERS_CLUB_GROUP_ID", 22419)
 	viper.SetDefault("SCHEDULER_AUDIENCE", "")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("ADMIN_PASS", "admin")

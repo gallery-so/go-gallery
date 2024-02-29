@@ -867,6 +867,8 @@ enum EmailUnsubscriptionType {
   All
   Notifications
   Digest
+  Marketing
+  MembersClub
 }
 
 type UserEmail {
@@ -879,12 +881,16 @@ type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
   unsubscribedFromDigest: Boolean!
+  unsubscribedFromMarketing: Boolean
+  unsubscribedFromMembersClub: Boolean # TODO make this required once frontend is updated
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
   unsubscribedFromDigest: Boolean!
+  unsubscribedFromMarketing: Boolean
+  unsubscribedFromMembersClub: Boolean
 }
 
 input UnsubscribeFromEmailTypeInput {
