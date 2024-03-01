@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
@@ -60,14 +59,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	return nil, nil
 }
 
-// customMetadataHandlerSet is a wire provider set for initializing custom metadata handlers
-var customMetadataHandlerSet = wire.NewSet(
-	rpc.NewEthClient,
-	ipfs.NewShell,
-	arweave.NewClient,
-	media.NewCustomMetadataHandlers,
-)
-
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(
 	newPqClient,
@@ -101,7 +92,6 @@ func multichainProviderInjector(context.Context, *postgres.Repositories, *db.Que
 		tokenmanage.New,
 		task.NewClient,
 		newProviderLookup,
-		customMetadataHandlerSet,
 	)
 	return nil
 }
@@ -165,6 +155,16 @@ func multiTokenByTokenIdentifiersFetcherProvider(a tokensByTokenIdentifiersFetch
 	return wrapper.NewMultiProviderWrapper(wrapper.MultiProviderWapperOptions.WithTokenByTokenIdentifiersFetchers(a, b))
 }
 
+func customMetadataHandlersInjector(openseaProvider *opensea.Provider) *multichain.CustomMetadataHandlers {
+	panic(wire.Build(
+		multichain.NewCustomMetadataHandlers,
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
+		rpc.NewEthClient,
+		ipfs.NewShell,
+		arweave.NewClient,
+	))
+}
+
 func ethInjector(envInit, context.Context, *http.Client) *multichain.EthereumProvider {
 	panic(wire.Build(
 		rpc.NewEthClient,
@@ -210,6 +210,7 @@ func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain
 		ethTokensContractFetcherInjector,
 		ethTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
+		customMetadataHandlersInjector,
 	))
 }
 
@@ -327,6 +328,7 @@ func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 		optimismTokensContractFetcherInjector,
 		optmismTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
+		customMetadataHandlersInjector,
 	))
 }
 
@@ -414,6 +416,7 @@ func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 		arbitrumTokensContractFetcherInjector,
 		arbitrumTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
+		customMetadataHandlersInjector,
 	))
 }
 
@@ -546,6 +549,7 @@ func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 		zoraTokensContractFetcherInjector,
 		zoraTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
+		customMetadataHandlersInjector,
 	))
 }
 
@@ -617,6 +621,7 @@ func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 		baseTokensContractFetcherInjector,
 		baseTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
+		customMetadataHandlersInjector,
 	))
 }
 
@@ -689,6 +694,7 @@ func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, c
 		polygonTokensContractFetcherInjector,
 		polygonTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
+		customMetadataHandlersInjector,
 	))
 }
 

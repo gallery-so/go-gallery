@@ -632,7 +632,7 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 	return cTokens, cContracts[0], nil
 }
 
-func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]persist.TokenMetadata, error) {
+func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []multichain.ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
 	type tokenRequest struct {
 		ContractAddress string `json:"contractAddress"`
 		TokenID         string `json:"tokenId"`
@@ -663,7 +663,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 	}
 
 	// alchemy doesn't return tokens in the same order as the input
-	lookup := make(map[persist.TokenIdentifiers]persist.TokenMetadata)
+	lookup := make(map[multichain.ChainAgnosticIdentifiers]persist.TokenMetadata)
 
 	for i, c := range chunks {
 		batchID := i + 1
@@ -710,7 +710,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 		}
 
 		for _, m := range batchResp {
-			tID := persist.NewTokenIdentifiers(persist.Address(m.Contract.Address), persist.MustTokenID(m.Id.TokenId), d.chain)
+			tID := multichain.ChainAgnosticIdentifiers{ContractAddress: persist.Address(m.Contract.Address), TokenID: persist.MustTokenID(m.Id.TokenId)}
 			lookup[tID] = alchemyMetadataToMetadata(m.Metadata)
 		}
 	}
