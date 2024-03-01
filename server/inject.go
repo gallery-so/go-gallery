@@ -155,10 +155,10 @@ func multiTokenByTokenIdentifiersFetcherProvider(a tokensByTokenIdentifiersFetch
 	return wrapper.NewMultiProviderWrapper(wrapper.MultiProviderWapperOptions.WithTokenByTokenIdentifiersFetchers(a, b))
 }
 
-func customMetadataHandlersInjector(openseaProvider *opensea.Provider) *multichain.CustomMetadataHandlers {
+func customMetadataHandlersInjector(alchemyProvider *alchemy.Provider) *multichain.CustomMetadataHandlers {
 	panic(wire.Build(
 		multichain.NewCustomMetadataHandlers,
-		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(alchemyProvider)),
 		rpc.NewEthClient,
 		ipfs.NewShell,
 		arweave.NewClient,
@@ -549,7 +549,17 @@ func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 		zoraTokensContractFetcherInjector,
 		zoraTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
-		customMetadataHandlersInjector,
+		zoraCustomMetadataHandlersInjector,
+	))
+}
+
+func zoraCustomMetadataHandlersInjector(openseaProvider *opensea.Provider) *multichain.CustomMetadataHandlers {
+	panic(wire.Build(
+		multichain.NewCustomMetadataHandlers,
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(openseaProvider)),
+		rpc.NewEthClient,
+		ipfs.NewShell,
+		arweave.NewClient,
 	))
 }
 
