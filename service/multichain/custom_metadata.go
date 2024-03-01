@@ -50,14 +50,14 @@ type CustomMetadataHandlers struct {
 	OpenseaSharedStorefrontHandler metadataHandler
 }
 
-func NewCustomMetadataHandlers(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, openseaMetadataFetcher TokenMetadataFetcher) *CustomMetadataHandlers {
+func NewCustomMetadataHandlers(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, f TokenMetadataFetcher) *CustomMetadataHandlers {
 	return &CustomMetadataHandlers{
 		AutoglyphHandler:               newAutoglyphHandler(ethClient),
 		ColorglyphHandler:              newColorglyphHandler(ethClient),
 		EnsHandler:                     newEnsHandler(),
 		CryptopunkHandler:              newCryptopunkHandler(ethClient),
 		ZoraHandler:                    newZoraHandler(ethClient, ipfsClient, arweaveClient),
-		OpenseaSharedStorefrontHandler: newOpenseaSharedStorefrontHandler(openseaMetadataFetcher),
+		OpenseaSharedStorefrontHandler: newOpenseaSharedStorefrontHandler(f),
 	}
 }
 
@@ -658,15 +658,6 @@ func newOpenseaSharedStorefrontHandler(f TokenMetadataFetcher) metadataHandler {
 		// Opensea uses imgix for image resizing. We add a width query parameter with the
 		// maximum width to get the highest resolution image.
 		if u.Hostname() == "i.seadn.io" {
-			for k := range query {
-				if k == "w" {
-					query.Set("w", "8120")
-					u.RawQuery = query.Encode()
-					m[imgKey] = u.String()
-					return m, nil
-				}
-			}
-			// If there is no width, add it
 			query.Set("w", "8120")
 			u.RawQuery = query.Encode()
 			m[imgKey] = u.String()
