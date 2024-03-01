@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
@@ -283,6 +282,7 @@ func getSpotlightPosts(ctx context.Context, q *db.Queries, gql *graphql.Client, 
 	})
 
 	trendingIDs := util.MapWithoutError(trendingPosts, func(p db.GetFeedEntityScoresRow) persist.DBID { return p.Post.ID })
+
 	addPosts(ctx, gql, &entities, added, n, trendingIDs, false)
 	return entities, nil
 }
@@ -296,7 +296,6 @@ func addGalleries(
 	entityIDs []persist.DBID,
 	editorialized bool,
 ) {
-	var mu sync.Mutex
 	batch := make([]persist.DBID, 0, 4)
 	var i int
 	var wg conc.WaitGroup
@@ -312,17 +311,15 @@ func addGalleries(
 		// run the batch
 		for i := 0; i < len(batch); i++ {
 			i := i
-			wg.Go(func() {
-				entity, err := galleryToEntity(ctx, *gql, batch[i], editorialized)
-				if err != nil {
-					logger.For(ctx).Error(err)
-					return
-				}
-				mu.Lock()
+			entity, err := galleryToEntity(ctx, *gql, batch[i], editorialized)
+			if err != nil {
+				logger.For(ctx).Error(err)
+				continue
+			}
+			if !added[batch[i]] {
 				*spotlightGalleries = append(*spotlightGalleries, entity)
 				added[batch[i]] = true
-				mu.Unlock()
-			})
+			}
 		}
 
 		wg.Wait()
@@ -341,7 +338,6 @@ func addCommunities(
 	entityIDs []persist.DBID,
 	editorialized bool,
 ) {
-	var mu sync.Mutex
 	batch := make([]persist.DBID, 0, 4)
 	var i int
 	var wg conc.WaitGroup
@@ -357,17 +353,15 @@ func addCommunities(
 		// run the batch
 		for i := 0; i < len(batch); i++ {
 			i := i
-			wg.Go(func() {
-				entity, err := communityToEntity(ctx, *gql, batch[i], editorialized)
-				if err != nil {
-					logger.For(ctx).Error(err)
-					return
-				}
-				mu.Lock()
+			entity, err := communityToEntity(ctx, *gql, batch[i], editorialized)
+			if err != nil {
+				logger.For(ctx).Error(err)
+				continue
+			}
+			if !added[batch[i]] {
 				*spotlightCommunities = append(*spotlightCommunities, entity)
 				added[batch[i]] = true
-				mu.Unlock()
-			})
+			}
 		}
 
 		wg.Wait()
@@ -386,7 +380,6 @@ func addPosts(
 	entityIDs []persist.DBID,
 	editorialized bool,
 ) {
-	var mu sync.Mutex
 	batch := make([]persist.DBID, 0, 4)
 	var i int
 	var wg conc.WaitGroup
@@ -401,18 +394,15 @@ func addPosts(
 
 		// run the batch
 		for i := 0; i < len(batch); i++ {
-			i := i
-			wg.Go(func() {
-				entity, err := postToEntity(ctx, *gql, batch[i], editorialized)
-				if err != nil {
-					logger.For(ctx).Error(err)
-					return
-				}
-				mu.Lock()
+			entity, err := postToEntity(ctx, *gql, batch[i], editorialized)
+			if err != nil {
+				logger.For(ctx).Error(err)
+				continue
+			}
+			if !added[batch[i]] {
 				*spotlightPosts = append(*spotlightPosts, entity)
 				added[batch[i]] = true
-				mu.Unlock()
-			})
+			}
 		}
 
 		wg.Wait()
