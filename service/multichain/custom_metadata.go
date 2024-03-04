@@ -457,78 +457,37 @@ func parseHexColor(s string) (c color.RGBA, err error) {
 }
 
 func newEnsHandler() metadataHandler {
-	type ensDomain struct {
-		LabelName string `json:"labelName"`
-	}
-
-	type ensDomains struct {
-		Domains []ensDomain `json:"domains"`
-	}
-
-	type graphResponse struct {
-		Data   ensDomains `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-
 	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
-		// The TokenID type removes leading zeros, but we want the zeros for ENS because the token ID
-		// is a hash that is used to look up a label. We convert the token ID to decimal then back to
-		// hexadecimal to get back the padding. Some tokenIDs are stored as decimal in the database, so we
-		// need to check both the hex and decimal representations of the token ID.
 		var resp *http.Response
-		var err error
-		labelHash := fmt.Sprintf("0x%x", t.TokenID.BigInt())
+		var m persist.TokenMetadata
 
-		for i := 0; i < 2; i++ {
-			gql := fmt.Sprintf(`{ domains(first:1, where:{labelhash:"%s"}){ labelName }}`, labelHash)
-			marshaled, _ := json.Marshal(map[string]any{"query": gql})
-
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.thegraph.com/subgraphs/name/ensdomains/ens", bytes.NewBuffer(marshaled))
-			if err != nil {
-				return persist.TokenMetadata{}, err
-			}
-
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err = http.DefaultClient.Do(req)
-			if err != nil {
-				// Try again assuming decimal token ID
-				labelHash = fmt.Sprintf("0x%x", persist.MustTokenID(t.TokenID.String()).BigInt())
-				continue
-			}
-
-			defer resp.Body.Close()
-			if err == nil {
-				break
-			}
-		}
-
+		u := fmt.Sprintf("https://metadata.ens.domains/mainnet/%s/%s", t.ContractAddress, t.TokenID.Base10String())
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}
 
-		var gr graphResponse
-
-		err = json.NewDecoder(resp.Body).Decode(&gr)
+		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}
 
-		if len(gr.Errors) > 0 {
-			return persist.TokenMetadata{}, fmt.Errorf("error from ENS graph: %s", gr.Errors[0].Message)
+		defer resp.Body.Close()
+
+		err = json.NewDecoder(resp.Body).Decode(&m)
+		if err != nil {
+			return persist.TokenMetadata{}, err
 		}
 
-		if len(gr.Data.Domains) == 0 {
-			return persist.TokenMetadata{}, fmt.Errorf("no ENS domain found for %s", t)
+		if errMsg, ok := m["message"].(string); ok && errMsg != "" {
+			return persist.TokenMetadata{}, fmt.Errorf(errMsg)
 		}
 
-		if len(gr.Data.Domains) > 1 {
-			return persist.TokenMetadata{}, fmt.Errorf("multiple ENS domains found for %s", t)
+		name, ok := m["name"].(string)
+		if !ok {
+			return persist.TokenMetadata{}, fmt.Errorf("no ENS name found in metadata")
 		}
 
-		result := gr.Data.Domains[0].LabelName + ".eth"
 		width := 240
 		height := 240
 		buf := &bytes.Buffer{}
@@ -536,7 +495,7 @@ func newEnsHandler() metadataHandler {
 		canvas.Start(width, height)
 		canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
 
-		canvas.Text(width/2, height/2, result, `font-size="16px"`, `text-anchor="middle"`, `alignment-baseline="middle"`, `font-family="Helvetica Neue"`)
+		canvas.Text(width/2, height/2, name, `font-size="16px"`, `text-anchor="middle"`, `alignment-baseline="middle"`, `font-family="Helvetica Neue"`)
 
 		canvas.End()
 
@@ -547,10 +506,10 @@ func newEnsHandler() metadataHandler {
 		}
 
 		return persist.TokenMetadata{
-			"name":          fmt.Sprintf("ENS: %s", result),
+			"name":          fmt.Sprintf("ENS: %s", name),
 			"description":   "ENS names are used to resolve domain names to Ethereum addresses.",
 			"image":         fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
-			"profile_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
+			"profile_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", name),
 		}, nil
 	}
 }
