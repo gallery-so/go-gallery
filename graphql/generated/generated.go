@@ -1763,17 +1763,18 @@ type ComplexityRoot struct {
 	}
 
 	Viewer struct {
-		Email                func(childComplexity int) int
-		Feed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
-		ID                   func(childComplexity int) int
-		NotificationSettings func(childComplexity int) int
-		Notifications        func(childComplexity int, before *string, after *string, first *int, last *int) int
-		Persona              func(childComplexity int) int
-		SocialAccounts       func(childComplexity int) int
-		SuggestedUsers       func(childComplexity int, before *string, after *string, first *int, last *int) int
-		User                 func(childComplexity int) int
-		UserExperiences      func(childComplexity int) int
-		ViewerGalleries      func(childComplexity int) int
+		Email                   func(childComplexity int) int
+		Feed                    func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		ID                      func(childComplexity int) int
+		NotificationSettings    func(childComplexity int) int
+		Notifications           func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Persona                 func(childComplexity int) int
+		SocialAccounts          func(childComplexity int) int
+		SuggestedUsers          func(childComplexity int, before *string, after *string, first *int, last *int) int
+		SuggestedUsersFarcaster func(childComplexity int, before *string, after *string, first *int, last *int) int
+		User                    func(childComplexity int) int
+		UserExperiences         func(childComplexity int) int
+		ViewerGalleries         func(childComplexity int) int
 	}
 
 	ViewerGallery struct {
@@ -2259,6 +2260,7 @@ type ViewerResolver interface {
 	UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error)
 	Persona(ctx context.Context, obj *model.Viewer) (*persist.Persona, error)
 	SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
+	SuggestedUsersFarcaster(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 }
 type WalletResolver interface {
 	Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error)
@@ -9395,6 +9397,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Viewer.SuggestedUsers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Viewer.suggestedUsersFarcaster":
+		if e.complexity.Viewer.SuggestedUsersFarcaster == nil {
+			break
+		}
+
+		args, err := ec.field_Viewer_suggestedUsersFarcaster_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Viewer.SuggestedUsersFarcaster(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
 	case "Viewer.user":
 		if e.complexity.Viewer.User == nil {
 			break
@@ -10504,6 +10518,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   userExperiences: [UserExperience!] @goField(forceResolver: true)
   persona: Persona @goField(forceResolver: true)
   suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
+    @goField(forceResolver: true)
+  suggestedUsersFarcaster(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
 }
 
@@ -16593,6 +16609,48 @@ func (ec *executionContext) field_Viewer_notifications_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Viewer_suggestedUsersFarcaster_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field_Viewer_suggestedUsers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -16731,6 +16789,8 @@ func (ec *executionContext) fieldContext_AddUserWalletPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -17189,6 +17249,8 @@ func (ec *executionContext) fieldContext_AdmireCommentPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -17378,6 +17440,8 @@ func (ec *executionContext) fieldContext_AdmireFeedEventPayload_viewer(ctx conte
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -17561,6 +17625,8 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -17752,6 +17818,8 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_viewer(ctx context.C
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -22521,6 +22589,8 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -22787,6 +22857,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -24965,6 +25037,8 @@ func (ec *executionContext) fieldContext_ConnectSocialAccountPayload_viewer(ctx 
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -25966,6 +26040,8 @@ func (ec *executionContext) fieldContext_CreateUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -26274,6 +26350,8 @@ func (ec *executionContext) fieldContext_DisconnectSocialAccountPayload_viewer(c
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -29756,6 +29834,8 @@ func (ec *executionContext) fieldContext_FollowAllOnboardingRecommendationsPaylo
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -29821,6 +29901,8 @@ func (ec *executionContext) fieldContext_FollowAllSocialConnectionsPayload_viewe
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -30018,6 +30100,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -35941,6 +36025,8 @@ func (ec *executionContext) fieldContext_LoginPayload_viewer(ctx context.Context
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36006,6 +36092,8 @@ func (ec *executionContext) fieldContext_LogoutPayload_viewer(ctx context.Contex
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -49239,6 +49327,8 @@ func (ec *executionContext) fieldContext_RegisterUserPushTokenPayload_viewer(ctx
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -49304,6 +49394,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -49544,6 +49636,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -49743,6 +49837,8 @@ func (ec *executionContext) fieldContext_RemoveProfileImagePayload_viewer(ctx co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -49808,6 +49904,8 @@ func (ec *executionContext) fieldContext_RemoveUserWalletsPayload_viewer(ctx con
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -49917,6 +50015,8 @@ func (ec *executionContext) fieldContext_ResendVerificationEmailPayload_viewer(c
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -50208,6 +50308,8 @@ func (ec *executionContext) fieldContext_SetPersonaPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -50273,6 +50375,8 @@ func (ec *executionContext) fieldContext_SetProfileImagePayload_viewer(ctx conte
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -56259,6 +56363,8 @@ func (ec *executionContext) fieldContext_SyncCreatedTokensForExistingContractPay
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -56324,6 +56430,8 @@ func (ec *executionContext) fieldContext_SyncCreatedTokensForNewContractsPayload
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -56521,6 +56629,8 @@ func (ec *executionContext) fieldContext_SyncTokensPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -61345,6 +61455,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -61779,6 +61891,8 @@ func (ec *executionContext) fieldContext_UnregisterUserPushTokenPayload_viewer(c
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -61844,6 +61958,8 @@ func (ec *executionContext) fieldContext_UnsubscribeFromEmailTypePayload_viewer(
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62155,6 +62271,8 @@ func (ec *executionContext) fieldContext_UpdateEmailNotificationSettingsPayload_
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62220,6 +62338,8 @@ func (ec *executionContext) fieldContext_UpdateEmailPayload_viewer(ctx context.C
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62285,6 +62405,8 @@ func (ec *executionContext) fieldContext_UpdateFeaturedGalleryPayload_viewer(ctx
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62533,6 +62655,8 @@ func (ec *executionContext) fieldContext_UpdateGalleryOrderPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62659,6 +62783,8 @@ func (ec *executionContext) fieldContext_UpdatePrimaryWalletPayload_viewer(ctx c
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62724,6 +62850,8 @@ func (ec *executionContext) fieldContext_UpdateSocialAccountDisplayedPayload_vie
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62892,6 +63020,8 @@ func (ec *executionContext) fieldContext_UpdateUserExperiencePayload_viewer(ctx 
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62957,6 +63087,8 @@ func (ec *executionContext) fieldContext_UpdateUserInfoPayload_viewer(ctx contex
 				return ec.fieldContext_Viewer_persona(ctx, field)
 			case "suggestedUsers":
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "suggestedUsersFarcaster":
+				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -65236,6 +65368,64 @@ func (ec *executionContext) fieldContext_Viewer_suggestedUsers(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Viewer_suggestedUsers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Viewer_suggestedUsersFarcaster(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Viewer().SuggestedUsersFarcaster(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.UsersConnection)
+	fc.Result = res
+	return ec.marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Viewer_suggestedUsersFarcaster(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_UsersConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_UsersConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UsersConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Viewer_suggestedUsersFarcaster_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -87686,6 +87876,23 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Viewer_suggestedUsers(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "suggestedUsersFarcaster":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_suggestedUsersFarcaster(ctx, field, obj)
 				return res
 			}
 

@@ -6,17 +6,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/farcaster"
-	"github.com/mikeydub/go-gallery/service/task"
-
 	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/socialauth"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -61,6 +61,35 @@ func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Add
 		Address:    address,
 		Signature:  sig,
 	}
+}
+
+func (api SocialAPI) GetFarcastingFollowingByUserID(ctx context.Context, userID persist.DBID) ([]farcaster.NeynarUser, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// if no rows found, might not be cached yet
+	wallets, err := For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
+
+	// check if no wallets
+	if err != nil {
+		return nil, err
+	}
+
+	f, ok := socials[persist.SocialProviderFarcaster]
+	if !ok {
+		return []farcaster.NeynarUser{}, nil
+	}
+	fUsers, err := api.neynarAPI.FollowingByUserID(ctx, f.ID)
+	return fUsers, err
 }
 
 func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider persist.SocialProvider, before, after *string, first, last *int, onlyUnfollowing *bool) ([]model.SocialConnection, PageInfo, error) {
@@ -112,17 +141,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 			return t.ID, nil
 		})
 	case persist.SocialProviderFarcaster:
-		// first fetch the user's farcaster profile
-		socials, err := api.queries.GetSocialsByUserID(ctx, userID)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-		far, hasFar := socials[persist.SocialProviderFarcaster]
-		if !hasFar {
-			return nil, PageInfo{}, nil
-		}
-
-		farcasterFollowing, err := api.neynarAPI.FollowingByUserID(ctx, far.ID)
+		farcasterFollowing, err := api.GetFarcastingFollowingByUserID(ctx, userID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}

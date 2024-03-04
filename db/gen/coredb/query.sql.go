@@ -2534,6 +2534,59 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 	return items, nil
 }
 
+const getFarcasterConnections = `-- name: GetFarcasterConnections :many
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona
+from (select unnest($1::varchar[]) fid) farcaster
+join pii.for_users p on p.pii_socials->'Farcaster'->>'id' = farcaster.fid
+join users u on u.id = p.user_id
+left join follows f on f.follower = $2 and u.id = f.followee
+where not u.deleted and not u.deleted
+`
+
+type GetFarcasterConnectionsParams struct {
+	Fids   []string     `db:"fids" json:"fids"`
+	UserID persist.DBID `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) GetFarcasterConnections(ctx context.Context, arg GetFarcasterConnectionsParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getFarcasterConnections, arg.Fids, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
+			&i.Persona,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFeedEventByID = `-- name: GetFeedEventByID :one
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = $1 AND deleted = false
 `
@@ -3808,6 +3861,7 @@ func (q *Queries) GetSocialConnections(ctx context.Context, arg GetSocialConnect
 }
 
 const getSocialConnectionsPaginate = `-- name: GetSocialConnectionsPaginate :many
+
 select s.social_id, s.social_username, s.social_displayname, s.social_profile_image, user_view.id as user_id, user_view.created_at as user_created_at, (f.id is not null)::bool as already_following
 from (select unnest($2::varchar[]) as social_id, unnest($3::varchar[]) as social_username, unnest($4::varchar[]) as social_displayname, unnest($5::varchar[]) as social_profile_image) as s
     inner join pii.user_view on user_view.pii_socials->$6::text->>'id'::varchar = s.social_id and user_view.deleted = false
@@ -3848,6 +3902,7 @@ type GetSocialConnectionsPaginateRow struct {
 	AlreadyFollowing   bool         `db:"already_following" json:"already_following"`
 }
 
+// and f.id is null;
 // this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
 // it will also go and search for whether the specified user follows any of the users returned
 func (q *Queries) GetSocialConnectionsPaginate(ctx context.Context, arg GetSocialConnectionsPaginateParams) ([]GetSocialConnectionsPaginateRow, error) {

@@ -3006,11 +3006,12 @@ type Viewer struct {
 	Email           *UserEmail       `json:"email"`
 	// Returns a list of notifications in reverse chronological order.
 	// Seen notifications come after unseen notifications
-	Notifications        *NotificationsConnection `json:"notifications"`
-	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
-	UserExperiences      []*UserExperience        `json:"userExperiences"`
-	Persona              *persist.Persona         `json:"persona"`
-	SuggestedUsers       *UsersConnection         `json:"suggestedUsers"`
+	Notifications           *NotificationsConnection `json:"notifications"`
+	NotificationSettings    *NotificationSettings    `json:"notificationSettings"`
+	UserExperiences         []*UserExperience        `json:"userExperiences"`
+	Persona                 *persist.Persona         `json:"persona"`
+	SuggestedUsers          *UsersConnection         `json:"suggestedUsers"`
+	SuggestedUsersFarcaster *UsersConnection         `json:"suggestedUsersFarcaster"`
 }
 
 func (Viewer) IsNode()          {}

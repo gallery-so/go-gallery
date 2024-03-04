@@ -840,6 +840,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   persona: Persona @goField(forceResolver: true)
   suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
+  suggestedUsersFarcaster(before: String, after: String, first: Int, last: Int): UsersConnection
+    @goField(forceResolver: true)
 }
 
 type NotificationSettings {

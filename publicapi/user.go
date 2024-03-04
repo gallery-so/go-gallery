@@ -26,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/membership"
@@ -1437,16 +1438,71 @@ func (api UserAPI) GetSuggestedUsers(ctx context.Context, before, after *string,
 
 		recommend.Shuffle(users, 8)
 
-		curPos := make(map[persist.DBID]int64, len(users))
-		curIDs := make([]persist.DBID, len(users))
+		cursorPositions := make(map[persist.DBID]int64, len(users))
+		cursorIDs := make([]persist.DBID, len(users))
 		for i, u := range users {
-			curPos[u.ID] = int64(i)
-			curIDs[i] = u.ID
+			cursorPositions[u.ID] = int64(i)
+			cursorIDs[i] = u.ID
 		}
 
 		cursor := cursors.NewPositionCursor()
-		cursor.IDs = curIDs
-		cursor.Positions = curPos
+		cursor.IDs = cursorIDs
+		cursor.Positions = cursorPositions
+		paginator = api.paginatorFromResults(ctx, cursor, users)
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
+func (api UserAPI) GetSuggestedUsersFarcaster(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+	// Validate
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	viewerID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	var paginator positionPaginator[db.User]
+
+	// If we have a cursor, we can page through the original set of recommended users
+	if before != nil {
+		paginator, err = api.paginatorFromCursorStr(ctx, *before)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	} else if after != nil {
+		paginator, err = api.paginatorFromCursorStr(ctx, *after)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	} else {
+		// Otherwise make a new recommendation
+		fUsers, err := For(ctx).Social.GetFarcastingFollowingByUserID(ctx, viewerID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		users, err := api.queries.GetFarcasterConnections(ctx, db.GetFarcasterConnectionsParams{
+			Fids:   util.MapWithoutError(fUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() }),
+			UserID: viewerID,
+		})
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		cursorPositions := make(map[persist.DBID]int64, len(users))
+		cursorIDs := make([]persist.DBID, len(users))
+		for i, u := range users {
+			cursorPositions[u.ID] = int64(i)
+			cursorIDs[i] = u.ID
+		}
+
+		cursor := cursors.NewPositionCursor()
+		cursor.IDs = cursorIDs
+		cursor.Positions = cursorPositions
 		paginator = api.paginatorFromResults(ctx, cursor, users)
 	}
 
