@@ -2,11 +2,13 @@ package publicapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -72,11 +74,18 @@ func (api SocialAPI) GetFarcastingFollowingByUserID(ctx context.Context, userID 
 	}
 
 	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 
-	fID := socials[persist.SocialProviderFarcaster].ID
+	farcasterProfile, ok := socials[persist.SocialProviderFarcaster]
+
+	// User isn't on farcaster
+	if !ok {
+		return []farcaster.NeynarUser{}, nil
+	}
+
+	fID := farcasterProfile.ID
 
 	// Socials not cached yet
 	if fID == "" {
