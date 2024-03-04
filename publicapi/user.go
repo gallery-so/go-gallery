@@ -1485,7 +1485,7 @@ func (api UserAPI) GetSuggestedUsersFarcaster(ctx context.Context, before, after
 			return nil, PageInfo{}, err
 		}
 
-		users, err := api.queries.GetFarcasterConnections(ctx, db.GetFarcasterConnectionsParams{
+		connectionRank, err := api.queries.GetFarcasterConnections(ctx, db.GetFarcasterConnectionsParams{
 			Fids:   util.MapWithoutError(fUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() }),
 			UserID: viewerID,
 		})
@@ -1493,11 +1493,16 @@ func (api UserAPI) GetSuggestedUsersFarcaster(ctx context.Context, before, after
 			return nil, PageInfo{}, err
 		}
 
-		cursorPositions := make(map[persist.DBID]int64, len(users))
-		cursorIDs := make([]persist.DBID, len(users))
-		for i, u := range users {
-			cursorPositions[u.ID] = int64(i)
-			cursorIDs[i] = u.ID
+		recommend.Shuffle(connectionRank, 8)
+
+		cursorPositions := make(map[persist.DBID]int64, len(connectionRank))
+		cursorIDs := make([]persist.DBID, len(connectionRank))
+		users := make([]db.User, len(connectionRank))
+
+		for i, u := range connectionRank {
+			cursorPositions[u.User.ID] = int64(i)
+			cursorIDs[i] = u.User.ID
+			users[i] = u.User
 		}
 
 		cursor := cursors.NewPositionCursor()

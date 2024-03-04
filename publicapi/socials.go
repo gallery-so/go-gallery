@@ -76,19 +76,53 @@ func (api SocialAPI) GetFarcastingFollowingByUserID(ctx context.Context, userID 
 		return nil, err
 	}
 
-	// if no rows found, might not be cached yet
-	wallets, err := For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
+	fID := socials[persist.SocialProviderFarcaster].ID
 
-	// check if no wallets
-	if err != nil {
-		return nil, err
+	// Socials not cached yet
+	if fID == "" {
+		user, err := For(ctx).User.GetUserById(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		wallets, err := For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		ethWallets := make([]persist.Address, 0)
+		var primaryAddress persist.Address
+
+		for _, w := range wallets {
+			if w.Chain == persist.ChainETH {
+				ethWallets = append(ethWallets, w.Address)
+				if w.ID == user.PrimaryWalletID {
+					primaryAddress = w.Address
+				}
+			}
+		}
+
+		fUsers, err := api.neynarAPI.UsersByAddresses(ctx, ethWallets)
+		if err != nil {
+			return nil, err
+		}
+
+		searchWallets := append([]persist.Address{primaryAddress}, util.MapKeys(fUsers)...)
+
+	outer:
+		for _, w := range searchWallets {
+			for _, u := range fUsers[w] {
+				fID = u.Fid.String()
+				break outer
+			}
+		}
 	}
 
-	f, ok := socials[persist.SocialProviderFarcaster]
-	if !ok {
+	if fID == "" {
 		return []farcaster.NeynarUser{}, nil
 	}
-	fUsers, err := api.neynarAPI.FollowingByUserID(ctx, f.ID)
+
+	fUsers, err := api.neynarAPI.FollowingByUserID(ctx, fID)
 	return fUsers, err
 }
 

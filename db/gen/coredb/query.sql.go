@@ -2535,12 +2535,22 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 }
 
 const getFarcasterConnections = `-- name: GetFarcasterConnections :many
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona
-from (select unnest($1::varchar[]) fid) farcaster
-join pii.for_users p on p.pii_socials->'Farcaster'->>'id' = farcaster.fid
-join users u on u.id = p.user_id
-left join follows f on f.follower = $2 and u.id = f.followee
-where not u.deleted and not u.deleted
+with farcaster         as ( select unnest($1::varchar[]) fid ),
+	 farcaster_gallery as ( select user_id, pii_unverified_email_address, deleted, pii_socials, pii_verified_email_address, fid from pii.for_users p join farcaster on p.pii_socials->'Farcaster'->>'id' = farcaster.fid ),
+	 not_followed      as ( select user_id, pii_unverified_email_address, fg.deleted, pii_socials, pii_verified_email_address, fid, id, follower, followee, f.deleted, created_at, last_updated from farcaster_gallery fg left join follows f on f.follower = $2 and f.followee = fg.user_id where f.id is null ),
+	 farcaster_users   as ( select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from users u join not_followed on u.id = not_followed.user_id and not u.deleted and not u.universal ),
+	 ordering          as ( select f.id
+	                            , rank() over (order by sum(cardinality(c.nfts)) desc nulls last) display_rank
+	                            , rank() over (order by count(p.id) desc nulls last) post_rank
+	 						from farcaster_users f
+	 						left join collections c on f.id = c.owner_user_id and not c.deleted
+	 						left join posts p on f.id = p.actor_id and not p.deleted
+	 						group by f.id )
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
+from farcaster_users users
+left join ordering using(id)
+order by ((ordering.display_rank + ordering.post_rank) / 2) asc nulls last
+limit 200
 `
 
 type GetFarcasterConnectionsParams struct {
@@ -2548,34 +2558,38 @@ type GetFarcasterConnectionsParams struct {
 	UserID persist.DBID `db:"user_id" json:"user_id"`
 }
 
-func (q *Queries) GetFarcasterConnections(ctx context.Context, arg GetFarcasterConnectionsParams) ([]User, error) {
+type GetFarcasterConnectionsRow struct {
+	User User `db:"user" json:"user"`
+}
+
+func (q *Queries) GetFarcasterConnections(ctx context.Context, arg GetFarcasterConnectionsParams) ([]GetFarcasterConnectionsRow, error) {
 	rows, err := q.db.Query(ctx, getFarcasterConnections, arg.Fids, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []GetFarcasterConnectionsRow
 	for rows.Next() {
-		var i User
+		var i GetFarcasterConnectionsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.ProfileImageID,
-			&i.Persona,
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
+			&i.User.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -3861,7 +3875,6 @@ func (q *Queries) GetSocialConnections(ctx context.Context, arg GetSocialConnect
 }
 
 const getSocialConnectionsPaginate = `-- name: GetSocialConnectionsPaginate :many
-
 select s.social_id, s.social_username, s.social_displayname, s.social_profile_image, user_view.id as user_id, user_view.created_at as user_created_at, (f.id is not null)::bool as already_following
 from (select unnest($2::varchar[]) as social_id, unnest($3::varchar[]) as social_username, unnest($4::varchar[]) as social_displayname, unnest($5::varchar[]) as social_profile_image) as s
     inner join pii.user_view on user_view.pii_socials->$6::text->>'id'::varchar = s.social_id and user_view.deleted = false
@@ -3902,7 +3915,6 @@ type GetSocialConnectionsPaginateRow struct {
 	AlreadyFollowing   bool         `db:"already_following" json:"already_following"`
 }
 
-// and f.id is null;
 // this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
 // it will also go and search for whether the specified user follows any of the users returned
 func (q *Queries) GetSocialConnectionsPaginate(ctx context.Context, arg GetSocialConnectionsPaginateParams) ([]GetSocialConnectionsPaginateRow, error) {

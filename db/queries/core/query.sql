@@ -1275,12 +1275,22 @@ update pii.for_users set pii_socials = @socials where user_id = @user_id;
 update events set caption = @caption where group_id = @group_id and deleted = false;
 
 -- name: GetFarcasterConnections :many
-select u.*
-from (select unnest(@fids::varchar[]) fid) farcaster
-join pii.for_users p on p.pii_socials->'Farcaster'->>'id' = farcaster.fid
-join users u on u.id = p.user_id
-left join follows f on f.follower = @user_id and u.id = f.followee
-where not u.deleted and not u.deleted; -- and f.id is null;
+with farcaster         as ( select unnest(@fids::varchar[]) fid ),
+	 farcaster_gallery as ( select * from pii.for_users p join farcaster on p.pii_socials->'Farcaster'->>'id' = farcaster.fid ),
+	 not_followed      as ( select * from farcaster_gallery fg left join follows f on f.follower = @user_id and f.followee = fg.user_id where f.id is null ),
+	 farcaster_users   as ( select u.* from users u join not_followed on u.id = not_followed.user_id and not u.deleted and not u.universal ),
+	 ordering          as ( select f.id
+	                            , rank() over (order by sum(cardinality(c.nfts)) desc nulls last) display_rank
+	                            , rank() over (order by count(p.id) desc nulls last) post_rank
+	 						from farcaster_users f
+	 						left join collections c on f.id = c.owner_user_id and not c.deleted
+	 						left join posts p on f.id = p.actor_id and not p.deleted
+	 						group by f.id )
+select sqlc.embed(users)
+from farcaster_users users
+left join ordering using(id)
+order by ((ordering.display_rank + ordering.post_rank) / 2) asc nulls last
+limit 200;
 
 -- this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
 -- it will also go and search for whether the specified user follows any of the users returned
