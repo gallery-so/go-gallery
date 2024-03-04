@@ -3524,7 +3524,18 @@ func (r *viewerResolver) SuggestedUsers(ctx context.Context, obj *model.Viewer, 
 	if err != nil {
 		return nil, err
 	}
+	return &model.UsersConnection{
+		Edges:    usersToEdges(ctx, users),
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
 
+// SuggestedUsersFarcaster is the resolver for the suggestedUsersFarcaster field.
+func (r *viewerResolver) SuggestedUsersFarcaster(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.GetSuggestedUsersFarcaster(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
 	return &model.UsersConnection{
 		Edges:    usersToEdges(ctx, users),
 		PageInfo: pageInfoToModel(ctx, pageInfo),

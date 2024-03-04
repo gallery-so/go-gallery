@@ -184,21 +184,24 @@ func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Ad
 	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
 		return nil, err
 	}
+
 	if neynarResp == nil || len(neynarResp) == 0 {
-		return nil, fmt.Errorf("no result for %s", addresses)
+		return nil, nil
 	}
 
 	return neynarResp, nil
 }
 
 type NeynarFollowingByUserIDResponse struct {
-	Result *struct {
+	Result struct {
 		Users []NeynarUser `json:"users"`
+		Next  struct {
+			Cursor string `json:"cursor"`
+		} `json:"next"`
 	} `json:"result"`
 }
 
 func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]NeynarUser, error) {
-
 	if n.cache != nil {
 		if cached, err := n.cache.Get(ctx, fmt.Sprintf("neynar-following-%s", fid)); err == nil {
 			var users []NeynarUser
@@ -209,34 +212,52 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 		}
 	}
 
-	// e.g. https://api.neynar.com/v1/farcaster/following?fid=3
-	u := fmt.Sprintf("%s/following?fid=%s", neynarV1BaseURL, fid)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	u, err := url.Parse(fmt.Sprintf("%s/following", neynarV1BaseURL))
 	if err != nil {
 		return nil, err
 	}
 
+	q := u.Query()
+	q.Set("fid", fid)
+	q.Set("limit", "150")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("accept", "application/json")
 	req.Header.Set("api_key", n.apiKey)
 
-	resp, err := n.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
+	users := make([]NeynarUser, 0)
 
-	defer resp.Body.Close()
+	for {
+		resp, err := n.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
 
-	var neynarResp NeynarFollowingByUserIDResponse
-	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
-		return nil, err
-	}
+		defer resp.Body.Close()
 
-	if neynarResp.Result == nil {
-		return nil, fmt.Errorf("no following result for %s", fid)
+		var r NeynarFollowingByUserIDResponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			return nil, err
+		}
+
+		users = append(users, r.Result.Users...)
+
+		if r.Result.Next.Cursor == "" {
+			break
+		}
+
+		q = req.URL.Query()
+		q.Set("cursor", r.Result.Next.Cursor)
+		req.URL.RawQuery = q.Encode()
 	}
 
 	if n.cache != nil {
-		asJSON, err := json.Marshal(neynarResp.Result.Users)
+		asJSON, err := json.Marshal(users)
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +267,7 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 		}
 	}
 
-	return neynarResp.Result.Users, nil
+	return users, nil
 }
 
 type NeynarSigner struct {

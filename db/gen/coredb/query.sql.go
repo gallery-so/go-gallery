@@ -2534,6 +2534,73 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 	return items, nil
 }
 
+const getFarcasterConnections = `-- name: GetFarcasterConnections :many
+with farcaster         as ( select unnest($1::varchar[]) fid ),
+	 farcaster_gallery as ( select user_id, pii_unverified_email_address, deleted, pii_socials, pii_verified_email_address, fid from pii.for_users p join farcaster on p.pii_socials->'Farcaster'->>'id' = farcaster.fid ),
+	 not_followed      as ( select user_id, pii_unverified_email_address, fg.deleted, pii_socials, pii_verified_email_address, fid, id, follower, followee, f.deleted, created_at, last_updated from farcaster_gallery fg left join follows f on f.follower = $2 and f.followee = fg.user_id where f.id is null ),
+	 farcaster_users   as ( select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from users u join not_followed on u.id = not_followed.user_id and not u.deleted and not u.universal ),
+	 ordering          as ( select f.id
+	                            , rank() over (order by sum(cardinality(c.nfts)) desc nulls last) display_rank
+	                            , rank() over (order by count(p.id) desc nulls last) post_rank
+	 						from farcaster_users f
+	 						left join collections c on f.id = c.owner_user_id and not c.deleted
+	 						left join posts p on f.id = p.actor_id and not p.deleted
+	 						group by f.id )
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
+from farcaster_users users
+left join ordering using(id)
+order by ((ordering.display_rank + ordering.post_rank) / 2) asc nulls last
+limit 200
+`
+
+type GetFarcasterConnectionsParams struct {
+	Fids   []string     `db:"fids" json:"fids"`
+	UserID persist.DBID `db:"user_id" json:"user_id"`
+}
+
+type GetFarcasterConnectionsRow struct {
+	User User `db:"user" json:"user"`
+}
+
+func (q *Queries) GetFarcasterConnections(ctx context.Context, arg GetFarcasterConnectionsParams) ([]GetFarcasterConnectionsRow, error) {
+	rows, err := q.db.Query(ctx, getFarcasterConnections, arg.Fids, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetFarcasterConnectionsRow
+	for rows.Next() {
+		var i GetFarcasterConnectionsRow
+		if err := rows.Scan(
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
+			&i.User.Persona,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFeedEventByID = `-- name: GetFeedEventByID :one
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = $1 AND deleted = false
 `
