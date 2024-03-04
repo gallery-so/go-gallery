@@ -264,7 +264,7 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress per
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
-	return collectionToChainAgnosticContract(contractAddress, cc.Collection), nil
+	return contractCollectionToChainAgnosticContract(cc), nil
 }
 
 func (p *Provider) assetsToTokens(ctx context.Context, ownerAddress persist.Address, outCh <-chan assetsReceived) (tokens []multichain.ChainAgnosticToken, contracts []multichain.ChainAgnosticContract, err error) {
@@ -384,12 +384,12 @@ func (p *Provider) getChainAgnosticContract(ctx context.Context, contractAddress
 		return nil
 	}
 
-	collection, err := fetchCollectionBySlug(ctx, p.httpClient, p.Chain, collectionSlug)
+	contractCollection, err := fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, contractAddress)
 	if err != nil {
 		return err
 	}
 
-	seenContracts.Store(contractAddress, collectionToChainAgnosticContract(contractAddress, collection))
+	seenContracts.Store(contractAddress, contractCollectionToChainAgnosticContract(contractCollection))
 	return nil
 }
 
@@ -552,18 +552,16 @@ func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {
 	}
 }
 
-func collectionToChainAgnosticContract(address persist.Address, collection Collection) multichain.ChainAgnosticContract {
+func contractCollectionToChainAgnosticContract(contractCollection contractCollection) multichain.ChainAgnosticContract {
 	desc := multichain.ChainAgnosticContractDescriptors{
-		Symbol:          "", // OpenSea doesn't provide this, but it isn't exposed in the schema anyway
-		Name:            collection.Name,
-		OwnerAddress:    persist.Address(collection.Owner),
-		Description:     collection.Description,
-		ProfileImageURL: collection.ImageURL,
+		Symbol:       "", // OpenSea doesn't provide this, but it isn't exposed in the schema anyway
+		Name:         contractCollection.Contract.Name,
+		OwnerAddress: persist.Address(contractCollection.Collection.Owner),
 	}
 	return multichain.ChainAgnosticContract{
-		Address:     address,
+		Address:     contractCollection.Contract.Address,
 		Descriptors: desc,
-		IsSpam:      util.ToPointer(collectionNameIsSpam(collection.Name)),
+		IsSpam:      util.ToPointer(contractNameIsSpam(contractCollection.Contract.Name)),
 	}
 }
 
@@ -751,7 +749,7 @@ func setPagingParams(url *url.URL) {
 	url.RawQuery = query.Encode()
 }
 
-func collectionNameIsSpam(name string) bool {
+func contractNameIsSpam(name string) bool {
 	return strings.HasSuffix(strings.ToLower(name), ".lens-follower")
 }
 
