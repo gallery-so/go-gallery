@@ -24,6 +24,8 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
+var ErrUserNotOnFarcaster = errors.New("user is not on farcaster")
+
 type SocialAPI struct {
 	repos      *postgres.Repositories
 	redis      *redis.Cache
@@ -65,74 +67,98 @@ func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Add
 	}
 }
 
-func (api SocialAPI) GetFarcastingFollowingByUserID(ctx context.Context, userID persist.DBID) ([]farcaster.NeynarUser, error) {
+// GetFarcasterIDByUserID gets the FID of a user by their Gallery userID. ErrUserNotOnFarcaster is returned if the user is not on Farcaster.
+func (api SocialAPI) GetFarcasterIDByUserID(ctx context.Context, userID persist.DBID) (farcaster.NeynarID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, "required"),
+	}); err != nil {
+		return "", err
+	}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	farcasterProfile, ok := socials[persist.SocialProviderFarcaster]
+
+	// User isn't on Farcaster
+	if !ok {
+		return "", ErrUserNotOnFarcaster
+	}
+
+	if ok && farcasterProfile.ID == "" {
+		return "", errors.New("cached farcaster profile has no associated FID")
+	}
+
+	if farcasterProfile.ID != "" {
+		return farcaster.NeynarID(farcasterProfile.ID), nil
+	}
+
+	// Socials not cached yet
+	user, err := For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	wallets, err := For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	ethWallets := make([]persist.Address, 0)
+	var primaryAddress persist.Address
+
+	for _, w := range wallets {
+		if w.Chain == persist.ChainETH {
+			ethWallets = append(ethWallets, w.Address)
+			if w.ID == user.PrimaryWalletID {
+				primaryAddress = w.Address
+			}
+		}
+	}
+
+	if len(ethWallets) == 0 {
+		return "", ErrUserNotOnFarcaster
+	}
+
+	fUsers, err := api.neynarAPI.UsersByAddresses(ctx, ethWallets)
+	if err != nil {
+		return "", err
+	}
+
+	searchOrder := append([]persist.Address{primaryAddress}, util.MapKeys(fUsers)...)
+
+	for _, w := range searchOrder {
+		for _, u := range fUsers[w] {
+			return u.Fid, nil
+		}
+	}
+
+	return "", ErrUserNotOnFarcaster
+}
+
+func (api SocialAPI) GetFarcasterFollowingByUserID(ctx context.Context, userID persist.DBID) ([]farcaster.NeynarUser, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
-
-	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	fID, err := api.GetFarcasterIDByUserID(ctx, userID)
+	if err != nil && errors.Is(err, ErrUserNotOnFarcaster) {
+		return []farcaster.NeynarUser{}, nil
+	}
+	if err != nil {
 		return nil, err
 	}
-
-	farcasterProfile, ok := socials[persist.SocialProviderFarcaster]
-
-	// User isn't on farcaster
-	if !ok {
-		return []farcaster.NeynarUser{}, nil
-	}
-
-	fID := farcasterProfile.ID
-
-	// Socials not cached yet
-	if fID == "" {
-		user, err := For(ctx).User.GetUserById(ctx, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		wallets, err := For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		ethWallets := make([]persist.Address, 0)
-		var primaryAddress persist.Address
-
-		for _, w := range wallets {
-			if w.Chain == persist.ChainETH {
-				ethWallets = append(ethWallets, w.Address)
-				if w.ID == user.PrimaryWalletID {
-					primaryAddress = w.Address
-				}
-			}
-		}
-
-		fUsers, err := api.neynarAPI.UsersByAddresses(ctx, ethWallets)
-		if err != nil {
-			return nil, err
-		}
-
-		searchWallets := append([]persist.Address{primaryAddress}, util.MapKeys(fUsers)...)
-
-	outer:
-		for _, w := range searchWallets {
-			for _, u := range fUsers[w] {
-				fID = u.Fid.String()
-				break outer
-			}
-		}
-	}
-
-	if fID == "" {
-		return []farcaster.NeynarUser{}, nil
-	}
-
-	fUsers, err := api.neynarAPI.FollowingByUserID(ctx, fID)
+	fUsers, err := api.neynarAPI.FollowingByUserID(ctx, fID.String())
 	return fUsers, err
+}
+
+func (api SocialAPI) GetFarcasterFollowersByUserID(ctx context.Context, userID persist.DBID) ([]farcaster.NeynarUser, error) {
+	panic("not implemented")
 }
 
 func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider persist.SocialProvider, before, after *string, first, last *int, onlyUnfollowing *bool) ([]model.SocialConnection, PageInfo, error) {
@@ -184,7 +210,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 			return t.ID, nil
 		})
 	case persist.SocialProviderFarcaster:
-		farcasterFollowing, err := api.GetFarcastingFollowingByUserID(ctx, userID)
+		farcasterFollowing, err := api.GetFarcasterFollowingByUserID(ctx, userID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}

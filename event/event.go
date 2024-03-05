@@ -54,11 +54,10 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addImmediateHandler(feed, persist.ActionGalleryInfoUpdated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToToken, feedHandler)
 	sender.addGroupHandler(feed, persist.ActionGalleryUpdated, feedHandler)
+	sender.feed = feed
 
 	notifications := newEventDispatcher()
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
-	followerNotificationHandler := newFollowerNotificationHandler(notif)
-	announcementNotificationHandler := newAnnouncementNotificationHandler(notif)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
@@ -72,12 +71,11 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
-	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, followerNotificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, &followerNotificationHandler{notif})
 	sender.addDelayedHandler(notifications, persist.ActionTopActivityBadgeReceived, notificationHandler)
-	sender.addDelayedHandler(notifications, persist.ActionAnnouncement, announcementNotificationHandler)
-
-	sender.feed = feed
+	sender.addDelayedHandler(notifications, persist.ActionAnnouncement, &announcementNotificationHandler{notif})
 	sender.notifications = notifications
+
 	ctx.Set(eventSenderContextKey, &sender)
 }
 
@@ -625,12 +623,6 @@ func (h followerNotificationHandler) handleDelayed(ctx context.Context, persiste
 // global handles events for consumption as global notifications.
 type announcementNotificationHandler struct {
 	notificationHandlers *notifications.NotificationHandlers
-}
-
-func newAnnouncementNotificationHandler(notifiers *notifications.NotificationHandlers) *announcementNotificationHandler {
-	return &announcementNotificationHandler{
-		notificationHandlers: notifiers,
-	}
 }
 
 func (h announcementNotificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {

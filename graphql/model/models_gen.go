@@ -2436,6 +2436,30 @@ func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
 
+type SomeoneYouFollowOnFarcasterJoinedNotification struct {
+	HelperSomeoneYouFollowOnFarcasterJoinedNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	User         *GalleryUser `json:"user"`
+}
+
+func (SomeoneYouFollowOnFarcasterJoinedNotification) IsNotification() {}
+func (SomeoneYouFollowOnFarcasterJoinedNotification) IsNode()         {}
+
+type SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification struct {
+	HelperSomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Post         *Post        `json:"post"`
+}
+
+func (SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) IsNotification() {}
+func (SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) IsNode()         {}
+
 type SomeoneYouFollowPostedTheirFirstPostNotification struct {
 	HelperSomeoneYouFollowPostedTheirFirstPostNotificationData
 	Dbid         persist.DBID `json:"dbid"`

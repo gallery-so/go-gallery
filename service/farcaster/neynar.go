@@ -185,10 +185,6 @@ func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Ad
 		return nil, err
 	}
 
-	if neynarResp == nil || len(neynarResp) == 0 {
-		return nil, nil
-	}
-
 	return neynarResp, nil
 }
 

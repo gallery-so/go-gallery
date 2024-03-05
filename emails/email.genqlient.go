@@ -2139,33 +2139,33 @@ func (v *definitionFragMediaVideoMedia) __premarshalJSON() (*__premarshaldefinit
 // errorFrag includes the GraphQL fields of Error requested by the fragment errorFrag.
 //
 // errorFrag is implemented by the following types:
+// errorFragErrAddressOwnedByUser
+// errorFragErrAdmireAlreadyExists
+// errorFragErrAdmireNotFound
+// errorFragErrAuthenticationFailed
 // errorFragErrCollectionNotFound
+// errorFragErrCommentNotFound
+// errorFragErrCommunityNotFound
+// errorFragErrDoesNotOwnRequiredToken
+// errorFragErrEmailAlreadyUsed
+// errorFragErrEmailUnverified
+// errorFragErrFeedEventNotFound
+// errorFragErrGalleryNotFound
+// errorFragErrInvalidInput
+// errorFragErrInvalidToken
+// errorFragErrNeedsToReconnectSocial
+// errorFragErrNoAvatarRecordSet
+// errorFragErrNoCookie
+// errorFragErrNotAuthorized
+// errorFragErrPostNotFound
+// errorFragErrPushTokenBelongsToAnotherUser
+// errorFragErrSessionInvalidated
+// errorFragErrSyncFailed
 // errorFragErrTokenNotFound
 // errorFragErrUnknownAction
-// errorFragErrFeedEventNotFound
-// errorFragErrPostNotFound
-// errorFragErrGalleryNotFound
-// errorFragErrAuthenticationFailed
-// errorFragErrEmailUnverified
-// errorFragErrEmailAlreadyUsed
 // errorFragErrUserAlreadyExists
-// errorFragErrUsernameNotAvailable
-// errorFragErrAddressOwnedByUser
 // errorFragErrUserNotFound
-// errorFragErrCommunityNotFound
-// errorFragErrNotAuthorized
-// errorFragErrInvalidInput
-// errorFragErrNoCookie
-// errorFragErrInvalidToken
-// errorFragErrSessionInvalidated
-// errorFragErrNeedsToReconnectSocial
-// errorFragErrDoesNotOwnRequiredToken
-// errorFragErrSyncFailed
-// errorFragErrAdmireNotFound
-// errorFragErrAdmireAlreadyExists
-// errorFragErrCommentNotFound
-// errorFragErrPushTokenBelongsToAnotherUser
-// errorFragErrNoAvatarRecordSet
+// errorFragErrUsernameNotAvailable
 type errorFrag interface {
 	implementsGraphQLInterfaceerrorFrag()
 	// GetMessage returns the interface-field "message" from its implementation.
@@ -2174,33 +2174,33 @@ type errorFrag interface {
 	GetTypename() *string
 }
 
+func (v *errorFragErrAddressOwnedByUser) implementsGraphQLInterfaceerrorFrag()            {}
+func (v *errorFragErrAdmireAlreadyExists) implementsGraphQLInterfaceerrorFrag()           {}
+func (v *errorFragErrAdmireNotFound) implementsGraphQLInterfaceerrorFrag()                {}
+func (v *errorFragErrAuthenticationFailed) implementsGraphQLInterfaceerrorFrag()          {}
 func (v *errorFragErrCollectionNotFound) implementsGraphQLInterfaceerrorFrag()            {}
+func (v *errorFragErrCommentNotFound) implementsGraphQLInterfaceerrorFrag()               {}
+func (v *errorFragErrCommunityNotFound) implementsGraphQLInterfaceerrorFrag()             {}
+func (v *errorFragErrDoesNotOwnRequiredToken) implementsGraphQLInterfaceerrorFrag()       {}
+func (v *errorFragErrEmailAlreadyUsed) implementsGraphQLInterfaceerrorFrag()              {}
+func (v *errorFragErrEmailUnverified) implementsGraphQLInterfaceerrorFrag()               {}
+func (v *errorFragErrFeedEventNotFound) implementsGraphQLInterfaceerrorFrag()             {}
+func (v *errorFragErrGalleryNotFound) implementsGraphQLInterfaceerrorFrag()               {}
+func (v *errorFragErrInvalidInput) implementsGraphQLInterfaceerrorFrag()                  {}
+func (v *errorFragErrInvalidToken) implementsGraphQLInterfaceerrorFrag()                  {}
+func (v *errorFragErrNeedsToReconnectSocial) implementsGraphQLInterfaceerrorFrag()        {}
+func (v *errorFragErrNoAvatarRecordSet) implementsGraphQLInterfaceerrorFrag()             {}
+func (v *errorFragErrNoCookie) implementsGraphQLInterfaceerrorFrag()                      {}
+func (v *errorFragErrNotAuthorized) implementsGraphQLInterfaceerrorFrag()                 {}
+func (v *errorFragErrPostNotFound) implementsGraphQLInterfaceerrorFrag()                  {}
+func (v *errorFragErrPushTokenBelongsToAnotherUser) implementsGraphQLInterfaceerrorFrag() {}
+func (v *errorFragErrSessionInvalidated) implementsGraphQLInterfaceerrorFrag()            {}
+func (v *errorFragErrSyncFailed) implementsGraphQLInterfaceerrorFrag()                    {}
 func (v *errorFragErrTokenNotFound) implementsGraphQLInterfaceerrorFrag()                 {}
 func (v *errorFragErrUnknownAction) implementsGraphQLInterfaceerrorFrag()                 {}
-func (v *errorFragErrFeedEventNotFound) implementsGraphQLInterfaceerrorFrag()             {}
-func (v *errorFragErrPostNotFound) implementsGraphQLInterfaceerrorFrag()                  {}
-func (v *errorFragErrGalleryNotFound) implementsGraphQLInterfaceerrorFrag()               {}
-func (v *errorFragErrAuthenticationFailed) implementsGraphQLInterfaceerrorFrag()          {}
-func (v *errorFragErrEmailUnverified) implementsGraphQLInterfaceerrorFrag()               {}
-func (v *errorFragErrEmailAlreadyUsed) implementsGraphQLInterfaceerrorFrag()              {}
 func (v *errorFragErrUserAlreadyExists) implementsGraphQLInterfaceerrorFrag()             {}
-func (v *errorFragErrUsernameNotAvailable) implementsGraphQLInterfaceerrorFrag()          {}
-func (v *errorFragErrAddressOwnedByUser) implementsGraphQLInterfaceerrorFrag()            {}
 func (v *errorFragErrUserNotFound) implementsGraphQLInterfaceerrorFrag()                  {}
-func (v *errorFragErrCommunityNotFound) implementsGraphQLInterfaceerrorFrag()             {}
-func (v *errorFragErrNotAuthorized) implementsGraphQLInterfaceerrorFrag()                 {}
-func (v *errorFragErrInvalidInput) implementsGraphQLInterfaceerrorFrag()                  {}
-func (v *errorFragErrNoCookie) implementsGraphQLInterfaceerrorFrag()                      {}
-func (v *errorFragErrInvalidToken) implementsGraphQLInterfaceerrorFrag()                  {}
-func (v *errorFragErrSessionInvalidated) implementsGraphQLInterfaceerrorFrag()            {}
-func (v *errorFragErrNeedsToReconnectSocial) implementsGraphQLInterfaceerrorFrag()        {}
-func (v *errorFragErrDoesNotOwnRequiredToken) implementsGraphQLInterfaceerrorFrag()       {}
-func (v *errorFragErrSyncFailed) implementsGraphQLInterfaceerrorFrag()                    {}
-func (v *errorFragErrAdmireNotFound) implementsGraphQLInterfaceerrorFrag()                {}
-func (v *errorFragErrAdmireAlreadyExists) implementsGraphQLInterfaceerrorFrag()           {}
-func (v *errorFragErrCommentNotFound) implementsGraphQLInterfaceerrorFrag()               {}
-func (v *errorFragErrPushTokenBelongsToAnotherUser) implementsGraphQLInterfaceerrorFrag() {}
-func (v *errorFragErrNoAvatarRecordSet) implementsGraphQLInterfaceerrorFrag()             {}
+func (v *errorFragErrUsernameNotAvailable) implementsGraphQLInterfaceerrorFrag()          {}
 
 func __unmarshalerrorFrag(b []byte, v *errorFrag) error {
 	if string(b) == "null" {
@@ -2216,8 +2216,71 @@ func __unmarshalerrorFrag(b []byte, v *errorFrag) error {
 	}
 
 	switch tn.TypeName {
+	case "ErrAddressOwnedByUser":
+		*v = new(errorFragErrAddressOwnedByUser)
+		return json.Unmarshal(b, *v)
+	case "ErrAdmireAlreadyExists":
+		*v = new(errorFragErrAdmireAlreadyExists)
+		return json.Unmarshal(b, *v)
+	case "ErrAdmireNotFound":
+		*v = new(errorFragErrAdmireNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrAuthenticationFailed":
+		*v = new(errorFragErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
 	case "ErrCollectionNotFound":
 		*v = new(errorFragErrCollectionNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrCommentNotFound":
+		*v = new(errorFragErrCommentNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrCommunityNotFound":
+		*v = new(errorFragErrCommunityNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrDoesNotOwnRequiredToken":
+		*v = new(errorFragErrDoesNotOwnRequiredToken)
+		return json.Unmarshal(b, *v)
+	case "ErrEmailAlreadyUsed":
+		*v = new(errorFragErrEmailAlreadyUsed)
+		return json.Unmarshal(b, *v)
+	case "ErrEmailUnverified":
+		*v = new(errorFragErrEmailUnverified)
+		return json.Unmarshal(b, *v)
+	case "ErrFeedEventNotFound":
+		*v = new(errorFragErrFeedEventNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrGalleryNotFound":
+		*v = new(errorFragErrGalleryNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(errorFragErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidToken":
+		*v = new(errorFragErrInvalidToken)
+		return json.Unmarshal(b, *v)
+	case "ErrNeedsToReconnectSocial":
+		*v = new(errorFragErrNeedsToReconnectSocial)
+		return json.Unmarshal(b, *v)
+	case "ErrNoAvatarRecordSet":
+		*v = new(errorFragErrNoAvatarRecordSet)
+		return json.Unmarshal(b, *v)
+	case "ErrNoCookie":
+		*v = new(errorFragErrNoCookie)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(errorFragErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(errorFragErrPostNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrPushTokenBelongsToAnotherUser":
+		*v = new(errorFragErrPushTokenBelongsToAnotherUser)
+		return json.Unmarshal(b, *v)
+	case "ErrSessionInvalidated":
+		*v = new(errorFragErrSessionInvalidated)
+		return json.Unmarshal(b, *v)
+	case "ErrSyncFailed":
+		*v = new(errorFragErrSyncFailed)
 		return json.Unmarshal(b, *v)
 	case "ErrTokenNotFound":
 		*v = new(errorFragErrTokenNotFound)
@@ -2225,77 +2288,14 @@ func __unmarshalerrorFrag(b []byte, v *errorFrag) error {
 	case "ErrUnknownAction":
 		*v = new(errorFragErrUnknownAction)
 		return json.Unmarshal(b, *v)
-	case "ErrFeedEventNotFound":
-		*v = new(errorFragErrFeedEventNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrPostNotFound":
-		*v = new(errorFragErrPostNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrGalleryNotFound":
-		*v = new(errorFragErrGalleryNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrAuthenticationFailed":
-		*v = new(errorFragErrAuthenticationFailed)
-		return json.Unmarshal(b, *v)
-	case "ErrEmailUnverified":
-		*v = new(errorFragErrEmailUnverified)
-		return json.Unmarshal(b, *v)
-	case "ErrEmailAlreadyUsed":
-		*v = new(errorFragErrEmailAlreadyUsed)
-		return json.Unmarshal(b, *v)
 	case "ErrUserAlreadyExists":
 		*v = new(errorFragErrUserAlreadyExists)
-		return json.Unmarshal(b, *v)
-	case "ErrUsernameNotAvailable":
-		*v = new(errorFragErrUsernameNotAvailable)
-		return json.Unmarshal(b, *v)
-	case "ErrAddressOwnedByUser":
-		*v = new(errorFragErrAddressOwnedByUser)
 		return json.Unmarshal(b, *v)
 	case "ErrUserNotFound":
 		*v = new(errorFragErrUserNotFound)
 		return json.Unmarshal(b, *v)
-	case "ErrCommunityNotFound":
-		*v = new(errorFragErrCommunityNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrNotAuthorized":
-		*v = new(errorFragErrNotAuthorized)
-		return json.Unmarshal(b, *v)
-	case "ErrInvalidInput":
-		*v = new(errorFragErrInvalidInput)
-		return json.Unmarshal(b, *v)
-	case "ErrNoCookie":
-		*v = new(errorFragErrNoCookie)
-		return json.Unmarshal(b, *v)
-	case "ErrInvalidToken":
-		*v = new(errorFragErrInvalidToken)
-		return json.Unmarshal(b, *v)
-	case "ErrSessionInvalidated":
-		*v = new(errorFragErrSessionInvalidated)
-		return json.Unmarshal(b, *v)
-	case "ErrNeedsToReconnectSocial":
-		*v = new(errorFragErrNeedsToReconnectSocial)
-		return json.Unmarshal(b, *v)
-	case "ErrDoesNotOwnRequiredToken":
-		*v = new(errorFragErrDoesNotOwnRequiredToken)
-		return json.Unmarshal(b, *v)
-	case "ErrSyncFailed":
-		*v = new(errorFragErrSyncFailed)
-		return json.Unmarshal(b, *v)
-	case "ErrAdmireNotFound":
-		*v = new(errorFragErrAdmireNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrAdmireAlreadyExists":
-		*v = new(errorFragErrAdmireAlreadyExists)
-		return json.Unmarshal(b, *v)
-	case "ErrCommentNotFound":
-		*v = new(errorFragErrCommentNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrPushTokenBelongsToAnotherUser":
-		*v = new(errorFragErrPushTokenBelongsToAnotherUser)
-		return json.Unmarshal(b, *v)
-	case "ErrNoAvatarRecordSet":
-		*v = new(errorFragErrNoAvatarRecordSet)
+	case "ErrUsernameNotAvailable":
+		*v = new(errorFragErrUsernameNotAvailable)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -2310,12 +2310,180 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 
 	var typename string
 	switch v := (*v).(type) {
+	case *errorFragErrAddressOwnedByUser:
+		typename = "ErrAddressOwnedByUser"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrAddressOwnedByUser
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrAdmireAlreadyExists:
+		typename = "ErrAdmireAlreadyExists"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrAdmireAlreadyExists
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrAdmireNotFound:
+		typename = "ErrAdmireNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrAdmireNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrAuthenticationFailed:
+		typename = "ErrAuthenticationFailed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
 	case *errorFragErrCollectionNotFound:
 		typename = "ErrCollectionNotFound"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*errorFragErrCollectionNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrCommentNotFound:
+		typename = "ErrCommentNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrCommentNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrCommunityNotFound:
+		typename = "ErrCommunityNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrCommunityNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrDoesNotOwnRequiredToken:
+		typename = "ErrDoesNotOwnRequiredToken"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrDoesNotOwnRequiredToken
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrEmailAlreadyUsed:
+		typename = "ErrEmailAlreadyUsed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrEmailAlreadyUsed
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrEmailUnverified:
+		typename = "ErrEmailUnverified"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrEmailUnverified
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrFeedEventNotFound:
+		typename = "ErrFeedEventNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrFeedEventNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrGalleryNotFound:
+		typename = "ErrGalleryNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrGalleryNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrInvalidToken:
+		typename = "ErrInvalidToken"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrInvalidToken
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrNeedsToReconnectSocial:
+		typename = "ErrNeedsToReconnectSocial"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrNeedsToReconnectSocial
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrNoAvatarRecordSet:
+		typename = "ErrNoAvatarRecordSet"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrNoAvatarRecordSet
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrNoCookie:
+		typename = "ErrNoCookie"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrNoCookie
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrPostNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrPushTokenBelongsToAnotherUser:
+		typename = "ErrPushTokenBelongsToAnotherUser"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrPushTokenBelongsToAnotherUser
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrSessionInvalidated:
+		typename = "ErrSessionInvalidated"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrSessionInvalidated
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrSyncFailed:
+		typename = "ErrSyncFailed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrSyncFailed
 		}{typename, v}
 		return json.Marshal(result)
 	case *errorFragErrTokenNotFound:
@@ -2334,76 +2502,12 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 			*errorFragErrUnknownAction
 		}{typename, v}
 		return json.Marshal(result)
-	case *errorFragErrFeedEventNotFound:
-		typename = "ErrFeedEventNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrFeedEventNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrPostNotFound:
-		typename = "ErrPostNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrPostNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrGalleryNotFound:
-		typename = "ErrGalleryNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrGalleryNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrAuthenticationFailed:
-		typename = "ErrAuthenticationFailed"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrAuthenticationFailed
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrEmailUnverified:
-		typename = "ErrEmailUnverified"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrEmailUnverified
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrEmailAlreadyUsed:
-		typename = "ErrEmailAlreadyUsed"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrEmailAlreadyUsed
-		}{typename, v}
-		return json.Marshal(result)
 	case *errorFragErrUserAlreadyExists:
 		typename = "ErrUserAlreadyExists"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*errorFragErrUserAlreadyExists
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrUsernameNotAvailable:
-		typename = "ErrUsernameNotAvailable"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrUsernameNotAvailable
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrAddressOwnedByUser:
-		typename = "ErrAddressOwnedByUser"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrAddressOwnedByUser
 		}{typename, v}
 		return json.Marshal(result)
 	case *errorFragErrUserNotFound:
@@ -2414,116 +2518,12 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 			*errorFragErrUserNotFound
 		}{typename, v}
 		return json.Marshal(result)
-	case *errorFragErrCommunityNotFound:
-		typename = "ErrCommunityNotFound"
+	case *errorFragErrUsernameNotAvailable:
+		typename = "ErrUsernameNotAvailable"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*errorFragErrCommunityNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrNotAuthorized:
-		typename = "ErrNotAuthorized"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrNotAuthorized
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrInvalidInput:
-		typename = "ErrInvalidInput"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrInvalidInput
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrNoCookie:
-		typename = "ErrNoCookie"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrNoCookie
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrInvalidToken:
-		typename = "ErrInvalidToken"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrInvalidToken
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrSessionInvalidated:
-		typename = "ErrSessionInvalidated"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrSessionInvalidated
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrNeedsToReconnectSocial:
-		typename = "ErrNeedsToReconnectSocial"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrNeedsToReconnectSocial
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrDoesNotOwnRequiredToken:
-		typename = "ErrDoesNotOwnRequiredToken"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrDoesNotOwnRequiredToken
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrSyncFailed:
-		typename = "ErrSyncFailed"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrSyncFailed
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrAdmireNotFound:
-		typename = "ErrAdmireNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrAdmireNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrAdmireAlreadyExists:
-		typename = "ErrAdmireAlreadyExists"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrAdmireAlreadyExists
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrCommentNotFound:
-		typename = "ErrCommentNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrCommentNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrPushTokenBelongsToAnotherUser:
-		typename = "ErrPushTokenBelongsToAnotherUser"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrPushTokenBelongsToAnotherUser
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrNoAvatarRecordSet:
-		typename = "ErrNoAvatarRecordSet"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrNoAvatarRecordSet
+			*errorFragErrUsernameNotAvailable
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -3194,18 +3194,18 @@ func (v *galleryDigestEntityQueryResponse) __premarshalJSON() (*__premarshalgall
 // mediaFrag includes the GraphQL fields of Media requested by the fragment mediaFrag.
 //
 // mediaFrag is implemented by the following types:
-// mediaFragImageMedia
-// mediaFragGIFMedia
-// mediaFragVideoMedia
 // mediaFragAudioMedia
-// mediaFragTextMedia
-// mediaFragPdfMedia
-// mediaFragHtmlMedia
-// mediaFragJsonMedia
+// mediaFragGIFMedia
 // mediaFragGltfMedia
-// mediaFragUnknownMedia
-// mediaFragSyncingMedia
+// mediaFragHtmlMedia
+// mediaFragImageMedia
 // mediaFragInvalidMedia
+// mediaFragJsonMedia
+// mediaFragPdfMedia
+// mediaFragSyncingMedia
+// mediaFragTextMedia
+// mediaFragUnknownMedia
+// mediaFragVideoMedia
 type mediaFrag interface {
 	implementsGraphQLInterfacemediaFrag()
 	// GetPreviewURLs returns the interface-field "previewURLs" from its implementation.
@@ -3214,18 +3214,18 @@ type mediaFrag interface {
 	GetFallbackMedia() *mediaFragFallbackMedia
 }
 
-func (v *mediaFragImageMedia) implementsGraphQLInterfacemediaFrag()   {}
-func (v *mediaFragGIFMedia) implementsGraphQLInterfacemediaFrag()     {}
-func (v *mediaFragVideoMedia) implementsGraphQLInterfacemediaFrag()   {}
 func (v *mediaFragAudioMedia) implementsGraphQLInterfacemediaFrag()   {}
-func (v *mediaFragTextMedia) implementsGraphQLInterfacemediaFrag()    {}
-func (v *mediaFragPdfMedia) implementsGraphQLInterfacemediaFrag()     {}
-func (v *mediaFragHtmlMedia) implementsGraphQLInterfacemediaFrag()    {}
-func (v *mediaFragJsonMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragGIFMedia) implementsGraphQLInterfacemediaFrag()     {}
 func (v *mediaFragGltfMedia) implementsGraphQLInterfacemediaFrag()    {}
-func (v *mediaFragUnknownMedia) implementsGraphQLInterfacemediaFrag() {}
-func (v *mediaFragSyncingMedia) implementsGraphQLInterfacemediaFrag() {}
+func (v *mediaFragHtmlMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragImageMedia) implementsGraphQLInterfacemediaFrag()   {}
 func (v *mediaFragInvalidMedia) implementsGraphQLInterfacemediaFrag() {}
+func (v *mediaFragJsonMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragPdfMedia) implementsGraphQLInterfacemediaFrag()     {}
+func (v *mediaFragSyncingMedia) implementsGraphQLInterfacemediaFrag() {}
+func (v *mediaFragTextMedia) implementsGraphQLInterfacemediaFrag()    {}
+func (v *mediaFragUnknownMedia) implementsGraphQLInterfacemediaFrag() {}
+func (v *mediaFragVideoMedia) implementsGraphQLInterfacemediaFrag()   {}
 
 func __unmarshalmediaFrag(b []byte, v *mediaFrag) error {
 	if string(b) == "null" {
@@ -3241,41 +3241,41 @@ func __unmarshalmediaFrag(b []byte, v *mediaFrag) error {
 	}
 
 	switch tn.TypeName {
-	case "ImageMedia":
-		*v = new(mediaFragImageMedia)
+	case "AudioMedia":
+		*v = new(mediaFragAudioMedia)
 		return json.Unmarshal(b, *v)
 	case "GIFMedia":
 		*v = new(mediaFragGIFMedia)
 		return json.Unmarshal(b, *v)
-	case "VideoMedia":
-		*v = new(mediaFragVideoMedia)
-		return json.Unmarshal(b, *v)
-	case "AudioMedia":
-		*v = new(mediaFragAudioMedia)
-		return json.Unmarshal(b, *v)
-	case "TextMedia":
-		*v = new(mediaFragTextMedia)
-		return json.Unmarshal(b, *v)
-	case "PdfMedia":
-		*v = new(mediaFragPdfMedia)
+	case "GltfMedia":
+		*v = new(mediaFragGltfMedia)
 		return json.Unmarshal(b, *v)
 	case "HtmlMedia":
 		*v = new(mediaFragHtmlMedia)
 		return json.Unmarshal(b, *v)
+	case "ImageMedia":
+		*v = new(mediaFragImageMedia)
+		return json.Unmarshal(b, *v)
+	case "InvalidMedia":
+		*v = new(mediaFragInvalidMedia)
+		return json.Unmarshal(b, *v)
 	case "JsonMedia":
 		*v = new(mediaFragJsonMedia)
 		return json.Unmarshal(b, *v)
-	case "GltfMedia":
-		*v = new(mediaFragGltfMedia)
-		return json.Unmarshal(b, *v)
-	case "UnknownMedia":
-		*v = new(mediaFragUnknownMedia)
+	case "PdfMedia":
+		*v = new(mediaFragPdfMedia)
 		return json.Unmarshal(b, *v)
 	case "SyncingMedia":
 		*v = new(mediaFragSyncingMedia)
 		return json.Unmarshal(b, *v)
-	case "InvalidMedia":
-		*v = new(mediaFragInvalidMedia)
+	case "TextMedia":
+		*v = new(mediaFragTextMedia)
+		return json.Unmarshal(b, *v)
+	case "UnknownMedia":
+		*v = new(mediaFragUnknownMedia)
+		return json.Unmarshal(b, *v)
+	case "VideoMedia":
+		*v = new(mediaFragVideoMedia)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -3290,12 +3290,12 @@ func __marshalmediaFrag(v *mediaFrag) ([]byte, error) {
 
 	var typename string
 	switch v := (*v).(type) {
-	case *mediaFragImageMedia:
-		typename = "ImageMedia"
+	case *mediaFragAudioMedia:
+		typename = "AudioMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragImageMedia
+			*mediaFragAudioMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case *mediaFragGIFMedia:
@@ -3306,36 +3306,12 @@ func __marshalmediaFrag(v *mediaFrag) ([]byte, error) {
 			*mediaFragGIFMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragVideoMedia:
-		typename = "VideoMedia"
+	case *mediaFragGltfMedia:
+		typename = "GltfMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragVideoMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *mediaFragAudioMedia:
-		typename = "AudioMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*mediaFragAudioMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *mediaFragTextMedia:
-		typename = "TextMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*mediaFragTextMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *mediaFragPdfMedia:
-		typename = "PdfMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*mediaFragPdfMedia
+			*mediaFragGltfMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case *mediaFragHtmlMedia:
@@ -3346,6 +3322,22 @@ func __marshalmediaFrag(v *mediaFrag) ([]byte, error) {
 			*mediaFragHtmlMedia
 		}{typename, v}
 		return json.Marshal(result)
+	case *mediaFragImageMedia:
+		typename = "ImageMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*mediaFragImageMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *mediaFragInvalidMedia:
+		typename = "InvalidMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*mediaFragInvalidMedia
+		}{typename, v}
+		return json.Marshal(result)
 	case *mediaFragJsonMedia:
 		typename = "JsonMedia"
 
@@ -3354,20 +3346,12 @@ func __marshalmediaFrag(v *mediaFrag) ([]byte, error) {
 			*mediaFragJsonMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragGltfMedia:
-		typename = "GltfMedia"
+	case *mediaFragPdfMedia:
+		typename = "PdfMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragGltfMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *mediaFragUnknownMedia:
-		typename = "UnknownMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*mediaFragUnknownMedia
+			*mediaFragPdfMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case *mediaFragSyncingMedia:
@@ -3378,12 +3362,28 @@ func __marshalmediaFrag(v *mediaFrag) ([]byte, error) {
 			*mediaFragSyncingMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *mediaFragInvalidMedia:
-		typename = "InvalidMedia"
+	case *mediaFragTextMedia:
+		typename = "TextMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*mediaFragInvalidMedia
+			*mediaFragTextMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *mediaFragUnknownMedia:
+		typename = "UnknownMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*mediaFragUnknownMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *mediaFragVideoMedia:
+		typename = "VideoMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*mediaFragVideoMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -4629,29 +4629,29 @@ fragment mediaFrag on Media {
 `
 
 func communityDigestEntityQuery(
-	ctx context.Context,
-	client graphql.Client,
+	ctx_ context.Context,
+	client_ graphql.Client,
 	id persist.DBID,
 ) (*communityDigestEntityQueryResponse, error) {
-	req := &graphql.Request{
+	req_ := &graphql.Request{
 		OpName: "communityDigestEntityQuery",
 		Query:  communityDigestEntityQuery_Operation,
 		Variables: &__communityDigestEntityQueryInput{
 			Id: id,
 		},
 	}
-	var err error
+	var err_ error
 
-	var data communityDigestEntityQueryResponse
-	resp := &graphql.Response{Data: &data}
+	var data_ communityDigestEntityQueryResponse
+	resp_ := &graphql.Response{Data: &data_}
 
-	err = client.MakeRequest(
-		ctx,
-		req,
-		resp,
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
 	)
 
-	return &data, err
+	return &data_, err_
 }
 
 // The query or mutation executed by galleryDigestEntityQuery.
@@ -4725,29 +4725,29 @@ fragment mediaFrag on Media {
 `
 
 func galleryDigestEntityQuery(
-	ctx context.Context,
-	client graphql.Client,
+	ctx_ context.Context,
+	client_ graphql.Client,
 	id persist.DBID,
 ) (*galleryDigestEntityQueryResponse, error) {
-	req := &graphql.Request{
+	req_ := &graphql.Request{
 		OpName: "galleryDigestEntityQuery",
 		Query:  galleryDigestEntityQuery_Operation,
 		Variables: &__galleryDigestEntityQueryInput{
 			Id: id,
 		},
 	}
-	var err error
+	var err_ error
 
-	var data galleryDigestEntityQueryResponse
-	resp := &graphql.Response{Data: &data}
+	var data_ galleryDigestEntityQueryResponse
+	resp_ := &graphql.Response{Data: &data_}
 
-	err = client.MakeRequest(
-		ctx,
-		req,
-		resp,
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
 	)
 
-	return &data, err
+	return &data_, err_
 }
 
 // The query or mutation executed by postDigestEntityQuery.
@@ -4826,27 +4826,27 @@ fragment mediaFrag on Media {
 `
 
 func postDigestEntityQuery(
-	ctx context.Context,
-	client graphql.Client,
+	ctx_ context.Context,
+	client_ graphql.Client,
 	id persist.DBID,
 ) (*postDigestEntityQueryResponse, error) {
-	req := &graphql.Request{
+	req_ := &graphql.Request{
 		OpName: "postDigestEntityQuery",
 		Query:  postDigestEntityQuery_Operation,
 		Variables: &__postDigestEntityQueryInput{
 			Id: id,
 		},
 	}
-	var err error
+	var err_ error
 
-	var data postDigestEntityQueryResponse
-	resp := &graphql.Response{Data: &data}
+	var data_ postDigestEntityQueryResponse
+	resp_ := &graphql.Response{Data: &data_}
 
-	err = client.MakeRequest(
-		ctx,
-		req,
-		resp,
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
 	)
 
-	return &data, err
+	return &data_, err_
 }
