@@ -1021,9 +1021,11 @@ type DisconnectSocialAccountPayload struct {
 func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
 
 type EmailNotificationSettings struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
-	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool  `json:"unsubscribedFromDigest"`
+	UnsubscribedFromMarketing     *bool `json:"unsubscribedFromMarketing"`
+	UnsubscribedFromMembersClub   *bool `json:"unsubscribedFromMembersClub"`
 }
 
 type EnsProfileImage struct {
@@ -2758,9 +2760,11 @@ type UpdateEmailInput struct {
 }
 
 type UpdateEmailNotificationSettingsInput struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
-	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool  `json:"unsubscribedFromDigest"`
+	UnsubscribedFromMarketing     *bool `json:"unsubscribedFromMarketing"`
+	UnsubscribedFromMembersClub   *bool `json:"unsubscribedFromMembersClub"`
 }
 
 type UpdateEmailNotificationSettingsPayload struct {
@@ -3055,17 +3059,21 @@ const (
 	EmailUnsubscriptionTypeAll           EmailUnsubscriptionType = "All"
 	EmailUnsubscriptionTypeNotifications EmailUnsubscriptionType = "Notifications"
 	EmailUnsubscriptionTypeDigest        EmailUnsubscriptionType = "Digest"
+	EmailUnsubscriptionTypeMarketing     EmailUnsubscriptionType = "Marketing"
+	EmailUnsubscriptionTypeMembersClub   EmailUnsubscriptionType = "MembersClub"
 )
 
 var AllEmailUnsubscriptionType = []EmailUnsubscriptionType{
 	EmailUnsubscriptionTypeAll,
 	EmailUnsubscriptionTypeNotifications,
 	EmailUnsubscriptionTypeDigest,
+	EmailUnsubscriptionTypeMarketing,
+	EmailUnsubscriptionTypeMembersClub,
 }
 
 func (e EmailUnsubscriptionType) IsValid() bool {
 	switch e {
-	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications, EmailUnsubscriptionTypeDigest:
+	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications, EmailUnsubscriptionTypeDigest, EmailUnsubscriptionTypeMarketing, EmailUnsubscriptionTypeMembersClub:
 		return true
 	}
 	return false

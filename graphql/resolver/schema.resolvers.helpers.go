@@ -599,6 +599,8 @@ func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
 			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
 			UnsubscribedFromDigest:        user.EmailUnsubscriptions.Digest.Bool(),
+			UnsubscribedFromMarketing:     user.EmailUnsubscriptions.Marketing.BoolPointer(),
+			UnsubscribedFromMembersClub:   user.EmailUnsubscriptions.MembersClub.BoolPointer(),
 		},
 	}
 
@@ -1420,6 +1422,8 @@ func updateUserEmailNotificationSettings(ctx context.Context, input model.Update
 		All:           persist.NullBool(input.UnsubscribedFromAll),
 		Notifications: persist.NullBool(input.UnsubscribedFromNotifications),
 		Digest:        persist.NullBool(input.UnsubscribedFromDigest),
+		Marketing:     persist.NullBool(util.FromPointer(input.UnsubscribedFromMarketing)),
+		MembersClub:   persist.NullBool(util.FromPointer(input.UnsubscribedFromMembersClub)),
 	})
 	if err != nil {
 		return nil, err
