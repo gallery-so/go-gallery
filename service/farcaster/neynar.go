@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -16,7 +17,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"github.com/jackc/pgx/v4"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -29,6 +33,8 @@ const neynarV2BaseURL = "https://api.neynar.com/v2/farcaster"
 const expirationSeconds = time.Minute * 10
 const followingCacheExpiration = time.Hour * 24 * 3
 
+var ErrUserNotOnFarcaster = errors.New("user is not on farcaster")
+
 func init() {
 	env.RegisterValidation("NEYNAR_API_KEY", "required")
 }
@@ -37,6 +43,7 @@ type NeynarAPI struct {
 	httpClient *http.Client
 	apiKey     string
 	cache      *redis.Cache
+	q          *db.Queries
 }
 
 func NewNeynarAPI(httpClient *http.Client, redisCache *redis.Cache) *NeynarAPI {
@@ -152,6 +159,65 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 	return neynarResp.Result.User, nil
 }
 
+func (n *NeynarAPI) FarcasterIDByGalleryID(ctx context.Context, userID persist.DBID) (NeynarID, error) {
+	socials, err := n.q.GetSocialsByUserID(ctx, userID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	p, ok := socials[persist.SocialProviderFarcaster]
+	if !ok {
+		return "", ErrUserNotOnFarcaster
+	}
+	if ok && p.ID == "" {
+		return "", errors.New("cached farcaster profile has no associated FID")
+	}
+	if p.ID != "" {
+		return NeynarID(p.ID), nil
+	}
+
+	// Socials not cached yet. Socials are fetched when a user is created, so this should be a rare case.
+	user, err := n.q.GetUserById(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	wallets, err := n.q.GetWalletsByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	ethAddresses := make([]persist.Address, 0)
+	var primaryAddress persist.Address
+
+	for _, w := range wallets {
+		if w.Chain == persist.ChainETH {
+			ethAddresses = append(ethAddresses, w.Address)
+			if w.ID == user.PrimaryWalletID {
+				primaryAddress = w.Address
+			}
+		}
+	}
+
+	if len(ethAddresses) == 0 {
+		return "", ErrUserNotOnFarcaster
+	}
+
+	fUsers, err := n.UsersByAddresses(ctx, ethAddresses)
+	if err != nil {
+		return "", err
+	}
+
+	searchOrder := append([]persist.Address{primaryAddress}, util.MapKeys(fUsers)...)
+
+	for _, w := range searchOrder {
+		for _, u := range fUsers[w] {
+			return u.Fid, nil
+		}
+	}
+
+	return "", ErrUserNotOnFarcaster
+}
+
 func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
 	addressesJoined := strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ",")
 	urlEnconded := url.QueryEscape(addressesJoined)
@@ -264,6 +330,10 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 	}
 
 	return users, nil
+}
+
+func (n *NeynarAPI) FollowersByUserID(ctx context.Context, fid NeynarID) ([]NeynarUser, error) {
+	panic("not implemented")
 }
 
 type NeynarSigner struct {

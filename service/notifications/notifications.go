@@ -218,6 +218,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	notifDispatcher.AddHandler(persist.ActionMentionUser, singleHandler)
 	notifDispatcher.AddHandler(persist.ActionMentionCommunity, singleHandler)
 	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionUserFromFarcasterJoined, singleHandler)
 
 	// notification specifically for ensuring that top users don't get re-notified and users recently notified arent notified again
 	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, topActivityHandler)
@@ -811,7 +812,13 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		return message, nil
 	}
 
+	// No rate limiting for announcements
 	if notif.Action == persist.ActionAnnouncement {
+		return message, nil
+	}
+
+	// No rate limiting for farcaster joined
+	if notif.Action == persist.ActionUserFromFarcasterJoined {
 		return message, nil
 	}
 
@@ -1136,10 +1143,21 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			Actor:  "You",
 			Action: "received a new badge for being amongst the top active users on Gallery this week!",
 		}, nil
-
 	case persist.ActionAnnouncement:
 		return UserFacingNotificationData{
 			Action: n.Data.AnnouncementDetails.PushNotificationText,
+		}, nil
+	case persist.ActionUserFromFarcasterJoined:
+		actor, err := queries.GetUserById(ctx, n.Data.UserFromFarcasterJoinedDetails.UserID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+		if !actor.Username.Valid {
+			return UserFacingNotificationData{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
+		}
+		return UserFacingNotificationData{
+			Actor:  actor.Username.String,
+			Action: "from Farcaster is now on Gallery",
 		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
@@ -1175,6 +1193,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionTopActivityBadgeReceived:
 		return false // TODO -activity
 	case persist.ActionAnnouncement:
+		return true
+	case persist.ActionUserFromFarcasterJoined:
 		return true
 	default:
 		return false
@@ -1490,6 +1510,14 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			EventIds:    notif.EventIds,
 			Post:        util.ToNullString(notif.PostID.String(), true),
 			CommunityID: notif.CommunityID,
+		})
+	case persist.ActionUserFromFarcasterJoined:
+		return queries.CreateSimpleNotification(ctx, db.CreateSimpleNotificationParams{
+			ID:       id,
+			OwnerID:  notif.OwnerID,
+			Action:   notif.Action,
+			Data:     notif.Data,
+			EventIds: notif.EventIds,
 		})
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)

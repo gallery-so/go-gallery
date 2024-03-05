@@ -12,6 +12,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/feed"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -34,7 +35,7 @@ const (
 )
 
 // Register specific event handlers
-func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *task.Client) {
+func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *task.Client, neynarAPI *farcaster.NeynarAPI) {
 	sender := newEventSender(queries)
 
 	feed := newEventDispatcher()
@@ -74,6 +75,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, &followerNotificationHandler{notif})
 	sender.addDelayedHandler(notifications, persist.ActionTopActivityBadgeReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAnnouncement, &announcementNotificationHandler{notif})
+	sender.addDelayedHandler(notifications, persist.ActionUserCreated, userCreatedNotificationHandler{notif, queries, neynarAPI})
 	sender.notifications = notifications
 
 	ctx.Set(eventSenderContextKey, &sender)
@@ -149,14 +151,14 @@ func dispatchDelayed(ctx context.Context, event db.Event) error {
 		return nil
 	}
 
-	persistedEvent, err := sender.eventRepo.Add(ctx, event)
+	e, err := sender.eventRepo.Add(ctx, event)
 	if err != nil {
 		return err
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error { return sender.feed.dispatchDelayed(ctx, *persistedEvent) })
-	eg.Go(func() error { return sender.notifications.dispatchDelayed(ctx, *persistedEvent) })
+	eg.Go(func() error { return sender.feed.dispatchDelayed(ctx, *e) })
+	eg.Go(func() error { return sender.notifications.dispatchDelayed(ctx, *e) })
 	return eg.Wait()
 }
 
@@ -393,16 +395,16 @@ var actionsToBeHandledByFeedService = map[persist.Action]bool{
 }
 
 // handleDelayed creates a delayed task for the Feed service to handle later.
-func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
-	if !actionsToBeHandledByFeedService[persistedEvent.Action] {
+func (h feedHandler) handleDelayed(ctx context.Context, e db.Event) error {
+	if !actionsToBeHandledByFeedService[e.Action] {
 		return nil
 	}
-	return h.tc.CreateTaskForFeed(ctx, task.FeedMessage{ID: persistedEvent.ID})
+	return h.tc.CreateTaskForFeed(ctx, task.FeedMessage{ID: e.ID})
 }
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
-func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Event) (*db.FeedEvent, error) {
-	return h.eventBuilder.NewFeedEventFromEvent(ctx, persistedEvent)
+func (h feedHandler) handleImmediate(ctx context.Context, e db.Event) (*db.FeedEvent, error) {
+	return h.eventBuilder.NewFeedEventFromEvent(ctx, e)
 }
 
 // handleGrouped processes a group of events into a single feed event.
@@ -448,8 +450,8 @@ func newNotificationHandler(notifiers *notifications.NotificationHandlers, disab
 	}
 }
 
-func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
-	owner, err := h.findOwnerForNotificationFromEvent(ctx, persistedEvent)
+func (h notificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
+	owner, err := h.findOwnerForNotificationFromEvent(ctx, e)
 	if err != nil {
 		return err
 	}
@@ -460,27 +462,27 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 	}
 
 	// Don't notify the user on self events
-	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && (persistedEvent.Action != persist.ActionNewTokensReceived && persistedEvent.Action != persist.ActionTopActivityBadgeReceived) {
+	if persist.DBID(persist.NullStrToStr(e.ActorID)) == owner && (e.Action != persist.ActionNewTokensReceived && e.Action != persist.ActionTopActivityBadgeReceived) {
 		return nil
 	}
 
 	// Don't notify the user on un-authed views
-	if persistedEvent.Action == persist.ActionViewedGallery && persistedEvent.ActorID.String == "" {
+	if e.Action == persist.ActionViewedGallery && e.ActorID.String == "" {
 		return nil
 	}
 
 	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
 		OwnerID:     owner,
-		Action:      persistedEvent.Action,
-		Data:        h.createNotificationDataForEvent(persistedEvent),
-		EventIds:    persist.DBIDList{persistedEvent.ID},
-		GalleryID:   persistedEvent.GalleryID,
-		FeedEventID: persistedEvent.FeedEventID,
-		PostID:      persistedEvent.PostID,
-		CommentID:   persistedEvent.CommentID,
-		TokenID:     persistedEvent.TokenID,
-		CommunityID: persistedEvent.CommunityID,
-		MentionID:   persistedEvent.MentionID,
+		Action:      e.Action,
+		Data:        h.createNotificationDataForEvent(e),
+		EventIds:    persist.DBIDList{e.ID},
+		GalleryID:   e.GalleryID,
+		FeedEventID: e.FeedEventID,
+		PostID:      e.PostID,
+		CommentID:   e.CommentID,
+		TokenID:     e.TokenID,
+		CommunityID: e.CommunityID,
+		MentionID:   e.MentionID,
 	})
 }
 
@@ -605,18 +607,18 @@ func newFollowerNotificationHandler(notifiers *notifications.NotificationHandler
 	}
 }
 
-func (h followerNotificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
+func (h followerNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
 	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
 		// no owner or data for follower notifications
-		Action:      persistedEvent.Action,
-		EventIds:    persist.DBIDList{persistedEvent.ID},
-		GalleryID:   persistedEvent.GalleryID,
-		FeedEventID: persistedEvent.FeedEventID,
-		PostID:      persistedEvent.PostID,
-		CommentID:   persistedEvent.CommentID,
-		TokenID:     persistedEvent.TokenID,
-		CommunityID: persistedEvent.CommunityID,
-		MentionID:   persistedEvent.MentionID,
+		Action:      e.Action,
+		EventIds:    persist.DBIDList{e.ID},
+		GalleryID:   e.GalleryID,
+		FeedEventID: e.FeedEventID,
+		PostID:      e.PostID,
+		CommentID:   e.CommentID,
+		TokenID:     e.TokenID,
+		CommunityID: e.CommunityID,
+		MentionID:   e.MentionID,
 	})
 }
 
@@ -625,20 +627,65 @@ type announcementNotificationHandler struct {
 	notificationHandlers *notifications.NotificationHandlers
 }
 
-func (h announcementNotificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
+func (h announcementNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
 	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
 		// no owner or data for follower notifications
-		Action:   persistedEvent.Action,
-		EventIds: persist.DBIDList{persistedEvent.ID},
-		Data: persist.NotificationData{
-			AnnouncementDetails: persistedEvent.Data.AnnouncementDetails,
-		},
+		Action:   e.Action,
+		EventIds: persist.DBIDList{e.ID},
+		Data:     persist.NotificationData{AnnouncementDetails: e.Data.AnnouncementDetails},
 	})
 }
 
 // slackHandler posts events to Slack
 type slackHandler struct{ tc *task.Client }
 
-func (s slackHandler) handleDelayed(ctx context.Context, event db.Event) error {
-	return s.tc.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: event.PostID})
+func (s slackHandler) handleDelayed(ctx context.Context, e db.Event) error {
+	return s.tc.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: e.PostID})
+}
+
+type userCreatedNotificationHandler struct {
+	notificationHandlers *notifications.NotificationHandlers
+	q                    *db.Queries
+	fc                   *farcaster.NeynarAPI
+}
+
+func (u userCreatedNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
+	fID, err := u.fc.FarcasterIDByGalleryID(ctx, e.UserID)
+	if err != nil {
+		return err
+	}
+
+	fcUsers, err := u.fc.FollowersByUserID(ctx, fID)
+	if err != nil {
+		return err
+	}
+
+	followerFIDs := util.MapWithoutError(fcUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() })
+	gUsers, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
+	if err != nil {
+		return err
+	}
+
+	userIDs := util.MapWithoutError(gUsers, func(u db.User) persist.DBID { return u.ID })
+	isFollowing, err := u.q.UsersIsFollowingUsers(ctx, e.UserID, util.MapWithoutError(userIDs, func(u db.User) persist.DBID { return u.ID }))
+	if err != nil {
+		return err
+	}
+
+	for i, u := range gUsers {
+		if isFollowing[i] {
+			continue
+		}
+		err = u.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
+			OwnerID:  u.ID,
+			Action:   persist.ActionUserFromFarcasterJoined,
+			Data:     persist.NotificationData{UserFromFarcasterJoinedDetails: persist.UserFromFarcasterJoinedDetails{UserID: u.ID}},
+			EventIds: []persist.DBID{e.ID},
+		})
+		if err != nil {
+			logger.For(ctx).Errorf("failed to send farcaster user joined notification: %s", err)
+		}
+	}
+
+	return nil
 }
