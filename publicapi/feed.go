@@ -297,26 +297,6 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		logger.For(ctx).Errorf("error dispatching event: %v", err)
 	}
 
-	count, err := api.queries.CountPostsByUserID(ctx, actorID)
-	if err != nil {
-		return "", err
-	}
-
-	if count == 1 {
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(actorID),
-			Action:         persist.ActionUserPostedFirstPost,
-			ResourceTypeID: persist.ResourceTypePost,
-			UserID:         actorID,
-			SubjectID:      postID,
-			PostID:         postID,
-		})
-		if err != nil {
-			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
-			logger.For(ctx).Errorf("error dispatching event: %v", err)
-		}
-	}
-
 	return postID, nil
 }
 

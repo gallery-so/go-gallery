@@ -1480,7 +1480,7 @@ func (api UserAPI) GetSuggestedUsersFarcaster(ctx context.Context, before, after
 		}
 	} else {
 		// Otherwise make a new recommendation
-		fUsers, err := For(ctx).Social.GetFarcastingFollowingByUserID(ctx, viewerID)
+		fUsers, err := For(ctx).Social.GetFarcasterFollowingByUserID(ctx, viewerID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}

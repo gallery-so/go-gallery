@@ -1191,6 +1191,52 @@ func (q *Queries) CreatePostEvent(ctx context.Context, arg CreatePostEventParams
 	return i, err
 }
 
+const createPostNotification = `-- name: CreatePostNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
+`
+
+type CreatePostNotificationParams struct {
+	ID       persist.DBID             `db:"id" json:"id"`
+	OwnerID  persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action   persist.Action           `db:"action" json:"action"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	PostID   persist.DBID             `db:"post_id" json:"post_id"`
+}
+
+func (q *Queries) CreatePostNotification(ctx context.Context, arg CreatePostNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createPostNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.PostID,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
+		&i.MentionID,
+		&i.CommunityID,
+	)
+	return i, err
+}
+
 const createPushTickets = `-- name: CreatePushTickets :exec
 insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
   (
@@ -1451,86 +1497,6 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		&i.CommunityID,
 	)
 	return i, err
-}
-
-const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
-WITH 
-follower_with_row_number AS (
-    SELECT follower, row_number() OVER () AS rn
-    FROM follows
-    WHERE followee = $5 AND deleted = false
-),
-id_with_row_number AS (
-    SELECT unnest($6::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($6::varchar(255)[])) AS rn
-)
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
-SELECT 
-    i.id, 
-    f.follower, 
-    $1, 
-    $2, 
-    $3, 
-    $4
-FROM 
-    id_with_row_number i
-JOIN 
-    follower_with_row_number f ON i.rn = f.rn
-RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
-`
-
-type CreateUserPostedFirstPostNotificationsParams struct {
-	Action   persist.Action           `db:"action" json:"action"`
-	Data     persist.NotificationData `db:"data" json:"data"`
-	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
-	PostID   persist.DBID             `db:"post_id" json:"post_id"`
-	ActorID  persist.DBID             `db:"actor_id" json:"actor_id"`
-	Ids      []string                 `db:"ids" json:"ids"`
-}
-
-func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, arg CreateUserPostedFirstPostNotificationsParams) ([]Notification, error) {
-	rows, err := q.db.Query(ctx, createUserPostedFirstPostNotifications,
-		arg.Action,
-		arg.Data,
-		arg.EventIds,
-		arg.PostID,
-		arg.ActorID,
-		arg.Ids,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Notification
-	for rows.Next() {
-		var i Notification
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.OwnerID,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Action,
-			&i.Data,
-			&i.EventIds,
-			&i.FeedEventID,
-			&i.CommentID,
-			&i.GalleryID,
-			&i.Seen,
-			&i.Amount,
-			&i.PostID,
-			&i.TokenID,
-			&i.MentionID,
-			&i.CommunityID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const createUserPostedYourWorkNotification = `-- name: CreateUserPostedYourWorkNotification :one
@@ -5322,6 +5288,53 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 			&i.ProfileImageID,
 			&i.Persona,
 			&i.Address,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersByFarcasterIDs = `-- name: GetUsersByFarcasterIDs :many
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.pii_unverified_email_address, users.pii_verified_email_address, users.pii_socials from pii.user_view users where ((pii_socials -> 'Farcaster'::text) ->> 'id'::text) = any($1::varchar[]) and not deleted
+`
+
+type GetUsersByFarcasterIDsRow struct {
+	User User `db:"user" json:"user"`
+}
+
+func (q *Queries) GetUsersByFarcasterIDs(ctx context.Context, fids []string) ([]GetUsersByFarcasterIDsRow, error) {
+	rows, err := q.db.Query(ctx, getUsersByFarcasterIDs, fids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUsersByFarcasterIDsRow
+	for rows.Next() {
+		var i GetUsersByFarcasterIDsRow
+		if err := rows.Scan(
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
+			&i.User.Persona,
 		); err != nil {
 			return nil, err
 		}

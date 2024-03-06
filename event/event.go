@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
@@ -36,6 +37,7 @@ const (
 
 // Register specific event handlers
 func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *task.Client, neynarAPI *farcaster.NeynarAPI) {
+	dataloaders := dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	sender := newEventSender(queries)
 
 	feed := newEventDispatcher()
@@ -55,10 +57,9 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addImmediateHandler(feed, persist.ActionGalleryInfoUpdated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToToken, feedHandler)
 	sender.addGroupHandler(feed, persist.ActionGalleryUpdated, feedHandler)
-	sender.feed = feed
 
 	notifications := newEventDispatcher()
-	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
+	notificationHandler := notificationHandler{dataloaders: dataloaders, notificationHandlers: notif}
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
@@ -72,12 +73,13 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionUserPostedYourWork, notificationHandler)
-	sender.addDelayedHandler(notifications, persist.ActionUserPostedFirstPost, &followerNotificationHandler{notif})
+	sender.addDelayedHandler(notifications, persist.ActionUserPosted, &userPostedNotificationHandler{notif, queries, dataloaders, neynarAPI})
 	sender.addDelayedHandler(notifications, persist.ActionTopActivityBadgeReceived, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAnnouncement, &announcementNotificationHandler{notif})
-	sender.addDelayedHandler(notifications, persist.ActionUserCreated, userCreatedNotificationHandler{notif, queries, neynarAPI})
-	sender.notifications = notifications
+	sender.addDelayedHandler(notifications, persist.ActionUserCreated, userCreatedNotificationHandler{notif, queries, dataloaders, neynarAPI})
 
+	sender.feed = feed
+	sender.notifications = notifications
 	ctx.Set(eventSenderContextKey, &sender)
 }
 
@@ -443,13 +445,6 @@ type notificationHandler struct {
 	notificationHandlers *notifications.NotificationHandlers
 }
 
-func newNotificationHandler(notifiers *notifications.NotificationHandlers, disableDataloaderCaching bool, queries *db.Queries) *notificationHandler {
-	return &notificationHandler{
-		notificationHandlers: notifiers,
-		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook),
-	}
-}
-
 func (h notificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
 	owner, err := h.findOwnerForNotificationFromEvent(ctx, e)
 	if err != nil {
@@ -596,32 +591,6 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	return
 }
 
-// followerNotificationHandler handles events for consumption as notifications.
-type followerNotificationHandler struct {
-	notificationHandlers *notifications.NotificationHandlers
-}
-
-func newFollowerNotificationHandler(notifiers *notifications.NotificationHandlers) *followerNotificationHandler {
-	return &followerNotificationHandler{
-		notificationHandlers: notifiers,
-	}
-}
-
-func (h followerNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
-	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
-		// no owner or data for follower notifications
-		Action:      e.Action,
-		EventIds:    persist.DBIDList{e.ID},
-		GalleryID:   e.GalleryID,
-		FeedEventID: e.FeedEventID,
-		PostID:      e.PostID,
-		CommentID:   e.CommentID,
-		TokenID:     e.TokenID,
-		CommunityID: e.CommunityID,
-		MentionID:   e.MentionID,
-	})
-}
-
 // global handles events for consumption as global notifications.
 type announcementNotificationHandler struct {
 	notificationHandlers *notifications.NotificationHandlers
@@ -646,11 +615,15 @@ func (s slackHandler) handleDelayed(ctx context.Context, e db.Event) error {
 type userCreatedNotificationHandler struct {
 	notificationHandlers *notifications.NotificationHandlers
 	q                    *db.Queries
+	dataloaders          *dataloader.Loaders
 	fc                   *farcaster.NeynarAPI
 }
 
 func (u userCreatedNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
 	fID, err := u.fc.FarcasterIDByGalleryID(ctx, e.UserID)
+	if err != nil && errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -661,25 +634,99 @@ func (u userCreatedNotificationHandler) handleDelayed(ctx context.Context, e db.
 	}
 
 	followerFIDs := util.MapWithoutError(fcUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() })
-	gUsers, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
+	fcUsersOnGallery, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
 	if err != nil {
 		return err
 	}
 
-	userIDs := util.MapWithoutError(gUsers, func(u db.User) persist.DBID { return u.ID })
-	isFollowing, err := u.q.UsersIsFollowingUsers(ctx, e.UserID, util.MapWithoutError(userIDs, func(u db.User) persist.DBID { return u.ID }))
+	followers, err := u.dataloaders.GetFollowersByUserIdBatch.Load(e.UserID)
 	if err != nil {
 		return err
 	}
 
-	for i, u := range gUsers {
-		if isFollowing[i] {
+	isFollowing := make(map[persist.DBID]bool, len(followers))
+	for _, f := range followers {
+		isFollowing[f.ID] = true
+	}
+
+	for _, f := range fcUsersOnGallery {
+		if isFollowing[f.User.ID] {
 			continue
 		}
 		err = u.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
-			OwnerID:  u.ID,
+			OwnerID:  f.User.ID,
 			Action:   persist.ActionUserFromFarcasterJoined,
-			Data:     persist.NotificationData{UserFromFarcasterJoinedDetails: persist.UserFromFarcasterJoinedDetails{UserID: u.ID}},
+			Data:     persist.NotificationData{UserFromFarcasterJoinedDetails: persist.UserFromFarcasterJoinedDetails{UserID: e.UserID}},
+			EventIds: []persist.DBID{e.ID},
+		})
+		if err != nil {
+			logger.For(ctx).Errorf("failed to send farcaster user joined notification: %s", err)
+		}
+	}
+
+	return nil
+}
+
+type userPostedNotificationHandler struct {
+	notificationHandlers *notifications.NotificationHandlers
+	q                    *db.Queries
+	dataloaders          *dataloader.Loaders
+	fc                   *farcaster.NeynarAPI
+}
+
+func (u userPostedNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
+	actorID := persist.DBID(e.ActorID.String)
+
+	postCount, err := u.q.CountPostsByUserID(ctx, actorID)
+	if err != nil {
+		return err
+	}
+
+	// Only send notification if this is the first post
+	if postCount != 1 {
+		return nil
+	}
+
+	followers, err := u.dataloaders.GetFollowersByUserIdBatch.Load(actorID)
+	if err != nil {
+		return err
+	}
+
+	fID, err := u.fc.FarcasterIDByGalleryID(ctx, actorID)
+	if err != nil && !errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
+		return err
+	}
+
+	if fID != "" {
+		fcUsers, err := u.fc.FollowersByUserID(ctx, fID)
+		if err != nil {
+			return err
+		}
+
+		followerFIDs := util.MapWithoutError(fcUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() })
+		fcUsersOnGallery, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
+		if err != nil {
+			return err
+		}
+
+		isFollowing := make(map[persist.DBID]bool, len(followers))
+		for _, f := range followers {
+			isFollowing[f.ID] = true
+		}
+
+		// Also notify farcaster followers that aren't gallery followers
+		for _, u := range fcUsersOnGallery {
+			if !isFollowing[u.User.ID] {
+				followers = append(followers, u.User)
+			}
+		}
+	}
+
+	for _, f := range followers {
+		err = u.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
+			OwnerID:  f.ID,
+			Action:   persist.ActionUserPostedFirstPost,
+			PostID:   e.PostID,
 			EventIds: []persist.DBID{e.ID},
 		})
 		if err != nil {
