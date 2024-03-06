@@ -43,7 +43,6 @@ func (r *EventRepository) Add(ctx context.Context, event db.Event) (*db.Event, e
 }
 
 func (r *EventRepository) AddUserEvent(ctx context.Context, event db.Event) (*db.Event, error) {
-
 	event, err := r.Queries.CreateUserEvent(ctx, db.CreateUserEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,

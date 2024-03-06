@@ -1064,7 +1064,9 @@ update users set primary_wallet_id = @wallet_id from wallets
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.l1_chain = @l1_chain AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
 
 -- name: GetUsersByFarcasterIDs :many
-select sqlc.embed(users) from pii.user_view users where ((pii_socials -> 'Farcaster'::text) ->> 'id'::text) = any(@fids::varchar[]) and not deleted;
+select users.*
+from pii.for_users join users on for_users.user_id = users.id
+where ((pii_socials -> 'Farcaster'::text) ->> 'id'::text) = any(@fids::varchar[]) and not users.deleted;
 
 -- name: GetFeedEventByID :one
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

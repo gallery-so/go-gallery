@@ -86,6 +86,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
 	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
 	OnGalleryAnnouncementNotification:                  fetchNotificationByID[model.GalleryAnnouncementNotification],
+	OnSomeoneYouFollowOnFarcasterJoinedNotification:    fetchNotificationByID[model.SomeoneYouFollowOnFarcasterJoinedNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type

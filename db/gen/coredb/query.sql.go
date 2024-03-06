@@ -5300,41 +5300,39 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 }
 
 const getUsersByFarcasterIDs = `-- name: GetUsersByFarcasterIDs :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.pii_unverified_email_address, users.pii_verified_email_address, users.pii_socials from pii.user_view users where ((pii_socials -> 'Farcaster'::text) ->> 'id'::text) = any($1::varchar[]) and not deleted
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
+from pii.for_users join users on for_users.user_id = users.id
+where ((pii_socials -> 'Farcaster'::text) ->> 'id'::text) = any($1::varchar[]) and not users.deleted
 `
 
-type GetUsersByFarcasterIDsRow struct {
-	User User `db:"user" json:"user"`
-}
-
-func (q *Queries) GetUsersByFarcasterIDs(ctx context.Context, fids []string) ([]GetUsersByFarcasterIDsRow, error) {
+func (q *Queries) GetUsersByFarcasterIDs(ctx context.Context, fids []string) ([]User, error) {
 	rows, err := q.db.Query(ctx, getUsersByFarcasterIDs, fids)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetUsersByFarcasterIDsRow
+	var items []User
 	for rows.Next() {
-		var i GetUsersByFarcasterIDsRow
+		var i User
 		if err := rows.Scan(
-			&i.User.ID,
-			&i.User.Deleted,
-			&i.User.Version,
-			&i.User.LastUpdated,
-			&i.User.CreatedAt,
-			&i.User.Username,
-			&i.User.UsernameIdempotent,
-			&i.User.Wallets,
-			&i.User.Bio,
-			&i.User.Traits,
-			&i.User.Universal,
-			&i.User.NotificationSettings,
-			&i.User.EmailUnsubscriptions,
-			&i.User.FeaturedGallery,
-			&i.User.PrimaryWalletID,
-			&i.User.UserExperiences,
-			&i.User.ProfileImageID,
-			&i.User.Persona,
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
+			&i.Persona,
 		); err != nil {
 			return nil, err
 		}

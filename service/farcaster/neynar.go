@@ -46,11 +46,12 @@ type NeynarAPI struct {
 	q          *db.Queries
 }
 
-func NewNeynarAPI(httpClient *http.Client, redisCache *redis.Cache) *NeynarAPI {
+func NewNeynarAPI(httpClient *http.Client, redisCache *redis.Cache, q *db.Queries) *NeynarAPI {
 	return &NeynarAPI{
 		httpClient: httpClient,
 		apiKey:     env.GetString("NEYNAR_API_KEY"),
 		cache:      redisCache,
+		q:          q,
 	}
 }
 
@@ -254,7 +255,7 @@ func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Ad
 	return neynarResp, nil
 }
 
-type NeynarFollowingByUserIDResponse struct {
+type NeynarFollowsReponse struct {
 	Result struct {
 		Users []NeynarUser `json:"users"`
 		Next  struct {
@@ -301,7 +302,7 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 
 		defer resp.Body.Close()
 
-		var r NeynarFollowingByUserIDResponse
+		var r NeynarFollowsReponse
 
 		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 			return nil, err
@@ -333,7 +334,50 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 }
 
 func (n *NeynarAPI) FollowersByUserID(ctx context.Context, fid NeynarID) ([]NeynarUser, error) {
-	panic("not implemented")
+	u, err := url.Parse(fmt.Sprintf("%s/followers", neynarV1BaseURL))
+	if err != nil {
+		return nil, err
+	}
+
+	q := u.Query()
+	q.Set("fid", fid.String())
+	q.Set("limit", "150")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("api_key", n.apiKey)
+
+	users := make([]NeynarUser, 0)
+	for {
+		resp, err := n.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		var r NeynarFollowsReponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			return nil, err
+		}
+
+		users = append(users, r.Result.Users...)
+
+		if r.Result.Next.Cursor == "" {
+			break
+		}
+
+		q = req.URL.Query()
+		q.Set("cursor", r.Result.Next.Cursor)
+		req.URL.RawQuery = q.Encode()
+	}
+
+	return users, nil
 }
 
 type NeynarSigner struct {

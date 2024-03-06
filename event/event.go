@@ -650,13 +650,13 @@ func (u userCreatedNotificationHandler) handleDelayed(ctx context.Context, e db.
 	}
 
 	for _, f := range fcUsersOnGallery {
-		if isFollowing[f.User.ID] {
+		if isFollowing[f.ID] {
 			continue
 		}
 		err = u.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
-			OwnerID:  f.User.ID,
+			OwnerID:  f.ID,
 			Action:   persist.ActionUserFromFarcasterJoined,
-			Data:     persist.NotificationData{UserFromFarcasterJoinedDetails: persist.UserFromFarcasterJoinedDetails{UserID: e.UserID}},
+			Data:     persist.NotificationData{UserFromFarcasterJoinedDetails: &persist.UserFromFarcasterJoinedDetails{UserID: e.UserID}},
 			EventIds: []persist.DBID{e.ID},
 		})
 		if err != nil {
@@ -716,8 +716,8 @@ func (u userPostedNotificationHandler) handleDelayed(ctx context.Context, e db.E
 
 		// Also notify farcaster followers that aren't gallery followers
 		for _, u := range fcUsersOnGallery {
-			if !isFollowing[u.User.ID] {
-				followers = append(followers, u.User)
+			if !isFollowing[u.ID] {
+				followers = append(followers, u)
 			}
 		}
 	}
