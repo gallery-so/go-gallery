@@ -42,7 +42,7 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 	queries := coredb.New(pgx)
 
 	// no cache for now, but we should add one if we ever do anything with followers here
-	ney := farcaster.NewNeynarAPI(http.DefaultClient, nil)
+	ney := farcaster.NewNeynarAPI(http.DefaultClient, nil, queries)
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 	router.POST("/process/users", processUsers(queries, ney, lens.NewAPI(http.DefaultClient)))
 	router.POST("/checkFarcasterApproval", checkFarcasterApproval(queries, ney))

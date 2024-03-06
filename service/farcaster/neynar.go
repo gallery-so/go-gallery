@@ -160,6 +160,8 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 	return neynarResp.Result.User, nil
 }
 
+// FarcasterIDByGalleryID returns the FID of a user via the user's Gallery ID. ErrUserNotOnFarcaster is returned
+// if the user is not on Farcaster based off their connected wallets.
 func (n *NeynarAPI) FarcasterIDByGalleryID(ctx context.Context, userID persist.DBID) (NeynarID, error) {
 	socials, err := n.q.GetSocialsByUserID(ctx, userID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -352,6 +354,7 @@ func (n *NeynarAPI) FollowersByUserID(ctx context.Context, fid NeynarID) ([]Neyn
 	req.Header.Set("api_key", n.apiKey)
 
 	users := make([]NeynarUser, 0)
+
 	for {
 		resp, err := n.httpClient.Do(req)
 		if err != nil {

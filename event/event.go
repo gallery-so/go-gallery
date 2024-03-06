@@ -730,7 +730,7 @@ func (u userPostedNotificationHandler) handleDelayed(ctx context.Context, e db.E
 			EventIds: []persist.DBID{e.ID},
 		})
 		if err != nil {
-			logger.For(ctx).Errorf("failed to send farcaster user joined notification: %s", err)
+			logger.For(ctx).Errorf("failed to send first post notification: %s", err)
 		}
 	}
 
