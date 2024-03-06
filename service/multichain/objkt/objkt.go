@@ -84,9 +84,14 @@ type tokensByContractQuery struct {
 	} `graphql:"fa(where: {contract: {_eq: $contractAddress}, type: {_eq: fa2}})"`
 }
 
-type tokensByIdentifiersQuery struct {
+type tokensByIdentifiersOwnerQuery struct {
 	Token []token `graphql:"token(where: {fa: {type: {_eq: fa2}}, fa_contract: {_eq: $contractAddress}, token_id: {_eq: $tokenID}, holders: {quantity: {_gt: 0}, holder: {address: {_eq: $ownerAddress}}}})"`
 }
+
+type tokensByIdentifiersQuery struct {
+	Token []token `graphql:"token(where: {fa: {type: {_eq: fa2}}, fa_contract: {_eq: $contractAddress}, token_id: {_eq: $tokenID}})"`
+}
+
 type Provider struct {
 	gql *graphql.Client
 }
@@ -263,7 +268,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
 
-	var query tokensByIdentifiersQuery
+	var query tokensByIdentifiersOwnerQuery
 
 	if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
 		"contractAddress": graphql.String(tokenIdentifiers.ContractAddress),
