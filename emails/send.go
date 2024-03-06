@@ -509,6 +509,13 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 	m := mail.NewV3Mail()
 	m.SetFrom(from)
 	p := mail.NewPersonalization()
+
+	if digestValues.Subject != nil {
+		m.Subject = *digestValues.Subject
+		// personalization subject always overrides the mail subject, might as well just set both just in case
+		p.Subject = *digestValues.Subject
+	}
+
 	m.SetTemplateID(env.GetString("SENDGRID_DIGEST_TEMPLATE_ID"))
 	p.DynamicTemplateData = asMap
 	m.AddPersonalizations(p)
