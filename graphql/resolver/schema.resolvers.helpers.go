@@ -1151,15 +1151,6 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			User:         nil, // handled by dedicated resolver
 			HelperSomeoneYouFollowOnFarcasterJoinedNotificationData: model.HelperSomeoneYouFollowOnFarcasterJoinedNotificationData{UserID: notif.Data.UserFromFarcasterJoinedDetails.UserID},
 		}, nil
-	case persist.ActionUserFromFarcasterPostedFirstPost:
-		return model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification{
-			Dbid:         notif.ID,
-			Seen:         &notif.Seen,
-			CreationTime: &notif.CreatedAt,
-			UpdatedTime:  &notif.LastUpdated,
-			Post:         nil, // handled by dedicated resolver
-			HelperSomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationData: model.HelperSomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationData{PostID: notif.PostID},
-		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}

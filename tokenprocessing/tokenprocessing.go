@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
@@ -55,7 +56,8 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	notificationsHandler := notifications.New(clients.Queries, clients.PubSubClient, clients.TaskClient, redis.NewLockClient(redis.NewCache(redis.NotificationLockCache)), false)
 
 	router.Use(func(c *gin.Context) {
-		event.AddTo(c, false, notificationsHandler, clients.Queries, clients.TaskClient)
+		var farcasterAPI *farcaster.NeynarAPI
+		event.AddTo(c, false, notificationsHandler, clients.Queries, clients.TaskClient, farcasterAPI)
 	})
 
 	if env.GetString("ENV") != "production" {

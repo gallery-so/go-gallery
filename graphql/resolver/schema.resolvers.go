@@ -3089,11 +3089,6 @@ func (r *someoneYouFollowOnFarcasterJoinedNotificationResolver) User(ctx context
 }
 
 // Post is the resolver for the post field.
-func (r *someoneYouFollowOnFarcasterPostedTheirFirstPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (*model.Post, error) {
-	return resolvePostByPostID(ctx, obj.HelperSomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationData.PostID)
-}
-
-// Post is the resolver for the post field.
 func (r *someoneYouFollowPostedTheirFirstPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (*model.Post, error) {
 	return resolvePostByPostID(ctx, obj.PostID)
 }
@@ -3812,11 +3807,6 @@ func (r *Resolver) SomeoneYouFollowOnFarcasterJoinedNotification() generated.Som
 	return &someoneYouFollowOnFarcasterJoinedNotificationResolver{r}
 }
 
-// SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification returns generated.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationResolver implementation.
-func (r *Resolver) SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification() generated.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationResolver {
-	return &someoneYouFollowOnFarcasterPostedTheirFirstPostNotificationResolver{r}
-}
-
 // SomeoneYouFollowPostedTheirFirstPostNotification returns generated.SomeoneYouFollowPostedTheirFirstPostNotificationResolver implementation.
 func (r *Resolver) SomeoneYouFollowPostedTheirFirstPostNotification() generated.SomeoneYouFollowPostedTheirFirstPostNotificationResolver {
 	return &someoneYouFollowPostedTheirFirstPostNotificationResolver{r}
@@ -3933,7 +3923,6 @@ type someonePostedYourWorkNotificationResolver struct{ *Resolver }
 type someoneRepliedToYourCommentNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
 type someoneYouFollowOnFarcasterJoinedNotificationResolver struct{ *Resolver }
-type someoneYouFollowOnFarcasterPostedTheirFirstPostNotificationResolver struct{ *Resolver }
 type someoneYouFollowPostedTheirFirstPostNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }

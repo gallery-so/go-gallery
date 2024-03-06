@@ -97,7 +97,6 @@ type ResolverRoot interface {
 	SomeoneRepliedToYourCommentNotification() SomeoneRepliedToYourCommentNotificationResolver
 	SomeoneViewedYourGalleryNotification() SomeoneViewedYourGalleryNotificationResolver
 	SomeoneYouFollowOnFarcasterJoinedNotification() SomeoneYouFollowOnFarcasterJoinedNotificationResolver
-	SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification() SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationResolver
 	SomeoneYouFollowPostedTheirFirstPostNotification() SomeoneYouFollowPostedTheirFirstPostNotificationResolver
 	Subscription() SubscriptionResolver
 	Token() TokenResolver
@@ -1435,15 +1434,6 @@ type ComplexityRoot struct {
 		User         func(childComplexity int) int
 	}
 
-	SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification struct {
-		CreationTime func(childComplexity int) int
-		Dbid         func(childComplexity int) int
-		ID           func(childComplexity int) int
-		Post         func(childComplexity int) int
-		Seen         func(childComplexity int) int
-		UpdatedTime  func(childComplexity int) int
-	}
-
 	SomeoneYouFollowPostedTheirFirstPostNotification struct {
 		CreationTime func(childComplexity int) int
 		Dbid         func(childComplexity int) int
@@ -2211,9 +2201,6 @@ type SomeoneViewedYourGalleryNotificationResolver interface {
 }
 type SomeoneYouFollowOnFarcasterJoinedNotificationResolver interface {
 	User(ctx context.Context, obj *model.SomeoneYouFollowOnFarcasterJoinedNotification) (*model.GalleryUser, error)
-}
-type SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationResolver interface {
-	Post(ctx context.Context, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (*model.Post, error)
 }
 type SomeoneYouFollowPostedTheirFirstPostNotificationResolver interface {
 	Post(ctx context.Context, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (*model.Post, error)
@@ -8246,48 +8233,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneYouFollowOnFarcasterJoinedNotification.User(childComplexity), true
 
-	case "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.creationTime":
-		if e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.CreationTime == nil {
-			break
-		}
-
-		return e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.CreationTime(childComplexity), true
-
-	case "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.dbid":
-		if e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.Dbid == nil {
-			break
-		}
-
-		return e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.Dbid(childComplexity), true
-
-	case "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.id":
-		if e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.ID == nil {
-			break
-		}
-
-		return e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.ID(childComplexity), true
-
-	case "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.post":
-		if e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.Post == nil {
-			break
-		}
-
-		return e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.Post(childComplexity), true
-
-	case "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.seen":
-		if e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.Seen == nil {
-			break
-		}
-
-		return e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.Seen(childComplexity), true
-
-	case "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.updatedTime":
-		if e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.UpdatedTime == nil {
-			break
-		}
-
-		return e.complexity.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification.UpdatedTime(childComplexity), true
-
 	case "SomeoneYouFollowPostedTheirFirstPostNotification.creationTime":
 		if e.complexity.SomeoneYouFollowPostedTheirFirstPostNotification.CreationTime == nil {
 			break
@@ -12184,16 +12129,6 @@ type SomeoneYouFollowOnFarcasterJoinedNotification implements Notification & Nod
   creationTime: Time
   updatedTime: Time
   user: GalleryUser @goField(forceResolver: true)
-}
-
-type SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification implements Notification & Node
-  @goEmbedHelper {
-  id: ID!
-  dbid: DBID!
-  seen: Boolean
-  creationTime: Time
-  updatedTime: Time
-  post: Post @goField(forceResolver: true)
 }
 
 type YouReceivedTopActivityBadgeNotification implements Notification & Node {
@@ -56527,288 +56462,6 @@ func (ec *executionContext) fieldContext_SomeoneYouFollowOnFarcasterJoinedNotifi
 	return fc, nil
 }
 
-func (ec *executionContext) _SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_id(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_dbid(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type DBID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_seen(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Seen, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_creationTime(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CreationTime, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*time.Time)
-	fc.Result = res
-	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Time does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_updatedTime(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.UpdatedTime, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*time.Time)
-	fc.Result = res
-	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Time does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_post(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_post(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification().Post(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Post)
-	fc.Result = res
-	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Post_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_Post_dbid(ctx, field)
-			case "author":
-				return ec.fieldContext_Post_author(ctx, field)
-			case "creationTime":
-				return ec.fieldContext_Post_creationTime(ctx, field)
-			case "tokens":
-				return ec.fieldContext_Post_tokens(ctx, field)
-			case "caption":
-				return ec.fieldContext_Post_caption(ctx, field)
-			case "mentions":
-				return ec.fieldContext_Post_mentions(ctx, field)
-			case "admires":
-				return ec.fieldContext_Post_admires(ctx, field)
-			case "comments":
-				return ec.fieldContext_Post_comments(ctx, field)
-			case "totalComments":
-				return ec.fieldContext_Post_totalComments(ctx, field)
-			case "interactions":
-				return ec.fieldContext_Post_interactions(ctx, field)
-			case "viewerAdmire":
-				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "isFirstPost":
-				return ec.fieldContext_Post_isFirstPost(ctx, field)
-			case "userAddedMintURL":
-				return ec.fieldContext_Post_userAddedMintURL(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _SomeoneYouFollowPostedTheirFirstPostNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneYouFollowPostedTheirFirstPostNotification) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SomeoneYouFollowPostedTheirFirstPostNotification_id(ctx, field)
 	if err != nil {
@@ -73401,55 +73054,6 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.SomeoneAdmiredYourPostNotification:
-		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, &obj)
-	case *model.SomeoneAdmiredYourPostNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, obj)
-	case model.SomeoneAdmiredYourCommentNotification:
-		return ec._SomeoneAdmiredYourCommentNotification(ctx, sel, &obj)
-	case *model.SomeoneAdmiredYourCommentNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneAdmiredYourCommentNotification(ctx, sel, obj)
-	case model.SomeoneFollowedYouBackNotification:
-		return ec._SomeoneFollowedYouBackNotification(ctx, sel, &obj)
-	case *model.SomeoneFollowedYouBackNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneFollowedYouBackNotification(ctx, sel, obj)
-	case model.SomeoneFollowedYouNotification:
-		return ec._SomeoneFollowedYouNotification(ctx, sel, &obj)
-	case *model.SomeoneFollowedYouNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneFollowedYouNotification(ctx, sel, obj)
-	case model.SomeoneAdmiredYourTokenNotification:
-		return ec._SomeoneAdmiredYourTokenNotification(ctx, sel, &obj)
-	case *model.SomeoneAdmiredYourTokenNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneAdmiredYourTokenNotification(ctx, sel, obj)
-	case model.SomeoneViewedYourGalleryNotification:
-		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, &obj)
-	case *model.SomeoneViewedYourGalleryNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, obj)
-	case model.SomeoneAdmiredYourFeedEventNotification:
-		return ec._SomeoneAdmiredYourFeedEventNotification(ctx, sel, &obj)
-	case *model.SomeoneAdmiredYourFeedEventNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneAdmiredYourFeedEventNotification(ctx, sel, obj)
 	case model.NewTokensNotification:
 		return ec._NewTokensNotification(ctx, sel, &obj)
 	case *model.NewTokensNotification:
@@ -73457,25 +73061,55 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._NewTokensNotification(ctx, sel, obj)
-	case model.GroupedNotification:
+	case model.SomeoneFollowedYouNotification:
+		return ec._SomeoneFollowedYouNotification(ctx, sel, &obj)
+	case *model.SomeoneFollowedYouNotification:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._GroupedNotification(ctx, sel, obj)
-	case model.SomeonePostedYourWorkNotification:
-		return ec._SomeonePostedYourWorkNotification(ctx, sel, &obj)
-	case *model.SomeonePostedYourWorkNotification:
+		return ec._SomeoneFollowedYouNotification(ctx, sel, obj)
+	case model.SomeoneFollowedYouBackNotification:
+		return ec._SomeoneFollowedYouBackNotification(ctx, sel, &obj)
+	case *model.SomeoneFollowedYouBackNotification:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SomeonePostedYourWorkNotification(ctx, sel, obj)
-	case model.SomeoneMentionedYourCommunityNotification:
-		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, &obj)
-	case *model.SomeoneMentionedYourCommunityNotification:
+		return ec._SomeoneFollowedYouBackNotification(ctx, sel, obj)
+	case model.SomeoneAdmiredYourFeedEventNotification:
+		return ec._SomeoneAdmiredYourFeedEventNotification(ctx, sel, &obj)
+	case *model.SomeoneAdmiredYourFeedEventNotification:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, obj)
+		return ec._SomeoneAdmiredYourFeedEventNotification(ctx, sel, obj)
+	case model.SomeoneAdmiredYourPostNotification:
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneAdmiredYourPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, obj)
+	case model.SomeoneAdmiredYourTokenNotification:
+		return ec._SomeoneAdmiredYourTokenNotification(ctx, sel, &obj)
+	case *model.SomeoneAdmiredYourTokenNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneAdmiredYourTokenNotification(ctx, sel, obj)
+	case model.SomeoneAdmiredYourCommentNotification:
+		return ec._SomeoneAdmiredYourCommentNotification(ctx, sel, &obj)
+	case *model.SomeoneAdmiredYourCommentNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneAdmiredYourCommentNotification(ctx, sel, obj)
+	case model.SomeoneViewedYourGalleryNotification:
+		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, &obj)
+	case *model.SomeoneViewedYourGalleryNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, obj)
 	case model.SomeoneYouFollowPostedTheirFirstPostNotification:
 		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, &obj)
 	case *model.SomeoneYouFollowPostedTheirFirstPostNotification:
@@ -73483,41 +73117,6 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneYouFollowPostedTheirFirstPostNotification(ctx, sel, obj)
-	case model.SomeoneCommentedOnYourPostNotification:
-		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, &obj)
-	case *model.SomeoneCommentedOnYourPostNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, obj)
-	case model.GalleryAnnouncementNotification:
-		return ec._GalleryAnnouncementNotification(ctx, sel, &obj)
-	case *model.GalleryAnnouncementNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._GalleryAnnouncementNotification(ctx, sel, obj)
-	case model.SomeoneYouFollowOnFarcasterJoinedNotification:
-		return ec._SomeoneYouFollowOnFarcasterJoinedNotification(ctx, sel, &obj)
-	case *model.SomeoneYouFollowOnFarcasterJoinedNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneYouFollowOnFarcasterJoinedNotification(ctx, sel, obj)
-	case model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification:
-		return ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification(ctx, sel, &obj)
-	case *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification(ctx, sel, obj)
-	case model.SomeoneCommentedOnYourFeedEventNotification:
-		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, &obj)
-	case *model.SomeoneCommentedOnYourFeedEventNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, obj)
 	case model.SomeoneRepliedToYourCommentNotification:
 		return ec._SomeoneRepliedToYourCommentNotification(ctx, sel, &obj)
 	case *model.SomeoneRepliedToYourCommentNotification:
@@ -73525,13 +73124,6 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneRepliedToYourCommentNotification(ctx, sel, obj)
-	case model.YouReceivedTopActivityBadgeNotification:
-		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, &obj)
-	case *model.YouReceivedTopActivityBadgeNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
 	case model.SomeoneMentionedYouNotification:
 		return ec._SomeoneMentionedYouNotification(ctx, sel, &obj)
 	case *model.SomeoneMentionedYouNotification:
@@ -73539,6 +73131,60 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneMentionedYouNotification(ctx, sel, obj)
+	case model.SomeoneCommentedOnYourPostNotification:
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneCommentedOnYourPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, obj)
+	case model.SomeoneMentionedYourCommunityNotification:
+		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, &obj)
+	case *model.SomeoneMentionedYourCommunityNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, obj)
+	case model.SomeonePostedYourWorkNotification:
+		return ec._SomeonePostedYourWorkNotification(ctx, sel, &obj)
+	case *model.SomeonePostedYourWorkNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeonePostedYourWorkNotification(ctx, sel, obj)
+	case model.GroupedNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GroupedNotification(ctx, sel, obj)
+	case model.SomeoneCommentedOnYourFeedEventNotification:
+		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, &obj)
+	case *model.SomeoneCommentedOnYourFeedEventNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, obj)
+	case model.SomeoneYouFollowOnFarcasterJoinedNotification:
+		return ec._SomeoneYouFollowOnFarcasterJoinedNotification(ctx, sel, &obj)
+	case *model.SomeoneYouFollowOnFarcasterJoinedNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneYouFollowOnFarcasterJoinedNotification(ctx, sel, obj)
+	case model.YouReceivedTopActivityBadgeNotification:
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, &obj)
+	case *model.YouReceivedTopActivityBadgeNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
+	case model.GalleryAnnouncementNotification:
+		return ec._GalleryAnnouncementNotification(ctx, sel, &obj)
+	case *model.GalleryAnnouncementNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryAnnouncementNotification(ctx, sel, obj)
 	case model.Community:
 		return ec._Community(ctx, sel, &obj)
 	case *model.Community:
@@ -73679,13 +73325,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.NewTokensNotification:
-		return ec._NewTokensNotification(ctx, sel, &obj)
-	case *model.NewTokensNotification:
+	case model.SomeoneViewedYourGalleryNotification:
+		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, &obj)
+	case *model.SomeoneViewedYourGalleryNotification:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._NewTokensNotification(ctx, sel, obj)
+		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, obj)
 	case model.SomeoneFollowedYouNotification:
 		return ec._SomeoneFollowedYouNotification(ctx, sel, &obj)
 	case *model.SomeoneFollowedYouNotification:
@@ -73707,13 +73353,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneAdmiredYourFeedEventNotification(ctx, sel, obj)
-	case model.SomeoneViewedYourGalleryNotification:
-		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, &obj)
-	case *model.SomeoneViewedYourGalleryNotification:
+	case model.NewTokensNotification:
+		return ec._NewTokensNotification(ctx, sel, &obj)
+	case *model.NewTokensNotification:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, obj)
+		return ec._NewTokensNotification(ctx, sel, obj)
 	case model.SomeoneAdmiredYourPostNotification:
 		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, &obj)
 	case *model.SomeoneAdmiredYourPostNotification:
@@ -73735,25 +73381,25 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneAdmiredYourCommentNotification(ctx, sel, obj)
-	case model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification:
-		return ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification(ctx, sel, &obj)
-	case *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification:
+	case model.SomeoneCommentedOnYourPostNotification:
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneCommentedOnYourPostNotification:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification(ctx, sel, obj)
-	case model.GalleryAnnouncementNotification:
-		return ec._GalleryAnnouncementNotification(ctx, sel, &obj)
-	case *model.GalleryAnnouncementNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._GalleryAnnouncementNotification(ctx, sel, obj)
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, obj)
 	case model.GroupedNotification:
 		if obj == nil {
 			return graphql.Null
 		}
 		return ec._GroupedNotification(ctx, sel, obj)
+	case model.SomeoneCommentedOnYourFeedEventNotification:
+		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, &obj)
+	case *model.SomeoneCommentedOnYourFeedEventNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, obj)
 	case model.SomeoneRepliedToYourCommentNotification:
 		return ec._SomeoneRepliedToYourCommentNotification(ctx, sel, &obj)
 	case *model.SomeoneRepliedToYourCommentNotification:
@@ -73796,13 +73442,6 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneYouFollowOnFarcasterJoinedNotification(ctx, sel, obj)
-	case model.SomeoneCommentedOnYourFeedEventNotification:
-		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, &obj)
-	case *model.SomeoneCommentedOnYourFeedEventNotification:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, obj)
 	case model.YouReceivedTopActivityBadgeNotification:
 		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, &obj)
 	case *model.YouReceivedTopActivityBadgeNotification:
@@ -73810,13 +73449,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._YouReceivedTopActivityBadgeNotification(ctx, sel, obj)
-	case model.SomeoneCommentedOnYourPostNotification:
-		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, &obj)
-	case *model.SomeoneCommentedOnYourPostNotification:
+	case model.GalleryAnnouncementNotification:
+		return ec._GalleryAnnouncementNotification(ctx, sel, &obj)
+	case *model.GalleryAnnouncementNotification:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, obj)
+		return ec._GalleryAnnouncementNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -89404,89 +89043,6 @@ func (ec *executionContext) _SomeoneYouFollowOnFarcasterJoinedNotification(ctx c
 					}
 				}()
 				res = ec._SomeoneYouFollowOnFarcasterJoinedNotification_user(ctx, field, obj)
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var someoneYouFollowOnFarcasterPostedTheirFirstPostNotificationImplementors = []string{"SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification", "Notification", "Node"}
-
-func (ec *executionContext) _SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, someoneYouFollowOnFarcasterPostedTheirFirstPostNotificationImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification")
-		case "id":
-			out.Values[i] = ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "dbid":
-			out.Values[i] = ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_dbid(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "seen":
-			out.Values[i] = ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_seen(ctx, field, obj)
-		case "creationTime":
-			out.Values[i] = ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_creationTime(ctx, field, obj)
-		case "updatedTime":
-			out.Values[i] = ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_updatedTime(ctx, field, obj)
-		case "post":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification_post(ctx, field, obj)
 				return res
 			}
 

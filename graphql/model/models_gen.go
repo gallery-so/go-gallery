@@ -2448,18 +2448,6 @@ type SomeoneYouFollowOnFarcasterJoinedNotification struct {
 func (SomeoneYouFollowOnFarcasterJoinedNotification) IsNotification() {}
 func (SomeoneYouFollowOnFarcasterJoinedNotification) IsNode()         {}
 
-type SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification struct {
-	HelperSomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationData
-	Dbid         persist.DBID `json:"dbid"`
-	Seen         *bool        `json:"seen"`
-	CreationTime *time.Time   `json:"creationTime"`
-	UpdatedTime  *time.Time   `json:"updatedTime"`
-	Post         *Post        `json:"post"`
-}
-
-func (SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) IsNotification() {}
-func (SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification) IsNode()         {}
-
 type SomeoneYouFollowPostedTheirFirstPostNotification struct {
 	HelperSomeoneYouFollowPostedTheirFirstPostNotificationData
 	Dbid         persist.DBID `json:"dbid"`

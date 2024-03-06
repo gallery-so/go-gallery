@@ -228,10 +228,6 @@ type HelperSomeoneYouFollowOnFarcasterJoinedNotificationData struct {
 	UserID persist.DBID
 }
 
-type HelperSomeoneYouFollowOnFarcasterPostedTheirFirstPostNotificationData struct {
-	PostID persist.DBID
-}
-
 type ErrInvalidIDFormat struct {
 	message string
 }

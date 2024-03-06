@@ -2338,16 +2338,6 @@ type SomeoneYouFollowOnFarcasterJoinedNotification implements Notification & Nod
   user: GalleryUser @goField(forceResolver: true)
 }
 
-type SomeoneYouFollowOnFarcasterPostedTheirFirstPostNotification implements Notification & Node
-  @goEmbedHelper {
-  id: ID!
-  dbid: DBID!
-  seen: Boolean
-  creationTime: Time
-  updatedTime: Time
-  post: Post @goField(forceResolver: true)
-}
-
 type YouReceivedTopActivityBadgeNotification implements Notification & Node {
   id: ID!
   dbid: DBID!
