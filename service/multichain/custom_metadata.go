@@ -93,6 +93,7 @@ func (c *CustomMetadataHandlers) AddToPage(ctx context.Context, chain persist.Ch
 	errOut := make(chan error)
 	go func() {
 		defer close(outCh)
+		defer close(errOut)
 		for {
 			select {
 			case page, ok := <-recCh:
