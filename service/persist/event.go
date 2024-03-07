@@ -45,6 +45,7 @@ const (
 	ActionNewTokensReceived               Action = "NewTokensReceived"
 	ActionTopActivityBadgeReceived        Action = "ActivityBadgeReceived"
 	ActionAnnouncement                    Action = "Announcement"
+	ActionUserFromFarcasterJoined         Action = "UserFromFarcasterJoined"
 )
 
 type EventData struct {

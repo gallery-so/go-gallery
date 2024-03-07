@@ -131,43 +131,6 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	return &post, nil
 }
 
-// getCreatorsForTokenDefinitionIDs looks up all creators for the given token definition IDs and all the communities that the token
-// definition IDs belong to, and returns a map of creator ID to community IDs.
-func getCreatorsForTokenDefinitionIDs(ctx context.Context, loaders *dataloader.Loaders, tokenDefinitionIDs []persist.DBID) map[persist.DBID][]persist.DBID {
-	communityIDs := make(map[persist.DBID]bool)
-	communities, errs := loaders.GetCommunitiesByTokenDefinitionID.LoadAll(tokenDefinitionIDs)
-	for i, err := range errs {
-		if err == nil {
-			for _, community := range communities[i] {
-				communityIDs[community.ID] = true
-			}
-		} else {
-			err = fmt.Errorf("error looking up communities by token definition ID: %w", err)
-			sentryutil.ReportError(ctx, err)
-			logger.For(ctx).WithError(err).Error(err)
-		}
-	}
-
-	creators, errs := loaders.GetCreatorsByCommunityID.LoadAll(util.MapKeys(communityIDs))
-	creatorIDToCommunityIDs := make(map[persist.DBID][]persist.DBID)
-
-	for i, err := range errs {
-		if err == nil {
-			for _, creator := range creators[i] {
-				if creator.CreatorUserID != "" {
-					creatorIDToCommunityIDs[creator.CreatorUserID] = append(creatorIDToCommunityIDs[creator.CreatorUserID], creator.CommunityID)
-				}
-			}
-		} else {
-			err = fmt.Errorf("error looking up creators by community ID: %w", err)
-			sentryutil.ReportError(ctx, err)
-			logger.For(ctx).WithError(err).Error(err)
-		}
-	}
-
-	return creatorIDToCommunityIDs
-}
-
 func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, mentions []*model.MentionInput, caption, mintURL *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -264,26 +227,6 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return "", err
 	}
 
-	creators := getCreatorsForTokenDefinitionIDs(ctx, api.loaders, tokenDefinitionIDs)
-
-	// Only notify creators once per post, even if the post includes tokens from multiple communities owned
-	// by the same creator. At some point we may want to update notifications to allow for multiple communities.
-	for creatorID, communityIDs := range creators {
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(actorID),
-			Action:         persist.ActionUserPostedYourWork,
-			ResourceTypeID: persist.ResourceTypeCommunity,
-			UserID:         creatorID,
-			SubjectID:      communityIDs[0],
-			PostID:         postID,
-			CommunityID:    communityIDs[0],
-		})
-		if err != nil {
-			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
-			logger.For(ctx).Errorf("error dispatching event: %v", err)
-		}
-	}
-
 	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(actorID),
 		Action:         persist.ActionUserPosted,
@@ -295,26 +238,6 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 	if err != nil {
 		sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 		logger.For(ctx).Errorf("error dispatching event: %v", err)
-	}
-
-	count, err := api.queries.CountPostsByUserID(ctx, actorID)
-	if err != nil {
-		return "", err
-	}
-
-	if count == 1 {
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(actorID),
-			Action:         persist.ActionUserPostedFirstPost,
-			ResourceTypeID: persist.ResourceTypePost,
-			UserID:         actorID,
-			SubjectID:      postID,
-			PostID:         postID,
-		})
-		if err != nil {
-			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
-			logger.For(ctx).Errorf("error dispatching event: %v", err)
-		}
 	}
 
 	return postID, nil
@@ -344,13 +267,11 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	})
 
 	var tokenID persist.DBID
-	var tokenDefinitionID persist.DBID
 	var contractID persist.DBID
 
 	if err == nil {
 		// The token is already synced
 		tokenID = r.Token.ID
-		tokenDefinitionID = r.Token.TokenDefinitionID
 		contractID = r.Contract.ID
 	} else if !util.ErrorIs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
 		// Unexpected error
@@ -367,7 +288,6 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		}
 
 		tokenID = synced.Instance.ID
-		tokenDefinitionID = synced.Instance.TokenDefinitionID
 		contractID = synced.Contract.ID
 	}
 
@@ -383,23 +303,6 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		return postID, err
 	}
 
-	creators := getCreatorsForTokenDefinitionIDs(ctx, api.loaders, []persist.DBID{tokenDefinitionID})
-	for creatorID, communityIDs := range creators {
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			Action:         persist.ActionUserPostedYourWork,
-			ResourceTypeID: persist.ResourceTypeCommunity,
-			UserID:         creatorID,
-			SubjectID:      communityIDs[0],
-			PostID:         postID,
-			CommunityID:    communityIDs[0],
-		})
-		if err != nil {
-			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
-			logger.For(ctx).Errorf("error dispatching event: %v", err)
-		}
-	}
-
 	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionUserPosted,
@@ -411,25 +314,6 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	if err != nil {
 		sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
 		logger.For(ctx).Errorf("error dispatching event: %v", err)
-	}
-	count, err := api.queries.CountPostsByUserID(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-
-	if count == 1 {
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			Action:         persist.ActionUserPostedFirstPost,
-			ResourceTypeID: persist.ResourceTypePost,
-			UserID:         userID,
-			SubjectID:      postID,
-			PostID:         postID,
-		})
-		if err != nil {
-			sentryutil.ReportError(ctx, fmt.Errorf("error dispatching event: %w", err))
-			logger.For(ctx).Errorf("error dispatching event: %v", err)
-		}
 	}
 
 	return postID, nil

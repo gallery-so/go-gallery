@@ -224,6 +224,10 @@ type HelperPostComposerDraftDetailsPayloadData struct {
 	ContractID      persist.DBID
 }
 
+type HelperSomeoneYouFollowOnFarcasterJoinedNotificationData struct {
+	UserID persist.DBID
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

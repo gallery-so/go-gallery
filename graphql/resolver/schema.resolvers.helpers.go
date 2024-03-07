@@ -86,6 +86,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
 	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
 	OnGalleryAnnouncementNotification:                  fetchNotificationByID[model.GalleryAnnouncementNotification],
+	OnSomeoneYouFollowOnFarcasterJoinedNotification:    fetchNotificationByID[model.SomeoneYouFollowOnFarcasterJoinedNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -1142,7 +1143,15 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CtaLink:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTALink),
 			PushNotificationText: util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.PushNotificationText),
 		}, nil
-
+	case persist.ActionUserFromFarcasterJoined:
+		return model.SomeoneYouFollowOnFarcasterJoinedNotification{
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			User:         nil, // handled by dedicated resolver
+			HelperSomeoneYouFollowOnFarcasterJoinedNotificationData: model.HelperSomeoneYouFollowOnFarcasterJoinedNotificationData{UserID: notif.Data.UserFromFarcasterJoinedDetails.UserID},
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}

@@ -587,6 +587,18 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		}
 	}
 
+	err = api.taskClient.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
+			userID: {
+				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
+				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
+			},
+		},
+	})
+	if err != nil {
+		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
+	}
+
 	// Send event
 	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
@@ -598,18 +610,6 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	})
 	if err != nil {
 		logger.For(ctx).Errorf("failed to dispatch event: %s", err)
-	}
-
-	err = api.taskClient.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
-		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
-			userID: {
-				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
-				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
-			},
-		},
-	})
-	if err != nil {
-		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
 	}
 
 	return userID, galleryID, nil
@@ -1480,7 +1480,7 @@ func (api UserAPI) GetSuggestedUsersFarcaster(ctx context.Context, before, after
 		}
 	} else {
 		// Otherwise make a new recommendation
-		fUsers, err := For(ctx).Social.GetFarcastingFollowingByUserID(ctx, viewerID)
+		fUsers, err := For(ctx).Social.GetFarcasterFollowingByUserID(ctx, viewerID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}

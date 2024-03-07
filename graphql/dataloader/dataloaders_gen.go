@@ -2037,6 +2037,47 @@ func (*GetTokenDefinitionByIdBatch) getKeyForResult(result coredb.TokenDefinitio
 	return result.ID
 }
 
+// GetTokenDefinitionByTokenDbidBatch batches and caches requests
+type GetTokenDefinitionByTokenDbidBatch struct {
+	generator.Dataloader[persist.DBID, coredb.TokenDefinition]
+}
+
+// newGetTokenDefinitionByTokenDbidBatch creates a new GetTokenDefinitionByTokenDbidBatch with the given settings, functions, and options
+func newGetTokenDefinitionByTokenDbidBatch(
+	ctx context.Context,
+	maxBatchSize int,
+	batchTimeout time.Duration,
+	cacheResults bool,
+	publishResults bool,
+	fetch func(context.Context, *GetTokenDefinitionByTokenDbidBatch, []persist.DBID) ([]coredb.TokenDefinition, []error),
+	preFetchHook PreFetchHook,
+	postFetchHook PostFetchHook,
+) *GetTokenDefinitionByTokenDbidBatch {
+	d := &GetTokenDefinitionByTokenDbidBatch{}
+
+	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenDefinition, []error) {
+		// Allow the preFetchHook to modify and return a new context
+		if preFetchHook != nil {
+			ctx = preFetchHook(ctx, "GetTokenDefinitionByTokenDbidBatch")
+		}
+
+		results, errors := fetch(ctx, d, keys)
+
+		if postFetchHook != nil {
+			postFetchHook(ctx, "GetTokenDefinitionByTokenDbidBatch")
+		}
+
+		return results, errors
+	}
+
+	d.Dataloader = *generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
+	return d
+}
+
+func (*GetTokenDefinitionByTokenDbidBatch) getKeyForResult(result coredb.TokenDefinition) persist.DBID {
+	return result.ID
+}
+
 // GetTokensByCollectionIdBatch batches and caches requests
 type GetTokensByCollectionIdBatch struct {
 	generator.Dataloader[coredb.GetTokensByCollectionIdBatchParams, []coredb.Token]

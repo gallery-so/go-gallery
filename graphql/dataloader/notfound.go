@@ -1,6 +1,8 @@
 package dataloader
 
 import (
+	"fmt"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -172,4 +174,8 @@ func (*GetCommunityByIDBatch) getNotFoundError(key persist.DBID) error {
 
 func (*CountGalleriesDisplayingCommunityIDBatch) getNotFoundError(key persist.DBID) error {
 	return persist.ErrGalleryNotFound{ID: key}
+}
+
+func (*GetTokenDefinitionByTokenDbidBatch) getNotFoundError(key persist.DBID) error {
+	return fmt.Errorf("tokenDefinition not found by tokenDBID=%s", key)
 }

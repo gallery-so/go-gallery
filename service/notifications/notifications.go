@@ -199,7 +199,6 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 
 	singleHandler := singleNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	ownerGroupedHandler := ownerGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
-	followerHandler := followerNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	tokenGroupedHandler := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	viewHandler := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	topActivityHandler := topActivityHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
@@ -218,12 +217,13 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *task.Client, lock 
 	notifDispatcher.AddHandler(persist.ActionMentionUser, singleHandler)
 	notifDispatcher.AddHandler(persist.ActionMentionCommunity, singleHandler)
 	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionUserFromFarcasterJoined, singleHandler)
+	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, singleHandler)
 
 	// notification specifically for ensuring that top users don't get re-notified and users recently notified arent notified again
 	notifDispatcher.AddHandler(persist.ActionTopActivityBadgeReceived, topActivityHandler)
 
 	// notification actions that are grouped and inserted by follower
-	notifDispatcher.AddHandler(persist.ActionUserPostedFirstPost, followerHandler)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenGroupedHandler)
@@ -339,17 +339,6 @@ func (h topActivityHandler) Handle(ctx context.Context, notif db.Notification) e
 	}
 
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
-}
-
-type followerNotificationHandler struct {
-	queries    *db.Queries
-	pubSub     *pubsub.Client
-	taskClient *task.Client
-	limiter    *pushLimiter
-}
-
-func (h followerNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-	return insertAndPublishFollowerNotifs(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 
 type announcementNotificationHandler struct {
@@ -646,147 +635,104 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 	}
 
 	message.Body = userFacing.String()
-	if notif.Action == persist.ActionAdmiredFeedEvent || notif.Action == persist.ActionAdmiredPost {
+
+	switch {
+	case notif.Action == persist.ActionAdmiredFeedEvent || notif.Action == persist.ActionAdmiredPost:
 		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		if err = limiter.tryAdmire(ctx, admirer.ID, notif.OwnerID, notif.FeedEventID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-
-	if notif.Action == persist.ActionAdmiredToken {
+	case notif.Action == persist.ActionAdmiredToken:
 		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		if err = limiter.tryAdmireToken(ctx, admirer.ID, notif.OwnerID, notif.TokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-
-	if notif.Action == persist.ActionAdmiredComment {
+	case notif.Action == persist.ActionAdmiredComment:
 		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		if err = limiter.tryAdmireComment(ctx, admirer.ID, notif.OwnerID, notif.TokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-
-	if notif.Action == persist.ActionCommentedOnFeedEvent || notif.Action == persist.ActionCommentedOnPost {
+	case notif.Action == persist.ActionCommentedOnFeedEvent || notif.Action == persist.ActionCommentedOnPost:
 		comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		commenter, err := queries.GetUserById(ctx, comment.ActorID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		if err = limiter.tryComment(ctx, commenter.ID, notif.OwnerID, notif.FeedEventID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-
-	if notif.Action == persist.ActionUserFollowedUsers {
+	case notif.Action == persist.ActionUserFollowedUsers:
 		follower, err := queries.GetUserById(ctx, notif.Data.FollowerIDs[0])
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		if err = limiter.tryFollow(ctx, follower.ID, notif.OwnerID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-	if notif.Action == persist.ActionNewTokensReceived {
-
+	case notif.Action == persist.ActionNewTokensReceived:
 		if err := limiter.tryTokens(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-
-	if notif.Action == persist.ActionReplyToComment {
-
+	case notif.Action == persist.ActionReplyToComment:
 		comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		commenter, err := queries.GetUserById(ctx, comment.ActorID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		if err = limiter.tryFeedEntity(ctx, commenter.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-
-	}
-
-	if notif.Action == persist.ActionMentionUser || notif.Action == persist.ActionMentionCommunity {
-
+	case notif.Action == persist.ActionMentionUser || notif.Action == persist.ActionMentionCommunity:
 		var actor db.User
-
 		switch {
 		case notif.CommentID != "":
-
 			comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
 			if err != nil {
 				return task.PushNotificationMessage{}, err
 			}
-
 			actor, err = queries.GetUserById(ctx, comment.ActorID)
 			if err != nil {
 				return task.PushNotificationMessage{}, err
 			}
-
 		case notif.PostID != "":
-
 			post, err := queries.GetPostByID(ctx, notif.PostID)
 			if err != nil {
 				return task.PushNotificationMessage{}, err
 			}
-
 			actor, err = queries.GetUserById(ctx, post.ActorID)
 			if err != nil {
 				return task.PushNotificationMessage{}, err
 			}
-
 		default:
 			return task.PushNotificationMessage{}, fmt.Errorf("no comment or post id provided for mention notification")
 		}
-
 		if err := limiter.tryFeedEntity(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-
-	}
-
-	if notif.Action == persist.ActionUserPostedYourWork || notif.Action == persist.ActionUserPostedFirstPost {
-
+	case notif.Action == persist.ActionUserPostedYourWork:
 		post, err := queries.GetPostByID(ctx, notif.PostID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
@@ -795,27 +741,27 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		if err := limiter.tryFeedEntity(ctx, actor.ID, notif.OwnerID, notif.PostID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-
-	if notif.Action == persist.ActionTopActivityBadgeReceived {
+	case notif.Action == persist.ActionTopActivityBadgeReceived:
 		if err := limiter.tryUsers(ctx, notif.OwnerID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
 		return message, nil
-	}
-
-	if notif.Action == persist.ActionAnnouncement {
+	case notif.Action == persist.ActionAnnouncement:
+		// No rate limiting for announcements
 		return message, nil
+	case notif.Action == persist.ActionUserFromFarcasterJoined:
+		// No rate limiting for farcaster joined
+		return message, nil
+	case notif.Action == persist.ActionUserPostedFirstPost:
+		// No rate limiting for first post
+		return message, nil
+	default:
+		return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 	}
-
-	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 }
 
 type UserFacingNotificationData struct {
@@ -1136,10 +1082,21 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 			Actor:  "You",
 			Action: "received a new badge for being amongst the top active users on Gallery this week!",
 		}, nil
-
 	case persist.ActionAnnouncement:
 		return UserFacingNotificationData{
 			Action: n.Data.AnnouncementDetails.PushNotificationText,
+		}, nil
+	case persist.ActionUserFromFarcasterJoined:
+		actor, err := queries.GetUserById(ctx, n.Data.UserFromFarcasterJoinedDetails.UserID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+		if !actor.Username.Valid {
+			return UserFacingNotificationData{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
+		}
+		return UserFacingNotificationData{
+			Actor:  actor.Username.String,
+			Action: "from Farcaster is now on Gallery",
 		}, nil
 	default:
 		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
@@ -1175,6 +1132,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionTopActivityBadgeReceived:
 		return false // TODO -activity
 	case persist.ActionAnnouncement:
+		return true
+	case persist.ActionUserFromFarcasterJoined:
 		return true
 	default:
 		return false
@@ -1227,28 +1186,9 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 		return fmt.Errorf("failed to create notification: %w", err)
 	}
 
-	err = sendNotifications(ctx, newNotif, queries, taskClient, limiter, ps)
+	err = sendNotification(ctx, newNotif, queries, taskClient, limiter, ps)
 	if err != nil {
 		return err
-	}
-
-	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
-
-	return nil
-}
-
-func insertAndPublishFollowerNotifs(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *task.Client, limiter *pushLimiter) error {
-	notifs, err := addFollowerNotifications(ctx, notif, queries)
-	if err != nil {
-		return fmt.Errorf("failed to create notification: %w", err)
-	}
-
-	p := pool.New().WithErrors().WithContext(ctx).WithMaxGoroutines(10)
-	for _, notif := range notifs {
-		notif := notif
-		p.Go(func(ctx context.Context) error {
-			return sendNotifications(ctx, notif, queries, taskClient, limiter, ps)
-		})
 	}
 
 	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
@@ -1268,7 +1208,7 @@ func insertAndPublishAnnouncementNotifs(ctx context.Context, notif db.Notificati
 		for _, notif := range notifs {
 			notif := notif
 			p.Go(func(ctx context.Context) error {
-				return sendNotifications(ctx, notif, queries, taskClient, limiter, ps)
+				return sendNotification(ctx, notif, queries, taskClient, limiter, ps)
 			})
 		}
 	}
@@ -1279,7 +1219,7 @@ func insertAndPublishAnnouncementNotifs(ctx context.Context, notif db.Notificati
 }
 
 // this function only sends push notifications, could probaby be renamed
-func sendNotifications(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *task.Client, limiter *pushLimiter, ps *pubsub.Client) error {
+func sendNotification(ctx context.Context, newNotif db.Notification, queries *db.Queries, taskClient *task.Client, limiter *pushLimiter, ps *pubsub.Client) error {
 	err := sendPushNotifications(ctx, newNotif, queries, taskClient, limiter)
 	if err != nil {
 		err = fmt.Errorf("failed to send push notifications for notification with DBID=%s, error: %w", newNotif.ID, err)
@@ -1491,45 +1431,25 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Post:        util.ToNullString(notif.PostID.String(), true),
 			CommunityID: notif.CommunityID,
 		})
-	default:
-		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
-	}
-}
-
-func addFollowerNotifications(ctx context.Context, notif db.Notification, queries *db.Queries) ([]db.Notification, error) {
-
-	switch notif.Action {
+	case persist.ActionUserFromFarcasterJoined:
+		return queries.CreateSimpleNotification(ctx, db.CreateSimpleNotificationParams{
+			ID:       id,
+			OwnerID:  notif.OwnerID,
+			Action:   notif.Action,
+			Data:     notif.Data,
+			EventIds: notif.EventIds,
+		})
 	case persist.ActionUserPostedFirstPost:
-		post, err := queries.GetPostByID(ctx, notif.PostID)
-		if err != nil {
-			return nil, err
-		}
-
-		followerCount, err := queries.CountFollowersByUserID(ctx, post.ActorID)
-		if err != nil {
-			return nil, err
-		}
-
-		var ids []string
-		for i := 0; i < int(followerCount); i++ {
-			ids = append(ids, persist.GenerateID().String())
-		}
-
-		notifs, err := queries.CreateUserPostedFirstPostNotifications(ctx, db.CreateUserPostedFirstPostNotificationsParams{
-			Ids:      ids,
+		return queries.CreatePostNotification(ctx, db.CreatePostNotificationParams{
+			ID:       id,
+			OwnerID:  notif.OwnerID,
 			Action:   notif.Action,
 			Data:     notif.Data,
 			EventIds: notif.EventIds,
 			PostID:   notif.PostID,
-			ActorID:  post.ActorID,
 		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create follower notifications: %w", err)
-		}
-
-		return notifs, nil
 	default:
-		return nil, fmt.Errorf("unknown follower notification action: %s", notif.Action)
+		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
 }
 

@@ -155,7 +155,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, httpClien
 		disableDataloaderCaching := false
 
 		mediamapper.AddTo(c)
-		event.AddTo(c, disableDataloaderCaching, notificationsHandler, queries, taskClient)
+		event.AddTo(c, disableDataloaderCaching, notificationsHandler, queries, taskClient, neynar)
 		notifications.AddTo(c, notificationsHandler)
 		recommend.AddTo(c, recommender)
 		userpref.AddTo(c, p)
