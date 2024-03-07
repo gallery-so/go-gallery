@@ -3442,6 +3442,8 @@ func (r *userEmailResolver) EmailNotificationSettings(ctx context.Context, obj *
 		UnsubscribedFromAll:           unsubs.All.Bool(),
 		UnsubscribedFromNotifications: unsubs.Notifications.Bool(),
 		UnsubscribedFromDigest:        unsubs.Digest.Bool(),
+		UnsubscribedFromMarketing:     unsubs.Marketing.BoolPointer(),
+		UnsubscribedFromMembersClub:   unsubs.MembersClub.BoolPointer(),
 	}, nil
 }
 
