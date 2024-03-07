@@ -4099,6 +4099,73 @@ func (b *GetTokenDefinitionByIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getTokenDefinitionByTokenDbidBatch = `-- name: GetTokenDefinitionByTokenDbidBatch :batchone
+select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash
+from token_definitions, tokens
+where token_definitions.id = tokens.token_definition_id
+    and tokens.id = $1
+    and not tokens.deleted
+    and not token_definitions.deleted
+`
+
+type GetTokenDefinitionByTokenDbidBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetTokenDefinitionByTokenDbidBatch(ctx context.Context, id []persist.DBID) *GetTokenDefinitionByTokenDbidBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getTokenDefinitionByTokenDbidBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetTokenDefinitionByTokenDbidBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetTokenDefinitionByTokenDbidBatchBatchResults) QueryRow(f func(int, TokenDefinition, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i TokenDefinition
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Name,
+			&i.Description,
+			&i.TokenType,
+			&i.TokenID,
+			&i.ExternalUrl,
+			&i.Chain,
+			&i.Metadata,
+			&i.FallbackMedia,
+			&i.ContractAddress,
+			&i.ContractID,
+			&i.TokenMediaID,
+			&i.IsFxhash,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetTokenDefinitionByTokenDbidBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getTokensByCollectionIdBatch = `-- name: GetTokensByCollectionIdBatch :batchmany
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)

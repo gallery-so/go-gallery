@@ -56,7 +56,7 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	notificationsHandler := notifications.New(clients.Queries, clients.PubSubClient, clients.TaskClient, redis.NewLockClient(redis.NewCache(redis.NotificationLockCache)), false)
 
 	router.Use(func(c *gin.Context) {
-		var farcasterAPI *farcaster.NeynarAPI // nill because tokenprocessing doesn't use farcaster for event processing
+		var farcasterAPI *farcaster.NeynarAPI // nil because tokenprocessing doesn't require farcaster for event processing
 		event.AddTo(c, false, notificationsHandler, clients.Queries, clients.TaskClient, farcasterAPI)
 	})
 

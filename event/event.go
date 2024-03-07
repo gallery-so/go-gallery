@@ -675,64 +675,146 @@ type userPostedNotificationHandler struct {
 }
 
 func (u userPostedNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
-	actorID := persist.DBID(e.ActorID.String)
-
-	postCount, err := u.q.CountPostsByUserID(ctx, actorID)
+	postedYourWorkReceipients, err := u.receipientsOfUserPostedYourWorkNotification(ctx, e)
 	if err != nil {
-		return err
+		logger.For(ctx).Errorf("failed to get receipients of posted your work notification: %s", err)
 	}
 
-	// Only send notification if this is the first post
-	if postCount != 1 {
-		return nil
-	}
-
-	followers, err := u.dataloaders.GetFollowersByUserIdBatch.Load(actorID)
+	postedFistPostReceipients, err := u.receipientsOfUserPostedFirstPostNotification(ctx, e)
 	if err != nil {
-		return err
+		logger.For(ctx).Errorf("failed to get receipients of first post notification: %s", err)
 	}
 
-	fID, err := u.fc.FarcasterIDByGalleryID(ctx, actorID)
-	if err != nil && !errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
-		return err
+	// Merge recipients with the more specific notification merged last
+	recipients := postedFistPostReceipients
+	for u, n := range postedYourWorkReceipients {
+		recipients[u] = n
 	}
 
-	if fID != "" {
-		fcUsers, err := u.fc.FollowersByUserID(ctx, fID)
+	for _, n := range recipients {
+		err = u.notificationHandlers.Notifications.Dispatch(ctx, n)
 		if err != nil {
-			return err
-		}
-
-		followerFIDs := util.MapWithoutError(fcUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() })
-		fcUsersOnGallery, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
-		if err != nil {
-			return err
-		}
-
-		isFollowing := make(map[persist.DBID]bool, len(followers))
-		for _, f := range followers {
-			isFollowing[f.ID] = true
-		}
-
-		// Also notify farcaster followers that aren't gallery followers
-		for _, u := range fcUsersOnGallery {
-			if !isFollowing[u.ID] {
-				followers = append(followers, u)
-			}
-		}
-	}
-
-	for _, f := range followers {
-		err = u.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
-			OwnerID:  f.ID,
-			Action:   persist.ActionUserPostedFirstPost,
-			PostID:   e.PostID,
-			EventIds: []persist.DBID{e.ID},
-		})
-		if err != nil {
-			logger.For(ctx).Errorf("failed to send first post notification: %s", err)
+			logger.For(ctx).Errorf("failed to send %s notification to %s", n.Action, n.OwnerID)
 		}
 	}
 
 	return nil
+}
+
+func (u userPostedNotificationHandler) receipientsOfUserPostedYourWorkNotification(ctx context.Context, e db.Event) (recipients map[persist.DBID]db.Notification, err error) {
+	recipients = make(map[persist.DBID]db.Notification)
+
+	post, err := u.dataloaders.GetPostByIdBatch.Load(e.PostID)
+	if err != nil {
+		return recipients, err
+	}
+
+	// Load token definitions from the post
+	tokenDefinitions, errors := u.dataloaders.GetTokenDefinitionByTokenDbidBatch.LoadAll(post.TokenIds)
+	j := 0
+	for i := range tokenDefinitions {
+		if errors[i] == nil {
+			tokenDefinitions[j] = tokenDefinitions[i]
+			j++
+		}
+	}
+	tokenDefinitions = tokenDefinitions[:j]
+
+	// Load communities
+	tokenDefinitionIDs := util.MapWithoutError(tokenDefinitions, func(t db.TokenDefinition) persist.DBID { return t.ID })
+	communities, errors := u.dataloaders.GetCommunitiesByTokenDefinitionID.LoadAll(tokenDefinitionIDs)
+	communitiesFlat := make([]db.Community, 0)
+	for i := range communities {
+		if errors[i] == nil {
+			communitiesFlat = append(communitiesFlat, communities[i]...)
+		}
+	}
+
+	// Load creators
+	communityIDs := util.MapWithoutError(communitiesFlat, func(c db.Community) persist.DBID { return c.ID })
+	creators, errors := u.dataloaders.GetCreatorsByCommunityID.LoadAll(communityIDs)
+	creatorsFlat := make([]db.GetCreatorsByCommunityIDRow, 0)
+	for i := range creators {
+		if errors[i] == nil {
+			creatorsFlat = append(creatorsFlat, creators[i]...)
+		}
+	}
+
+	// Only notifiy creators once per posts, even if the post includes tokens from multiple
+	// communities owned by the same creator.
+	for _, c := range creatorsFlat {
+		if c.CreatorUserID != "" {
+			recipients[c.CreatorUserID] = db.Notification{
+				OwnerID:     c.CreatorUserID,
+				Action:      persist.ActionUserPostedYourWork,
+				PostID:      e.PostID,
+				EventIds:    []persist.DBID{e.ID},
+				CommunityID: c.CommunityID,
+			}
+		}
+	}
+
+	return recipients, nil
+}
+
+func (u userPostedNotificationHandler) receipientsOfUserPostedFirstPostNotification(ctx context.Context, e db.Event) (recipients map[persist.DBID]db.Notification, err error) {
+	actorID := persist.DBID(e.ActorID.String)
+	recipients = make(map[persist.DBID]db.Notification)
+
+	postCount, err := u.q.CountPostsByUserID(ctx, actorID)
+	if err != nil {
+		return recipients, err
+	}
+
+	// Only send notification if this is the first post
+	if postCount != 1 {
+		return recipients, nil
+	}
+
+	followers, err := u.dataloaders.GetFollowersByUserIdBatch.Load(actorID)
+	if err != nil {
+		return recipients, err
+	}
+
+	fID, err := u.fc.FarcasterIDByGalleryID(ctx, actorID)
+	if err != nil && !errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
+		return recipients, err
+	}
+	if errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
+		return recipients, nil
+	}
+
+	fcUsers, err := u.fc.FollowersByUserID(ctx, fID)
+	if err != nil {
+		return recipients, err
+	}
+
+	followerFIDs := util.MapWithoutError(fcUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() })
+	fcUsersOnGallery, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
+	if err != nil {
+		return recipients, err
+	}
+
+	isFollowingOnGallery := make(map[persist.DBID]bool, len(followers))
+	for _, f := range followers {
+		isFollowingOnGallery[f.ID] = true
+	}
+
+	// Also notify farcaster followers that aren't gallery followers
+	for _, u := range fcUsersOnGallery {
+		if !isFollowingOnGallery[u.ID] {
+			followers = append(followers, u)
+		}
+	}
+
+	for _, f := range followers {
+		recipients[f.ID] = db.Notification{
+			OwnerID:  f.ID,
+			Action:   persist.ActionUserPostedFirstPost,
+			PostID:   e.PostID,
+			EventIds: []persist.DBID{e.ID},
+		}
+	}
+
+	return recipients, nil
 }
