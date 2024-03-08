@@ -165,7 +165,7 @@ func customMetadataHandlersInjector(alchemyProvider *alchemy.Provider) *multicha
 	))
 }
 
-func ethInjector(envInit, context.Context, *http.Client) *multichain.EthereumProvider {
+func ethInjector(envInit, context.Context, *http.Client) (*multichain.EthereumProvider, func()) {
 	panic(wire.Build(
 		rpc.NewEthClient,
 		wire.Value(persist.ChainETH),
@@ -201,12 +201,13 @@ func ethProviderInjector(
 	))
 }
 
-func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
 		ethTokenIdentifierOwnerFetcherInjector,
-		ethTokensIncrementalOwnerFetcherInjector,
+		// ethTokensIncrementalOwnerFetcherInjector,
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
 		ethTokensContractFetcherInjector,
 		ethTokenByTokenIdentifiersFetcherInjector,
 		wrapper.NewFillInWrapper,
@@ -292,7 +293,7 @@ func tezosProviderInjector(tezosProvider *tezos.Provider, tzktProvider *tzkt.Pro
 	))
 }
 
-func optimismInjector(context.Context, *http.Client) *multichain.OptimismProvider {
+func optimismInjector(context.Context, *http.Client) (*multichain.OptimismProvider, func()) {
 	panic(wire.Build(
 		wire.Value(persist.ChainOptimism),
 		optimismProviderInjector,
@@ -319,7 +320,7 @@ func optimismProviderInjector(
 	))
 }
 
-func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
@@ -380,7 +381,7 @@ func optmismTokenByTokenIdentifiersFetcherInjector(openseaProvider *opensea.Prov
 	))
 }
 
-func arbitrumInjector(context.Context, *http.Client) *multichain.ArbitrumProvider {
+func arbitrumInjector(context.Context, *http.Client) (*multichain.ArbitrumProvider, func()) {
 	panic(wire.Build(
 		arbitrumProviderInjector,
 		wire.Value(persist.ChainArbitrum),
@@ -407,7 +408,7 @@ func arbitrumProviderInjector(
 	))
 }
 
-func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
@@ -485,7 +486,7 @@ func poapProviderInjector(poapProvider *poap.Provider) *multichain.PoapProvider 
 	))
 }
 
-func zoraInjector(envInit, context.Context, *http.Client) *multichain.ZoraProvider {
+func zoraInjector(envInit, context.Context, *http.Client) (*multichain.ZoraProvider, func()) {
 	panic(wire.Build(
 		zoraProviderInjector,
 		wire.Value(persist.ChainZora),
@@ -540,7 +541,7 @@ func zoraContractFetcherInjector(openseaProvider *opensea.Provider, zoraProvider
 	))
 }
 
-func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, zoraProvider *zora.Provider) *wrapper.SyncPipelineWrapper {
+func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, zoraProvider *zora.Provider) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(zoraProvider)),
@@ -595,7 +596,7 @@ func zoraTokenByTokenIdentifiersFetcherInjector(openseaProvider *opensea.Provide
 	))
 }
 
-func baseInjector(context.Context, *http.Client) *multichain.BaseProvider {
+func baseInjector(context.Context, *http.Client) (*multichain.BaseProvider, func()) {
 	panic(wire.Build(
 		baseProvidersInjector,
 		wire.Value(persist.ChainBase),
@@ -622,7 +623,7 @@ func baseProvidersInjector(
 	))
 }
 
-func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
@@ -683,7 +684,7 @@ func baseTokenByTokenIdentifiersFetcherInjector(openseaProvider *opensea.Provide
 	))
 }
 
-func polygonInjector(context.Context, *http.Client) *multichain.PolygonProvider {
+func polygonInjector(context.Context, *http.Client) (*multichain.PolygonProvider, func()) {
 	panic(wire.Build(
 		polygonProvidersInjector,
 		wire.Value(persist.ChainPolygon),
@@ -695,7 +696,7 @@ func polygonInjector(context.Context, *http.Client) *multichain.PolygonProvider 
 	))
 }
 
-func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) *wrapper.SyncPipelineWrapper {
+func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, openseaProvider *opensea.Provider, alchemyProvider *alchemy.Provider) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),

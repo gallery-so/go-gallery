@@ -1011,7 +1011,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 				return nil
 			}, func(err error) bool {
 				return err == errNameNotAvailable
-			}, retry.Retry{Base: 5, Cap: 30, Tries: 3})
+			}, retry.Retry{MinWait: 5, MaxWait: 30, MaxRetries: 3})
 		}
 
 		name := util.TruncateWithEllipsis(td.Name.String, 40)
