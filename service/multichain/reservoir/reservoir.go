@@ -8,11 +8,14 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/platform"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 )
@@ -150,7 +153,10 @@ func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Cha
 		panic("no reservoir api key set")
 	}
 
-	r, cleanup := retry.NewRetryerReservoir(ctx, httpClient)
+	cache := redis.NewCache(redis.TokenManageCache)
+	// 110 requests per minute is slightly under the actual limit of 120 requests per minute
+	limiter := limiters.NewKeyRateLimiter(ctx, cache, "retryer:reservoir", 110, time.Minute)
+	r, cleanup := retry.New(limiter, httpClient)
 
 	return &Provider{
 		apiURL:     apiURL,

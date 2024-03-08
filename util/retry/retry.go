@@ -10,7 +10,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
 )
@@ -23,18 +22,6 @@ type Retry struct {
 	MinWait    int // Min amount of time to sleep per iteration in seconds
 	MaxWait    int // Max amount of time to sleep per iteration in seconds
 	MaxRetries int // Number of times to retry
-}
-
-// NewRetryerReservoir creates a new Retryer with a rate limit configured for Reservoir
-func NewRetryerReservoir(ctx context.Context, c *http.Client) (*Retryer, func()) {
-	cache := redis.NewCache(redis.TokenManageCache)
-	return New(limiters.NewKeyRateLimiter(ctx, cache, "retryer:reservoir", 120, time.Minute), c)
-}
-
-// NewRetryerOpensea creates a new Retryer with a rate limit configured for Opensea
-func NewRetryerOpensea(ctx context.Context, c *http.Client) (*Retryer, func()) {
-	cache := redis.NewCache(redis.TokenManageCache)
-	return New(limiters.NewKeyRateLimiter(ctx, cache, "retryer:opensea", 1000, time.Minute), c)
 }
 
 // Retryer protects against rate limits by requiring requests to be sent through it.
@@ -98,11 +85,11 @@ func (r *Retryer) do(p pending) (*http.Response, error) {
 		return resp, err
 	}
 	if resp.StatusCode != http.StatusTooManyRequests {
-		logger.For(p.req.Context()).Infof("waited for %s to submit request to %s", time.Since(p.queuedAt), p.req.Host)
+		logger.For(p.req.Context()).Infof("request successful, waited for %s to submit request to %s", time.Since(p.queuedAt), p.req.Host)
 		return resp, nil
 	}
 	if p.retryCount >= p.r.MaxRetries {
-		logger.For(p.req.Context()).Errorf("waited for %s to submit request to %s; ran out of retries", time.Since(p.queuedAt), p.req.Host)
+		logger.For(p.req.Context()).Errorf("ran out of retries, waited for %s to submit request to %s", time.Since(p.queuedAt), p.req.Host)
 		return resp, ErrOutOfRetries
 	}
 
