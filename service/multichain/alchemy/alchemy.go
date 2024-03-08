@@ -210,7 +210,6 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	u := mustGetNftsEndpoint(d.alchemyAPIURL)
 	setOwner(u, addr)
 	setWithMetadata(u)
-	setExcludeSpamOptionally(u, d.chain)
 	tokens, err := getNFTsPaginate(ctx, u.String(), 100, "pageKey", 0, 0, "", d.httpClient, nil, &getNFTsResponse{})
 	if err != nil {
 		return nil, nil, err
@@ -227,7 +226,6 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 	u := mustGetNftsEndpoint(d.alchemyAPIURL)
 	setOwner(u, addr)
 	setWithMetadata(u)
-	setExcludeSpamOptionally(u, d.chain)
 
 	alchemyRec := make(chan []Token)
 	subErrChan := make(chan error)
@@ -277,7 +275,6 @@ func (d *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	u := mustGetNftsForCollectionEndpoint(d.alchemyAPIURL)
 	setContractAddress(u, addr)
 	setWithMetadata(u)
-	setExcludeSpamOptionally(u, d.chain)
 
 	alchemyRec := make(chan []Token)
 	subErrChan := make(chan error)
@@ -912,14 +909,6 @@ func setWithMetadata(url *url.URL) {
 	query := url.Query()
 	query.Set("withMetadata", "true")
 	url.RawQuery = query.Encode()
-}
-
-func setExcludeSpamOptionally(url *url.URL, chain persist.Chain) {
-	if chain != persist.ChainPolygon {
-		query := url.Query()
-		query.Set("excludeFilters[]", "SPAM")
-		url.RawQuery = query.Encode()
-	}
 }
 
 func setContractAddress(url *url.URL, address persist.Address) {
