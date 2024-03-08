@@ -16,7 +16,7 @@ import (
 )
 
 var ErrOutOfRetries = fmt.Errorf("tried too many times")
-var DefaultRetry = Retry{MaxWait: 64, MaxRetries: 12}
+var DefaultRetry = Retry{MaxWait: 64, MaxRetries: 8}
 
 // Retry is a configuration for retrying requests
 type Retry struct {
@@ -28,7 +28,7 @@ type Retry struct {
 // NewRetryerReservoir creates a new Retryer with a rate limit configured for Reservoir
 func NewRetryerReservoir(ctx context.Context, c *http.Client) (*Retryer, func()) {
 	cache := redis.NewCache(redis.TokenManageCache)
-	return New(limiters.NewKeyRateLimiter(ctx, cache, "retryer:reservoir", 100000000, time.Minute), c)
+	return New(limiters.NewKeyRateLimiter(ctx, cache, "retryer:reservoir", 120, time.Minute), c)
 }
 
 // NewRetryerOpensea creates a new Retryer with a rate limit configured for Opensea
@@ -56,6 +56,7 @@ type pending struct {
 	done       chan error
 	retryCount int
 	r          Retry
+	queuedAt   time.Time
 }
 
 func New(l *limiters.KeyRateLimiter, c *http.Client) (*Retryer, func()) {
@@ -78,7 +79,7 @@ func (r *Retryer) Do(req *http.Request) (*http.Response, error) {
 }
 
 func (r *Retryer) DoRetry(req *http.Request, c Retry) (*http.Response, error) {
-	p := pending{req, make(chan error), 0, c}
+	p := pending{req, make(chan error), 0, c, time.Now()}
 	err := r.wait(p)
 	if err != nil {
 		return nil, err
@@ -96,17 +97,19 @@ func (r *Retryer) do(p pending) (*http.Response, error) {
 	if err != nil {
 		return resp, err
 	}
-	// XXX if resp.StatusCode != http.StatusTooManyRequests {
-	// XXX 	return resp, nil
-	// XXX }
+	if resp.StatusCode != http.StatusTooManyRequests {
+		logger.For(p.req.Context()).Infof("waited for %s to submit request to %s", time.Since(p.queuedAt), p.req.Host)
+		return resp, nil
+	}
 	if p.retryCount >= p.r.MaxRetries {
+		logger.For(p.req.Context()).Errorf("waited for %s to submit request to %s; ran out of retries", time.Since(p.queuedAt), p.req.Host)
 		return resp, ErrOutOfRetries
 	}
 
 	// wait for a bit before retrying
 	p.retryCount++
 	wait := WaitTime(p.r.MinWait, p.r.MaxWait, p.retryCount)
-	logger.For(p.req.Context()).Infof("rate limited by %s (attempt=%d/%d); waiting for %s", p.req.Host, p.retryCount, p.r.MaxRetries, wait)
+	logger.For(p.req.Context()).Infof("rate limited by %s (attempt=%d/%d); waiting for %s (so far waited for %s)", p.req.Host, p.retryCount, p.r.MaxRetries, wait, time.Since(p.queuedAt))
 	<-time.After(wait)
 
 	// re-enqueue the request
@@ -120,7 +123,7 @@ func (r *Retryer) enqueue() {
 		select {
 		case pending := <-r.q:
 			ctx := pending.req.Context()
-			waited := time.Duration(0)
+			var waited time.Duration
 		msgLoop:
 			for {
 				select {
@@ -137,12 +140,11 @@ func (r *Retryer) enqueue() {
 					}
 
 					if wait <= 0 {
-						logger.For(ctx).Infof("retryer consumed token for %s, waited for %s", pending.req.Host, waited)
 						close(pending.done)
 						break msgLoop
 					}
 
-					logger.For(ctx).Infof("out of tokens for %s, waiting for %s", pending.req.Host, wait)
+					logger.For(ctx).Infof("out of tokens for %s, waiting for %s to refill (so far waited for %s)", pending.req.Host, wait, waited)
 					waited += wait
 					<-time.After(wait)
 				}
