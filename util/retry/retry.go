@@ -85,11 +85,11 @@ func (r *Retryer) do(p pending) (*http.Response, error) {
 		return resp, err
 	}
 	if resp.StatusCode != http.StatusTooManyRequests {
-		logger.For(p.req.Context()).Infof("request successful, waited for %s to submit request to %s", time.Since(p.queuedAt), p.req.Host)
+		logger.For(p.req.Context()).Infof("request to %s was successful, took %s in total", p.req.Host, time.Since(p.queuedAt))
 		return resp, nil
 	}
 	if p.retryCount >= p.r.MaxRetries {
-		logger.For(p.req.Context()).Errorf("ran out of retries, waited for %s to submit request to %s", time.Since(p.queuedAt), p.req.Host)
+		logger.For(p.req.Context()).Errorf("ran out of retries, waited for %s to handle request to %s", time.Since(p.queuedAt), p.req.Host)
 		return resp, ErrOutOfRetries
 	}
 

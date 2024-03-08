@@ -333,6 +333,7 @@ func (p *Provider) streamAssetsToTokens(
 			out.Tokens = append(out.Tokens, tokens...)
 			out.Contracts = append(out.Contracts, contract.(multichain.ChainAgnosticContract))
 		}
+
 		recCh <- out
 	}
 }
