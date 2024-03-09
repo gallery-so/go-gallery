@@ -12,14 +12,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/sourcegraph/conc/pool"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -98,34 +101,18 @@ type Contract struct {
 	Name            string          `json:"name"`
 }
 
-func FetchAssetsForTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) ([]Asset, error) {
-	outCh := make(chan assetsReceived)
-
-	go func() {
-		defer close(outCh)
-		streamAssetsForToken(ctx, http.DefaultClient, chain, contractAddress, tokenID, outCh)
-	}()
-
-	assets := make([]Asset, 0)
-	for a := range outCh {
-		if a.Err != nil {
-			return nil, a.Err
-		}
-		assets = append(assets, a.Assets...)
-	}
-
-	return assets, nil
-}
-
 type Provider struct {
-	Chain      persist.Chain
-	httpClient *http.Client
+	Chain persist.Chain
+	r     *retry.Retryer
 }
 
 // NewProvider creates a new provider for OpenSea
-func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
+func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain) (*Provider, func()) {
 	mustChainIdentifierFrom(chain)
-	return &Provider{httpClient: httpClient, Chain: chain}
+	cache := redis.NewCache(redis.TokenManageCache)
+	limiter := limiters.NewKeyRateLimiter(ctx, cache, "retryer:opensea", 500, time.Minute)
+	r, cleanup := retry.New(limiter, httpClient)
+	return &Provider{Chain: chain, r: r}, cleanup
 }
 
 // GetTokensByWalletAddress returns a list of tokens for an address
@@ -133,7 +120,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 	outCh := make(chan assetsReceived)
 	go func() {
 		defer close(outCh)
-		streamAssetsForWallet(ctx, p.httpClient, p.Chain, ownerAddress, outCh)
+		streamAssetsForWallet(ctx, p.r, p.Chain, ownerAddress, outCh)
 	}()
 	return p.assetsToTokens(ctx, ownerAddress, outCh)
 }
@@ -145,7 +132,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 	outCh := make(chan assetsReceived, 32)
 	go func() {
 		defer close(outCh)
-		streamAssetsForWallet(ctx, p.httpClient, p.Chain, ownerAddress, outCh)
+		streamAssetsForWallet(ctx, p.r, p.Chain, ownerAddress, outCh)
 	}()
 	go func() {
 		defer close(recCh)
@@ -162,7 +149,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	assetsCh := make(chan assetsReceived)
 	go func() {
 		defer close(assetsCh)
-		streamAssetsForContract(ctx, p.httpClient, p.Chain, address, assetsCh)
+		streamAssetsForContract(ctx, p.r, p.Chain, address, assetsCh)
 	}()
 	go func() {
 		defer close(recCh)
@@ -177,7 +164,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	outCh := make(chan assetsReceived)
 	go func() {
 		defer close(outCh)
-		streamAssetsForContract(ctx, p.httpClient, p.Chain, contractAddress, outCh)
+		streamAssetsForContract(ctx, p.r, p.Chain, contractAddress, outCh)
 	}()
 	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh)
 	if err != nil {
@@ -195,7 +182,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	outCh := make(chan assetsReceived)
 	go func() {
 		defer close(outCh)
-		streamAssetsForToken(ctx, p.httpClient, p.Chain, ti.ContractAddress, ti.TokenID, outCh)
+		streamAssetsForToken(ctx, p.r, p.Chain, ti.ContractAddress, ti.TokenID, outCh)
 	}()
 	tokens, contracts, err := p.assetsToTokens(ctx, "", outCh)
 	if err != nil {
@@ -212,7 +199,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 	outCh := make(chan assetsReceived)
 	go func() {
 		defer close(outCh)
-		streamAssetsForTokenIdentifiersAndOwner(ctx, p.httpClient, p.Chain, ownerAddress, ti.ContractAddress, ti.TokenID, outCh)
+		streamAssetsForTokenIdentifiersAndOwner(ctx, p.r, p.Chain, ownerAddress, ti.ContractAddress, ti.TokenID, outCh)
 	}()
 
 	tokens, contracts, err := p.assetsToTokens(ctx, ownerAddress, outCh)
@@ -260,7 +247,7 @@ func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti
 
 // GetContractByAddress returns a contract for a contract address
 func (p *Provider) GetContractByAddress(ctx context.Context, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
-	cc, err := fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, contractAddress)
+	cc, err := fetchContractCollectionByAddress(ctx, p.r, p.Chain, contractAddress)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
@@ -346,6 +333,7 @@ func (p *Provider) streamAssetsToTokens(
 			out.Tokens = append(out.Tokens, tokens...)
 			out.Contracts = append(out.Contracts, contract.(multichain.ChainAgnosticContract))
 		}
+
 		recCh <- out
 	}
 }
@@ -384,7 +372,7 @@ func (p *Provider) getChainAgnosticContract(ctx context.Context, contractAddress
 		return nil
 	}
 
-	contractCollection, err := fetchContractCollectionByAddress(ctx, p.httpClient, p.Chain, contractAddress)
+	contractCollection, err := fetchContractCollectionByAddress(ctx, p.r, p.Chain, contractAddress)
 	if err != nil {
 		return err
 	}
@@ -425,21 +413,21 @@ func (p *Provider) assetToChainAgnosticTokens(ownerAddress persist.Address, asse
 	return []multichain.ChainAgnosticToken{token}, nil
 }
 
-func fetchContractCollectionByAddress(ctx context.Context, client *http.Client, chain persist.Chain, contractAddress persist.Address) (contractCollection, error) {
-	contract, err := fetchContractByAddress(ctx, client, chain, contractAddress)
+func fetchContractCollectionByAddress(ctx context.Context, r *retry.Retryer, chain persist.Chain, contractAddress persist.Address) (contractCollection, error) {
+	contract, err := fetchContractByAddress(ctx, r, chain, contractAddress)
 	if err != nil {
 		return contractCollection{}, err
 	}
-	collection, err := fetchCollectionBySlug(ctx, client, chain, contract.Collection)
+	collection, err := fetchCollectionBySlug(ctx, r, chain, contract.Collection)
 	if err != nil {
 		return contractCollection{}, err
 	}
 	return contractCollection{contract, collection}, nil
 }
 
-func fetchContractByAddress(ctx context.Context, client *http.Client, chain persist.Chain, contractAddress persist.Address) (contract Contract, err error) {
+func fetchContractByAddress(ctx context.Context, r *retry.Retryer, chain persist.Chain, contractAddress persist.Address) (contract Contract, err error) {
 	endpoint := mustContractEndpoint(chain, contractAddress)
-	resp, err := retry.RetryRequest(client, mustAuthRequest(ctx, endpoint))
+	resp, err := r.Do(mustAuthRequest(ctx, endpoint))
 	if err != nil {
 		return Contract{}, wrapRateLimitErr(ctx, err)
 	}
@@ -457,9 +445,9 @@ func fetchContractByAddress(ctx context.Context, client *http.Client, chain pers
 	return contract, nil
 }
 
-func fetchCollectionBySlug(ctx context.Context, client *http.Client, chain persist.Chain, slug string) (collection Collection, err error) {
+func fetchCollectionBySlug(ctx context.Context, r *retry.Retryer, chain persist.Chain, slug string) (collection Collection, err error) {
 	endpoint := mustCollectionEndpoint(slug)
-	resp, err := retry.RetryRequest(client, mustAuthRequest(ctx, endpoint))
+	resp, err := r.Do(mustAuthRequest(ctx, endpoint))
 	if err != nil {
 		return Collection{}, wrapRateLimitErr(ctx, err)
 	}
@@ -510,28 +498,28 @@ func mustNftsByContractEndpoint(chain persist.Chain, address persist.Address) *u
 	return checkURL(s)
 }
 
-func streamAssetsForToken(ctx context.Context, client *http.Client, chain persist.Chain, address persist.Address, tokenID persist.TokenID, outCh chan assetsReceived) {
+func streamAssetsForToken(ctx context.Context, r *retry.Retryer, chain persist.Chain, address persist.Address, tokenID persist.TokenID, outCh chan assetsReceived) {
 	endpoint := mustNftEndpoint(chain, address, tokenID)
 	setPagingParams(endpoint)
-	paginateAssets(ctx, client, mustAuthRequest(ctx, endpoint), outCh)
+	paginateAssets(ctx, r, mustAuthRequest(ctx, endpoint), outCh)
 }
 
-func streamAssetsForWallet(ctx context.Context, client *http.Client, chain persist.Chain, address persist.Address, outCh chan assetsReceived) {
+func streamAssetsForWallet(ctx context.Context, r *retry.Retryer, chain persist.Chain, address persist.Address, outCh chan assetsReceived) {
 	endpoint := mustNftsByWalletEndpoint(chain, address)
 	setPagingParams(endpoint)
-	paginateAssets(ctx, client, mustAuthRequest(ctx, endpoint), outCh)
+	paginateAssets(ctx, r, mustAuthRequest(ctx, endpoint), outCh)
 }
 
-func streamAssetsForContract(ctx context.Context, client *http.Client, chain persist.Chain, address persist.Address, outCh chan assetsReceived) {
+func streamAssetsForContract(ctx context.Context, r *retry.Retryer, chain persist.Chain, address persist.Address, outCh chan assetsReceived) {
 	endpoint := mustNftsByContractEndpoint(chain, address)
 	setPagingParams(endpoint)
-	paginateAssets(ctx, client, mustAuthRequest(ctx, endpoint), outCh)
+	paginateAssets(ctx, r, mustAuthRequest(ctx, endpoint), outCh)
 }
 
-func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, client *http.Client, chain persist.Chain, ownerAddress, contractAddress persist.Address, tokenID persist.TokenID, outCh chan assetsReceived) {
+func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, r *retry.Retryer, chain persist.Chain, ownerAddress, contractAddress persist.Address, tokenID persist.TokenID, outCh chan assetsReceived) {
 	endpoint := mustNftsByWalletEndpoint(chain, ownerAddress)
 	setPagingParams(endpoint)
-	paginateAssetsFilter(ctx, client, mustAuthRequest(ctx, endpoint), outCh, func(a Asset) bool {
+	paginateAssetsFilter(ctx, r, mustAuthRequest(ctx, endpoint), outCh, func(a Asset) bool {
 		// OS doesn't let you filter by tokenID and owner, so we have to filter for only the token
 		ca := persist.NewChainAddress(persist.Address(a.Contract), chain)
 		if (ca.Address() == contractAddress) && (persist.MustTokenID(a.Identifier) == tokenID) {
@@ -657,16 +645,16 @@ func readErrBody(ctx context.Context, body io.Reader) error {
 	return fmt.Errorf(string(byt))
 }
 
-func paginateAssets(ctx context.Context, client *http.Client, req *http.Request, outCh chan assetsReceived) {
-	paginateAssetsFilter(ctx, client, req, outCh, nil)
+func paginateAssets(ctx context.Context, r *retry.Retryer, req *http.Request, outCh chan assetsReceived) {
+	paginateAssetsFilter(ctx, r, req, outCh, nil)
 }
 
 // paginatesAssetsFilter fetches assets from OpenSea and sends them to outCh. An optional keepAssetFilter can be provided to filter out an asset
 // after it is fetched if keepAssetFilter evaluates to false. This is useful for filtering out assets that can't be filtered natively by the API.
-func paginateAssetsFilter(ctx context.Context, client *http.Client, req *http.Request, outCh chan assetsReceived, keepAssetFilter func(a Asset) bool) {
+func paginateAssetsFilter(ctx context.Context, r *retry.Retryer, req *http.Request, outCh chan assetsReceived, keepAssetFilter func(a Asset) bool) {
 	pages := 0
 	for {
-		resp, err := retry.RetryRequest(client, req)
+		resp, err := r.Do(req)
 		if err != nil {
 			err = wrapRateLimitErr(ctx, err)
 			logger.For(ctx).Errorf("failed to get tokens from opensea: %s", err)
@@ -762,7 +750,7 @@ func mustChainIdentifierFrom(c persist.Chain) string {
 }
 
 func wrapRateLimitErr(ctx context.Context, err error) error {
-	if !util.ErrorIs[retry.ErrOutOfRetries](err) {
+	if !errors.Is(err, retry.ErrOutOfRetries) {
 		return err
 	}
 	err = ErrOpenseaRateLimited{err}
