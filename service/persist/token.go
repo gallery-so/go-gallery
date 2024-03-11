@@ -296,7 +296,18 @@ type Chain int
 
 type L1Chain Chain
 
-// HexTokenID represents the ID of a token
+type DecimalTokenID string
+type DecimalTokenIDList []DecimalTokenID
+
+func (l DecimalTokenIDList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+func (l *DecimalTokenIDList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
+}
+
+// HexTokenID represents the ID of a token in hexadecimal
 type HexTokenID string
 
 type HexTokenIDList []HexTokenID
@@ -660,6 +671,77 @@ func (uri TokenURI) IsHTTP() bool {
 	return strings.HasPrefix(asString, "http")
 }
 
+func (id DecimalTokenID) String() string {
+	return util.RemoveLeftPaddedZeros(string(id))
+}
+
+// Value implements the driver.Valuer interface for token IDs
+func (id DecimalTokenID) Value() (driver.Value, error) {
+	return id.String(), nil
+}
+
+// Scan implements the sql.Scanner interface for token IDs
+func (id *DecimalTokenID) Scan(src interface{}) error {
+	if src == nil {
+		*id = ""
+		return nil
+	}
+	*id = DecimalTokenID(src.(string))
+	return nil
+}
+
+// BigInt returns the token ID as a big.Int
+func (id DecimalTokenID) BigInt() *big.Int {
+	normalized := id.String()
+	if normalized == "" {
+		return big.NewInt(0)
+	}
+	i, ok := new(big.Int).SetString(normalized, 10)
+
+	if !ok {
+		panic(fmt.Sprintf("failed to parse token ID %s as base 10", normalized))
+	}
+
+	return i
+}
+
+// ToUint256String returns the uint256 hex string representation of the token id
+// TODO: Unsure if we need this for decimal IDs
+//func (id DecimalTokenID) ToUint256String() string {
+//	return fmt.Sprintf("%064s", id.String())
+//}
+
+// Base10String returns the token ID as a base 10 string
+func (id DecimalTokenID) ToHexTokenID() HexTokenID {
+	return HexTokenID(id.BigInt().Text(16))
+}
+
+// ToInt returns the token ID as a base 10 integer
+// TODO: We should look at places where we use this, since an int64 can't hold all possible TokenIDs
+//func (id DecimalTokenID) ToInt() int64 {
+//	return id.BigInt().Int64()
+//}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (id *DecimalTokenID) UnmarshalGQL(v any) error {
+	val, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("failed to convert %s to an integer", v)
+	}
+
+	if i, ok := new(big.Int).SetString(val, 10); ok {
+		*id = DecimalTokenID(i.Text(10))
+		return nil
+	}
+
+	return fmt.Errorf("failed to convert %s to an integer", val)
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (id DecimalTokenID) MarshalGQL(w io.Writer) {
+	w.Write([]byte(fmt.Sprintf(`"%s"`, id.String())))
+}
+
 func (id HexTokenID) String() string {
 	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
 }
@@ -702,6 +784,10 @@ func (id HexTokenID) ToUint256String() string {
 // Base10String returns the token ID as a base 10 string
 func (id HexTokenID) Base10String() string {
 	return id.BigInt().String()
+}
+
+func (id HexTokenID) ToDecimalTokenID() DecimalTokenID {
+	return DecimalTokenID(id.BigInt().Text(10))
 }
 
 // ToInt returns the token ID as a base 10 integer
