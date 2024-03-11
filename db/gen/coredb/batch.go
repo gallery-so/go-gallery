@@ -3798,10 +3798,10 @@ type GetTokenByUserTokenIdentifiersBatchBatchResults struct {
 }
 
 type GetTokenByUserTokenIdentifiersBatchParams struct {
-	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	OwnerID         persist.DBID       `db:"owner_id" json:"owner_id"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
 }
 
 type GetTokenByUserTokenIdentifiersBatchRow struct {
@@ -3925,10 +3925,10 @@ type GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchBatchResults struct {
 }
 
 type GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchParams struct {
-	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	OwnerID         persist.DBID       `db:"owner_id" json:"owner_id"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
 }
 
 type GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow struct {

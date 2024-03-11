@@ -31,9 +31,9 @@ import (
 )
 
 type ProcessMediaForTokenInput struct {
-	TokenID         persist.TokenID `json:"token_id" binding:"required"`
-	ContractAddress persist.Address `json:"contract_address" binding:"required"`
-	Chain           persist.Chain   `json:"chain"`
+	TokenID         persist.HexTokenID `json:"token_id" binding:"required"`
+	ContractAddress persist.Address    `json:"contract_address" binding:"required"`
+	Chain           persist.Chain      `json:"chain"`
 }
 
 func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {

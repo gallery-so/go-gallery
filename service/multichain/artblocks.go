@@ -111,7 +111,7 @@ func (i artBlocksCommunityInfo) GetWebsiteURL() string {
 // Art Blocks project IDs are the token ID divided by 1,000,000
 var oneMillion = big.NewInt(1000000)
 
-func tokenIDToArtBlocksProjectID(tokenID persist.TokenID) string {
+func tokenIDToArtBlocksProjectID(tokenID persist.HexTokenID) string {
 	var projectIDInt big.Int
 	projectIDInt.Div(tokenID.BigInt(), oneMillion)
 	return projectIDInt.String()
@@ -119,7 +119,7 @@ func tokenIDToArtBlocksProjectID(tokenID persist.TokenID) string {
 
 // projectIDToTokenID returns the first token ID that would belong to a given project ID.
 // Note: the Art Blocks API expects base 10 token IDs, so for efficiency, this helper method
-// works directly with base 10 numbers and doesn't use the hex-based persist.TokenID type.
+// works directly with base 10 numbers and doesn't use the hex-based persist.HexTokenID type.
 func projectIDToBase10ArtBlocksTokenID(projectID string) string {
 	var projectIDInt big.Int
 	projectIDInt.SetString(projectID, 10)

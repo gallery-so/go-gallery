@@ -610,7 +610,7 @@ func (*Provider) tokenToAgnostic(ctx context.Context, token zoraToken) (multicha
 		},
 		TokenType:       tokenType,
 		TokenMetadata:   token.Metadata,
-		TokenID:         persist.TokenID(token.TokenID.toBase16String()),
+		TokenID:         persist.HexTokenID(token.TokenID.toBase16String()),
 		Quantity:        persist.HexString("1"),
 		OwnerAddress:    persist.Address(strings.ToLower(token.Owner)),
 		ContractAddress: persist.Address(strings.ToLower(token.CollectionAddress)),

@@ -2925,9 +2925,9 @@ where (chain, contract_address, token_id) = ($1, $2, $3)
 `
 
 type GetMediaByTokenIdentifiersIgnoringStatusParams struct {
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetMediaByTokenIdentifiersIgnoringStatus(ctx context.Context, arg GetMediaByTokenIdentifiersIgnoringStatusParams) (TokenMedia, error) {
@@ -2992,7 +2992,7 @@ const getMerchDiscountCodeByTokenID = `-- name: GetMerchDiscountCodeByTokenID :o
 select discount_code from merch where token_id = $1 and redeemed = true and deleted = false
 `
 
-func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex persist.TokenID) (sql.NullString, error) {
+func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex persist.HexTokenID) (sql.NullString, error) {
 	row := q.db.QueryRow(ctx, getMerchDiscountCodeByTokenID, tokenHex)
 	var discount_code sql.NullString
 	err := row.Scan(&discount_code)
@@ -4007,10 +4007,10 @@ where t.token_definition_id = td.id
 `
 
 type GetTokenByUserTokenIdentifiersParams struct {
-	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	OwnerID         persist.DBID       `db:"owner_id" json:"owner_id"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
 }
 
 type GetTokenByUserTokenIdentifiersRow struct {
@@ -4152,9 +4152,9 @@ where (chain, contract_address, token_id) = ($1, $2, $3) and not deleted
 `
 
 type GetTokenDefinitionByTokenIdentifiersParams struct {
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetTokenDefinitionByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionByTokenIdentifiersParams) (TokenDefinition, error) {
@@ -4372,10 +4372,10 @@ order by tokens.block_number desc
 `
 
 type GetTokenFullDetailsByUserTokenIdentifiersParams struct {
-	OwnerUserID     persist.DBID    `db:"owner_user_id" json:"owner_user_id"`
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	OwnerUserID     persist.DBID       `db:"owner_user_id" json:"owner_user_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
 }
 
 type GetTokenFullDetailsByUserTokenIdentifiersRow struct {
@@ -4769,11 +4769,11 @@ group by (token_definitions.token_id, token_definitions.contract_address, token_
 `
 
 type GetUniqueTokenIdentifiersByTokenIDRow struct {
-	TokenID         persist.TokenID   `db:"token_id" json:"token_id"`
-	ContractAddress persist.Address   `db:"contract_address" json:"contract_address"`
-	Chain           persist.Chain     `db:"chain" json:"chain"`
-	Quantity        persist.HexString `db:"quantity" json:"quantity"`
-	OwnerAddresses  []string          `db:"owner_addresses" json:"owner_addresses"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	Quantity        persist.HexString  `db:"quantity" json:"quantity"`
+	OwnerAddresses  []string           `db:"owner_addresses" json:"owner_addresses"`
 }
 
 func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id persist.DBID) (GetUniqueTokenIdentifiersByTokenIDRow, error) {
@@ -6164,7 +6164,7 @@ type InsertTokenPipelineResultsParams struct {
 	RetiringMediaID  persist.DBID             `db:"retiring_media_id" json:"retiring_media_id"`
 	Chain            persist.Chain            `db:"chain" json:"chain"`
 	ContractAddress  persist.Address          `db:"contract_address" json:"contract_address"`
-	TokenID          persist.TokenID          `db:"token_id" json:"token_id"`
+	TokenID          persist.HexTokenID       `db:"token_id" json:"token_id"`
 	NewMediaIsActive bool                     `db:"new_media_is_active" json:"new_media_is_active"`
 	NewMediaID       persist.DBID             `db:"new_media_id" json:"new_media_id"`
 	NewMedia         pgtype.JSONB             `db:"new_media" json:"new_media"`
@@ -6661,8 +6661,8 @@ update merch set redeemed = true, token_id = $1, last_updated = now() where id =
 `
 
 type RedeemMerchParams struct {
-	TokenHex   persist.TokenID `db:"token_hex" json:"token_hex"`
-	ObjectType int32           `db:"object_type" json:"object_type"`
+	TokenHex   persist.HexTokenID `db:"token_hex" json:"token_hex"`
+	ObjectType int32              `db:"object_type" json:"object_type"`
 }
 
 func (q *Queries) RedeemMerch(ctx context.Context, arg RedeemMerchParams) (sql.NullString, error) {
@@ -7213,11 +7213,11 @@ returning id, created_at, last_updated, deleted, name, description, token_type, 
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
-	Name        sql.NullString  `db:"name" json:"name"`
-	Description sql.NullString  `db:"description" json:"description"`
-	TokenID     persist.TokenID `db:"token_id" json:"token_id"`
-	ContractID  persist.DBID    `db:"contract_id" json:"contract_id"`
-	Chain       persist.Chain   `db:"chain" json:"chain"`
+	Name        sql.NullString     `db:"name" json:"name"`
+	Description sql.NullString     `db:"description" json:"description"`
+	TokenID     persist.HexTokenID `db:"token_id" json:"token_id"`
+	ContractID  persist.DBID       `db:"contract_id" json:"contract_id"`
+	Chain       persist.Chain      `db:"chain" json:"chain"`
 }
 
 func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) (TokenDefinition, error) {

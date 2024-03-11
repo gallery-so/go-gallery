@@ -637,7 +637,7 @@ func (BlockUserPayload) IsBlockUserPayloadOrError() {}
 type ChainAddressTokenInput struct {
 	ChainAddress *persist.ChainAddress `json:"chainAddress"`
 	// Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
-	TokenID persist.TokenID `json:"tokenId"`
+	TokenID persist.HexTokenID `json:"tokenId"`
 }
 
 type ChainTokens struct {

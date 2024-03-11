@@ -98,7 +98,7 @@ type Contract struct {
 	Name            string          `json:"name"`
 }
 
-func FetchAssetsForTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) ([]Asset, error) {
+func FetchAssetsForTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID) ([]Asset, error) {
 	outCh := make(chan assetsReceived)
 
 	go func() {
@@ -495,7 +495,7 @@ func mustCollectionEndpoint(slug string) *url.URL {
 	return checkURL(s)
 }
 
-func mustNftEndpoint(chain persist.Chain, address persist.Address, tokenID persist.TokenID) *url.URL {
+func mustNftEndpoint(chain persist.Chain, address persist.Address, tokenID persist.HexTokenID) *url.URL {
 	s := fmt.Sprintf(getNftEndpointTemplate, mustChainIdentifierFrom(chain), address, tokenID.Base10String())
 	return checkURL(s)
 }
@@ -510,7 +510,7 @@ func mustNftsByContractEndpoint(chain persist.Chain, address persist.Address) *u
 	return checkURL(s)
 }
 
-func streamAssetsForToken(ctx context.Context, client *http.Client, chain persist.Chain, address persist.Address, tokenID persist.TokenID, outCh chan assetsReceived) {
+func streamAssetsForToken(ctx context.Context, client *http.Client, chain persist.Chain, address persist.Address, tokenID persist.HexTokenID, outCh chan assetsReceived) {
 	endpoint := mustNftEndpoint(chain, address, tokenID)
 	setPagingParams(endpoint)
 	paginateAssets(ctx, client, mustAuthRequest(ctx, endpoint), outCh)
@@ -528,7 +528,7 @@ func streamAssetsForContract(ctx context.Context, client *http.Client, chain per
 	paginateAssets(ctx, client, mustAuthRequest(ctx, endpoint), outCh)
 }
 
-func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, client *http.Client, chain persist.Chain, ownerAddress, contractAddress persist.Address, tokenID persist.TokenID, outCh chan assetsReceived) {
+func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, client *http.Client, chain persist.Chain, ownerAddress, contractAddress persist.Address, tokenID persist.HexTokenID, outCh chan assetsReceived) {
 	endpoint := mustNftsByWalletEndpoint(chain, ownerAddress)
 	setPagingParams(endpoint)
 	paginateAssetsFilter(ctx, client, mustAuthRequest(ctx, endpoint), outCh, func(a Asset) bool {

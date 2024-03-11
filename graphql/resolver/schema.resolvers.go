@@ -2010,9 +2010,9 @@ func (r *mutationResolver) VerifyEmailMagicLink(ctx context.Context, input model
 
 // RedeemMerch is the resolver for the redeemMerch field.
 func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
-	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
+	tokenIDList := make([]persist.HexTokenID, len(input.TokenIds))
 	for i, id := range input.TokenIds {
-		tokenIDList[i] = persist.TokenID(id)
+		tokenIDList[i] = persist.HexTokenID(id)
 	}
 	if input.Address == nil {
 		return nil, fmt.Errorf("address is required")

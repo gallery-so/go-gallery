@@ -109,8 +109,8 @@ const (
 	MaxChainValue = ChainBase
 )
 
-func MustTokenID(s string) TokenID {
-	return TokenID(MustHexString(s))
+func MustTokenID(s string) HexTokenID {
+	return HexTokenID(MustHexString(s))
 }
 
 func MustHexString(s string) HexString {
@@ -296,16 +296,16 @@ type Chain int
 
 type L1Chain Chain
 
-// TokenID represents the ID of a token
-type TokenID string
+// HexTokenID represents the ID of a token
+type HexTokenID string
 
-type TokenIDList []TokenID
+type HexTokenIDList []HexTokenID
 
-func (l TokenIDList) Value() (driver.Value, error) {
+func (l HexTokenIDList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
 }
 
-func (l *TokenIDList) Scan(value interface{}) error {
+func (l *HexTokenIDList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
@@ -349,7 +349,7 @@ type Token struct {
 	Description NullString `json:"description"`
 
 	TokenURI         TokenURI                 `json:"token_uri"`
-	TokenID          TokenID                  `json:"token_id"`
+	TokenID          HexTokenID               `json:"token_id"`
 	Quantity         HexString                `json:"quantity"`
 	OwnerAddress     EthereumAddress          `json:"owner_address"`
 	OwnershipHistory []EthereumAddressAtBlock `json:"previous_owners"`
@@ -584,7 +584,7 @@ func (uri TokenURI) Value() (driver.Value, error) {
 }
 
 // ReplaceID replaces the token's ID with the given ID
-func (uri TokenURI) ReplaceID(id TokenID) TokenURI {
+func (uri TokenURI) ReplaceID(id HexTokenID) TokenURI {
 	return TokenURI(strings.TrimSpace(strings.ReplaceAll(uri.String(), "{id}", id.ToUint256String())))
 }
 
@@ -660,27 +660,27 @@ func (uri TokenURI) IsHTTP() bool {
 	return strings.HasPrefix(asString, "http")
 }
 
-func (id TokenID) String() string {
+func (id HexTokenID) String() string {
 	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
 }
 
 // Value implements the driver.Valuer interface for token IDs
-func (id TokenID) Value() (driver.Value, error) {
+func (id HexTokenID) Value() (driver.Value, error) {
 	return id.String(), nil
 }
 
 // Scan implements the sql.Scanner interface for token IDs
-func (id *TokenID) Scan(src interface{}) error {
+func (id *HexTokenID) Scan(src interface{}) error {
 	if src == nil {
-		*id = TokenID("")
+		*id = HexTokenID("")
 		return nil
 	}
-	*id = TokenID(src.(string))
+	*id = HexTokenID(src.(string))
 	return nil
 }
 
 // BigInt returns the token ID as a big.Int
-func (id TokenID) BigInt() *big.Int {
+func (id HexTokenID) BigInt() *big.Int {
 	normalized := id.String()
 	if normalized == "" {
 		return big.NewInt(0)
@@ -695,26 +695,26 @@ func (id TokenID) BigInt() *big.Int {
 }
 
 // ToUint256String returns the uint256 hex string representation of the token id
-func (id TokenID) ToUint256String() string {
+func (id HexTokenID) ToUint256String() string {
 	return fmt.Sprintf("%064s", id.String())
 }
 
 // Base10String returns the token ID as a base 10 string
-func (id TokenID) Base10String() string {
+func (id HexTokenID) Base10String() string {
 	return id.BigInt().String()
 }
 
 // ToInt returns the token ID as a base 10 integer
-func (id TokenID) ToInt() int64 {
+func (id HexTokenID) ToInt() int64 {
 	return id.BigInt().Int64()
 }
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
-func (id *TokenID) UnmarshalGQL(v any) error {
+func (id *HexTokenID) UnmarshalGQL(v any) error {
 	if val, ok := v.(string); ok {
 		// Assume its in hexadecimal
 		if strings.HasPrefix(val, "0x") {
-			*id = TokenID(TokenID(val).String())
+			*id = HexTokenID(HexTokenID(val).String())
 			return nil
 		}
 		// Assume its in decimal
@@ -722,13 +722,13 @@ func (id *TokenID) UnmarshalGQL(v any) error {
 		if err != nil {
 			return fmt.Errorf("failed to convert %s; prepend with '0x' if val is in hex", val)
 		}
-		*id = TokenID(fmt.Sprintf("%x", asInt))
+		*id = HexTokenID(fmt.Sprintf("%x", asInt))
 	}
 	return nil
 }
 
 // MarshalGQL implements the graphql.Marshaler interface
-func (id TokenID) MarshalGQL(w io.Writer) {
+func (id HexTokenID) MarshalGQL(w io.Writer) {
 	p := "0x" + id.String()
 	w.Write([]byte(fmt.Sprintf(`"%s"`, p)))
 }
@@ -974,7 +974,7 @@ func (t *TokenType) Scan(src interface{}) error {
 }
 
 // NewEthereumTokenIdentifiers creates a new token identifiers
-func NewEthereumTokenIdentifiers(pContractAddress EthereumAddress, pTokenID TokenID) EthereumTokenIdentifiers {
+func NewEthereumTokenIdentifiers(pContractAddress EthereumAddress, pTokenID HexTokenID) EthereumTokenIdentifiers {
 	return EthereumTokenIdentifiers(fmt.Sprintf("%s+%s", pContractAddress, pTokenID))
 }
 
@@ -983,12 +983,12 @@ func (t EthereumTokenIdentifiers) String() string {
 }
 
 // GetParts returns the parts of the token identifiers
-func (t EthereumTokenIdentifiers) GetParts() (EthereumAddress, TokenID, error) {
+func (t EthereumTokenIdentifiers) GetParts() (EthereumAddress, HexTokenID, error) {
 	parts := strings.Split(t.String(), "+")
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid token identifiers: %s", t)
 	}
-	return EthereumAddress(EthereumAddress(parts[0]).String()), TokenID(TokenID(parts[1]).String()), nil
+	return EthereumAddress(EthereumAddress(parts[0]).String()), HexTokenID(HexTokenID(parts[1]).String()), nil
 }
 
 // Value implements the driver.Valuer interface

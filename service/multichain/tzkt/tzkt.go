@@ -693,7 +693,7 @@ func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {
 	seen := map[string]tzktBalanceToken{}
 	result := make([]tzktBalanceToken, 0, len(tzTokens))
 	for _, t := range tzTokens {
-		id := multichain.ChainAgnosticIdentifiers{ContractAddress: t.Token.Contract.Address, TokenID: persist.TokenID(t.Token.TokenID)}
+		id := multichain.ChainAgnosticIdentifiers{ContractAddress: t.Token.Contract.Address, TokenID: persist.HexTokenID(t.Token.TokenID)}
 		seen[id.String()] = t
 	}
 	for _, t := range seen {

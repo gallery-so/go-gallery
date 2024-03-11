@@ -32,13 +32,13 @@ func (t TokenID) String() string {
 	return string(t)
 }
 
-func (t TokenID) ToTokenID() persist.TokenID {
+func (t TokenID) ToTokenID() persist.HexTokenID {
 
 	big, ok := new(big.Int).SetString(t.String(), 10)
 	if !ok {
 		return ""
 	}
-	return persist.TokenID(big.Text(16))
+	return persist.HexTokenID(big.Text(16))
 
 }
 
@@ -314,9 +314,9 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string,
 }
 
 type TokenMetadata struct {
-	Contract persist.Address `json:"contract"`
-	TokenID  persist.TokenID `json:"token_id"`
-	Metadata Metadata        `json:"metadata"`
+	Contract persist.Address    `json:"contract"`
+	TokenID  persist.HexTokenID `json:"token_id"`
+	Metadata Metadata           `json:"metadata"`
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID

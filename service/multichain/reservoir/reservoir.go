@@ -61,7 +61,7 @@ func mustCollectionsEndpoint(baseURL string) *url.URL {
 
 type ErrTokenNotFoundByIdentifiers struct {
 	ContractAddress persist.Address
-	TokenID         persist.TokenID
+	TokenID         persist.HexTokenID
 	OwnerAddress    persist.Address
 }
 
@@ -388,7 +388,7 @@ func paginateTokens(ctx context.Context, client *http.Client, req *http.Request,
 	}
 }
 
-func (p *Provider) streamAssetsForToken(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, outCh chan<- pageResult) {
+func (p *Provider) streamAssetsForToken(ctx context.Context, contractAddress persist.Address, tokenID persist.HexTokenID, outCh chan<- pageResult) {
 	endpoint := mustTokensEndpoint(p.apiURL)
 	setToken(endpoint, contractAddress, tokenID)
 	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
@@ -412,7 +412,7 @@ func (p *Provider) streamAssetsForWallet(ctx context.Context, addr persist.Addre
 	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
 }
 
-func (p *Provider) streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, tokenID persist.TokenID, outCh chan<- pageResult) {
+func (p *Provider) streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, tokenID persist.HexTokenID, outCh chan<- pageResult) {
 	endpoint := mustUserTokensEndpoint(p.apiURL, ownerAddress)
 	setLimit(endpoint, 1)
 	setToken(endpoint, contractAddress, tokenID)
@@ -647,7 +647,7 @@ func setLimit(url *url.URL, limit int) {
 	url.RawQuery = query.Encode()
 }
 
-func setToken(url *url.URL, contractAddress persist.Address, tokenID persist.TokenID) {
+func setToken(url *url.URL, contractAddress persist.Address, tokenID persist.HexTokenID) {
 	setTokens(url, []persist.TokenIdentifiers{{ContractAddress: contractAddress, TokenID: tokenID}})
 }
 

@@ -57,7 +57,7 @@ type ChainAgnosticToken struct {
 	Descriptors     ChainAgnosticTokenDescriptors `json:"descriptors"`
 	TokenType       persist.TokenType             `json:"token_type"`
 	TokenURI        persist.TokenURI              `json:"token_uri"`
-	TokenID         persist.TokenID               `json:"token_id"`
+	TokenID         persist.HexTokenID            `json:"token_id"`
 	Quantity        persist.HexString             `json:"quantity"`
 	OwnerAddress    persist.Address               `json:"owner_address"`
 	TokenMetadata   persist.TokenMetadata         `json:"metadata"`
@@ -97,8 +97,8 @@ type ChainAgnosticContractDescriptors struct {
 
 // ChainAgnosticIdentifiers identify tokens despite their chain
 type ChainAgnosticIdentifiers struct {
-	ContractAddress persist.Address `json:"contract_address"`
-	TokenID         persist.TokenID `json:"token_id"`
+	ContractAddress persist.Address    `json:"contract_address"`
+	TokenID         persist.HexTokenID `json:"token_id"`
 }
 
 func (t ChainAgnosticIdentifiers) String() string {
@@ -960,7 +960,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 	return f.GetTokenMetadataByTokenIdentifiersBatch(ctx, tIDs)
 }
 
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain) (persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.HexTokenID, chain persist.Chain) (persist.TokenMetadata, error) {
 	fetcher, ok := p.Chains[chain].(TokenMetadataFetcher)
 	if !ok {
 		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)

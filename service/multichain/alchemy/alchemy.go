@@ -61,20 +61,20 @@ func (t TokenID) String() string {
 	return string(t)
 }
 
-func (t TokenID) ToTokenID() persist.TokenID {
+func (t TokenID) ToTokenID() persist.HexTokenID {
 
 	if strings.HasPrefix(t.String(), "0x") {
 		big, ok := new(big.Int).SetString(strings.TrimPrefix(t.String(), "0x"), 16)
 		if !ok {
 			return ""
 		}
-		return persist.TokenID(big.Text(16))
+		return persist.HexTokenID(big.Text(16))
 	}
 	big, ok := new(big.Int).SetString(t.String(), 10)
 	if !ok {
 		return ""
 	}
-	return persist.TokenID(big.Text(16))
+	return persist.HexTokenID(big.Text(16))
 
 }
 
