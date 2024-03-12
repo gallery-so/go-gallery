@@ -12,17 +12,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/sourcegraph/conc/pool"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -107,11 +104,9 @@ type Provider struct {
 }
 
 // NewProvider creates a new provider for OpenSea
-func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain) (*Provider, func()) {
+func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain, l retry.Limiter) (*Provider, func()) {
 	mustChainIdentifierFrom(chain)
-	cache := redis.NewCache(redis.TokenManageCache)
-	limiter := limiters.NewKeyRateLimiter(ctx, cache, "retryer:opensea", 500, time.Minute)
-	r, cleanup := retry.New(limiter, httpClient)
+	r, cleanup := retry.New(l, httpClient)
 	return &Provider{Chain: chain, r: r}, cleanup
 }
 
