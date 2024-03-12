@@ -206,6 +206,10 @@ sql:
           - column: 'reported_posts.reason'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.ReportReason'
 
+          # Token community memberships
+          - column: 'token_community_memberships.token_id'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.DecimalTokenID'
+
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.
           # Format is schema.table.column; where *.*.<column> applies to all schemas and tables.

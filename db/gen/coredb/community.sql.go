@@ -632,7 +632,7 @@ insert into token_community_memberships(id, token_definition_id, community_id, c
 )
 on conflict (community_id, token_definition_id) where not deleted
     do nothing
-returning id, version, token_definition_id, community_id, created_at, last_updated, deleted
+returning id, version, token_definition_id, community_id, created_at, last_updated, deleted, token_id
 `
 
 type UpsertTokenCommunityMembershipsParams struct {
@@ -658,6 +658,7 @@ func (q *Queries) UpsertTokenCommunityMemberships(ctx context.Context, arg Upser
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}

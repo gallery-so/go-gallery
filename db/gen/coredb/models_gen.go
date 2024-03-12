@@ -621,13 +621,14 @@ type Token struct {
 }
 
 type TokenCommunityMembership struct {
-	ID                persist.DBID `db:"id" json:"id"`
-	Version           int32        `db:"version" json:"version"`
-	TokenDefinitionID persist.DBID `db:"token_definition_id" json:"token_definition_id"`
-	CommunityID       persist.DBID `db:"community_id" json:"community_id"`
-	CreatedAt         time.Time    `db:"created_at" json:"created_at"`
-	LastUpdated       time.Time    `db:"last_updated" json:"last_updated"`
-	Deleted           bool         `db:"deleted" json:"deleted"`
+	ID                persist.DBID           `db:"id" json:"id"`
+	Version           int32                  `db:"version" json:"version"`
+	TokenDefinitionID persist.DBID           `db:"token_definition_id" json:"token_definition_id"`
+	CommunityID       persist.DBID           `db:"community_id" json:"community_id"`
+	CreatedAt         time.Time              `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time              `db:"last_updated" json:"last_updated"`
+	Deleted           bool                   `db:"deleted" json:"deleted"`
+	TokenID           persist.DecimalTokenID `db:"token_id" json:"token_id"`
 }
 
 type TokenDefinition struct {
