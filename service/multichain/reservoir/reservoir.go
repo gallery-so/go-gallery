@@ -8,14 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/platform"
-	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 )
@@ -135,7 +132,7 @@ type Provider struct {
 }
 
 // NewProvider creates a new Reservoir provider
-func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain) (*Provider, func()) {
+func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain, l retry.Limiter) (*Provider, func()) {
 	apiURL := map[persist.Chain]string{
 		persist.ChainETH:      ethMainnetBaseURL,
 		persist.ChainOptimism: optimismBaseURL,
@@ -153,10 +150,7 @@ func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Cha
 		panic("no reservoir api key set")
 	}
 
-	cache := redis.NewCache(redis.TokenManageCache)
-	// 110 requests per minute is slightly under the actual limit of 120 requests per minute
-	limiter := limiters.NewKeyRateLimiter(ctx, cache, "retryer:reservoir", 110, time.Minute)
-	r, cleanup := retry.New(limiter, httpClient)
+	r, cleanup := retry.New(l, httpClient)
 
 	return &Provider{
 		apiURL:     apiURL,

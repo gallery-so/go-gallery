@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
@@ -24,6 +23,10 @@ type Retry struct {
 	MaxRetries int // Number of times to retry
 }
 
+type Limiter interface {
+	ForKey(context.Context, string) (bool, time.Duration, error)
+}
+
 // Retryer protects against rate limits by requiring requests to be sent through it.
 // Retryer checks its underlying rate limiter before sending the request, and if the rate limit is exceeded,
 // it will wait before retrying the request. If the request does get rate limited by the external service even after
@@ -31,7 +34,7 @@ type Retry struct {
 // Retryer will handle requests in the same order they are received. For retries, the request will be re-enqueued
 // and won't be retried until it is popped off the queue again.
 type Retryer struct {
-	l       *limiters.KeyRateLimiter
+	l       Limiter
 	c       *http.Client
 	q       chan pending
 	closing chan struct{}
@@ -46,7 +49,7 @@ type pending struct {
 	queuedAt   time.Time
 }
 
-func New(l *limiters.KeyRateLimiter, c *http.Client) (*Retryer, func()) {
+func New(l Limiter, c *http.Client) (*Retryer, func()) {
 	r := &Retryer{
 		l:       l,
 		c:       c,
@@ -121,6 +124,7 @@ func (r *Retryer) enqueue() {
 				default:
 					_, wait, err := r.l.ForKey(ctx, pending.req.Host)
 					if err != nil {
+						logger.For(ctx).Errorf("error checking rate limiter for %s: %s", pending.req.Host, err)
 						pending.done <- err
 						close(pending.done)
 						break msgLoop
