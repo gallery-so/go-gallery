@@ -106,10 +106,10 @@ type Token struct {
 	ID               TokenIdentifiers `json:"id"`
 	Balance          string           `json:"balance"`
 	Title            string           `json:"title"`
-	Description      string           `json:"description"`
+	Description      any              `json:"description"` // TODO: Update to string when on alchemy V3
 	TokenURI         TokenURI         `json:"tokenUri"`
 	Media            []Media          `json:"media"`
-	Metadata         any              `json:"metadata"`
+	Metadata         any              `json:"metadata"` // TODO: Update to persist.TokenMetadata when on alchemy V3
 	ContractMetadata ContractMetadata `json:"contractMetadata"`
 	TimeLastUpdated  time.Time        `json:"timeLastUpdated"`
 	SpamInfo         SpamInfo         `json:"spamInfo"`
@@ -823,14 +823,26 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		bal = big.NewInt(1)
 	}
 
+	// TODO: Remove this when alchemy v3 is used
 	metadata := alchemyMetadataToMetadata(token.Metadata)
 	externalURL, _ := metadata["external_url"].(string)
+
+	// TODO: Remove this when alchemy v3 is used
+	var description string
+	descriptionAsStr, descAsStr := metadata["description"].(string)
+	descriptionAsArr, descAsArr := metadata["description"].([]string)
+	switch {
+	case descAsStr:
+		description = descriptionAsStr
+	case descAsArr && len(descriptionAsArr) == 1:
+		description = descriptionAsArr[0]
+	}
 
 	t := multichain.ChainAgnosticToken{
 		TokenType: tokenType,
 		Descriptors: multichain.ChainAgnosticTokenDescriptors{
 			Name:        token.Title,
-			Description: token.Description,
+			Description: description,
 		},
 		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
 		TokenMetadata:   metadata,
