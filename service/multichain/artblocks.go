@@ -390,6 +390,7 @@ func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownPr
 			upsertParams.Ids = append(upsertParams.Ids, persist.GenerateID().String())
 			upsertParams.TokenDefinitionID = append(upsertParams.TokenDefinitionID, token.Definition.ID.String())
 			upsertParams.CommunityID = append(upsertParams.CommunityID, community.ID.String())
+			upsertParams.TokenID = append(upsertParams.TokenID, token.Definition.TokenID.ToDecimalTokenID().Numeric())
 		}
 	}
 

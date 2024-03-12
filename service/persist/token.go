@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgtype"
 	"io"
 	"math/big"
 	"net/url"
@@ -677,7 +678,17 @@ func (id DecimalTokenID) String() string {
 
 // Value implements the driver.Valuer interface for token IDs
 func (id DecimalTokenID) Value() (driver.Value, error) {
-	return id.String(), nil
+	if id == "" {
+		return nil, nil
+	}
+
+	num := pgtype.Numeric{}
+	err := num.Set(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return num, nil
 }
 
 // Scan implements the sql.Scanner interface for token IDs
@@ -686,8 +697,29 @@ func (id *DecimalTokenID) Scan(src interface{}) error {
 		*id = ""
 		return nil
 	}
-	*id = DecimalTokenID(src.(string))
+
+	var num pgtype.Numeric
+	switch src := src.(type) {
+	case pgtype.Numeric:
+		num = src
+	default:
+		return fmt.Errorf("cannot convert %T to pgtype.Numeric", src)
+	}
+
+	if err := num.AssignTo(id); err != nil {
+		return fmt.Errorf("cannot assign pgtype.Numeric to DecimalTokenID: %w", err)
+	}
+
 	return nil
+}
+
+func (id DecimalTokenID) Numeric() pgtype.Numeric {
+	num := pgtype.Numeric{}
+	err := num.Set(id)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert %s to pgtype.Numeric: %s", id, err))
+	}
+	return num
 }
 
 // BigInt returns the token ID as a big.Int
