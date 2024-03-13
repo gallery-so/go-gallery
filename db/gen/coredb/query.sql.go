@@ -28,7 +28,7 @@ func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionT
 	return err
 }
 
-const addManyFollows = `-- name: AddManyFollows :exec
+const addManyFollows = `-- name: AddManyFollows :many
 insert into follows (id, follower, followee, deleted) select unnest($1::varchar[]), $2, unnest($3::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at
 `
 
@@ -38,9 +38,24 @@ type AddManyFollowsParams struct {
 	Followees []string     `db:"followees" json:"followees"`
 }
 
-func (q *Queries) AddManyFollows(ctx context.Context, arg AddManyFollowsParams) error {
-	_, err := q.db.Exec(ctx, addManyFollows, arg.Ids, arg.Follower, arg.Followees)
-	return err
+func (q *Queries) AddManyFollows(ctx context.Context, arg AddManyFollowsParams) ([]bool, error) {
+	rows, err := q.db.Query(ctx, addManyFollows, arg.Ids, arg.Follower, arg.Followees)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []bool
+	for rows.Next() {
+		var column_1 bool
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const addPiiAccountCreationInfo = `-- name: AddPiiAccountCreationInfo :exec
@@ -7508,4 +7523,39 @@ func (q *Queries) UserOwnsGallery(ctx context.Context, arg UserOwnsGalleryParams
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const usersFollowUser = `-- name: UsersFollowUser :many
+select (follows.id is not null)::bool
+from (
+    select unnest($2::varchar[]) as id,
+    generate_subscripts($2::varchar[], 1) as index
+    ) user_ids
+left join follows on follows.follower = user_ids.id and followee = $1 and not deleted
+order by user_ids.index
+`
+
+type UsersFollowUserParams struct {
+	Followee    persist.DBID `db:"followee" json:"followee"`
+	FollowedIds []string     `db:"followed_ids" json:"followed_ids"`
+}
+
+func (q *Queries) UsersFollowUser(ctx context.Context, arg UsersFollowUserParams) ([]bool, error) {
+	rows, err := q.db.Query(ctx, usersFollowUser, arg.Followee, arg.FollowedIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []bool
+	for rows.Next() {
+		var column_1 bool
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

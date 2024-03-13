@@ -92,7 +92,7 @@ func newConnectionParamsFromEnv() connectionParams {
 		port:     env.GetInt("POSTGRES_PORT"),
 
 		// Retry connections by default
-		retry: &retry.Retry{Base: 2, Cap: 4, Tries: 3},
+		retry: &retry.Retry{MinWait: 2, MaxWait: 4, MaxRetries: 3},
 	}
 }
 

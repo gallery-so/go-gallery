@@ -743,7 +743,7 @@ func (u userPostedNotificationHandler) receipientsOfUserPostedYourWorkNotificati
 	// Only notifiy creators once per posts, even if the post includes tokens from multiple
 	// communities owned by the same creator.
 	for _, c := range creatorsFlat {
-		if c.CreatorUserID != "" {
+		if c.CreatorUserID != "" && c.CreatorUserID != post.ActorID {
 			recipients[c.CreatorUserID] = db.Notification{
 				OwnerID:     c.CreatorUserID,
 				Action:      persist.ActionUserPostedYourWork,

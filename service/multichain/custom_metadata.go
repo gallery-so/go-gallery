@@ -39,7 +39,7 @@ var (
 	OpenseaSharedStorefrontContract = persist.ContractIdentifiers{ContractAddress: "0x495f947276749ce646f68ac8c248420045cb7b5e", Chain: persist.ChainETH}
 )
 
-type metadataHandler func(context.Context, persist.TokenIdentifiers) (persist.TokenMetadata, error)
+type metadataHandler func(context.Context, persist.TokenIdentifiers, ...persist.TokenMetadata) (persist.TokenMetadata, error)
 
 type CustomMetadataHandlers struct {
 	AutoglyphHandler               metadataHandler
@@ -83,7 +83,7 @@ func (c *CustomMetadataHandlers) HandlerFor(t persist.TokenIdentifiers) metadata
 
 func (c *CustomMetadataHandlers) AddToToken(ctx context.Context, chain persist.Chain, t ChainAgnosticToken) ChainAgnosticToken {
 	tID := ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
-	m := c.Load(ctx, chain, tID)
+	m := c.Load(ctx, chain, tID, t.TokenMetadata)
 	t.TokenMetadata = m
 	return t
 }
@@ -116,13 +116,13 @@ func (c *CustomMetadataHandlers) AddToPage(ctx context.Context, chain persist.Ch
 	return outCh, errOut
 }
 
-func (c *CustomMetadataHandlers) Load(ctx context.Context, chain persist.Chain, t ChainAgnosticIdentifiers) persist.TokenMetadata {
+func (c *CustomMetadataHandlers) Load(ctx context.Context, chain persist.Chain, t ChainAgnosticIdentifiers, oldMetadata ...persist.TokenMetadata) persist.TokenMetadata {
 	tID := persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, chain)
 	h := c.HandlerFor(tID)
 	if h == nil {
 		return persist.TokenMetadata{}
 	}
-	m, err := h(ctx, tID)
+	m, err := h(ctx, tID, oldMetadata...)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to get custom metadata for token(chain=%d, contract=%s, tokenID=%s): %s", chain, t.ContractAddress, t.TokenID, err)
 		return nil
@@ -157,7 +157,7 @@ func newAutoglyphHandler(ethClient *ethclient.Client) metadataHandler {
 	 *   #  Fill in the cell completely.
 	 *
 	 */
-	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
+	return func(ctx context.Context, t persist.TokenIdentifiers, _ ...persist.TokenMetadata) (persist.TokenMetadata, error) {
 		tURI, err := rpc.RetryGetTokenURI(ctx, "", persist.EthereumAddress(t.ContractAddress), t.TokenID, ethClient)
 		if err != nil {
 			return persist.TokenMetadata{}, err
@@ -279,7 +279,7 @@ func newColorglyphHandler(ethClient *ethclient.Client) metadataHandler {
 	 * scheme 9 = greenest address color on reddest address color
 	 * scheme 10 = reddest address color, yellowest address color, bluest address color, lightest address color, and black on white
 	 */
-	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
+	return func(ctx context.Context, t persist.TokenIdentifiers, _ ...persist.TokenMetadata) (persist.TokenMetadata, error) {
 		tURI, err := rpc.RetryGetTokenURI(ctx, "", persist.EthereumAddress(t.ContractAddress), t.TokenID, ethClient)
 		if err != nil {
 			return persist.TokenMetadata{}, err
@@ -458,7 +458,7 @@ func parseHexColor(s string) (c color.RGBA, err error) {
 }
 
 func newEnsHandler() metadataHandler {
-	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
+	return func(ctx context.Context, t persist.TokenIdentifiers, _ ...persist.TokenMetadata) (persist.TokenMetadata, error) {
 		var resp *http.Response
 		var m persist.TokenMetadata
 
@@ -516,7 +516,7 @@ func newEnsHandler() metadataHandler {
 }
 
 func newCryptopunkHandler(ethClient *ethclient.Client) metadataHandler {
-	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
+	return func(ctx context.Context, t persist.TokenIdentifiers, _ ...persist.TokenMetadata) (persist.TokenMetadata, error) {
 		dataContract, err := contracts.NewCryptopunksDataCaller(common.HexToAddress("0x16f5a35647d6f03d5d3da7b35409d65ba03af3b2"), ethClient)
 		if err != nil {
 			return persist.TokenMetadata{}, err
@@ -541,7 +541,7 @@ func newCryptopunkHandler(ethClient *ethclient.Client) metadataHandler {
 }
 
 func newZoraHandler(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) metadataHandler {
-	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
+	return func(ctx context.Context, t persist.TokenIdentifiers, _ ...persist.TokenMetadata) (persist.TokenMetadata, error) {
 		metadataContract, err := contracts.NewZoraCaller(common.HexToAddress(t.ContractAddress.String()), ethClient)
 		if err != nil {
 			return persist.TokenMetadata{}, err
@@ -593,17 +593,23 @@ func newZoraHandler(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweav
 		return resultMetadata, nil
 	}
 }
-
 func newOpenseaSharedStorefrontHandler(f TokenMetadataFetcher) metadataHandler {
-	return func(ctx context.Context, t persist.TokenIdentifiers) (persist.TokenMetadata, error) {
-		m, err := f.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID})
-		if err != nil {
-			return persist.TokenMetadata{}, err
+	return func(ctx context.Context, t persist.TokenIdentifiers, oldMetadata ...persist.TokenMetadata) (persist.TokenMetadata, error) {
+		var m persist.TokenMetadata
+		var err error
+
+		// Determine whether to use existing metadata or fetch new metadata
+		if len(oldMetadata) > 0 {
+			m = oldMetadata[0]
+		} else {
+			m, err = f.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID})
+			if err != nil {
+				return persist.TokenMetadata{}, err
+			}
 		}
 
 		imgKey, imgURL, _, _, err := media.FindMediaURLsKeysChain(m, t.Chain)
-
-		// If there is no image, return the metadata as is
+		// If there is no image or error occurred, return the metadata as is
 		if err != nil {
 			return m, nil
 		}
@@ -614,14 +620,12 @@ func newOpenseaSharedStorefrontHandler(f TokenMetadataFetcher) metadataHandler {
 		}
 
 		query := u.Query()
-
 		// Opensea uses imgix for image resizing. We add a width query parameter with the
 		// maximum width to get the highest resolution image.
 		if u.Hostname() == "i.seadn.io" {
 			query.Set("w", "8120")
 			u.RawQuery = query.Encode()
 			m[imgKey] = u.String()
-			return m, nil
 		}
 
 		return m, nil

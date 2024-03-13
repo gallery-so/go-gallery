@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 var (
@@ -337,14 +338,15 @@ type FillInWrapper struct {
 	resultCache       sync.Map
 }
 
-func NewFillInWrapper(ctx context.Context, httpClient *http.Client, chain persist.Chain) *FillInWrapper {
+func NewFillInWrapper(ctx context.Context, httpClient *http.Client, chain persist.Chain, l retry.Limiter) (*FillInWrapper, func()) {
+	r, cleanup := reservoir.NewProvider(ctx, httpClient, chain, l)
 	return &FillInWrapper{
 		chain:             chain,
-		reservoirProvider: reservoir.NewProvider(httpClient, chain),
+		reservoirProvider: r,
 		ctx:               ctx,
 		wait:              250 * time.Millisecond,
 		maxBatch:          10,
-	}
+	}, cleanup
 }
 
 // AddToToken adds missing data to a token.
@@ -359,6 +361,7 @@ func (w *FillInWrapper) AddToPage(ctx context.Context, recCh <-chan multichain.C
 	w.resultCache = sync.Map{}
 	go func() {
 		defer close(outCh)
+		defer close(errOut)
 		for {
 			select {
 			case page, ok := <-recCh:

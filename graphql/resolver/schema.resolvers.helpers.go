@@ -1990,11 +1990,11 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 		if contract.Chain == persist.ChainZora {
 			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", contract.Address)
 		} else if contract.Chain == persist.ChainBase {
-			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+			mintURL = fmt.Sprintf("https://zora.co/collect/base:%s", contract.Address)
 		} else if contract.Chain == persist.ChainOptimism {
-			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+			mintURL = fmt.Sprintf("https://zora.co/collect/oeth:%s", contract.Address)
 		} else if contract.Chain == persist.ChainETH {
-			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+			mintURL = fmt.Sprintf("https://zora.co/collect/eth:%s", contract.Address)
 		}
 	}
 
