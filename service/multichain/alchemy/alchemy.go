@@ -945,7 +945,7 @@ func setWithTokenBalances(url *url.URL) {
 	url.RawQuery = query.Encode()
 }
 
-func setTokenID(url *url.URL, tokenID persist.TokenID) {
+func setTokenID(url *url.URL, tokenID persist.HexTokenID) {
 	query := url.Query()
 	query.Set("tokenId", tokenID.Base10String())
 	url.RawQuery = query.Encode()
