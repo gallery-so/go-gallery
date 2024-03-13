@@ -1128,8 +1128,8 @@ func pushFollowEvent(ctx context.Context, followingID, followedID persist.DBID, 
 
 func pushFollowEvents(ctx context.Context, followingID persist.DBID, followedIDs []persist.DBID, refollowed []bool) {
 	followedIDsAsStr := util.MapWithoutError(followedIDs, func(id persist.DBID) string { return id.String() })
-	followsBack, err := For(ctx).User.queries.UserFollowsUsers(ctx, db.UserFollowsUsersParams{
-		Follower:    followingID,
+	followsBack, err := For(ctx).User.queries.UsersFollowUser(ctx, db.UsersFollowUserParams{
+		Followee:    followingID,
 		FollowedIds: followedIDsAsStr,
 	})
 	if err != nil {
