@@ -1312,8 +1312,13 @@ from (select unnest(@social_ids::varchar[]) as social_id) as s
     left outer join follows f on f.follower = @user_id and f.followee = user_view.id and f.deleted = false
 where case when @only_unfollowing::bool then f.id is null else true end;
 
--- name: AddManyFollows :exec
+-- name: AddManyFollows :many
 insert into follows (id, follower, followee, deleted) select unnest(@ids::varchar[]), @follower, unnest(@followees::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at;
+
+-- name: UserFollowsUsers :many
+select (follows.id is not null)::bool
+from (select unnest(@followed_ids::varchar[]) id) user_ids
+left join follows on follows.follower = $1 and followee = user_ids.id and not deleted;
 
 -- name: GetSharedFollowersBatchPaginate :batchmany
 select sqlc.embed(users), a.created_at followed_on

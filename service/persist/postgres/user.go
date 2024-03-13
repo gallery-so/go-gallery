@@ -39,7 +39,6 @@ type UserRepository struct {
 	deleteWalletStmt         *sql.Stmt
 	addFollowerStmt          *sql.Stmt
 	removeFollowerStmt       *sql.Stmt
-	followsUserStmt          *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -96,9 +95,6 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 	removeFollowerStmt, err := db.PrepareContext(ctx, `UPDATE follows SET DELETED = true, LAST_UPDATED = NOW() WHERE FOLLOWER = $1 AND FOLLOWEE = $2`)
 	checkNoErr(err)
 
-	followsUserStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM follows WHERE follower = $1 AND followee = $2 AND deleted = false);`)
-	checkNoErr(err)
-
 	return &UserRepository{
 		db:             db,
 		pgx:            pgx,
@@ -121,7 +117,6 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 		deleteWalletStmt:         deleteWalletStmt,
 		addFollowerStmt:          addFollowerStmt,
 		removeFollowerStmt:       removeFollowerStmt,
-		followsUserStmt:          followsUserStmt,
 	}
 }
 
@@ -583,27 +578,6 @@ func (u *UserRepository) RemoveFollower(pCtx context.Context, follower persist.D
 	return err
 }
 
-func (u *UserRepository) UserFollowsUser(pCtx context.Context, follower persist.DBID, followee persist.DBID) (bool, error) {
-	res, err := u.followsUserStmt.QueryContext(pCtx, follower, followee)
-	if err != nil {
-		return false, err
-	}
-	defer res.Close()
-
-	var follows bool
-	for res.Next() {
-		err = res.Scan(&follows)
-		if err != nil {
-			return false, err
-		}
-	}
-
-	if err = res.Err(); err != nil {
-		return false, err
-	}
-
-	return follows, nil
-}
 func (u *UserRepository) FillWalletDataForUser(pCtx context.Context, user *persist.User) error {
 
 	if len(user.Wallets) == 0 {
