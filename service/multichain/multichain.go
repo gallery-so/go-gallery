@@ -629,14 +629,14 @@ func (p *Provider) SyncCreatedTokensForExistingContract(ctx context.Context, use
 	return err
 }
 
-func (p *Provider) processTokenCommunities(ctx context.Context, contracts []db.Contract, tokens []op.TokenFullDetails) error {
+func (p *Provider) processCommunities(ctx context.Context, contracts []db.Contract, tokens []op.TokenFullDetails) error {
 	knownProviders, err := p.Queries.GetCommunityContractProviders(ctx, util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID }))
 	if err != nil {
 		return fmt.Errorf("failed to retrieve contract community types: %w", err)
 	}
 
 	// TODO: Make this more flexible, allow other providers, etc (possibly via wire)
-	return p.processArtBlocksTokenCommunities(ctx, knownProviders, tokens)
+	return p.processArtBlocksCommunityTokens(ctx, knownProviders, tokens)
 }
 
 func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chain, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]ChainAgnosticToken,
@@ -677,7 +677,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 	// TODO: Consider tracking (token_definition_id, community_type) in a table so we'd know whether we've already
 	// evaluated a token for a given community type and can avoid checking it again.
 	communityTokens := upsertedTokens
-	err = p.processTokenCommunities(ctx, contracts, communityTokens)
+	err = p.processCommunities(ctx, contracts, communityTokens)
 	if err != nil {
 		// Report errors, but don't return. We can retry token community memberships at some point, but the whole
 		// sync shouldn't fail because a community provider's API was unavailable.

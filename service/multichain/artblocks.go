@@ -217,7 +217,7 @@ func (a artBlocksCommunityKey) String() string {
 	return fmt.Sprintf("ProjectID=%s:Chain=%d:ContractAddress=%s", a.ProjectID, a.ContractChain, a.ContractAddress)
 }
 
-func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownProviders []db.CommunityContractProvider, tokens []op.TokenFullDetails) error {
+func (p *Provider) processArtBlocksCommunityTokens(ctx context.Context, knownProviders []db.CommunityContractProvider, tokens []op.TokenFullDetails) error {
 	artBlocksContracts := make(map[persist.DBID]bool)
 	for _, t := range knownProviders {
 		if t.CommunityType == persist.CommunityTypeArtBlocks {
