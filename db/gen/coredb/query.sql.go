@@ -7482,37 +7482,6 @@ func (q *Queries) UpsertSocialOAuth(ctx context.Context, arg UpsertSocialOAuthPa
 	return err
 }
 
-const userFollowsUsers = `-- name: UserFollowsUsers :many
-select (follows.id is not null)::bool
-from (select unnest($2::varchar[]) id) user_ids
-left join follows on follows.follower = $1 and followee = user_ids.id and not deleted
-`
-
-type UserFollowsUsersParams struct {
-	Follower    persist.DBID `db:"follower" json:"follower"`
-	FollowedIds []string     `db:"followed_ids" json:"followed_ids"`
-}
-
-func (q *Queries) UserFollowsUsers(ctx context.Context, arg UserFollowsUsersParams) ([]bool, error) {
-	rows, err := q.db.Query(ctx, userFollowsUsers, arg.Follower, arg.FollowedIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []bool
-	for rows.Next() {
-		var column_1 bool
-		if err := rows.Scan(&column_1); err != nil {
-			return nil, err
-		}
-		items = append(items, column_1)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one
 select exists(select position,count(*) from galleries where owner_user_id = $1 and deleted = false group by position having count(*) > 1)
 `
@@ -7554,4 +7523,39 @@ func (q *Queries) UserOwnsGallery(ctx context.Context, arg UserOwnsGalleryParams
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const usersFollowUser = `-- name: UsersFollowUser :many
+select (follows.id is not null)::bool
+from (
+    select unnest($2::varchar[]) as id,
+    generate_subscripts($2::varchar[], 1) as index
+    ) user_ids
+left join follows on follows.follower = user_ids.id and followee = $1 and not deleted
+order by user_ids.index
+`
+
+type UsersFollowUserParams struct {
+	Followee    persist.DBID `db:"followee" json:"followee"`
+	FollowedIds []string     `db:"followed_ids" json:"followed_ids"`
+}
+
+func (q *Queries) UsersFollowUser(ctx context.Context, arg UsersFollowUserParams) ([]bool, error) {
+	rows, err := q.db.Query(ctx, usersFollowUser, arg.Followee, arg.FollowedIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []bool
+	for rows.Next() {
+		var column_1 bool
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
