@@ -107,7 +107,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 	return merchTokens, nil
 }
 
-func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.TokenID) (*model.MerchToken, error) {
+func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.HexTokenID) (*model.MerchToken, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": validate.WithTag(tokenID, "required"),
@@ -163,7 +163,7 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 	return t, nil
 }
 
-func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchToken, error) {
+func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.HexTokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchToken, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenIDs": validate.WithTag(tokenIDs, "required,unique"),

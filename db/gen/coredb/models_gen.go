@@ -344,15 +344,15 @@ type Mention struct {
 }
 
 type Merch struct {
-	ID           persist.DBID    `db:"id" json:"id"`
-	Deleted      bool            `db:"deleted" json:"deleted"`
-	Version      sql.NullInt32   `db:"version" json:"version"`
-	CreatedAt    time.Time       `db:"created_at" json:"created_at"`
-	LastUpdated  time.Time       `db:"last_updated" json:"last_updated"`
-	TokenID      persist.TokenID `db:"token_id" json:"token_id"`
-	ObjectType   int32           `db:"object_type" json:"object_type"`
-	DiscountCode sql.NullString  `db:"discount_code" json:"discount_code"`
-	Redeemed     bool            `db:"redeemed" json:"redeemed"`
+	ID           persist.DBID       `db:"id" json:"id"`
+	Deleted      bool               `db:"deleted" json:"deleted"`
+	Version      sql.NullInt32      `db:"version" json:"version"`
+	CreatedAt    time.Time          `db:"created_at" json:"created_at"`
+	LastUpdated  time.Time          `db:"last_updated" json:"last_updated"`
+	TokenID      persist.HexTokenID `db:"token_id" json:"token_id"`
+	ObjectType   int32              `db:"object_type" json:"object_type"`
+	DiscountCode sql.NullString     `db:"discount_code" json:"discount_code"`
+	Redeemed     bool               `db:"redeemed" json:"redeemed"`
 }
 
 type MigrationValidation struct {
@@ -621,13 +621,14 @@ type Token struct {
 }
 
 type TokenCommunityMembership struct {
-	ID                persist.DBID `db:"id" json:"id"`
-	Version           int32        `db:"version" json:"version"`
-	TokenDefinitionID persist.DBID `db:"token_definition_id" json:"token_definition_id"`
-	CommunityID       persist.DBID `db:"community_id" json:"community_id"`
-	CreatedAt         time.Time    `db:"created_at" json:"created_at"`
-	LastUpdated       time.Time    `db:"last_updated" json:"last_updated"`
-	Deleted           bool         `db:"deleted" json:"deleted"`
+	ID                persist.DBID           `db:"id" json:"id"`
+	Version           int32                  `db:"version" json:"version"`
+	TokenDefinitionID persist.DBID           `db:"token_definition_id" json:"token_definition_id"`
+	CommunityID       persist.DBID           `db:"community_id" json:"community_id"`
+	CreatedAt         time.Time              `db:"created_at" json:"created_at"`
+	LastUpdated       time.Time              `db:"last_updated" json:"last_updated"`
+	Deleted           bool                   `db:"deleted" json:"deleted"`
+	TokenID           persist.DecimalTokenID `db:"token_id" json:"token_id"`
 }
 
 type TokenDefinition struct {
@@ -638,7 +639,7 @@ type TokenDefinition struct {
 	Name            sql.NullString        `db:"name" json:"name"`
 	Description     sql.NullString        `db:"description" json:"description"`
 	TokenType       persist.TokenType     `db:"token_type" json:"token_type"`
-	TokenID         persist.TokenID       `db:"token_id" json:"token_id"`
+	TokenID         persist.HexTokenID    `db:"token_id" json:"token_id"`
 	ExternalUrl     sql.NullString        `db:"external_url" json:"external_url"`
 	Chain           persist.Chain         `db:"chain" json:"chain"`
 	Metadata        persist.TokenMetadata `db:"metadata" json:"metadata"`

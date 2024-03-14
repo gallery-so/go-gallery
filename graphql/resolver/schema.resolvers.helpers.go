@@ -1348,7 +1348,7 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 }
 
 func resolveMerchTokenByTokenID(ctx context.Context, tokenID string) (*model.MerchToken, error) {
-	token, err := publicapi.For(ctx).Merch.GetMerchTokenByTokenID(ctx, persist.TokenID(tokenID))
+	token, err := publicapi.For(ctx).Merch.GetMerchTokenByTokenID(ctx, persist.HexTokenID(tokenID))
 
 	if err != nil {
 		return nil, err

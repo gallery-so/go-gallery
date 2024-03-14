@@ -107,7 +107,7 @@ func ReverseResolvesTo(ctx context.Context, ethClient *ethclient.Client, domain 
 }
 
 // DeriveTokenID derives the token ID (in hexadecimal) from a domain
-func DeriveTokenID(domain string) (persist.TokenID, error) {
+func DeriveTokenID(domain string) (persist.HexTokenID, error) {
 	domain, err := NormalizeDomain(domain)
 	if err != nil {
 		return "", err
@@ -120,7 +120,7 @@ func DeriveTokenID(domain string) (persist.TokenID, error) {
 	if err != nil {
 		return "", err
 	}
-	return persist.TokenID(fmt.Sprintf("%x", labelHash)), nil
+	return persist.HexTokenID(fmt.Sprintf("%x", labelHash)), nil
 }
 
 // NormalizeDomain converts a domain to its canonical form
@@ -209,7 +209,7 @@ func IsOwner(ctx context.Context, ethClient *ethclient.Client, addr persist.Ethe
 }
 
 // TokenInfoFor is a helper function for parsing info from a token record
-func TokenInfoFor(r EnsTokenRecord) (persist.Chain, persist.Address, persist.TokenType, persist.TokenID, error) {
+func TokenInfoFor(r EnsTokenRecord) (persist.Chain, persist.Address, persist.TokenType, persist.HexTokenID, error) {
 	errs := make([]error, 4)
 	chain, err := r.Chain()
 	errs[0] = err
@@ -291,7 +291,7 @@ func (e EnsTokenRecord) TokenType() (persist.TokenType, error) {
 	return "", ErrUnknownTokenType
 }
 
-func (e EnsTokenRecord) TokenID() (persist.TokenID, error) {
+func (e EnsTokenRecord) TokenID() (persist.HexTokenID, error) {
 	if e.ChainID != ethMainnetChainID {
 		return "", ErrChainNotSupported
 	}

@@ -9,16 +9,16 @@ import (
 
 // TokenIdentifiers represents a unique identifier for a token
 type TokenIdentifiers struct {
-	TokenID         TokenID `json:"token_id"`
-	ContractAddress Address `json:"contract_address"`
-	Chain           Chain   `json:"chain"`
+	TokenID         HexTokenID `json:"token_id"`
+	ContractAddress Address    `json:"contract_address"`
+	Chain           Chain      `json:"chain"`
 }
 
 type TokenUniqueIdentifiers struct {
-	Chain           Chain   `json:"chain"`
-	ContractAddress Address `json:"contract_address"`
-	TokenID         TokenID `json:"token_id"`
-	OwnerAddress    Address `json:"owner_address"`
+	Chain           Chain      `json:"chain"`
+	ContractAddress Address    `json:"contract_address"`
+	TokenID         HexTokenID `json:"token_id"`
+	OwnerAddress    Address    `json:"owner_address"`
 }
 
 // ContractIdentifiers represents a unique identifier for a contract
@@ -28,9 +28,9 @@ type ContractIdentifiers struct {
 }
 
 // NewTokenIdentifiers creates a new token identifiers
-func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pChain Chain) TokenIdentifiers {
+func NewTokenIdentifiers(pContractAddress Address, pTokenID HexTokenID, pChain Chain) TokenIdentifiers {
 	return TokenIdentifiers{
-		TokenID:         TokenID(pTokenID.BigInt().Text(16)),
+		TokenID:         HexTokenID(pTokenID.BigInt().Text(16)),
 		ContractAddress: Address(pChain.NormalizeAddress(pContractAddress)),
 		Chain:           pChain,
 	}
@@ -60,7 +60,7 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 		return err
 	}
 	*t = TokenIdentifiers{
-		TokenID:         TokenID(res[1]),
+		TokenID:         HexTokenID(res[1]),
 		ContractAddress: Address(res[0]),
 		Chain:           Chain(chain),
 	}
@@ -81,7 +81,7 @@ func TokenUniqueIdentifiersFromString(s string) (TokenUniqueIdentifiers, error) 
 		return TokenUniqueIdentifiers{}, err
 	}
 	return TokenUniqueIdentifiers{
-		TokenID:         TokenID(res[1]),
+		TokenID:         HexTokenID(res[1]),
 		ContractAddress: Address(res[0]),
 		Chain:           Chain(chain),
 		OwnerAddress:    Address(res[2]),

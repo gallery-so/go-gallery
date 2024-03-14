@@ -8,6 +8,7 @@ package coredb
 import (
 	"context"
 
+	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -617,32 +618,39 @@ with memberships as (
     select unnest($1::varchar[]) as id
          , unnest($2::varchar[]) as token_definition_id
          , unnest($3::varchar[]) as community_id
+         , unnest($4::numeric[]) as token_id
          , now() as created_at
          , now() as last_updated
          , false as deleted
 ),
 valid_memberships as (
-    select memberships.id, memberships.token_definition_id, memberships.community_id, memberships.created_at, memberships.last_updated, memberships.deleted
+    select memberships.id, memberships.token_definition_id, memberships.community_id, memberships.token_id, memberships.created_at, memberships.last_updated, memberships.deleted
     from memberships
     join communities on communities.id = memberships.community_id and not communities.deleted
     join token_definitions on token_definitions.id = memberships.token_definition_id and not token_definitions.deleted
 )
-insert into token_community_memberships(id, token_definition_id, community_id, created_at, last_updated, deleted) (
-    select id, token_definition_id, community_id, created_at, last_updated, deleted from valid_memberships
+insert into token_community_memberships(id, token_definition_id, community_id, token_id, created_at, last_updated, deleted) (
+    select id, token_definition_id, community_id, token_id, created_at, last_updated, deleted from valid_memberships
 )
 on conflict (community_id, token_definition_id) where not deleted
     do nothing
-returning id, version, token_definition_id, community_id, created_at, last_updated, deleted
+returning id, version, token_definition_id, community_id, created_at, last_updated, deleted, token_id
 `
 
 type UpsertTokenCommunityMembershipsParams struct {
-	Ids               []string `db:"ids" json:"ids"`
-	TokenDefinitionID []string `db:"token_definition_id" json:"token_definition_id"`
-	CommunityID       []string `db:"community_id" json:"community_id"`
+	Ids               []string         `db:"ids" json:"ids"`
+	TokenDefinitionID []string         `db:"token_definition_id" json:"token_definition_id"`
+	CommunityID       []string         `db:"community_id" json:"community_id"`
+	TokenID           []pgtype.Numeric `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) UpsertTokenCommunityMemberships(ctx context.Context, arg UpsertTokenCommunityMembershipsParams) ([]TokenCommunityMembership, error) {
-	rows, err := q.db.Query(ctx, upsertTokenCommunityMemberships, arg.Ids, arg.TokenDefinitionID, arg.CommunityID)
+	rows, err := q.db.Query(ctx, upsertTokenCommunityMemberships,
+		arg.Ids,
+		arg.TokenDefinitionID,
+		arg.CommunityID,
+		arg.TokenID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -658,6 +666,7 @@ func (q *Queries) UpsertTokenCommunityMemberships(ctx context.Context, arg Upser
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}

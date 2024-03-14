@@ -174,7 +174,7 @@ func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 	})
 }
 
-func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID) {
 	scope.SetTag("chain", fmt.Sprintf("%d", chain))
 	scope.SetTag("contractAddress", contractAddress.String())
 	scope.SetTag("nftID", string(tokenID))
@@ -185,7 +185,7 @@ func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress pers
 	scope.SetTag("assetURL", assetPage)
 }
 
-func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
+func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID) string {
 	switch chain {
 	case persist.ChainETH:
 		return fmt.Sprintf("https://opensea.io/assets/ethereum/%s/%d", contractAddress.String(), tokenID.ToInt())
@@ -198,7 +198,7 @@ func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID pers
 	}
 }
 
-func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID, isSpam bool) {
 	scope.SetContext(sentryTokenContextName, sentry.Context{
 		"Chain":           chain,
 		"ContractAddress": contractAddress,

@@ -17,7 +17,7 @@ bindings:
   Time:
     type: string
   TokenId:
-    type: github.com/mikeydub/go-gallery/service/persist.TokenID
+    type: github.com/mikeydub/go-gallery/service/persist.HexTokenID
 operations:
 - testdata/*.graphql
 generated: generated_test.go

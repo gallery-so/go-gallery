@@ -484,7 +484,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 			result = append(result, rpc.Transfer{
 				From:            persist.EthereumAddress(pLog.Topics[1].Hex()),
 				To:              persist.EthereumAddress(pLog.Topics[2].Hex()),
-				TokenID:         persist.TokenID(pLog.Topics[3].Hex()),
+				TokenID:         persist.HexTokenID(pLog.Topics[3].Hex()),
 				Amount:          1,
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
@@ -519,7 +519,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 			result = append(result, rpc.Transfer{
 				From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
 				To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
-				TokenID:         persist.TokenID(id.Text(16)),
+				TokenID:         persist.HexTokenID(id.Text(16)),
 				Amount:          value.Uint64(),
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
@@ -556,7 +556,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 				result = append(result, rpc.Transfer{
 					From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
 					To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
-					TokenID:         persist.TokenID(ids[j].Text(16)),
+					TokenID:         persist.HexTokenID(ids[j].Text(16)),
 					Amount:          values[j].Uint64(),
 					ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 					TokenType:       persist.TokenTypeERC1155,

@@ -1033,7 +1033,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process image", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x0"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x0"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/image", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1048,7 +1048,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process video", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x1"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x1"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/video", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1063,7 +1063,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process iframe", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x2"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x2"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/iframe", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1078,7 +1078,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process gif", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x3"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x3"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/gif", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1093,7 +1093,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process bad metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x4"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x4"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/bad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1107,7 +1107,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process missing metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x5"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x5"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/notfound", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1121,7 +1121,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process bad media", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x6"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x6"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/bad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1135,7 +1135,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process missing media", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x7"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x7"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/notfound", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1149,7 +1149,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process svg", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x8"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x8"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/svg", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1164,7 +1164,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process base64 encoded svg", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x9"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x9"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/base64svg", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1179,7 +1179,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process base64 encoded metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xa"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xa"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/base64", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1194,7 +1194,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process ipfs", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xb"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xb"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/ipfs", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1209,7 +1209,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process bad dns", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xc"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xc"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/dnsbad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1223,7 +1223,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process different keyword", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xd"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xd"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/differentkeyword", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1238,7 +1238,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process wrong keyword", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xe"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xe"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/wrongkeyword", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1253,7 +1253,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process animation", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0xf"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xf"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/animation", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1268,7 +1268,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process pdf", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x10"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x10"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/pdf", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1283,7 +1283,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process text", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x11"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x11"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/text", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1298,7 +1298,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process bad image", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.TokenID("0x12"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x12"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/badimage", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
@@ -1589,7 +1589,7 @@ func dummyTokenContract(ownerAddress, contractAddress persist.Address) multichai
 }
 
 // dummyTokenIDContract returns a dummy token owned by the provided address from the provided contract with the given tokenID
-func dummyTokenIDContract(ownerAddress, contractAddress persist.Address, tokenID persist.TokenID) multichain.ChainAgnosticToken {
+func dummyTokenIDContract(ownerAddress, contractAddress persist.Address, tokenID persist.HexTokenID) multichain.ChainAgnosticToken {
 	return multichain.ChainAgnosticToken{
 		TokenID:         tokenID,
 		Quantity:        "1",

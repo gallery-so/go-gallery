@@ -166,7 +166,7 @@ sql:
 
           # Merch
           - column: 'merch.token_id'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenID'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenID'
 
           # pii.AccountCreationInfo
           - column: pii.account_creation_info.ip_address
@@ -190,7 +190,7 @@ sql:
 
           # Token Definitions
           - column: 'token_definitions.token_id'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenID'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenID'
           - column: 'token_definitions.fallback_media'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.FallbackMedia'
           - column: 'token_definitions.token_type'
@@ -205,6 +205,10 @@ sql:
           # Reported Posts
           - column: 'reported_posts.reason'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.ReportReason'
+
+          # Token community memberships
+          - column: 'token_community_memberships.token_id'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.DecimalTokenID'
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.
@@ -250,9 +254,9 @@ sql:
           - column: '*.*.roles'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.RoleList'
           - column: '*.*.tokens_hex'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenIDList'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenIDList'
           - column: '*.*.token_hex'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenID'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenID'
           - column: '*.previews'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.NullString'
           - column: '*.*.*socials'

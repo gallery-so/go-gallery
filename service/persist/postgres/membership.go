@@ -37,13 +37,13 @@ func NewMembershipRepository(db *sql.DB, queries *db.Queries) *MembershipReposit
 }
 
 // UpsertByTokenID upserts the given tier
-func (m *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID persist.TokenID, pTier persist.MembershipTier) error {
+func (m *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID persist.HexTokenID, pTier persist.MembershipTier) error {
 	_, err := m.upsertByTokenIDStmt.ExecContext(pCtx, persist.GenerateID(), pTier.TokenID, pTier.Name, pTier.AssetURL, pq.Array(pTier.Owners), pTier.LastUpdated)
 	return err
 }
 
 // GetByTokenID returns the tier with the given token ID
-func (m *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID) (persist.MembershipTier, error) {
+func (m *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persist.HexTokenID) (persist.MembershipTier, error) {
 	tier := persist.MembershipTier{TokenID: pTokenID}
 	err := m.getByTokenIDStmt.QueryRowContext(pCtx, pTokenID).Scan(&tier.ID, &tier.CreationTime, &tier.LastUpdated, &tier.Version, &tier.Name, &tier.AssetURL, pq.Array(&tier.Owners))
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 type OpenseaNFTID struct {
 	Chain           Chain
 	ContractAddress Address
-	TokenID         TokenID
+	TokenID         HexTokenID
 }
 
 func (o OpenseaNFTID) String() string {
@@ -70,7 +70,7 @@ func (o *OpenseaNFTID) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("invalid opensea token id: %s", split[2])
 		}
 	}
-	o.TokenID = TokenID(asBig.Text(16))
+	o.TokenID = HexTokenID(asBig.Text(16))
 
 	return nil
 }

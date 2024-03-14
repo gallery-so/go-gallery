@@ -94353,13 +94353,13 @@ func (ec *executionContext) marshalNTokenDefinition2ᚖgithubᚗcomᚋmikeydub�
 	return ec._TokenDefinition(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, v interface{}) (persist.TokenID, error) {
-	var res persist.TokenID
+func (ec *executionContext) unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, v interface{}) (persist.HexTokenID, error) {
+	var res persist.HexTokenID
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, sel ast.SelectionSet, v persist.TokenID) graphql.Marshaler {
+func (ec *executionContext) marshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, sel ast.SelectionSet, v persist.HexTokenID) graphql.Marshaler {
 	return v
 }
 

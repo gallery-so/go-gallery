@@ -544,7 +544,7 @@ func mediaTypeToObjectType(mediaType persist.MediaType, startType objectType) ob
 
 type cachedMediaObject struct {
 	MediaType       persist.MediaType
-	TokenID         persist.TokenID
+	TokenID         persist.HexTokenID
 	ContractAddress persist.Address
 	Chain           persist.Chain
 	ContentType     string

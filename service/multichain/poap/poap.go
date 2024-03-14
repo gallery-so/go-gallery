@@ -295,7 +295,7 @@ func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 
 	return multichain.ChainAgnosticToken{
 		OwnerAddress: persist.Address(pPoap.Owner),
-		TokenID:      persist.TokenID(pPoap.TokenID.toBase16()),
+		TokenID:      persist.HexTokenID(pPoap.TokenID.toBase16()),
 		Descriptors: multichain.ChainAgnosticTokenDescriptors{
 			Name:        pPoap.Event.Name,
 			Description: pPoap.Event.Description,
