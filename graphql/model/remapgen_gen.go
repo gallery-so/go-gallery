@@ -208,6 +208,16 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"HighlightCheckMintClaimPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(HighlightCheckMintClaimPayloadOrError)
+		return obj, ok
+	},
+
+	"HighlightClaimMintPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(HighlightClaimMintPayloadOrError)
+		return obj, ok
+	},
+
 	"Interaction": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Interaction)
 		return obj, ok

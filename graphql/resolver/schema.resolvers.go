@@ -1777,6 +1777,20 @@ func (r *mutationResolver) DeletePost(ctx context.Context, postID persist.DBID) 
 	return output, nil
 }
 
+// HighlightClaimMint is the resolver for the highlightClaimMint field.
+func (r *mutationResolver) HighlightClaimMint(ctx context.Context, input model.HighlightClaimMintInput) (model.HighlightClaimMintPayloadOrError, error) {
+	claimID, err := publicapi.For(ctx).Mint.HighlightClaimMint(ctx, input.CollectionID, input.QuantityToMint, input.RecipientWalletID)
+	if err != nil {
+		return nil, err
+	}
+	return model.HighlightClaimMintPayload{ClaimID: claimID}, nil
+}
+
+// HighlightCheckMintClaim is the resolver for the highlightCheckMintClaim field.
+func (r *mutationResolver) HighlightCheckMintClaim(ctx context.Context, input model.HighlightCheckMintClaimInput) (model.HighlightCheckMintClaimPayloadOrError, error) {
+	panic(fmt.Errorf("not implemented: HighlightCheckMintClaim - highlightCheckMintClaim"))
+}
+
 // ViewGallery is the resolver for the viewGallery field.
 func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error) {
 	gallery, err := publicapi.For(ctx).Gallery.ViewGallery(ctx, galleryID)

@@ -242,9 +242,10 @@ func SetDefaults() {
 	viper.SetDefault("AUTOSOCIAL_QUEUE", "projects/gallery-local/locations/here/queues/autosocial")
 	viper.SetDefault("AUTOSOCIAL_POLL_QUEUE", "projects/gallery-local/locations/here/queues/autosocial-poll")
 	viper.SetDefault("ACTIVITY_QUEUE", "projects/gallery-local/locations/here/queues/activity")
-
 	viper.SetDefault("FARCASTER_MNEMONIC", "")
 	viper.SetDefault("FARCASTER_APP_ID", "")
+	viper.SetDefault("HIGHLIGHT_APP_ID", "")
+	viper.SetDefault("HIGHLIGHT_APP_SECRET", "")
 
 	viper.AutomaticEnv()
 

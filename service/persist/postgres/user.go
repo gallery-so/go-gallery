@@ -371,7 +371,7 @@ func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress p
 	err := u.getWalletIDStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.L1Chain()).Scan(&walletID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrWalletNotFound{L1ChainAddress: pChainAddress}
+			return persist.User{}, persist.ErrWalletNotFoundByAddress{Address: pChainAddress}
 		}
 		return persist.User{}, err
 	}

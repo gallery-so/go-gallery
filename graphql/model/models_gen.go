@@ -178,6 +178,14 @@ type GroupedNotification interface {
 	IsGroupedNotification()
 }
 
+type HighlightCheckMintClaimPayloadOrError interface {
+	IsHighlightCheckMintClaimPayloadOrError()
+}
+
+type HighlightClaimMintPayloadOrError interface {
+	IsHighlightClaimMintPayloadOrError()
+}
+
 type Interaction interface {
 	IsInteraction()
 }
@@ -1043,6 +1051,13 @@ type EoaAuth struct {
 	Signature   string               `json:"signature"`
 }
 
+type ErrAddressNotOwnedByUser struct {
+	Message string `json:"message"`
+}
+
+func (ErrAddressNotOwnedByUser) IsError()                            {}
+func (ErrAddressNotOwnedByUser) IsHighlightClaimMintPayloadOrError() {}
+
 type ErrAddressOwnedByUser struct {
 	Message string `json:"message"`
 }
@@ -1156,6 +1171,36 @@ type ErrGalleryNotFound struct {
 func (ErrGalleryNotFound) IsError()                           {}
 func (ErrGalleryNotFound) IsGalleryByIDPayloadOrError()       {}
 func (ErrGalleryNotFound) IsViewerGalleryByIDPayloadOrError() {}
+
+type ErrHighlightChainNotSupported struct {
+	Message string `json:"message"`
+}
+
+func (ErrHighlightChainNotSupported) IsError()                            {}
+func (ErrHighlightChainNotSupported) IsHighlightClaimMintPayloadOrError() {}
+
+type ErrHighlightMintUnavailable struct {
+	Message string `json:"message"`
+}
+
+func (ErrHighlightMintUnavailable) IsError()                                 {}
+func (ErrHighlightMintUnavailable) IsHighlightClaimMintPayloadOrError()      {}
+func (ErrHighlightMintUnavailable) IsHighlightCheckMintClaimPayloadOrError() {}
+
+type ErrHighlightTokenSyncFailed struct {
+	Message string `json:"message"`
+}
+
+func (ErrHighlightTokenSyncFailed) IsError()                                 {}
+func (ErrHighlightTokenSyncFailed) IsHighlightCheckMintClaimPayloadOrError() {}
+
+type ErrHighlightTxnFailed struct {
+	Message string `json:"message"`
+}
+
+func (ErrHighlightTxnFailed) IsError()                                 {}
+func (ErrHighlightTxnFailed) IsHighlightClaimMintPayloadOrError()      {}
+func (ErrHighlightTxnFailed) IsHighlightCheckMintClaimPayloadOrError() {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -1684,6 +1729,29 @@ type GroupNotificationUsersConnection struct {
 type HTTPSProfileImage struct {
 	PreviewURLs *PreviewURLSet `json:"previewURLs"`
 }
+
+type HighlightCheckMintClaimInput struct {
+	ClaimID string `json:"claimId"`
+}
+
+type HighlightCheckMintClaimPayload struct {
+	Status HighlightTxnStatus `json:"status"`
+	Token  *Token             `json:"token"`
+}
+
+func (HighlightCheckMintClaimPayload) IsHighlightCheckMintClaimPayloadOrError() {}
+
+type HighlightClaimMintInput struct {
+	CollectionID      string       `json:"collectionId"`
+	QuantityToMint    int          `json:"quantityToMint"`
+	RecipientWalletID persist.DBID `json:"recipientWalletId"`
+}
+
+type HighlightClaimMintPayload struct {
+	ClaimID string `json:"claimId"`
+}
+
+func (HighlightClaimMintPayload) IsHighlightClaimMintPayloadOrError() {}
 
 type HTMLMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -3109,6 +3177,49 @@ func (e *EmailUnsubscriptionType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e EmailUnsubscriptionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type HighlightTxnStatus string
+
+const (
+	HighlightTxnStatusTxnPending  HighlightTxnStatus = "TXN_PENDING"
+	HighlightTxnStatusTxnComplete HighlightTxnStatus = "TXN_COMPLETE"
+	HighlightTxnStatusTokenSynced HighlightTxnStatus = "TOKEN_SYNCED"
+)
+
+var AllHighlightTxnStatus = []HighlightTxnStatus{
+	HighlightTxnStatusTxnPending,
+	HighlightTxnStatusTxnComplete,
+	HighlightTxnStatusTokenSynced,
+}
+
+func (e HighlightTxnStatus) IsValid() bool {
+	switch e {
+	case HighlightTxnStatusTxnPending, HighlightTxnStatusTxnComplete, HighlightTxnStatusTokenSynced:
+		return true
+	}
+	return false
+}
+
+func (e HighlightTxnStatus) String() string {
+	return string(e)
+}
+
+func (e *HighlightTxnStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HighlightTxnStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HighlightTxnStatus", str)
+	}
+	return nil
+}
+
+func (e HighlightTxnStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

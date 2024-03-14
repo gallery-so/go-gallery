@@ -708,7 +708,7 @@ func (r *reservoirLimiter) ForKey(ctx context.Context, key string) (bool, time.D
 }
 
 func newOpenseaLimiter(ctx context.Context, c *redis.Cache) *openseaLimiter {
-	l := limiters.NewKeyRateLimiter(ctx, c, "retryer:opensea", 500, time.Minute)
+	l := limiters.NewKeyRateLimiter(ctx, c, "retryer:opensea", 300, time.Minute)
 	return util.ToPointer(openseaLimiter(*l))
 }
 

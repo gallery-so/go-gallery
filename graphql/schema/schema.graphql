@@ -1827,6 +1827,10 @@ type ErrAddressOwnedByUser implements Error {
   message: String!
 }
 
+type ErrAddressNotOwnedByUser implements Error {
+  message: String!
+}
+
 type ErrUserNotFound implements Error {
   message: String!
 }
@@ -2986,6 +2990,60 @@ union UnblockUserPayloadOrError =
   | ErrNotAuthorized
   | ErrInvalidInput
 
+input HighlightClaimMintInput {
+  collectionId: String!
+  quantityToMint: Int!
+  recipientWalletId: DBID!
+}
+
+type HighlightClaimMintPayload {
+  claimId: String!
+}
+
+type ErrHighlightTxnFailed implements Error {
+  message: String!
+}
+
+type ErrHighlightMintUnavailable implements Error {
+  message: String!
+}
+
+type ErrHighlightTokenSyncFailed implements Error {
+  message: String!
+}
+
+type ErrHighlightChainNotSupported implements Error {
+  message: String!
+}
+
+union HighlightClaimMintPayloadOrError =
+    HighlightClaimMintPayload
+  | ErrHighlightTxnFailed
+  | ErrHighlightMintUnavailable
+  | ErrHighlightChainNotSupported
+  | ErrAddressNotOwnedByUser
+
+input HighlightCheckMintClaimInput {
+  claimId: String!
+}
+
+enum HighlightTxnStatus {
+  TXN_PENDING
+  TXN_COMPLETE
+  TOKEN_SYNCED
+}
+
+type HighlightCheckMintClaimPayload {
+  status: HighlightTxnStatus!
+  token: Token
+}
+
+union HighlightCheckMintClaimPayloadOrError = 
+    HighlightCheckMintClaimPayload
+  | ErrHighlightTxnFailed
+  | ErrHighlightMintUnavailable
+  | ErrHighlightTokenSyncFailed
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -3093,6 +3151,9 @@ type Mutation {
   referralPostToken(input: ReferralPostTokenInput!): ReferralPostTokenPayloadOrError @authRequired
   referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
+
+  highlightClaimMint(input: HighlightClaimMintInput!):  HighlightClaimMintPayloadOrError @authRequired
+  highlightCheckMintClaim(input: HighlightCheckMintClaimInput!): HighlightCheckMintClaimPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
   viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
