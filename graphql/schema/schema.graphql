@@ -842,7 +842,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     @goField(forceResolver: true)
   suggestedUsersFarcaster(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
-}
+  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError @goField(forceResolver: true)
+} 
 
 type NotificationSettings {
   someoneFollowedYou: Boolean
@@ -2992,12 +2993,11 @@ union UnblockUserPayloadOrError =
 
 input HighlightClaimMintInput {
   collectionId: String!
-  quantityToMint: Int!
   recipientWalletId: DBID!
 }
 
 type HighlightClaimMintPayload {
-  claimId: String!
+  claimId: DBID!
 }
 
 type ErrHighlightTxnFailed implements Error {
@@ -3022,10 +3022,7 @@ union HighlightClaimMintPayloadOrError =
   | ErrHighlightMintUnavailable
   | ErrHighlightChainNotSupported
   | ErrAddressNotOwnedByUser
-
-input HighlightCheckMintClaimInput {
-  claimId: String!
-}
+  | ErrNotAuthorized
 
 enum HighlightTxnStatus {
   TXN_PENDING
@@ -3033,16 +3030,17 @@ enum HighlightTxnStatus {
   TOKEN_SYNCED
 }
 
-type HighlightCheckMintClaimPayload {
+type HighlightMintClaimStatusPayload @goEmbedHelper {
   status: HighlightTxnStatus!
-  token: Token
+  token: Token @goField(forceResolver: true)
 }
 
-union HighlightCheckMintClaimPayloadOrError = 
-    HighlightCheckMintClaimPayload
+union HighlightMintClaimStatusPayloadOrError = 
+    HighlightMintClaimStatusPayload
   | ErrHighlightTxnFailed
   | ErrHighlightMintUnavailable
   | ErrHighlightTokenSyncFailed
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -3153,7 +3151,6 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   highlightClaimMint(input: HighlightClaimMintInput!):  HighlightClaimMintPayloadOrError @authRequired
-  highlightCheckMintClaim(input: HighlightCheckMintClaimInput!): HighlightCheckMintClaimPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
   viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError

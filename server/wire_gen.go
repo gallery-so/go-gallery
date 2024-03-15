@@ -91,9 +91,7 @@ func openseaProviderInjector(ctx context.Context, c *http.Client, chain persist.
 }
 
 func multichainProviderInjector(contextContext context.Context, repositories *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, chainProvider *multichain.ChainProvider) *multichain.Provider {
-	client := task.NewClient(contextContext)
-	manager := tokenmanage.New(contextContext, client, cache)
-	submitTokensF := newSubmitBatch(manager)
+	submitTokensF := submitTokenBatchInjector(contextContext, cache)
 	providerLookup := newProviderLookup(chainProvider)
 	provider := &multichain.Provider{
 		Repos:        repositories,
@@ -674,6 +672,14 @@ func polygonTokenByTokenIdentifiersFetcherInjector(openseaProvider *opensea.Prov
 	return tokensByTokenIdentifiersFetcher
 }
 
+func submitTokenBatchInjector(contextContext context.Context, cache *redis.Cache) multichain.SubmitTokensF {
+	client := task.NewClient(contextContext)
+	tokenmanageTickToken := tickToken()
+	manager := tokenmanage.New(contextContext, client, cache, tokenmanageTickToken)
+	submitTokensF := submitBatch(manager)
+	return submitTokensF
+}
+
 // inject.go:
 
 // envInit is a type returned after setting up the environment
@@ -785,6 +791,8 @@ func newTokenManageCache() *redis.Cache {
 	return redis.NewCache(redis.TokenManageCache)
 }
 
-func newSubmitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
+func tickToken() tokenmanage.TickToken { return nil }
+
+func submitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
 	return tm.SubmitBatch
 }

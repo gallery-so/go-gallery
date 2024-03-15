@@ -69,6 +69,10 @@ type PostPreflightMessage struct {
 	UserID persist.DBID             `json:"user_id"`
 }
 
+type HighlightMintClaimMessage struct {
+	ClaimID persist.DBID `json:"claim_id" binding:"required"`
+}
+
 type AutosocialProcessUsersMessage struct {
 	Users map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress `json:"users" binding:"required"`
 }
@@ -215,6 +219,14 @@ func (c *Client) CreateTaskForPostPreflight(ctx context.Context, message PostPre
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process/post-preflight", env.GetString("TOKEN_PROCESSING_URL"))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
+}
+
+func (c *Client) CreateTaskForHighlightMintClaim(ctx context.Context, message HighlightMintClaimMessage) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForHighlightMintClaim")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("MINT_PROCESSING_QUEUE")
+	url := fmt.Sprintf("%s/media/process/highlight-mint-claim", env.GetString("TOKEN_PROCESSING_URL"))
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 

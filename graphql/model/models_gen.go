@@ -178,12 +178,12 @@ type GroupedNotification interface {
 	IsGroupedNotification()
 }
 
-type HighlightCheckMintClaimPayloadOrError interface {
-	IsHighlightCheckMintClaimPayloadOrError()
-}
-
 type HighlightClaimMintPayloadOrError interface {
 	IsHighlightClaimMintPayloadOrError()
+}
+
+type HighlightMintClaimStatusPayloadOrError interface {
+	IsHighlightMintClaimStatusPayloadOrError()
 }
 
 type Interaction interface {
@@ -1183,24 +1183,24 @@ type ErrHighlightMintUnavailable struct {
 	Message string `json:"message"`
 }
 
-func (ErrHighlightMintUnavailable) IsError()                                 {}
-func (ErrHighlightMintUnavailable) IsHighlightClaimMintPayloadOrError()      {}
-func (ErrHighlightMintUnavailable) IsHighlightCheckMintClaimPayloadOrError() {}
+func (ErrHighlightMintUnavailable) IsError()                                  {}
+func (ErrHighlightMintUnavailable) IsHighlightClaimMintPayloadOrError()       {}
+func (ErrHighlightMintUnavailable) IsHighlightMintClaimStatusPayloadOrError() {}
 
 type ErrHighlightTokenSyncFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrHighlightTokenSyncFailed) IsError()                                 {}
-func (ErrHighlightTokenSyncFailed) IsHighlightCheckMintClaimPayloadOrError() {}
+func (ErrHighlightTokenSyncFailed) IsError()                                  {}
+func (ErrHighlightTokenSyncFailed) IsHighlightMintClaimStatusPayloadOrError() {}
 
 type ErrHighlightTxnFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrHighlightTxnFailed) IsError()                                 {}
-func (ErrHighlightTxnFailed) IsHighlightClaimMintPayloadOrError()      {}
-func (ErrHighlightTxnFailed) IsHighlightCheckMintClaimPayloadOrError() {}
+func (ErrHighlightTxnFailed) IsError()                                  {}
+func (ErrHighlightTxnFailed) IsHighlightClaimMintPayloadOrError()       {}
+func (ErrHighlightTxnFailed) IsHighlightMintClaimStatusPayloadOrError() {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -1385,6 +1385,8 @@ func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                         
 func (ErrNotAuthorized) IsDeletePostPayloadOrError()                                      {}
 func (ErrNotAuthorized) IsBlockUserPayloadOrError()                                       {}
 func (ErrNotAuthorized) IsUnblockUserPayloadOrError()                                     {}
+func (ErrNotAuthorized) IsHighlightClaimMintPayloadOrError()                              {}
+func (ErrNotAuthorized) IsHighlightMintClaimStatusPayloadOrError()                        {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`
@@ -1730,28 +1732,24 @@ type HTTPSProfileImage struct {
 	PreviewURLs *PreviewURLSet `json:"previewURLs"`
 }
 
-type HighlightCheckMintClaimInput struct {
-	ClaimID string `json:"claimId"`
-}
-
-type HighlightCheckMintClaimPayload struct {
-	Status HighlightTxnStatus `json:"status"`
-	Token  *Token             `json:"token"`
-}
-
-func (HighlightCheckMintClaimPayload) IsHighlightCheckMintClaimPayloadOrError() {}
-
 type HighlightClaimMintInput struct {
 	CollectionID      string       `json:"collectionId"`
-	QuantityToMint    int          `json:"quantityToMint"`
 	RecipientWalletID persist.DBID `json:"recipientWalletId"`
 }
 
 type HighlightClaimMintPayload struct {
-	ClaimID string `json:"claimId"`
+	ClaimID persist.DBID `json:"claimId"`
 }
 
 func (HighlightClaimMintPayload) IsHighlightClaimMintPayloadOrError() {}
+
+type HighlightMintClaimStatusPayload struct {
+	HelperHighlightMintClaimStatusPayloadData
+	Status HighlightTxnStatus `json:"status"`
+	Token  *Token             `json:"token"`
+}
+
+func (HighlightMintClaimStatusPayload) IsHighlightMintClaimStatusPayloadOrError() {}
 
 type HTMLMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -3090,12 +3088,13 @@ type Viewer struct {
 	Email           *UserEmail       `json:"email"`
 	// Returns a list of notifications in reverse chronological order.
 	// Seen notifications come after unseen notifications
-	Notifications           *NotificationsConnection `json:"notifications"`
-	NotificationSettings    *NotificationSettings    `json:"notificationSettings"`
-	UserExperiences         []*UserExperience        `json:"userExperiences"`
-	Persona                 *persist.Persona         `json:"persona"`
-	SuggestedUsers          *UsersConnection         `json:"suggestedUsers"`
-	SuggestedUsersFarcaster *UsersConnection         `json:"suggestedUsersFarcaster"`
+	Notifications            *NotificationsConnection               `json:"notifications"`
+	NotificationSettings     *NotificationSettings                  `json:"notificationSettings"`
+	UserExperiences          []*UserExperience                      `json:"userExperiences"`
+	Persona                  *persist.Persona                       `json:"persona"`
+	SuggestedUsers           *UsersConnection                       `json:"suggestedUsers"`
+	SuggestedUsersFarcaster  *UsersConnection                       `json:"suggestedUsersFarcaster"`
+	HighlightMintClaimStatus HighlightMintClaimStatusPayloadOrError `json:"highlightMintClaimStatus"`
 }
 
 func (Viewer) IsNode()          {}

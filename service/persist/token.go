@@ -104,10 +104,12 @@ const (
 	ChainZora
 	// ChainBase represents the base chain
 	ChainBase
+	// ChainBaseSepolia - Base testnet
+	ChainBaseSepolia
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to
 	// point to the most recently added chain type.
-	MaxChainValue = ChainBase
+	MaxChainValue = ChainBaseSepolia
 )
 
 func MustTokenID(s string) HexTokenID {

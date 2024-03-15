@@ -210,6 +210,14 @@ sql:
           - column: 'token_community_memberships.token_id'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.DecimalTokenID'
 
+          # Highlight mint claims
+          - column: 'highlight_mint_claims.collection_id'
+            go_type: 'string'
+          - column: 'highlight_mint_claims.claim_id'
+            go_type: 'database/sql.NullString'
+          - column: 'highlight_mint_claims.status'
+            go_type: 'github.com/mikeydub/go-gallery/service/multichain/highlight.ClaimStatus'
+
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.
           # Format is schema.table.column; where *.*.<column> applies to all schemas and tables.

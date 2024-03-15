@@ -176,8 +176,8 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		TokenIds:    tokenIDs,
 		ContractIds: contractIDs,
 		ActorID:     actorID,
-		Caption:     util.ToSQLNullString(caption),
-		UserMintUrl: util.ToSQLNullString(mintURL),
+		Caption:     util.ToNullStringEmptyNull(util.GetOptionalValue(caption, "")),
+		UserMintUrl: util.ToNullStringEmptyNull(util.GetOptionalValue(mintURL, "")),
 	})
 	if err != nil {
 		return "", err
@@ -296,8 +296,8 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		TokenIds:    []persist.DBID{tokenID},
 		ContractIds: []persist.DBID{contractID},
 		ActorID:     userID,
-		Caption:     util.ToSQLNullString(caption),
-		UserMintUrl: util.ToSQLNullString(mintURL),
+		Caption:     util.ToNullStringEmptyNull(util.GetOptionalValue(caption, "")),
+		UserMintUrl: util.ToNullStringEmptyNull(util.GetOptionalValue(mintURL, "")),
 	})
 	if err != nil {
 		return postID, err

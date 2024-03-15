@@ -2015,3 +2015,15 @@ where
 insert into privy_users (id, user_id, privy_did)
     values (@id, @user_id, @privy_did)
     on conflict (user_id) where not deleted do update set privy_did = excluded.privy_did, last_updated = now();
+
+-- name: SaveHighlightMintClaim :one
+insert into highlight_mint_claims(id, user_id, chain, contract_address, collection_id, claim_id, status, error_message) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id;
+
+-- name: GetHighlightMintClaim :one
+select * from highlight_mint_claims where id = $1 and not deleted;
+
+-- name: UpdateHighlightMintClaimStatus :exec
+update highlight_mint_claims set last_updated = now(), status = $1, error_message = $2 where id = @id;
+
+-- name: UpdateHighlightMintClaimStatusCompleted :exec
+update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2, error_message = null where id = @id;

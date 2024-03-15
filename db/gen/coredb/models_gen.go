@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -297,6 +298,21 @@ type Gallery struct {
 type GalleryRelevance struct {
 	ID    persist.DBID `db:"id" json:"id"`
 	Score int32        `db:"score" json:"score"`
+}
+
+type HighlightMintClaim struct {
+	ID              persist.DBID          `db:"id" json:"id"`
+	UserID          persist.DBID          `db:"user_id" json:"user_id"`
+	Chain           persist.Chain         `db:"chain" json:"chain"`
+	ContractAddress persist.Address       `db:"contract_address" json:"contract_address"`
+	CollectionID    string                `db:"collection_id" json:"collection_id"`
+	TokenID         persist.DBID          `db:"token_id" json:"token_id"`
+	ClaimID         sql.NullString        `db:"claim_id" json:"claim_id"`
+	Status          highlight.ClaimStatus `db:"status" json:"status"`
+	ErrorMessage    sql.NullString        `db:"error_message" json:"error_message"`
+	CreatedAt       time.Time             `db:"created_at" json:"created_at"`
+	LastUpdated     time.Time             `db:"last_updated" json:"last_updated"`
+	Deleted         bool                  `db:"deleted" json:"deleted"`
 }
 
 type LegacyView struct {

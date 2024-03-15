@@ -20,6 +20,7 @@ const (
 	ProcessingCauseSyncRetry     ProcessingCause = "sync_retry"
 	ProcessingCauseRefresh       ProcessingCause = "refresh"
 	ProcessingCausePostPreflight ProcessingCause = "post_preflight"
+	ProcessingCauseAppMint       ProcessingCause = "app_mint"
 )
 
 func (p ProcessingCause) String() string {

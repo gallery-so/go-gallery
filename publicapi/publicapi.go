@@ -70,7 +70,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	validator := validate.WithCustomValidators()
-	tokenManager := tokenmanage.New(ctx, taskClient, tokenManageCache)
+	tokenManager := tokenmanage.New(ctx, taskClient, tokenManageCache, nil)
 	privyClient := privy.NewPrivyClient(httpClient)
 	highlightProvider := highlight.NewProvider(httpClient)
 
@@ -98,7 +98,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache, httpClient: httpClient, taskClient: taskClient, neynarAPI: neynar},
 		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 		Search:        &SearchAPI{queries: queries, loaders: loaders, validator: validator},
-		Mint:          &MintAPI{validator: validator, highlightProvider: highlightProvider},
+		Mint:          &MintAPI{validator: validator, highlightProvider: highlightProvider, queries: queries, taskClient: taskClient},
 	}
 }
 

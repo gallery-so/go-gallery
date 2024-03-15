@@ -124,9 +124,7 @@ func newQueries(p *pgxpool.Pool) *db.Queries {
 func multichainProviderInjector(context.Context, *postgres.Repositories, *db.Queries, *redis.Cache, *multichain.ChainProvider) *multichain.Provider {
 	panic(wire.Build(
 		wire.Struct(new(multichain.Provider), "*"),
-		newSubmitBatch,
-		tokenmanage.New,
-		task.NewClient,
+		submitTokenBatchInjector,
 		newProviderLookup,
 	))
 }
@@ -858,6 +856,17 @@ func newTokenManageCache() *redis.Cache {
 	return redis.NewCache(redis.TokenManageCache)
 }
 
-func newSubmitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
+func submitTokenBatchInjector(context.Context, *redis.Cache) multichain.SubmitTokensF {
+	panic(wire.Build(
+		submitBatch,
+		tokenmanage.New,
+		task.NewClient,
+		tickToken,
+	))
+}
+
+func tickToken() tokenmanage.TickToken { return nil }
+
+func submitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
 	return tm.SubmitBatch
 }

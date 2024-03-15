@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -2809,6 +2810,30 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 	var gallery_id persist.DBID
 	err := row.Scan(&gallery_id)
 	return gallery_id, err
+}
+
+const getHighlightMintClaim = `-- name: GetHighlightMintClaim :one
+select id, user_id, chain, contract_address, collection_id, token_id, claim_id, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where id = $1 and not deleted
+`
+
+func (q *Queries) GetHighlightMintClaim(ctx context.Context, id persist.DBID) (HighlightMintClaim, error) {
+	row := q.db.QueryRow(ctx, getHighlightMintClaim, id)
+	var i HighlightMintClaim
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Chain,
+		&i.ContractAddress,
+		&i.CollectionID,
+		&i.TokenID,
+		&i.ClaimID,
+		&i.Status,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
@@ -6811,6 +6836,37 @@ func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) (persist
 	return id, err
 }
 
+const saveHighlightMintClaim = `-- name: SaveHighlightMintClaim :one
+insert into highlight_mint_claims(id, user_id, chain, contract_address, collection_id, claim_id, status, error_message) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id
+`
+
+type SaveHighlightMintClaimParams struct {
+	ID              persist.DBID          `db:"id" json:"id"`
+	UserID          persist.DBID          `db:"user_id" json:"user_id"`
+	Chain           persist.Chain         `db:"chain" json:"chain"`
+	ContractAddress persist.Address       `db:"contract_address" json:"contract_address"`
+	CollectionID    string                `db:"collection_id" json:"collection_id"`
+	ClaimID         sql.NullString        `db:"claim_id" json:"claim_id"`
+	Status          highlight.ClaimStatus `db:"status" json:"status"`
+	ErrorMessage    sql.NullString        `db:"error_message" json:"error_message"`
+}
+
+func (q *Queries) SaveHighlightMintClaim(ctx context.Context, arg SaveHighlightMintClaimParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, saveHighlightMintClaim,
+		arg.ID,
+		arg.UserID,
+		arg.Chain,
+		arg.ContractAddress,
+		arg.CollectionID,
+		arg.ClaimID,
+		arg.Status,
+		arg.ErrorMessage,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = $1, last_updated = now() where id = $2 and deleted = false
 `
@@ -7136,6 +7192,36 @@ type UpdateGalleryPositionsParams struct {
 
 func (q *Queries) UpdateGalleryPositions(ctx context.Context, arg UpdateGalleryPositionsParams) error {
 	_, err := q.db.Exec(ctx, updateGalleryPositions, arg.OwnerUserID, arg.GalleryIds, arg.Positions)
+	return err
+}
+
+const updateHighlightMintClaimStatus = `-- name: UpdateHighlightMintClaimStatus :exec
+update highlight_mint_claims set last_updated = now(), status = $1, error_message = $2 where id = $3
+`
+
+type UpdateHighlightMintClaimStatusParams struct {
+	Status       highlight.ClaimStatus `db:"status" json:"status"`
+	ErrorMessage sql.NullString        `db:"error_message" json:"error_message"`
+	ID           persist.DBID          `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateHighlightMintClaimStatus(ctx context.Context, arg UpdateHighlightMintClaimStatusParams) error {
+	_, err := q.db.Exec(ctx, updateHighlightMintClaimStatus, arg.Status, arg.ErrorMessage, arg.ID)
+	return err
+}
+
+const updateHighlightMintClaimStatusCompleted = `-- name: UpdateHighlightMintClaimStatusCompleted :exec
+update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2, error_message = null where id = $3
+`
+
+type UpdateHighlightMintClaimStatusCompletedParams struct {
+	Status  highlight.ClaimStatus `db:"status" json:"status"`
+	TokenID persist.DBID          `db:"token_id" json:"token_id"`
+	ID      persist.DBID          `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateHighlightMintClaimStatusCompleted(ctx context.Context, arg UpdateHighlightMintClaimStatusCompletedParams) error {
+	_, err := q.db.Exec(ctx, updateHighlightMintClaimStatusCompleted, arg.Status, arg.TokenID, arg.ID)
 	return err
 }
 
