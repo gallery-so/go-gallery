@@ -35,13 +35,18 @@ var ErrHighlightChainNotSupported = errors.New("chain is not supported by highli
 type ClaimStatus string
 
 type ErrHighlightTxnFailed struct{ Msg string }
+type ErrHighlightCollectionMintUnavailable struct{ CollectionID string }
+type ErrHighlightInternalError struct{ Err error }
 
 func (e ErrHighlightTxnFailed) Error() string { return e.Msg }
 
-type ErrHighlightCollectionMintUnavailable struct{ CollectionID string }
-
 func (e ErrHighlightCollectionMintUnavailable) Error() string {
 	return fmt.Sprintf("collectionID=%s is unavailable for minting", e.CollectionID)
+}
+
+func (e ErrHighlightInternalError) Unwrap() error { return e.Err }
+func (e ErrHighlightInternalError) Error() string {
+	return fmt.Sprintf("unexpected reply from highlight: %s", e.Err)
 }
 
 // authT adds authentication headers to each request
@@ -122,6 +127,7 @@ func (api *Provider) ClaimMint(ctx context.Context, collectionID string, qty int
 	}
 	// Unknown error
 	if err != nil {
+		err = ErrHighlightInternalError{err}
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 		return "", "", persist.ChainAddress{}, err

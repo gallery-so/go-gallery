@@ -130,16 +130,18 @@ func multichainProviderInjector(context.Context, *postgres.Repositories, *db.Que
 	))
 }
 
+// New chains must be added here
 func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
 	return multichain.ProviderLookup{
-		persist.ChainETH:      p.Ethereum,
-		persist.ChainTezos:    p.Tezos,
-		persist.ChainOptimism: p.Optimism,
-		persist.ChainArbitrum: p.Arbitrum,
-		persist.ChainPOAP:     p.Poap,
-		persist.ChainZora:     p.Zora,
-		persist.ChainBase:     p.Base,
-		persist.ChainPolygon:  p.Polygon,
+		persist.ChainETH:         p.Ethereum,
+		persist.ChainTezos:       p.Tezos,
+		persist.ChainOptimism:    p.Optimism,
+		persist.ChainArbitrum:    p.Arbitrum,
+		persist.ChainPOAP:        p.Poap,
+		persist.ChainZora:        p.Zora,
+		persist.ChainBase:        p.Base,
+		persist.ChainBaseSepolia: p.BaseSepolia,
+		persist.ChainPolygon:     p.Polygon,
 	}
 }
 

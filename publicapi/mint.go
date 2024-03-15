@@ -70,7 +70,9 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 	// Mint one token from highlight
 	claimID, status, contract, claimErr := api.highlightProvider.ClaimMint(ctx, collectionID, 1, chainAddress)
 	// Catch errors not related to issues with the transaction itself
-	if claimErr != nil && (errors.Is(claimErr, highlight.ErrHighlightChainNotSupported) || util.ErrorIs[highlight.ErrHighlightCollectionMintUnavailable](claimErr)) {
+	if claimErr != nil && (errors.Is(claimErr, highlight.ErrHighlightChainNotSupported) ||
+		util.ErrorIs[highlight.ErrHighlightCollectionMintUnavailable](claimErr) ||
+		util.ErrorIs[highlight.ErrHighlightInternalError](claimErr)) {
 		return "", claimErr
 	}
 
