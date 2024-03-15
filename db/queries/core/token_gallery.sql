@@ -131,8 +131,8 @@ with token_definitions_insert as (
     from (
       select unnest(@community_membership_dbid::varchar[]) as id
         , unnest(@community_membership_token_id::numeric[]) as token_id
-        , unnest(@definition_contract_id) as definition_contract_id
-        , unnest(@definition_token_id) as definition_token_id
+        , unnest(@definition_contract_id::varchar[]) as definition_contract_id
+        , unnest(@definition_token_id::varchar[]) as definition_token_id
     ) community_memberships
     join token_definitions_insert on
         community_memberships.definition_contract_id = token_definitions_insert.contract_id
@@ -141,7 +141,7 @@ with token_definitions_insert as (
     -- contract community for this token. Every contract should have a community created for it by the time we get here!
     left join communities on communities.contract_id = community_memberships.definition_contract_id and communities.community_type = 0
   )
-  on conflict (community_id, token_definition_id) where deleted = false
+  on conflict (token_definition_id, community_id) where not deleted
   do update set
     last_updated = excluded.last_updated
   returning *
