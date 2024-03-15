@@ -133,14 +133,15 @@ func MustHexString(s string) HexString {
 }
 
 var L1Chains = map[Chain]L1Chain{
-	ChainPOAP:     L1Chain(ChainETH),
-	ChainOptimism: L1Chain(ChainETH),
-	ChainPolygon:  L1Chain(ChainETH),
-	ChainArbitrum: L1Chain(ChainETH),
-	ChainZora:     L1Chain(ChainETH),
-	ChainBase:     L1Chain(ChainETH),
-	ChainETH:      L1Chain(ChainETH),
-	ChainTezos:    L1Chain(ChainTezos),
+	ChainPOAP:        L1Chain(ChainETH),
+	ChainOptimism:    L1Chain(ChainETH),
+	ChainPolygon:     L1Chain(ChainETH),
+	ChainArbitrum:    L1Chain(ChainETH),
+	ChainZora:        L1Chain(ChainETH),
+	ChainBase:        L1Chain(ChainETH),
+	ChainBaseSepolia: L1Chain(ChainETH),
+	ChainETH:         L1Chain(ChainETH),
+	ChainTezos:       L1Chain(ChainTezos),
 }
 
 var L1ChainGroups = map[L1Chain][]Chain{

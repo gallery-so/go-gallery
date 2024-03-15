@@ -512,6 +512,14 @@ func processHighlightMintClaim(
 			return
 		}
 
+		recipientWallet, err := mcPipe.Queries.GetWalletByID(ctx, claim.RecipientWalletID)
+		if err != nil {
+			logger.For(ctx).Warnf("walletID=%s does not exist for mint claimID=%s", claim.RecipientWalletID, msg.ClaimID)
+			updateHighlightClaimStatus(ctx, mcPipe.Queries, claim.ID, highlight.ClaimStatusFailedUnknownStatus, err.Error())
+			util.ErrResponse(ctx, http.StatusOK, err)
+			return
+		}
+
 		switch claim.Status {
 		// Shouldn't never receive claims in these states, but gracefully handle them anyway
 		case highlight.ClaimStatusFailedUnknownStatus, highlight.ClaimStatusTxFailed, highlight.ClaimStatusTokenSyncCompleted:
@@ -541,14 +549,18 @@ func processHighlightMintClaim(
 			// we want finer control of how and when a token is processed in order to keep track of the
 			// minting state, so the submit function is updated to run the tokenprocessing pipeline immediately.
 			mcPipe.SubmitTokens = runPipelineImmediatelyForHighlight(tp, tm, mcPipe.Queries, claim.ID, metadata)
-			newTokenID := persist.TokenUniqueIdentifiers{TokenID: tokenID.ToHexTokenID(), ContractAddress: claim.ContractAddress, Chain: claim.Chain}
+			newTokenID := persist.TokenUniqueIdentifiers{
+				OwnerAddress:    recipientWallet.Address,
+				TokenID:         tokenID.ToHexTokenID(),
+				ContractAddress: claim.ContractAddress,
+				Chain:           claim.Chain,
+			}
 
 			var newTokens []operation.TokenFullDetails
-			var syncErr error
 
 			// We retry here because there is some delay from when the transaction completes to when the token is indexed by providers.
 			for i := 0; i < attemptsForSync; i++ {
-				newTokens, syncErr = mcPipe.AddTokensToUserUnchecked(ctx, claim.UserID, []persist.TokenUniqueIdentifiers{newTokenID}, []persist.HexString{"1"})
+				newTokens, err = mcPipe.AddTokensToUserUnchecked(ctx, claim.UserID, []persist.TokenUniqueIdentifiers{newTokenID}, []persist.HexString{"1"})
 				if err != nil {
 					err := fmt.Errorf("failed to sync token for highlight mint claimID=%s, retrying on err: %s; waiting %s (attempt=%d/%d)", claim.ID, err, pollTimeForSync, i, attemptsForSync)
 					logger.For(ctx).Error(err)
@@ -559,9 +571,9 @@ func processHighlightMintClaim(
 			}
 
 			// Providers don't have the token yet, put back in the queue to try again later
-			if syncErr != nil {
-				logger.For(ctx).Warnf("unable to find minted token=%s from providers for claimID=%s, retrying later: %s", newTokenID, claim.ID, syncErr)
-				util.ErrResponse(ctx, http.StatusInternalServerError, syncErr)
+			if err != nil {
+				logger.For(ctx).Warnf("unable to find minted token=%s from providers for claimID=%s, retrying later: %s", newTokenID, claim.ID, err)
+				util.ErrResponse(ctx, http.StatusInternalServerError, err)
 				return
 			}
 
@@ -600,7 +612,7 @@ func processHighlightMintClaim(
 			ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 			return
 		default:
-			err := fmt.Errorf("highlight mint claimID=%s has an unexpected status [%s], removing from queue", claim.ID, claim.Status)
+			err := fmt.Errorf("highlight mint claimID=%s has an unexpected status=%s, removing from queue", claim.ID, claim.Status)
 			logger.For(ctx).Warn(err)
 			sentryutil.ReportError(ctx, err)
 			util.ErrResponse(ctx, http.StatusOK, err)

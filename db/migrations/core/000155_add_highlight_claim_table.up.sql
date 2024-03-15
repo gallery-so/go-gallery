@@ -3,6 +3,7 @@ create table if not exists highlight_mint_claims (
   user_id varchar(255) references users(id),
   chain int,
   contract_address varchar,
+  recipient_wallet_id varchar not null references wallets(id),
   collection_id varchar not null,
   token_id varchar(255) references tokens(id),
   claim_id varchar not null unique,
