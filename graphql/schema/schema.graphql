@@ -842,8 +842,9 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     @goField(forceResolver: true)
   suggestedUsersFarcaster(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
-  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError @goField(forceResolver: true)
-} 
+  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError
+    @goField(forceResolver: true)
+}
 
 type NotificationSettings {
   someoneFollowedYou: Boolean
@@ -3035,7 +3036,7 @@ type HighlightMintClaimStatusPayload @goEmbedHelper {
   token: Token @goField(forceResolver: true)
 }
 
-union HighlightMintClaimStatusPayloadOrError = 
+union HighlightMintClaimStatusPayloadOrError =
     HighlightMintClaimStatusPayload
   | ErrHighlightTxnFailed
   | ErrHighlightMintUnavailable
@@ -3150,7 +3151,8 @@ type Mutation {
   referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
-  highlightClaimMint(input: HighlightClaimMintInput!):  HighlightClaimMintPayloadOrError @authRequired
+  highlightClaimMint(input: HighlightClaimMintInput!): HighlightClaimMintPayloadOrError
+    @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
   viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
