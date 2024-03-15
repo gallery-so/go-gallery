@@ -47,12 +47,13 @@ var (
 
 // Map of chains to OS chain identifiers
 var chainToIdentifier = map[persist.Chain]string{
-	persist.ChainETH:      "ethereum",
-	persist.ChainPolygon:  "matic",
-	persist.ChainOptimism: "optimism",
-	persist.ChainArbitrum: "arbitrum",
-	persist.ChainBase:     "base",
-	persist.ChainZora:     "zora",
+	persist.ChainETH:         "ethereum",
+	persist.ChainPolygon:     "matic",
+	persist.ChainOptimism:    "optimism",
+	persist.ChainArbitrum:    "arbitrum",
+	persist.ChainBase:        "base",
+	persist.ChainBaseSepolia: "base_sepolia",
+	persist.ChainZora:        "zora",
 }
 
 type ErrOpenseaRateLimited struct{ Err error }

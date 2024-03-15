@@ -550,7 +550,7 @@ func processHighlightMintClaim(
 			for i := 0; i < attemptsForSync; i++ {
 				newTokens, syncErr = mcPipe.AddTokensToUserUnchecked(ctx, claim.UserID, []persist.TokenUniqueIdentifiers{newTokenID}, []persist.HexString{"1"})
 				if err != nil {
-					err := fmt.Errorf("failed to sync token for highlight mint claimID=%s, retrying on err: %s", claim.ID, err)
+					err := fmt.Errorf("failed to sync token for highlight mint claimID=%s, retrying on err: %s; waiting %s (attempt=%d/%d)", claim.ID, err, pollTimeForSync, i, attemptsForSync)
 					logger.For(ctx).Error(err)
 					<-time.After(pollTimeForSync)
 					continue
@@ -622,22 +622,22 @@ func pollHighlightTransaction(
 	q *db.Queries,
 	highlightProvider *highlight.Provider,
 	claim db.HighlightMintClaim,
-	retryAttemptsPerMessage int,
-	waitAttemptsForTxn time.Duration,
+	attemptsForTxn int,
+	pollTimeForTxn time.Duration,
 ) (highlight.ClaimStatus, persist.DecimalTokenID, persist.TokenMetadata, error) {
 	var status highlight.ClaimStatus
 	var tokenID persist.DecimalTokenID
 	var metadata persist.TokenMetadata
 	var err error
-	for i := 0; i < retryAttemptsPerMessage; i++ {
+	for i := 0; i < attemptsForTxn; i++ {
 		status, tokenID, metadata, err = highlightProvider.GetClaimStatus(ctx, claim.ClaimID.String)
 		if err != nil {
 			return status, "", persist.TokenMetadata{}, err
 		}
 		if status == highlight.ClaimStatusTxPending {
 			updateHighlightClaimStatus(ctx, q, claim.ID, status, "")
-			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting", claim.ID)
-			<-time.After(waitAttemptsForTxn)
+			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting %s (attempt=%d/%d)", claim.ID, pollTimeForTxn, i, attemptsForTxn)
+			<-time.After(pollTimeForTxn)
 			continue
 		}
 		mustExpectedStatus(highlight.ClaimStatusTxSucceeded, status)

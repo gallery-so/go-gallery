@@ -22,12 +22,13 @@ func init() {
 }
 
 const (
-	ethMainnetBaseURL = "https://api.reservoir.tools"
-	optimismBaseURL   = "https://api-optimism.reservoir.tools"
-	polygonBaseURL    = "https://api-polygon.reservoir.tools"
-	arbitrumBaseURL   = "https://api-arbitrum.reservoir.tools"
-	zoraBaseURL       = "https://api-zora.reservoir.tools"
-	baseBaseURL       = "https://api-base.reservoir.tools"
+	ethMainnetBaseURL  = "https://api.reservoir.tools"
+	optimismBaseURL    = "https://api-optimism.reservoir.tools"
+	polygonBaseURL     = "https://api-polygon.reservoir.tools"
+	arbitrumBaseURL    = "https://api-arbitrum.reservoir.tools"
+	zoraBaseURL        = "https://api-zora.reservoir.tools"
+	baseBaseURL        = "https://api-base.reservoir.tools"
+	baseSepoliaBaseURL = "https://api-sepolia.reservoir.tools"
 )
 
 const (
@@ -134,12 +135,13 @@ type Provider struct {
 // NewProvider creates a new Reservoir provider
 func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain, l retry.Limiter) (*Provider, func()) {
 	apiURL := map[persist.Chain]string{
-		persist.ChainETH:      ethMainnetBaseURL,
-		persist.ChainOptimism: optimismBaseURL,
-		persist.ChainPolygon:  polygonBaseURL,
-		persist.ChainArbitrum: arbitrumBaseURL,
-		persist.ChainZora:     zoraBaseURL,
-		persist.ChainBase:     baseBaseURL,
+		persist.ChainETH:         ethMainnetBaseURL,
+		persist.ChainOptimism:    optimismBaseURL,
+		persist.ChainPolygon:     polygonBaseURL,
+		persist.ChainArbitrum:    arbitrumBaseURL,
+		persist.ChainZora:        zoraBaseURL,
+		persist.ChainBase:        baseBaseURL,
+		persist.ChainBaseSepolia: baseSepoliaBaseURL,
 	}[chain]
 	if apiURL == "" {
 		panic(fmt.Sprintf("no reservoir api url set for chain %d", chain))

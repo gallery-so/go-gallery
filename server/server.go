@@ -229,7 +229,7 @@ func SetDefaults() {
 	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
 	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
-	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
+	viper.SetDefault("ALCHEMY_BASE_SEPOLIA_API_URL", "")
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
