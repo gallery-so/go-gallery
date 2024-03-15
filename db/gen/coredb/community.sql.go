@@ -632,7 +632,7 @@ valid_memberships as (
 insert into token_community_memberships(id, token_definition_id, community_id, token_id, created_at, last_updated, deleted) (
     select id, token_definition_id, community_id, token_id, created_at, last_updated, deleted from valid_memberships
 )
-on conflict (community_id, token_definition_id) where not deleted
+on conflict (token_definition_id, community_id) where not deleted
     do nothing
 returning id, version, token_definition_id, community_id, created_at, last_updated, deleted, token_id
 `
