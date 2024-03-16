@@ -2813,7 +2813,7 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 }
 
 const getHighlightMintClaim = `-- name: GetHighlightMintClaim :one
-select id, user_id, chain, contract_address, recipient_wallet_id, collection_id, token_id, claim_id, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where id = $1 and not deleted
+select id, user_id, chain, contract_address, recipient_wallet_id, highlight_collection_id, token_id, claim_id, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where id = $1 and not deleted
 `
 
 func (q *Queries) GetHighlightMintClaim(ctx context.Context, id persist.DBID) (HighlightMintClaim, error) {
@@ -2825,7 +2825,7 @@ func (q *Queries) GetHighlightMintClaim(ctx context.Context, id persist.DBID) (H
 		&i.Chain,
 		&i.ContractAddress,
 		&i.RecipientWalletID,
-		&i.CollectionID,
+		&i.HighlightCollectionID,
 		&i.TokenID,
 		&i.ClaimID,
 		&i.Status,
@@ -6838,19 +6838,19 @@ func (q *Queries) ReportPost(ctx context.Context, arg ReportPostParams) (persist
 }
 
 const saveHighlightMintClaim = `-- name: SaveHighlightMintClaim :one
-insert into highlight_mint_claims(id, user_id, chain, contract_address, recipient_wallet_id, collection_id, claim_id, status, error_message) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id
+insert into highlight_mint_claims(id, user_id, chain, contract_address, recipient_wallet_id, highlight_collection_id, claim_id, status, error_message) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id
 `
 
 type SaveHighlightMintClaimParams struct {
-	ID                persist.DBID          `db:"id" json:"id"`
-	UserID            persist.DBID          `db:"user_id" json:"user_id"`
-	Chain             persist.Chain         `db:"chain" json:"chain"`
-	ContractAddress   persist.Address       `db:"contract_address" json:"contract_address"`
-	RecipientWalletID persist.DBID          `db:"recipient_wallet_id" json:"recipient_wallet_id"`
-	CollectionID      string                `db:"collection_id" json:"collection_id"`
-	ClaimID           sql.NullString        `db:"claim_id" json:"claim_id"`
-	Status            highlight.ClaimStatus `db:"status" json:"status"`
-	ErrorMessage      sql.NullString        `db:"error_message" json:"error_message"`
+	ID                    persist.DBID          `db:"id" json:"id"`
+	UserID                persist.DBID          `db:"user_id" json:"user_id"`
+	Chain                 persist.Chain         `db:"chain" json:"chain"`
+	ContractAddress       persist.Address       `db:"contract_address" json:"contract_address"`
+	RecipientWalletID     persist.DBID          `db:"recipient_wallet_id" json:"recipient_wallet_id"`
+	HighlightCollectionID string                `db:"highlight_collection_id" json:"highlight_collection_id"`
+	ClaimID               sql.NullString        `db:"claim_id" json:"claim_id"`
+	Status                highlight.ClaimStatus `db:"status" json:"status"`
+	ErrorMessage          sql.NullString        `db:"error_message" json:"error_message"`
 }
 
 func (q *Queries) SaveHighlightMintClaim(ctx context.Context, arg SaveHighlightMintClaimParams) (persist.DBID, error) {
@@ -6860,7 +6860,7 @@ func (q *Queries) SaveHighlightMintClaim(ctx context.Context, arg SaveHighlightM
 		arg.Chain,
 		arg.ContractAddress,
 		arg.RecipientWalletID,
-		arg.CollectionID,
+		arg.HighlightCollectionID,
 		arg.ClaimID,
 		arg.Status,
 		arg.ErrorMessage,

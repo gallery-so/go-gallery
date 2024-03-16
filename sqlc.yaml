@@ -211,7 +211,7 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.DecimalTokenID'
 
           # Highlight mint claims
-          - column: 'highlight_mint_claims.collection_id'
+          - column: 'highlight_mint_claims.highlight_collection_id'
             go_type: 'string'
           - column: 'highlight_mint_claims.claim_id'
             go_type: 'database/sql.NullString'

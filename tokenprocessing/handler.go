@@ -31,9 +31,11 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesSync, tickTokenSync(ctx, fastRetry, slowRetry))
 	highlightProvider := highlight.NewProvider(http.DefaultClient)
 	highlightManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesMint, tickTokenMint(ctx, appMintRetry))
-	mintAttemptsForTxn := 12
+	// XXX mintAttemptsForTxn := 12
+	mintAttemptsForTxn := 0
 	mintPollTimeForTxn := 5 * time.Second
-	mintAttemptsForSync := 12
+	// XXX mintAttemptsForSync := 12
+	mintAttemptsForSync := 0
 	mintPollTimeForSync := 5 * time.Second
 
 	mediaGroup := router.Group("/media")

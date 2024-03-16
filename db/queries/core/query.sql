@@ -2017,7 +2017,7 @@ insert into privy_users (id, user_id, privy_did)
     on conflict (user_id) where not deleted do update set privy_did = excluded.privy_did, last_updated = now();
 
 -- name: SaveHighlightMintClaim :one
-insert into highlight_mint_claims(id, user_id, chain, contract_address, recipient_wallet_id, collection_id, claim_id, status, error_message) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;
+insert into highlight_mint_claims(id, user_id, chain, contract_address, recipient_wallet_id, highlight_collection_id, claim_id, status, error_message) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;
 
 -- name: GetHighlightMintClaim :one
 select * from highlight_mint_claims where id = $1 and not deleted;

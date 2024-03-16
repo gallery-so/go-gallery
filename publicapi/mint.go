@@ -77,14 +77,14 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 	}
 
 	storeParams := db.SaveHighlightMintClaimParams{
-		ID:                persist.GenerateID(),
-		UserID:            userID,
-		Chain:             contract.Chain(),
-		ContractAddress:   contract.Address(),
-		RecipientWalletID: wallet.ID,
-		CollectionID:      collectionID,
-		ClaimID:           util.ToNullString(claimID, true),
-		Status:            status,
+		ID:                    persist.GenerateID(),
+		UserID:                userID,
+		Chain:                 contract.Chain(),
+		ContractAddress:       contract.Address(),
+		RecipientWalletID:     wallet.ID,
+		HighlightCollectionID: collectionID,
+		ClaimID:               util.ToNullString(claimID, true),
+		Status:                status,
 	}
 	if claimErr != nil {
 		storeParams.ErrorMessage = util.ToNullString(claimErr.Error(), true)

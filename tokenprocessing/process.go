@@ -562,7 +562,7 @@ func processHighlightMintClaim(
 			for i := 0; i < attemptsForSync; i++ {
 				newTokens, err = mcPipe.AddTokensToUserUnchecked(ctx, claim.UserID, []persist.TokenUniqueIdentifiers{newTokenID}, []persist.HexString{"1"})
 				if err != nil {
-					err := fmt.Errorf("failed to sync token for highlight mint claimID=%s, retrying on err: %s; waiting %s (attempt=%d/%d)", claim.ID, err, pollTimeForSync, i, attemptsForSync)
+					err := fmt.Errorf("failed to sync token for highlight mint claimID=%s, retrying on err: %s; waiting %s (attempt=%d/%d)", claim.ID, err, pollTimeForSync, i+1, attemptsForSync)
 					logger.For(ctx).Error(err)
 					<-time.After(pollTimeForSync)
 					continue
@@ -596,8 +596,8 @@ func processHighlightMintClaim(
 				}
 				newToken = token.Token
 			} else {
-				logger.For(ctx).Infof("synced tokenID=%s for claimID=%s", newToken.ID, claim.ID)
 				newToken = newTokens[0].Instance
+				logger.For(ctx).Infof("synced tokenID=%s for claimID=%s", newToken.ID, claim.ID)
 			}
 
 			// Write complete status
@@ -609,10 +609,11 @@ func processHighlightMintClaim(
 				util.ErrResponse(ctx, http.StatusOK, err)
 				return
 			}
+
 			ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 			return
 		default:
-			err := fmt.Errorf("highlight mint claimID=%s has an unexpected status=%s, removing from queue", claim.ID, claim.Status)
+			err := fmt.Errorf("highlight mint claimID=%s has an unexpected status [%s], removing from queue", claim.ID, claim.Status)
 			logger.For(ctx).Warn(err)
 			sentryutil.ReportError(ctx, err)
 			util.ErrResponse(ctx, http.StatusOK, err)
@@ -637,7 +638,7 @@ func pollHighlightTransaction(
 	attemptsForTxn int,
 	pollTimeForTxn time.Duration,
 ) (highlight.ClaimStatus, persist.DecimalTokenID, persist.TokenMetadata, error) {
-	var status highlight.ClaimStatus
+	status := claim.Status
 	var tokenID persist.DecimalTokenID
 	var metadata persist.TokenMetadata
 	var err error
@@ -648,7 +649,7 @@ func pollHighlightTransaction(
 		}
 		if status == highlight.ClaimStatusTxPending {
 			updateHighlightClaimStatus(ctx, q, claim.ID, status, "")
-			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting %s (attempt=%d/%d)", claim.ID, pollTimeForTxn, i, attemptsForTxn)
+			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting %s (attempt=%d/%d)", claim.ID, pollTimeForTxn, i+1, attemptsForTxn)
 			<-time.After(pollTimeForTxn)
 			continue
 		}
