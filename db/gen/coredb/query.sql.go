@@ -2813,7 +2813,7 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 }
 
 const getHighlightMintClaim = `-- name: GetHighlightMintClaim :one
-select id, user_id, chain, contract_address, recipient_wallet_id, highlight_collection_id, token_id, claim_id, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where id = $1 and not deleted
+select id, user_id, chain, contract_address, token_id, token_metadata, recipient_wallet_id, highlight_collection_id, token_instance_id, claim_id, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where id = $1 and not deleted
 `
 
 func (q *Queries) GetHighlightMintClaim(ctx context.Context, id persist.DBID) (HighlightMintClaim, error) {
@@ -2824,9 +2824,11 @@ func (q *Queries) GetHighlightMintClaim(ctx context.Context, id persist.DBID) (H
 		&i.UserID,
 		&i.Chain,
 		&i.ContractAddress,
+		&i.TokenID,
+		&i.TokenMetadata,
 		&i.RecipientWalletID,
 		&i.HighlightCollectionID,
-		&i.TokenID,
+		&i.TokenInstanceID,
 		&i.ClaimID,
 		&i.Status,
 		&i.ErrorMessage,
@@ -7218,9 +7220,9 @@ update highlight_mint_claims set last_updated = now(), status = $1, token_id = $
 `
 
 type UpdateHighlightMintClaimStatusCompletedParams struct {
-	Status  highlight.ClaimStatus `db:"status" json:"status"`
-	TokenID persist.DBID          `db:"token_id" json:"token_id"`
-	ID      persist.DBID          `db:"id" json:"id"`
+	Status  highlight.ClaimStatus  `db:"status" json:"status"`
+	TokenID persist.DecimalTokenID `db:"token_id" json:"token_id"`
+	ID      persist.DBID           `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateHighlightMintClaimStatusCompleted(ctx context.Context, arg UpdateHighlightMintClaimStatusCompletedParams) error {

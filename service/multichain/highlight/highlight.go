@@ -15,18 +15,21 @@ import (
 )
 
 const (
-	baseURL                                    = "https://api.highlight.xyz:8080"
-	txCodeInitiated                            = "INITIATED"
-	txCodeSent                                 = "TX_SENT"
-	txCodeReverted                             = "TX_REVERTED"
-	txCodeCancelled                            = "TX_CANCELLED"
-	txCodeComplete                             = "TX_COMPLETE"
-	claimCodeMintUnavailable                   = "MINT_UNAVAILABLE"
-	ClaimStatusTxPending           ClaimStatus = "CLAIM_STATE_TX_PENDING"
-	ClaimStatusTxFailed            ClaimStatus = "CLAIM_STATE_TX_FAILED"
-	ClaimStatusTxSucceeded         ClaimStatus = "CLAIM_STATE_TX_SUCCEEDED"
-	ClaimStatusTokenSyncCompleted  ClaimStatus = "CLAIM_STATE_TOKEN_SYNCED_COMPLETED"
-	ClaimStatusFailedUnknownStatus ClaimStatus = "CLAIM_STATE_FAILED_UNKNOWN_STATUS"
+	baseURL                                         = "https://api.highlight.xyz:8080"
+	txCodeInitiated                                 = "INITIATED"
+	txCodeSent                                      = "TX_SENT"
+	txCodeReverted                                  = "TX_REVERTED"
+	txCodeCancelled                                 = "TX_CANCELLED"
+	txCodeComplete                                  = "TX_COMPLETE"
+	claimCodeMintUnavailable                        = "MINT_UNAVAILABLE"
+	ClaimStatusTxPending                ClaimStatus = "CLAIM_STATE_TX_PENDING"                 // Waiting for transaction to complete
+	ClaimStatusTxFailed                 ClaimStatus = "CLAIM_STATE_TX_FAILED"                  // Transaction reverted or was cancelled
+	ClaimStatusTxSucceeded              ClaimStatus = "CLAIM_STATE_TX_SUCCEEDED"               // Transaction completed successfully
+	ClaimStatusTokenSyncing             ClaimStatus = "CLAIM_STATE_TOKEN_SYNCING"              // Waiting for providers to index token
+	ClaimStatusTokenSyncFailed          ClaimStatus = "CLAIM_STATE_TOKEN_FAILED"               // Providers do not have the token
+	ClaimStatusTokenProcessingSucceeded ClaimStatus = "CLAIM_STATE_TOKEN_PROCESSING_SUCCEEDED" // Succesfully processed media for the token
+	ClaimStatusTokenProcessingFailed    ClaimStatus = "CLAIM_STATE_TOKEN_PROCESSING_FAILED"    // Failed to process media for the token
+	ClaimStatusFailedUnknownStatus      ClaimStatus = "CLAIM_STATE_FAILED_UNKNOWN_STATUS"      // Unexpected error occurred in processing
 )
 
 var ErrHighlightChainNotSupported = errors.New("chain is not supported by highlight")
@@ -173,7 +176,7 @@ func (api *Provider) GetClaimStatus(ctx context.Context, claimID string) (ClaimS
 
 	err := api.gql.Query(ctx, &q, map[string]any{"claimId": graphql.String(claimID)})
 	if err != nil {
-		return "", "", persist.TokenMetadata{}, err
+		return ClaimStatusFailedUnknownStatus, "", persist.TokenMetadata{}, err
 	}
 
 	status := q.ClaimStatusApp.Status

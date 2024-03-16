@@ -301,19 +301,21 @@ type GalleryRelevance struct {
 }
 
 type HighlightMintClaim struct {
-	ID                    persist.DBID          `db:"id" json:"id"`
-	UserID                persist.DBID          `db:"user_id" json:"user_id"`
-	Chain                 persist.Chain         `db:"chain" json:"chain"`
-	ContractAddress       persist.Address       `db:"contract_address" json:"contract_address"`
-	RecipientWalletID     persist.DBID          `db:"recipient_wallet_id" json:"recipient_wallet_id"`
-	HighlightCollectionID string                `db:"highlight_collection_id" json:"highlight_collection_id"`
-	TokenID               persist.DBID          `db:"token_id" json:"token_id"`
-	ClaimID               sql.NullString        `db:"claim_id" json:"claim_id"`
-	Status                highlight.ClaimStatus `db:"status" json:"status"`
-	ErrorMessage          sql.NullString        `db:"error_message" json:"error_message"`
-	CreatedAt             time.Time             `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time             `db:"last_updated" json:"last_updated"`
-	Deleted               bool                  `db:"deleted" json:"deleted"`
+	ID                    persist.DBID           `db:"id" json:"id"`
+	UserID                persist.DBID           `db:"user_id" json:"user_id"`
+	Chain                 persist.Chain          `db:"chain" json:"chain"`
+	ContractAddress       persist.Address        `db:"contract_address" json:"contract_address"`
+	TokenID               persist.DecimalTokenID `db:"token_id" json:"token_id"`
+	TokenMetadata         persist.TokenMetadata  `db:"token_metadata" json:"token_metadata"`
+	RecipientWalletID     persist.DBID           `db:"recipient_wallet_id" json:"recipient_wallet_id"`
+	HighlightCollectionID string                 `db:"highlight_collection_id" json:"highlight_collection_id"`
+	TokenInstanceID       persist.DBID           `db:"token_instance_id" json:"token_instance_id"`
+	ClaimID               sql.NullString         `db:"claim_id" json:"claim_id"`
+	Status                highlight.ClaimStatus  `db:"status" json:"status"`
+	ErrorMessage          sql.NullString         `db:"error_message" json:"error_message"`
+	CreatedAt             time.Time              `db:"created_at" json:"created_at"`
+	LastUpdated           time.Time              `db:"last_updated" json:"last_updated"`
+	Deleted               bool                   `db:"deleted" json:"deleted"`
 }
 
 type LegacyView struct {
