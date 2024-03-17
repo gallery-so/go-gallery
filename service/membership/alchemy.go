@@ -24,7 +24,7 @@ type indexerTokenResponse struct {
 	NFTs []persist.Token `json:"nfts"`
 }
 
-func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress) ([]persist.EthereumAddress, error) {
+func getOwnersForToken(ctx context.Context, tid persist.HexTokenID, contractAddress persist.EthereumAddress) ([]persist.EthereumAddress, error) {
 	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s", env.GetString("INDEXER_HOST"), tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -53,7 +53,7 @@ func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress
 	return owners, nil
 }
 
-func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
+func getTokenMetadata(ctx context.Context, tid persist.HexTokenID, contractAddress persist.EthereumAddress, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
 	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s&limit=1", env.GetString("INDEXER_HOST"), tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

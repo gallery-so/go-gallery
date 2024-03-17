@@ -63,7 +63,7 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, q *core
 
 func useEventHandler(q *coredb.Queries, p *pubsub.Client, t *task.Client, l *redislock.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		event.AddTo(c, false, notifications.New(q, p, t, l, false), q, t)
+		event.AddTo(c, false, notifications.New(q, p, t, l, false), q, t, nil)
 		c.Next()
 	}
 }

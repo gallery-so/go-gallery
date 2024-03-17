@@ -9,7 +9,7 @@ bindings:
   DBID:
     type: github.com/mikeydub/go-gallery/service/persist.DBID
   TokenId:
-    type: github.com/mikeydub/go-gallery/service/persist.TokenID
+    type: github.com/mikeydub/go-gallery/service/persist.HexTokenID
   Address:
     type: github.com/mikeydub/go-gallery/service/persist.Address
   ChainAddressInput:

@@ -133,11 +133,12 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
 	tokenManageCache := redis.NewCache(redis.TokenManageCache)
 	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
+	neynar := farcaster.NewNeynarAPI(c.HTTPClient, socialCache, c.Queries)
 
 	recommender.Loop(ctx, time.NewTicker(time.Hour))
 	p.Loop(ctx, time.NewTicker(time.Minute*15))
 
-	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, farcaster.NewNeynarAPI(c.HTTPClient, socialCache))
+	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar)
 }
 
 func newSecretsClient() *secretmanager.Client {

@@ -93,7 +93,7 @@ type Transfer struct {
 	BlockNumber     persist.BlockNumber
 	From            persist.EthereumAddress
 	To              persist.EthereumAddress
-	TokenID         persist.TokenID
+	TokenID         persist.HexTokenID
 	TokenType       persist.TokenType
 	Amount          uint64
 	ContractAddress persist.EthereumAddress
@@ -251,12 +251,12 @@ func GetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, e
 func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, error) {
 	var height uint64
 	var err error
-	for i := 0; i < retry.DefaultRetry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.MaxRetries; i++ {
 		height, err = GetBlockNumber(ctx, ethClient)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(ctx, i)
+		<-time.After(retry.WaitTime(retry.DefaultRetry.MinWait, retry.DefaultRetry.MaxRetries, i))
 	}
 	return height, err
 }
@@ -270,12 +270,12 @@ func GetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.Fi
 func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery) ([]types.Log, error) {
 	logs := make([]types.Log, 0)
 	var err error
-	for i := 0; i < retry.DefaultRetry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.MaxRetries; i++ {
 		logs, err = GetLogs(ctx, ethClient, query)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(ctx, i)
+		<-time.After(retry.WaitTime(retry.DefaultRetry.MinWait, retry.DefaultRetry.MaxWait, i))
 	}
 	return logs, err
 }
@@ -286,16 +286,16 @@ func GetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash com
 }
 
 // RetryGetTransaction calls GetTransaction with backoff.
-func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, retry retry.Retry) (*types.Transaction, bool, error) {
+func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, r retry.Retry) (*types.Transaction, bool, error) {
 	var tx *types.Transaction
 	var pending bool
 	var err error
-	for i := 0; i < retry.Tries; i++ {
+	for i := 0; i < r.MaxRetries; i++ {
 		tx, pending, err = GetTransaction(ctx, ethClient, txHash)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.Sleep(ctx, i)
+		<-time.After(retry.WaitTime(r.MinWait, r.MaxWait, i))
 	}
 	return tx, pending, err
 }
@@ -328,12 +328,12 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
 	var metadata *TokenContractMetadata
 	var err error
-	for i := 0; i < retry.DefaultRetry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.MaxRetries; i++ {
 		metadata, err = GetTokenContractMetadata(ctx, contractAddress, ethClient)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(ctx, i)
+		<-time.After(retry.WaitTime(retry.DefaultRetry.MinWait, retry.DefaultRetry.MaxWait, i))
 	}
 	return metadata, err
 }
@@ -618,7 +618,7 @@ func GetHTTPHeaders(ctx context.Context, url string) (http.Header, error) {
 }
 
 // GetTokenURI returns metadata URI for a given token address.
-func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
+func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.EthereumAddress, pTokenID persist.HexTokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
 	contract := pContractAddress.Address()
 	switch pTokenType {
@@ -677,21 +677,21 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 }
 
 // RetryGetTokenURI calls GetTokenURI with backoff.
-func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
+func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.HexTokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 	var u persist.TokenURI
 	var err error
-	for i := 0; i < retry.DefaultRetry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.MaxRetries; i++ {
 		u, err = GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.DefaultRetry.Sleep(ctx, i)
+		<-time.After(retry.WaitTime(retry.DefaultRetry.MinWait, retry.DefaultRetry.MaxWait, i))
 	}
 	return u, err
 }
 
 // GetBalanceOfERC1155Token returns the balance of an ERC1155 token
-func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
+func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.HexTokenID, ethClient *ethclient.Client) (*big.Int, error) {
 	contract := common.HexToAddress(string(pContractAddress))
 	owner := common.HexToAddress(string(pOwnerAddress))
 	instance, err := contracts.NewIERC1155(contract, ethClient)
@@ -710,7 +710,7 @@ func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddre
 }
 
 // GetOwnerOfERC721Token returns the Owner of an ERC721 token
-func GetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
+func GetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.EthereumAddress, pTokenID persist.HexTokenID, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
 	contract := common.HexToAddress(string(pContractAddress))
 
 	instance, err := contracts.NewIERC721Caller(contract, ethClient)

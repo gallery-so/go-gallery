@@ -136,6 +136,10 @@ func (r *SomeoneViewedYourGalleryNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneViewedYourGalleryNotification:%s", r.Dbid))
 }
 
+func (r *SomeoneYouFollowOnFarcasterJoinedNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneYouFollowOnFarcasterJoinedNotification:%s", r.Dbid))
+}
+
 func (r *SomeoneYouFollowPostedTheirFirstPostNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneYouFollowPostedTheirFirstPostNotification:%s", r.Dbid))
 }
@@ -199,6 +203,7 @@ type NodeFetcher struct {
 	OnSomeonePostedYourWorkNotification                func(ctx context.Context, dbid persist.DBID) (*SomeonePostedYourWorkNotification, error)
 	OnSomeoneRepliedToYourCommentNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneRepliedToYourCommentNotification, error)
 	OnSomeoneViewedYourGalleryNotification             func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
+	OnSomeoneYouFollowOnFarcasterJoinedNotification    func(ctx context.Context, dbid persist.DBID) (*SomeoneYouFollowOnFarcasterJoinedNotification, error)
 	OnSomeoneYouFollowPostedTheirFirstPostNotification func(ctx context.Context, dbid persist.DBID) (*SomeoneYouFollowPostedTheirFirstPostNotification, error)
 	OnToken                                            func(ctx context.Context, dbid persist.DBID) (*Token, error)
 	OnTokenDefinition                                  func(ctx context.Context, dbid persist.DBID) (*TokenDefinition, error)
@@ -362,6 +367,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneViewedYourGalleryNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnSomeoneViewedYourGalleryNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneYouFollowOnFarcasterJoinedNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneYouFollowOnFarcasterJoinedNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneYouFollowOnFarcasterJoinedNotification(ctx, persist.DBID(ids[0]))
 	case "SomeoneYouFollowPostedTheirFirstPostNotification":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneYouFollowPostedTheirFirstPostNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -457,6 +467,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneRepliedToYourCommentNotification")
 	case n.OnSomeoneViewedYourGalleryNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneViewedYourGalleryNotification")
+	case n.OnSomeoneYouFollowOnFarcasterJoinedNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneYouFollowOnFarcasterJoinedNotification")
 	case n.OnSomeoneYouFollowPostedTheirFirstPostNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneYouFollowPostedTheirFirstPostNotification")
 	case n.OnToken == nil:

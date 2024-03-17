@@ -114,7 +114,7 @@ models:
       - github.com/mikeydub/go-gallery/service/persist.CommunityType
   TokenId:
     model:
-      - github.com/mikeydub/go-gallery/service/persist.TokenID
+      - github.com/mikeydub/go-gallery/service/persist.HexTokenID
   ReportReason:
     model:
       - github.com/mikeydub/go-gallery/service/persist.ReportReason

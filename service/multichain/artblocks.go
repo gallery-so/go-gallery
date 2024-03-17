@@ -111,7 +111,7 @@ func (i artBlocksCommunityInfo) GetWebsiteURL() string {
 // Art Blocks project IDs are the token ID divided by 1,000,000
 var oneMillion = big.NewInt(1000000)
 
-func tokenIDToArtBlocksProjectID(tokenID persist.TokenID) string {
+func tokenIDToArtBlocksProjectID(tokenID persist.HexTokenID) string {
 	var projectIDInt big.Int
 	projectIDInt.Div(tokenID.BigInt(), oneMillion)
 	return projectIDInt.String()
@@ -119,7 +119,7 @@ func tokenIDToArtBlocksProjectID(tokenID persist.TokenID) string {
 
 // projectIDToTokenID returns the first token ID that would belong to a given project ID.
 // Note: the Art Blocks API expects base 10 token IDs, so for efficiency, this helper method
-// works directly with base 10 numbers and doesn't use the hex-based persist.TokenID type.
+// works directly with base 10 numbers and doesn't use the hex-based persist.HexTokenID type.
 func projectIDToBase10ArtBlocksTokenID(projectID string) string {
 	var projectIDInt big.Int
 	projectIDInt.SetString(projectID, 10)
@@ -217,7 +217,7 @@ func (a artBlocksCommunityKey) String() string {
 	return fmt.Sprintf("ProjectID=%s:Chain=%d:ContractAddress=%s", a.ProjectID, a.ContractChain, a.ContractAddress)
 }
 
-func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownProviders []db.CommunityContractProvider, tokens []op.TokenFullDetails) error {
+func (p *Provider) processArtBlocksCommunityTokens(ctx context.Context, knownProviders []db.CommunityContractProvider, tokens []op.TokenFullDetails) error {
 	artBlocksContracts := make(map[persist.DBID]bool)
 	for _, t := range knownProviders {
 		if t.CommunityType == persist.CommunityTypeArtBlocks {
@@ -390,6 +390,7 @@ func (p *Provider) processArtBlocksTokenCommunities(ctx context.Context, knownPr
 			upsertParams.Ids = append(upsertParams.Ids, persist.GenerateID().String())
 			upsertParams.TokenDefinitionID = append(upsertParams.TokenDefinitionID, token.Definition.ID.String())
 			upsertParams.CommunityID = append(upsertParams.CommunityID, community.ID.String())
+			upsertParams.TokenID = append(upsertParams.TokenID, token.Definition.TokenID.ToDecimalTokenID().Numeric())
 		}
 	}
 

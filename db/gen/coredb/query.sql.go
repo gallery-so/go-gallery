@@ -28,7 +28,7 @@ func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionT
 	return err
 }
 
-const addManyFollows = `-- name: AddManyFollows :exec
+const addManyFollows = `-- name: AddManyFollows :many
 insert into follows (id, follower, followee, deleted) select unnest($1::varchar[]), $2, unnest($3::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at
 `
 
@@ -38,9 +38,24 @@ type AddManyFollowsParams struct {
 	Followees []string     `db:"followees" json:"followees"`
 }
 
-func (q *Queries) AddManyFollows(ctx context.Context, arg AddManyFollowsParams) error {
-	_, err := q.db.Exec(ctx, addManyFollows, arg.Ids, arg.Follower, arg.Followees)
-	return err
+func (q *Queries) AddManyFollows(ctx context.Context, arg AddManyFollowsParams) ([]bool, error) {
+	rows, err := q.db.Query(ctx, addManyFollows, arg.Ids, arg.Follower, arg.Followees)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []bool
+	for rows.Next() {
+		var column_1 bool
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const addPiiAccountCreationInfo = `-- name: AddPiiAccountCreationInfo :exec
@@ -1191,6 +1206,52 @@ func (q *Queries) CreatePostEvent(ctx context.Context, arg CreatePostEventParams
 	return i, err
 }
 
+const createPostNotification = `-- name: CreatePostNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
+`
+
+type CreatePostNotificationParams struct {
+	ID       persist.DBID             `db:"id" json:"id"`
+	OwnerID  persist.DBID             `db:"owner_id" json:"owner_id"`
+	Action   persist.Action           `db:"action" json:"action"`
+	Data     persist.NotificationData `db:"data" json:"data"`
+	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
+	PostID   persist.DBID             `db:"post_id" json:"post_id"`
+}
+
+func (q *Queries) CreatePostNotification(ctx context.Context, arg CreatePostNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createPostNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.PostID,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
+		&i.MentionID,
+		&i.CommunityID,
+	)
+	return i, err
+}
+
 const createPushTickets = `-- name: CreatePushTickets :exec
 insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
   (
@@ -1451,86 +1512,6 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		&i.CommunityID,
 	)
 	return i, err
-}
-
-const createUserPostedFirstPostNotifications = `-- name: CreateUserPostedFirstPostNotifications :many
-WITH 
-follower_with_row_number AS (
-    SELECT follower, row_number() OVER () AS rn
-    FROM follows
-    WHERE followee = $5 AND deleted = false
-),
-id_with_row_number AS (
-    SELECT unnest($6::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest($6::varchar(255)[])) AS rn
-)
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
-SELECT 
-    i.id, 
-    f.follower, 
-    $1, 
-    $2, 
-    $3, 
-    $4
-FROM 
-    id_with_row_number i
-JOIN 
-    follower_with_row_number f ON i.rn = f.rn
-RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, mention_id, community_id
-`
-
-type CreateUserPostedFirstPostNotificationsParams struct {
-	Action   persist.Action           `db:"action" json:"action"`
-	Data     persist.NotificationData `db:"data" json:"data"`
-	EventIds persist.DBIDList         `db:"event_ids" json:"event_ids"`
-	PostID   persist.DBID             `db:"post_id" json:"post_id"`
-	ActorID  persist.DBID             `db:"actor_id" json:"actor_id"`
-	Ids      []string                 `db:"ids" json:"ids"`
-}
-
-func (q *Queries) CreateUserPostedFirstPostNotifications(ctx context.Context, arg CreateUserPostedFirstPostNotificationsParams) ([]Notification, error) {
-	rows, err := q.db.Query(ctx, createUserPostedFirstPostNotifications,
-		arg.Action,
-		arg.Data,
-		arg.EventIds,
-		arg.PostID,
-		arg.ActorID,
-		arg.Ids,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Notification
-	for rows.Next() {
-		var i Notification
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.OwnerID,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Action,
-			&i.Data,
-			&i.EventIds,
-			&i.FeedEventID,
-			&i.CommentID,
-			&i.GalleryID,
-			&i.Seen,
-			&i.Amount,
-			&i.PostID,
-			&i.TokenID,
-			&i.MentionID,
-			&i.CommunityID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const createUserPostedYourWorkNotification = `-- name: CreateUserPostedYourWorkNotification :one
@@ -2534,6 +2515,73 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 	return items, nil
 }
 
+const getFarcasterConnections = `-- name: GetFarcasterConnections :many
+with farcaster         as ( select unnest($1::varchar[]) fid ),
+	 farcaster_gallery as ( select user_id, pii_unverified_email_address, deleted, pii_socials, pii_verified_email_address, fid from pii.for_users p join farcaster on p.pii_socials->'Farcaster'->>'id' = farcaster.fid ),
+	 not_followed      as ( select user_id, pii_unverified_email_address, fg.deleted, pii_socials, pii_verified_email_address, fid, id, follower, followee, f.deleted, created_at, last_updated from farcaster_gallery fg left join follows f on f.follower = $2 and f.followee = fg.user_id where f.id is null ),
+	 farcaster_users   as ( select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id, u.persona from users u join not_followed on u.id = not_followed.user_id and not u.deleted and not u.universal ),
+	 ordering          as ( select f.id
+	                            , rank() over (order by sum(cardinality(c.nfts)) desc nulls last) display_rank
+	                            , rank() over (order by count(p.id) desc nulls last) post_rank
+	 						from farcaster_users f
+	 						left join collections c on f.id = c.owner_user_id and not c.deleted
+	 						left join posts p on f.id = p.actor_id and not p.deleted
+	 						group by f.id )
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
+from farcaster_users users
+left join ordering using(id)
+order by ((ordering.display_rank + ordering.post_rank) / 2) asc nulls last
+limit 200
+`
+
+type GetFarcasterConnectionsParams struct {
+	Fids   []string     `db:"fids" json:"fids"`
+	UserID persist.DBID `db:"user_id" json:"user_id"`
+}
+
+type GetFarcasterConnectionsRow struct {
+	User User `db:"user" json:"user"`
+}
+
+func (q *Queries) GetFarcasterConnections(ctx context.Context, arg GetFarcasterConnectionsParams) ([]GetFarcasterConnectionsRow, error) {
+	rows, err := q.db.Query(ctx, getFarcasterConnections, arg.Fids, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetFarcasterConnectionsRow
+	for rows.Next() {
+		var i GetFarcasterConnectionsRow
+		if err := rows.Scan(
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
+			&i.User.Persona,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFeedEventByID = `-- name: GetFeedEventByID :one
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = $1 AND deleted = false
 `
@@ -2892,9 +2940,9 @@ where (chain, contract_address, token_id) = ($1, $2, $3)
 `
 
 type GetMediaByTokenIdentifiersIgnoringStatusParams struct {
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetMediaByTokenIdentifiersIgnoringStatus(ctx context.Context, arg GetMediaByTokenIdentifiersIgnoringStatusParams) (TokenMedia, error) {
@@ -2959,7 +3007,7 @@ const getMerchDiscountCodeByTokenID = `-- name: GetMerchDiscountCodeByTokenID :o
 select discount_code from merch where token_id = $1 and redeemed = true and deleted = false
 `
 
-func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex persist.TokenID) (sql.NullString, error) {
+func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex persist.HexTokenID) (sql.NullString, error) {
 	row := q.db.QueryRow(ctx, getMerchDiscountCodeByTokenID, tokenHex)
 	var discount_code sql.NullString
 	err := row.Scan(&discount_code)
@@ -3974,10 +4022,10 @@ where t.token_definition_id = td.id
 `
 
 type GetTokenByUserTokenIdentifiersParams struct {
-	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	OwnerID         persist.DBID       `db:"owner_id" json:"owner_id"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
 }
 
 type GetTokenByUserTokenIdentifiersRow struct {
@@ -4119,9 +4167,9 @@ where (chain, contract_address, token_id) = ($1, $2, $3) and not deleted
 `
 
 type GetTokenDefinitionByTokenIdentifiersParams struct {
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetTokenDefinitionByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionByTokenIdentifiersParams) (TokenDefinition, error) {
@@ -4339,10 +4387,10 @@ order by tokens.block_number desc
 `
 
 type GetTokenFullDetailsByUserTokenIdentifiersParams struct {
-	OwnerUserID     persist.DBID    `db:"owner_user_id" json:"owner_user_id"`
-	Chain           persist.Chain   `db:"chain" json:"chain"`
-	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	OwnerUserID     persist.DBID       `db:"owner_user_id" json:"owner_user_id"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
 }
 
 type GetTokenFullDetailsByUserTokenIdentifiersRow struct {
@@ -4736,11 +4784,11 @@ group by (token_definitions.token_id, token_definitions.contract_address, token_
 `
 
 type GetUniqueTokenIdentifiersByTokenIDRow struct {
-	TokenID         persist.TokenID   `db:"token_id" json:"token_id"`
-	ContractAddress persist.Address   `db:"contract_address" json:"contract_address"`
-	Chain           persist.Chain     `db:"chain" json:"chain"`
-	Quantity        persist.HexString `db:"quantity" json:"quantity"`
-	OwnerAddresses  []string          `db:"owner_addresses" json:"owner_addresses"`
+	TokenID         persist.HexTokenID `db:"token_id" json:"token_id"`
+	ContractAddress persist.Address    `db:"contract_address" json:"contract_address"`
+	Chain           persist.Chain      `db:"chain" json:"chain"`
+	Quantity        persist.HexString  `db:"quantity" json:"quantity"`
+	OwnerAddresses  []string           `db:"owner_addresses" json:"owner_addresses"`
 }
 
 func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id persist.DBID) (GetUniqueTokenIdentifiersByTokenIDRow, error) {
@@ -5255,6 +5303,51 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 			&i.ProfileImageID,
 			&i.Persona,
 			&i.Address,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersByFarcasterIDs = `-- name: GetUsersByFarcasterIDs :many
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, users.persona
+from pii.for_users join users on for_users.user_id = users.id
+where ((pii_socials -> 'Farcaster'::text) ->> 'id'::text) = any($1::varchar[]) and not users.deleted
+`
+
+func (q *Queries) GetUsersByFarcasterIDs(ctx context.Context, fids []string) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersByFarcasterIDs, fids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.ProfileImageID,
+			&i.Persona,
 		); err != nil {
 			return nil, err
 		}
@@ -6086,7 +6179,7 @@ type InsertTokenPipelineResultsParams struct {
 	RetiringMediaID  persist.DBID             `db:"retiring_media_id" json:"retiring_media_id"`
 	Chain            persist.Chain            `db:"chain" json:"chain"`
 	ContractAddress  persist.Address          `db:"contract_address" json:"contract_address"`
-	TokenID          persist.TokenID          `db:"token_id" json:"token_id"`
+	TokenID          persist.HexTokenID       `db:"token_id" json:"token_id"`
 	NewMediaIsActive bool                     `db:"new_media_is_active" json:"new_media_is_active"`
 	NewMediaID       persist.DBID             `db:"new_media_id" json:"new_media_id"`
 	NewMedia         pgtype.JSONB             `db:"new_media" json:"new_media"`
@@ -6583,8 +6676,8 @@ update merch set redeemed = true, token_id = $1, last_updated = now() where id =
 `
 
 type RedeemMerchParams struct {
-	TokenHex   persist.TokenID `db:"token_hex" json:"token_hex"`
-	ObjectType int32           `db:"object_type" json:"object_type"`
+	TokenHex   persist.HexTokenID `db:"token_hex" json:"token_hex"`
+	ObjectType int32              `db:"object_type" json:"object_type"`
 }
 
 func (q *Queries) RedeemMerch(ctx context.Context, arg RedeemMerchParams) (sql.NullString, error) {
@@ -7135,11 +7228,11 @@ returning id, created_at, last_updated, deleted, name, description, token_type, 
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
-	Name        sql.NullString  `db:"name" json:"name"`
-	Description sql.NullString  `db:"description" json:"description"`
-	TokenID     persist.TokenID `db:"token_id" json:"token_id"`
-	ContractID  persist.DBID    `db:"contract_id" json:"contract_id"`
-	Chain       persist.Chain   `db:"chain" json:"chain"`
+	Name        sql.NullString     `db:"name" json:"name"`
+	Description sql.NullString     `db:"description" json:"description"`
+	TokenID     persist.HexTokenID `db:"token_id" json:"token_id"`
+	ContractID  persist.DBID       `db:"contract_id" json:"contract_id"`
+	Chain       persist.Chain      `db:"chain" json:"chain"`
 }
 
 func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) (TokenDefinition, error) {
@@ -7430,4 +7523,39 @@ func (q *Queries) UserOwnsGallery(ctx context.Context, arg UserOwnsGalleryParams
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const usersFollowUser = `-- name: UsersFollowUser :many
+select (follows.id is not null)::bool
+from (
+    select unnest($2::varchar[]) as id,
+    generate_subscripts($2::varchar[], 1) as index
+    ) user_ids
+left join follows on follows.follower = user_ids.id and followee = $1 and not deleted
+order by user_ids.index
+`
+
+type UsersFollowUserParams struct {
+	Followee    persist.DBID `db:"followee" json:"followee"`
+	FollowedIds []string     `db:"followed_ids" json:"followed_ids"`
+}
+
+func (q *Queries) UsersFollowUser(ctx context.Context, arg UsersFollowUserParams) ([]bool, error) {
+	rows, err := q.db.Query(ctx, usersFollowUser, arg.Followee, arg.FollowedIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []bool
+	for rows.Next() {
+		var column_1 bool
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

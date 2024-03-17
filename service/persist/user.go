@@ -114,7 +114,6 @@ type UserRepository interface {
 	MergeUsers(context.Context, DBID, DBID) error
 	AddFollower(pCtx context.Context, follower DBID, followee DBID) (refollowed bool, err error)
 	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
-	UserFollowsUser(pCtx context.Context, userA DBID, userB DBID) (bool, error)
 	FillWalletDataForUser(pCtx context.Context, user *User) error
 }
 

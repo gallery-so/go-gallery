@@ -110,6 +110,42 @@ with token_definitions_insert as (
     , contract_id = excluded.contract_id
   returning *
 )
+, community_memberships_insert as (
+  insert into token_community_memberships
+  (
+    id
+    , token_definition_id
+    , community_id
+    , created_at
+    , last_updated
+    , deleted
+    , token_id
+  ) (
+    select community_memberships.id
+      , token_definitions_insert.id
+      , communities.id
+      , now()
+      , now()
+      , false
+      , community_memberships.token_id
+    from (
+      select unnest(@community_membership_dbid::varchar[]) as id
+        , unnest(@community_membership_token_id::numeric[]) as token_id
+        , unnest(@definition_contract_id::varchar[]) as definition_contract_id
+        , unnest(@definition_token_id::varchar[]) as definition_token_id
+    ) community_memberships
+    join token_definitions_insert on
+        community_memberships.definition_contract_id = token_definitions_insert.contract_id
+        and community_memberships.definition_token_id = token_definitions_insert.token_id
+    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
+    -- contract community for this token. Every contract should have a community created for it by the time we get here!
+    left join communities on communities.contract_id = community_memberships.definition_contract_id and communities.community_type = 0
+  )
+  on conflict (token_definition_id, community_id) where not deleted
+  do update set
+    last_updated = excluded.last_updated
+  returning *
+)
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
 from tokens_insert tokens
 join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id

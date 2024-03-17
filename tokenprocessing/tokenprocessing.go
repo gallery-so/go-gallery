@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
@@ -55,7 +56,8 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	notificationsHandler := notifications.New(clients.Queries, clients.PubSubClient, clients.TaskClient, redis.NewLockClient(redis.NewCache(redis.NotificationLockCache)), false)
 
 	router.Use(func(c *gin.Context) {
-		event.AddTo(c, false, notificationsHandler, clients.Queries, clients.TaskClient)
+		var farcasterAPI *farcaster.NeynarAPI // nil because tokenprocessing doesn't require farcaster for event processing
+		event.AddTo(c, false, notificationsHandler, clients.Queries, clients.TaskClient, farcasterAPI)
 	})
 
 	if env.GetString("ENV") != "production" {
@@ -172,7 +174,7 @@ func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 	})
 }
 
-func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID) {
 	scope.SetTag("chain", fmt.Sprintf("%d", chain))
 	scope.SetTag("contractAddress", contractAddress.String())
 	scope.SetTag("nftID", string(tokenID))
@@ -183,7 +185,7 @@ func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress pers
 	scope.SetTag("assetURL", assetPage)
 }
 
-func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
+func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID) string {
 	switch chain {
 	case persist.ChainETH:
 		return fmt.Sprintf("https://opensea.io/assets/ethereum/%s/%d", contractAddress.String(), tokenID.ToInt())
@@ -196,7 +198,7 @@ func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID pers
 	}
 }
 
-func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID, isSpam bool) {
 	scope.SetContext(sentryTokenContextName, sentry.Context{
 		"Chain":           chain,
 		"ContractAddress": contractAddress,

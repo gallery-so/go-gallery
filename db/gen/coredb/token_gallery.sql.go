@@ -169,6 +169,42 @@ with token_definitions_insert as (
     , contract_id = excluded.contract_id
   returning id, deleted, version, created_at, last_updated, collectors_note, quantity, block_number, owner_user_id, owned_by_wallets, contract_id, is_user_marked_spam, last_synced, is_creator_token, token_definition_id, is_holder_token, displayable
 )
+, community_memberships_insert as (
+  insert into token_community_memberships
+  (
+    id
+    , token_definition_id
+    , community_id
+    , created_at
+    , last_updated
+    , deleted
+    , token_id
+  ) (
+    select community_memberships.id
+      , token_definitions_insert.id
+      , communities.id
+      , now()
+      , now()
+      , false
+      , community_memberships.token_id
+    from (
+      select unnest($29::varchar[]) as id
+        , unnest($30::numeric[]) as token_id
+        , unnest($10::varchar[]) as definition_contract_id
+        , unnest($5::varchar[]) as definition_token_id
+    ) community_memberships
+    join token_definitions_insert on
+        community_memberships.definition_contract_id = token_definitions_insert.contract_id
+        and community_memberships.definition_token_id = token_definitions_insert.token_id
+    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
+    -- contract community for this token. Every contract should have a community created for it by the time we get here!
+    left join communities on communities.contract_id = community_memberships.definition_contract_id and communities.community_type = 0
+  )
+  on conflict (token_definition_id, community_id) where not deleted
+  do update set
+    last_updated = excluded.last_updated
+  returning id, version, token_definition_id, community_id, created_at, last_updated, deleted, token_id
+)
 select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
 from tokens_insert tokens
 join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id
@@ -176,34 +212,36 @@ join contracts on token_definitions.contract_id = contracts.id
 `
 
 type UpsertTokensParams struct {
-	DefinitionDbid              []string       `db:"definition_dbid" json:"definition_dbid"`
-	DefinitionName              []string       `db:"definition_name" json:"definition_name"`
-	DefinitionDescription       []string       `db:"definition_description" json:"definition_description"`
-	DefinitionTokenType         []string       `db:"definition_token_type" json:"definition_token_type"`
-	DefinitionTokenID           []string       `db:"definition_token_id" json:"definition_token_id"`
-	DefinitionExternalUrl       []string       `db:"definition_external_url" json:"definition_external_url"`
-	DefinitionChain             []int32        `db:"definition_chain" json:"definition_chain"`
-	DefinitionFallbackMedia     []pgtype.JSONB `db:"definition_fallback_media" json:"definition_fallback_media"`
-	DefinitionContractAddress   []string       `db:"definition_contract_address" json:"definition_contract_address"`
-	DefinitionContractID        []string       `db:"definition_contract_id" json:"definition_contract_id"`
-	DefinitionMetadata          []pgtype.JSONB `db:"definition_metadata" json:"definition_metadata"`
-	DefinitionIsFxhash          []bool         `db:"definition_is_fxhash" json:"definition_is_fxhash"`
-	SetHolderFields             bool           `db:"set_holder_fields" json:"set_holder_fields"`
-	SetCreatorFields            bool           `db:"set_creator_fields" json:"set_creator_fields"`
-	TokenDbid                   []string       `db:"token_dbid" json:"token_dbid"`
-	TokenVersion                []int32        `db:"token_version" json:"token_version"`
-	TokenCollectorsNote         []string       `db:"token_collectors_note" json:"token_collectors_note"`
-	TokenQuantity               []string       `db:"token_quantity" json:"token_quantity"`
-	TokenBlockNumber            []int64        `db:"token_block_number" json:"token_block_number"`
-	TokenOwnerUserID            []string       `db:"token_owner_user_id" json:"token_owner_user_id"`
-	TokenOwnedByWallets         []string       `db:"token_owned_by_wallets" json:"token_owned_by_wallets"`
-	TokenOwnedByWalletsStartIdx []int32        `db:"token_owned_by_wallets_start_idx" json:"token_owned_by_wallets_start_idx"`
-	TokenOwnedByWalletsEndIdx   []int32        `db:"token_owned_by_wallets_end_idx" json:"token_owned_by_wallets_end_idx"`
-	TokenIsCreatorToken         []bool         `db:"token_is_creator_token" json:"token_is_creator_token"`
-	TokenTokenID                []string       `db:"token_token_id" json:"token_token_id"`
-	TokenContractAddress        []string       `db:"token_contract_address" json:"token_contract_address"`
-	TokenChain                  []int32        `db:"token_chain" json:"token_chain"`
-	TokenContractID             []string       `db:"token_contract_id" json:"token_contract_id"`
+	DefinitionDbid              []string         `db:"definition_dbid" json:"definition_dbid"`
+	DefinitionName              []string         `db:"definition_name" json:"definition_name"`
+	DefinitionDescription       []string         `db:"definition_description" json:"definition_description"`
+	DefinitionTokenType         []string         `db:"definition_token_type" json:"definition_token_type"`
+	DefinitionTokenID           []string         `db:"definition_token_id" json:"definition_token_id"`
+	DefinitionExternalUrl       []string         `db:"definition_external_url" json:"definition_external_url"`
+	DefinitionChain             []int32          `db:"definition_chain" json:"definition_chain"`
+	DefinitionFallbackMedia     []pgtype.JSONB   `db:"definition_fallback_media" json:"definition_fallback_media"`
+	DefinitionContractAddress   []string         `db:"definition_contract_address" json:"definition_contract_address"`
+	DefinitionContractID        []string         `db:"definition_contract_id" json:"definition_contract_id"`
+	DefinitionMetadata          []pgtype.JSONB   `db:"definition_metadata" json:"definition_metadata"`
+	DefinitionIsFxhash          []bool           `db:"definition_is_fxhash" json:"definition_is_fxhash"`
+	SetHolderFields             bool             `db:"set_holder_fields" json:"set_holder_fields"`
+	SetCreatorFields            bool             `db:"set_creator_fields" json:"set_creator_fields"`
+	TokenDbid                   []string         `db:"token_dbid" json:"token_dbid"`
+	TokenVersion                []int32          `db:"token_version" json:"token_version"`
+	TokenCollectorsNote         []string         `db:"token_collectors_note" json:"token_collectors_note"`
+	TokenQuantity               []string         `db:"token_quantity" json:"token_quantity"`
+	TokenBlockNumber            []int64          `db:"token_block_number" json:"token_block_number"`
+	TokenOwnerUserID            []string         `db:"token_owner_user_id" json:"token_owner_user_id"`
+	TokenOwnedByWallets         []string         `db:"token_owned_by_wallets" json:"token_owned_by_wallets"`
+	TokenOwnedByWalletsStartIdx []int32          `db:"token_owned_by_wallets_start_idx" json:"token_owned_by_wallets_start_idx"`
+	TokenOwnedByWalletsEndIdx   []int32          `db:"token_owned_by_wallets_end_idx" json:"token_owned_by_wallets_end_idx"`
+	TokenIsCreatorToken         []bool           `db:"token_is_creator_token" json:"token_is_creator_token"`
+	TokenTokenID                []string         `db:"token_token_id" json:"token_token_id"`
+	TokenContractAddress        []string         `db:"token_contract_address" json:"token_contract_address"`
+	TokenChain                  []int32          `db:"token_chain" json:"token_chain"`
+	TokenContractID             []string         `db:"token_contract_id" json:"token_contract_id"`
+	CommunityMembershipDbid     []string         `db:"community_membership_dbid" json:"community_membership_dbid"`
+	CommunityMembershipTokenID  []pgtype.Numeric `db:"community_membership_token_id" json:"community_membership_token_id"`
 }
 
 type UpsertTokensRow struct {
@@ -242,6 +280,8 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 		arg.TokenContractAddress,
 		arg.TokenChain,
 		arg.TokenContractID,
+		arg.CommunityMembershipDbid,
+		arg.CommunityMembershipTokenID,
 	)
 	if err != nil {
 		return nil, err

@@ -105,7 +105,7 @@ func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress per
 	return func(p *stubProvider) {
 		tokens := []multichain.ChainAgnosticToken{}
 		for i := 0; i < n; i++ {
-			tokenID := persist.TokenID(fmt.Sprintf("%X", i))
+			tokenID := persist.HexTokenID(fmt.Sprintf("%X", i))
 			token := dummyTokenIDContract(ownerAddress, contract.Address, tokenID)
 			tokens = append(tokens, token)
 		}
@@ -115,7 +115,7 @@ func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress per
 }
 
 // withDummyTokenID will generate a token with the provided token ID
-func withDummyTokenID(ownerAddress persist.Address, tokenID persist.TokenID) providerOpt {
+func withDummyTokenID(ownerAddress persist.Address, tokenID persist.HexTokenID) providerOpt {
 	c := multichain.ChainAgnosticContract{Address: "0x123"}
 	return func(p *stubProvider) {
 		withContracts([]multichain.ChainAgnosticContract{c})(p)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -16,7 +17,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"github.com/jackc/pgx/v4"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -29,6 +33,8 @@ const neynarV2BaseURL = "https://api.neynar.com/v2/farcaster"
 const expirationSeconds = time.Minute * 10
 const followingCacheExpiration = time.Hour * 24 * 3
 
+var ErrUserNotOnFarcaster = errors.New("user is not on farcaster")
+
 func init() {
 	env.RegisterValidation("NEYNAR_API_KEY", "required")
 }
@@ -37,13 +43,15 @@ type NeynarAPI struct {
 	httpClient *http.Client
 	apiKey     string
 	cache      *redis.Cache
+	q          *db.Queries
 }
 
-func NewNeynarAPI(httpClient *http.Client, redisCache *redis.Cache) *NeynarAPI {
+func NewNeynarAPI(httpClient *http.Client, redisCache *redis.Cache, q *db.Queries) *NeynarAPI {
 	return &NeynarAPI{
 		httpClient: httpClient,
 		apiKey:     env.GetString("NEYNAR_API_KEY"),
 		cache:      redisCache,
+		q:          q,
 	}
 }
 
@@ -152,6 +160,67 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 	return neynarResp.Result.User, nil
 }
 
+// FarcasterIDByGalleryID returns the FID of a user via the user's Gallery ID. ErrUserNotOnFarcaster is returned
+// if the user is not on Farcaster based off their connected wallets.
+func (n *NeynarAPI) FarcasterIDByGalleryID(ctx context.Context, userID persist.DBID) (NeynarID, error) {
+	socials, err := n.q.GetSocialsByUserID(ctx, userID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	p, ok := socials[persist.SocialProviderFarcaster]
+	if !ok {
+		return "", ErrUserNotOnFarcaster
+	}
+	if ok && p.ID == "" {
+		return "", errors.New("cached farcaster profile has no associated FID")
+	}
+	if p.ID != "" {
+		return NeynarID(p.ID), nil
+	}
+
+	// Socials not cached yet. Socials are fetched when a user is created, so this should be a rare case.
+	user, err := n.q.GetUserById(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	wallets, err := n.q.GetWalletsByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	ethAddresses := make([]persist.Address, 0)
+	var primaryAddress persist.Address
+
+	for _, w := range wallets {
+		if w.Chain == persist.ChainETH {
+			ethAddresses = append(ethAddresses, w.Address)
+			if w.ID == user.PrimaryWalletID {
+				primaryAddress = w.Address
+			}
+		}
+	}
+
+	if len(ethAddresses) == 0 {
+		return "", ErrUserNotOnFarcaster
+	}
+
+	fUsers, err := n.UsersByAddresses(ctx, ethAddresses)
+	if err != nil {
+		return "", err
+	}
+
+	searchOrder := append([]persist.Address{primaryAddress}, util.MapKeys(fUsers)...)
+
+	for _, w := range searchOrder {
+		for _, u := range fUsers[w] {
+			return u.Fid, nil
+		}
+	}
+
+	return "", ErrUserNotOnFarcaster
+}
+
 func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
 	addressesJoined := strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ",")
 	urlEnconded := url.QueryEscape(addressesJoined)
@@ -184,21 +253,20 @@ func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Ad
 	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
 		return nil, err
 	}
-	if neynarResp == nil || len(neynarResp) == 0 {
-		return nil, fmt.Errorf("no result for %s", addresses)
-	}
 
 	return neynarResp, nil
 }
 
-type NeynarFollowingByUserIDResponse struct {
-	Result *struct {
+type NeynarFollowsReponse struct {
+	Result struct {
 		Users []NeynarUser `json:"users"`
+		Next  struct {
+			Cursor string `json:"cursor"`
+		} `json:"next"`
 	} `json:"result"`
 }
 
 func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]NeynarUser, error) {
-
 	if n.cache != nil {
 		if cached, err := n.cache.Get(ctx, fmt.Sprintf("neynar-following-%s", fid)); err == nil {
 			var users []NeynarUser
@@ -209,34 +277,52 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 		}
 	}
 
-	// e.g. https://api.neynar.com/v1/farcaster/following?fid=3
-	u := fmt.Sprintf("%s/following?fid=%s", neynarV1BaseURL, fid)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	u, err := url.Parse(fmt.Sprintf("%s/following", neynarV1BaseURL))
 	if err != nil {
 		return nil, err
 	}
 
+	q := u.Query()
+	q.Set("fid", fid)
+	q.Set("limit", "150")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("accept", "application/json")
 	req.Header.Set("api_key", n.apiKey)
 
-	resp, err := n.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
+	users := make([]NeynarUser, 0)
 
-	defer resp.Body.Close()
+	for {
+		resp, err := n.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
 
-	var neynarResp NeynarFollowingByUserIDResponse
-	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
-		return nil, err
-	}
+		defer resp.Body.Close()
 
-	if neynarResp.Result == nil {
-		return nil, fmt.Errorf("no following result for %s", fid)
+		var r NeynarFollowsReponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			return nil, err
+		}
+
+		users = append(users, r.Result.Users...)
+
+		if r.Result.Next.Cursor == "" {
+			break
+		}
+
+		q = req.URL.Query()
+		q.Set("cursor", r.Result.Next.Cursor)
+		req.URL.RawQuery = q.Encode()
 	}
 
 	if n.cache != nil {
-		asJSON, err := json.Marshal(neynarResp.Result.Users)
+		asJSON, err := json.Marshal(users)
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +332,55 @@ func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]Neynar
 		}
 	}
 
-	return neynarResp.Result.Users, nil
+	return users, nil
+}
+
+func (n *NeynarAPI) FollowersByUserID(ctx context.Context, fid NeynarID) ([]NeynarUser, error) {
+	u, err := url.Parse(fmt.Sprintf("%s/followers", neynarV1BaseURL))
+	if err != nil {
+		return nil, err
+	}
+
+	q := u.Query()
+	q.Set("fid", fid.String())
+	q.Set("limit", "150")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("api_key", n.apiKey)
+
+	users := make([]NeynarUser, 0)
+
+	for {
+		resp, err := n.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		var r NeynarFollowsReponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			return nil, err
+		}
+
+		users = append(users, r.Result.Users...)
+
+		if r.Result.Next.Cursor == "" {
+			break
+		}
+
+		q = req.URL.Query()
+		q.Set("cursor", r.Result.Next.Cursor)
+		req.URL.RawQuery = q.Encode()
+	}
+
+	return users, nil
 }
 
 type NeynarSigner struct {

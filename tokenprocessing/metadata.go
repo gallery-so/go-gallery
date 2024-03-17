@@ -8,6 +8,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 // MetadataFinder is a service for fetching metadata for a token
@@ -101,13 +102,16 @@ func (b *batch) startTimer(m *MetadataFinder) {
 }
 
 func (b *batch) end(m *MetadataFinder) {
-	for c, t := range b.tokens {
-		metadata, err := m.mc.Chains[c].(multichain.TokenMetadataBatcher).GetTokenMetadataByTokenIdentifiersBatch(m.ctx, t)
+	for chain, tokens := range b.tokens {
+		tIDs := util.MapWithoutError(tokens, func(t persist.TokenIdentifiers) multichain.ChainAgnosticIdentifiers {
+			return multichain.ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
+		})
+		metadata, err := m.mc.GetTokenMetadataByTokenIdentifiersBatch(m.ctx, chain, tIDs)
 		if err != nil {
-			logger.For(m.ctx).Errorf("failed to load batch of metadata for chain=%d: %s", c, err)
-			b.errors[c] = err
+			logger.For(m.ctx).Errorf("failed to load batch of metadata for chain=%d: %s", chain, err)
+			b.errors[chain] = err
 		} else {
-			b.results[c] = metadata
+			b.results[chain] = metadata
 		}
 	}
 	close(b.done)

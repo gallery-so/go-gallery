@@ -107,6 +107,14 @@ where token_definitions.id = tokens.token_definition_id
     and not tokens.deleted
     and not token_definitions.deleted;
 
+-- name: GetTokenDefinitionByTokenDbidBatch :batchone
+select token_definitions.*
+from token_definitions, tokens
+where token_definitions.id = tokens.token_definition_id
+    and tokens.id = $1
+    and not tokens.deleted
+    and not token_definitions.deleted;
+
 -- name: GetTokenDefinitionByTokenIdentifiers :one
 select *
 from token_definitions
@@ -884,30 +892,6 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, commu
 -- name: CountFollowersByUserID :one
 SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
 
--- name: CreateUserPostedFirstPostNotifications :many
-WITH 
-follower_with_row_number AS (
-    SELECT follower, row_number() OVER () AS rn
-    FROM follows
-    WHERE followee = @actor_id AND deleted = false
-),
-id_with_row_number AS (
-    SELECT unnest(@ids::varchar(255)[]) AS id, row_number() OVER (ORDER BY unnest(@ids::varchar(255)[])) AS rn
-)
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id)
-SELECT 
-    i.id, 
-    f.follower, 
-    $1, 
-    $2, 
-    $3, 
-    $4
-FROM 
-    id_with_row_number i
-JOIN 
-    follower_with_row_number f ON i.rn = f.rn
-RETURNING *;
-
 -- later on, we might want to add a "global" column to notifications or even an enum column like "match" to determine how largely consumed
 -- notifications will get searched for for a given user. For example, global notifications will always return for a user and follower notifications will
 -- perform the check to see if the user follows the owner of the notification. Where this breaks is how we handle "seen" notifications. Since there is 1:1 notifications to users
@@ -944,7 +928,6 @@ RETURNING *;
 -- name: CountAllUsers :one
 SELECT count(*) FROM users WHERE deleted = false and universal = false;
 
-
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
@@ -956,6 +939,9 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 
 -- name: CreateViewGalleryNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: CreatePostNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 
 -- name: UpdateNotification :exec
 UPDATE notifications SET data = $2, event_ids = event_ids || $3, amount = $4, last_updated = now(), seen = false WHERE id = $1 AND deleted = false AND NOT amount = $4;
@@ -1084,6 +1070,11 @@ update users set primary_wallet_id = @wallet_id from wallets
 
 -- name: GetUsersByChainAddresses :many
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.l1_chain = @l1_chain AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
+
+-- name: GetUsersByFarcasterIDs :many
+select users.*
+from pii.for_users join users on for_users.user_id = users.id
+where ((pii_socials -> 'Farcaster'::text) ->> 'id'::text) = any(@fids::varchar[]) and not users.deleted;
 
 -- name: GetFeedEventByID :one
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
@@ -1274,6 +1265,24 @@ update pii.for_users set pii_socials = @socials where user_id = @user_id;
 -- name: UpdateEventCaptionByGroup :exec
 update events set caption = @caption where group_id = @group_id and deleted = false;
 
+-- name: GetFarcasterConnections :many
+with farcaster         as ( select unnest(@fids::varchar[]) fid ),
+	 farcaster_gallery as ( select * from pii.for_users p join farcaster on p.pii_socials->'Farcaster'->>'id' = farcaster.fid ),
+	 not_followed      as ( select * from farcaster_gallery fg left join follows f on f.follower = @user_id and f.followee = fg.user_id where f.id is null ),
+	 farcaster_users   as ( select u.* from users u join not_followed on u.id = not_followed.user_id and not u.deleted and not u.universal ),
+	 ordering          as ( select f.id
+	                            , rank() over (order by sum(cardinality(c.nfts)) desc nulls last) display_rank
+	                            , rank() over (order by count(p.id) desc nulls last) post_rank
+	 						from farcaster_users f
+	 						left join collections c on f.id = c.owner_user_id and not c.deleted
+	 						left join posts p on f.id = p.actor_id and not p.deleted
+	 						group by f.id )
+select sqlc.embed(users)
+from farcaster_users users
+left join ordering using(id)
+order by ((ordering.display_rank + ordering.post_rank) / 2) asc nulls last
+limit 200;
+
 -- this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
 -- it will also go and search for whether the specified user follows any of the users returned
 -- name: GetSocialConnectionsPaginate :many
@@ -1303,8 +1312,17 @@ from (select unnest(@social_ids::varchar[]) as social_id) as s
     left outer join follows f on f.follower = @user_id and f.followee = user_view.id and f.deleted = false
 where case when @only_unfollowing::bool then f.id is null else true end;
 
--- name: AddManyFollows :exec
+-- name: AddManyFollows :many
 insert into follows (id, follower, followee, deleted) select unnest(@ids::varchar[]), @follower, unnest(@followees::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at;
+
+-- name: UsersFollowUser :many
+select (follows.id is not null)::bool
+from (
+    select unnest(@followed_ids::varchar[]) as id,
+    generate_subscripts(@followed_ids::varchar[], 1) as index
+    ) user_ids
+left join follows on follows.follower = user_ids.id and followee = $1 and not deleted
+order by user_ids.index;
 
 -- name: GetSharedFollowersBatchPaginate :batchmany
 select sqlc.embed(users), a.created_at followed_on

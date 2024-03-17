@@ -74,19 +74,24 @@ type AnnouncementDetails struct {
 	PushNotificationText string               `json:"push_notification_text,omitempty"`
 }
 
+type UserFromFarcasterJoinedDetails struct {
+	UserID DBID `json:"user_id" binding:"required"`
+}
+
 type NotificationData struct {
-	AuthedViewerIDs        []DBID               `json:"viewer_ids,omitempty"`
-	UnauthedViewerIDs      []string             `json:"unauthed_viewer_ids,omitempty"`
-	FollowerIDs            []DBID               `json:"follower_ids,omitempty"`
-	AdmirerIDs             []DBID               `json:"admirer_ids,omitempty"`
-	FollowedBack           NullBool             `json:"followed_back,omitempty"`
-	Refollowed             NullBool             `json:"refollowed,omitempty"`
-	NewTokenID             DBID                 `json:"new_token_id,omitempty"`
-	NewTokenQuantity       HexString            `json:"new_token_quantity,omitempty"`
-	OriginalCommentID      DBID                 `json:"original_comment_id,omitempty"`
-	ActivityBadgeThreshold int                  `json:"activity_badge_threshold,omitempty"`
-	NewTopActiveUser       bool                 `json:"new_top_active_user,omitempty"`
-	AnnouncementDetails    *AnnouncementDetails `json:"announcement_details,omitempty"`
+	AuthedViewerIDs                []DBID                          `json:"viewer_ids,omitempty"`
+	UnauthedViewerIDs              []string                        `json:"unauthed_viewer_ids,omitempty"`
+	FollowerIDs                    []DBID                          `json:"follower_ids,omitempty"`
+	AdmirerIDs                     []DBID                          `json:"admirer_ids,omitempty"`
+	FollowedBack                   NullBool                        `json:"followed_back,omitempty"`
+	Refollowed                     NullBool                        `json:"refollowed,omitempty"`
+	NewTokenID                     DBID                            `json:"new_token_id,omitempty"`
+	NewTokenQuantity               HexString                       `json:"new_token_quantity,omitempty"`
+	OriginalCommentID              DBID                            `json:"original_comment_id,omitempty"`
+	ActivityBadgeThreshold         int                             `json:"activity_badge_threshold,omitempty"`
+	NewTopActiveUser               bool                            `json:"new_top_active_user,omitempty"`
+	AnnouncementDetails            *AnnouncementDetails            `json:"announcement_details,omitempty"`
+	UserFromFarcasterJoinedDetails *UserFromFarcasterJoinedDetails `json:"user_from_farcaster_joined_details,omitempty"`
 }
 
 func (n NotificationData) Validate() NotificationData {

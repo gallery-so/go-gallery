@@ -56,6 +56,7 @@ with memberships as (
     select unnest(@ids::varchar[]) as id
          , unnest(@token_definition_id::varchar[]) as token_definition_id
          , unnest(@community_id::varchar[]) as community_id
+         , unnest(@token_id::numeric[]) as token_id
          , now() as created_at
          , now() as last_updated
          , false as deleted
@@ -66,10 +67,10 @@ valid_memberships as (
     join communities on communities.id = memberships.community_id and not communities.deleted
     join token_definitions on token_definitions.id = memberships.token_definition_id and not token_definitions.deleted
 )
-insert into token_community_memberships(id, token_definition_id, community_id, created_at, last_updated, deleted) (
+insert into token_community_memberships(id, token_definition_id, community_id, token_id, created_at, last_updated, deleted) (
     select * from valid_memberships
 )
-on conflict (community_id, token_definition_id) where not deleted
+on conflict (token_definition_id, community_id) where not deleted
     do nothing
 returning *;
 

@@ -26,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/membership"
@@ -586,6 +587,18 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		}
 	}
 
+	err = api.taskClient.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
+			userID: {
+				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
+				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
+			},
+		},
+	})
+	if err != nil {
+		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
+	}
+
 	// Send event
 	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
@@ -597,18 +610,6 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	})
 	if err != nil {
 		logger.For(ctx).Errorf("failed to dispatch event: %s", err)
-	}
-
-	err = api.taskClient.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
-		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
-			userID: {
-				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
-				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
-			},
-		},
-	})
-	if err != nil {
-		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
 	}
 
 	return userID, galleryID, nil
@@ -1012,9 +1013,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		return err
 	}
 
-	// Send event
-	go dispatchFollowEventToFeed(sentryutil.NewSentryHubGinContext(ctx), api, curUserID, userID, refollowed)
-
+	go pushFollowEvent(sentryutil.NewSentryHubGinContext(ctx), curUserID, userID, refollowed)
 	return nil
 }
 
@@ -1031,31 +1030,35 @@ func (api UserAPI) FollowAllSocialConnections(ctx context.Context, socialType pe
 		return err
 	}
 
-	var userIDs []string
-	switch socialType {
-	case persist.SocialProviderTwitter:
-		onlyUnfollowing := true
-		conns, err := For(ctx).Social.GetConnections(ctx, socialType, &onlyUnfollowing)
-		if err != nil {
-			return err
-		}
-		userIDs, _ = util.Map(conns, func(s model.SocialConnection) (string, error) {
-			return s.UserID.String(), nil
-		})
-
-	default:
+	if socialType != persist.SocialProviderTwitter {
 		return fmt.Errorf("invalid social type: %s", socialType)
 	}
 
-	newIDs, _ := util.Map(userIDs, func(id string) (string, error) {
-		return persist.GenerateID().String(), nil
-	})
+	conns, err := For(ctx).Social.GetConnections(ctx, socialType, util.ToPointer(true))
+	if err != nil {
+		return err
+	}
 
-	return api.queries.AddManyFollows(ctx, db.AddManyFollowsParams{
-		Ids:       newIDs,
+	userIDs := make([]persist.DBID, len(conns))
+	userIDsAsStr := make([]string, len(conns))
+	newFollowIDs := make([]string, len(conns))
+	for i, c := range conns {
+		userIDs[i] = c.UserID
+		userIDsAsStr[i] = c.UserID.String()
+		newFollowIDs[i] = persist.GenerateID().String()
+	}
+
+	refollowed, err := api.queries.AddManyFollows(ctx, db.AddManyFollowsParams{
+		Ids:       newFollowIDs,
 		Follower:  curUserID,
-		Followees: userIDs,
+		Followees: userIDsAsStr,
 	})
+	if err != nil {
+		return err
+	}
+
+	go pushFollowEvents(sentryutil.NewSentryHubGinContext(ctx), curUserID, userIDs, refollowed)
+	return nil
 }
 
 func (api UserAPI) FollowAllOnboardingRecommendations(ctx context.Context, curStr *string) error {
@@ -1084,18 +1087,23 @@ func (api UserAPI) FollowAllOnboardingRecommendations(ctx context.Context, curSt
 		}
 	}
 
-	ids := make([]string, len(usersToFollow))
-	userIDs := make([]string, len(usersToFollow))
+	newFollowIDs := make([]string, len(usersToFollow))
+	userIDs := make([]persist.DBID, len(usersToFollow))
+	userIDsAsStr := make([]string, len(usersToFollow))
 	for i, id := range usersToFollow {
-		ids[i] = persist.GenerateID().String()
-		userIDs[i] = id.String()
+		newFollowIDs[i] = persist.GenerateID().String()
+		userIDs[i] = id
+		userIDsAsStr[i] = id.String()
 	}
 
-	return api.queries.AddManyFollows(ctx, db.AddManyFollowsParams{
-		Ids:       ids,
+	refollowed, err := api.queries.AddManyFollows(ctx, db.AddManyFollowsParams{
+		Ids:       newFollowIDs,
 		Follower:  curUserID,
-		Followees: userIDs,
+		Followees: userIDsAsStr,
 	})
+
+	go pushFollowEvents(sentryutil.NewSentryHubGinContext(ctx), curUserID, userIDs, refollowed)
+	return err
 }
 
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
@@ -1114,22 +1122,32 @@ func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error 
 	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
 }
 
-func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persist.DBID, followedUserID persist.DBID, refollowed bool) {
-	followedBack, err := api.repos.UserRepository.UserFollowsUser(ctx, followedUserID, curUserID)
+func pushFollowEvent(ctx context.Context, followingID, followedID persist.DBID, refollowed bool) {
+	pushFollowEvents(ctx, followingID, []persist.DBID{followedID}, []bool{refollowed})
+}
 
+func pushFollowEvents(ctx context.Context, followingID persist.DBID, followedIDs []persist.DBID, refollowed []bool) {
+	followedIDsAsStr := util.MapWithoutError(followedIDs, func(id persist.DBID) string { return id.String() })
+	followsBack, err := For(ctx).User.queries.UsersFollowUser(ctx, db.UsersFollowUserParams{
+		Followee:    followingID,
+		FollowedIds: followedIDsAsStr,
+	})
 	if err != nil {
+		logger.For(ctx).Errorf("failed to fetch follow back data for user=%s: %s", followingID, err)
 		sentryutil.ReportError(ctx, err)
 		return
 	}
-
-	event.PushEvent(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(curUserID),
-		Action:         persist.ActionUserFollowedUsers,
-		ResourceTypeID: persist.ResourceTypeUser,
-		UserID:         curUserID,
-		SubjectID:      followedUserID,
-		Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
-	})
+	for i, followedID := range followedIDs {
+		logger.For(ctx).Infof("pushing follow event for user=%s, followed=%s, followedBack=%t, refollowed=%t", followingID, followedID, followsBack[i], refollowed[i])
+		event.PushEvent(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(followingID),
+			Action:         persist.ActionUserFollowedUsers,
+			ResourceTypeID: persist.ResourceTypeUser,
+			UserID:         followingID,
+			SubjectID:      followedID,
+			Data:           persist.EventData{UserFollowedBack: followsBack[i], UserRefollowed: refollowed[i]},
+		})
+	}
 }
 
 func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) ([]*model.UserExperience, error) {
@@ -1437,16 +1455,76 @@ func (api UserAPI) GetSuggestedUsers(ctx context.Context, before, after *string,
 
 		recommend.Shuffle(users, 8)
 
-		curPos := make(map[persist.DBID]int64, len(users))
-		curIDs := make([]persist.DBID, len(users))
+		cursorPositions := make(map[persist.DBID]int64, len(users))
+		cursorIDs := make([]persist.DBID, len(users))
 		for i, u := range users {
-			curPos[u.ID] = int64(i)
-			curIDs[i] = u.ID
+			cursorPositions[u.ID] = int64(i)
+			cursorIDs[i] = u.ID
 		}
 
 		cursor := cursors.NewPositionCursor()
-		cursor.IDs = curIDs
-		cursor.Positions = curPos
+		cursor.IDs = cursorIDs
+		cursor.Positions = cursorPositions
+		paginator = api.paginatorFromResults(ctx, cursor, users)
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
+func (api UserAPI) GetSuggestedUsersFarcaster(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+	// Validate
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	viewerID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	var paginator positionPaginator[db.User]
+
+	// If we have a cursor, we can page through the original set of recommended users
+	if before != nil {
+		paginator, err = api.paginatorFromCursorStr(ctx, *before)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	} else if after != nil {
+		paginator, err = api.paginatorFromCursorStr(ctx, *after)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	} else {
+		// Otherwise make a new recommendation
+		fUsers, err := For(ctx).Social.GetFarcasterFollowingByUserID(ctx, viewerID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		connectionRank, err := api.queries.GetFarcasterConnections(ctx, db.GetFarcasterConnectionsParams{
+			Fids:   util.MapWithoutError(fUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() }),
+			UserID: viewerID,
+		})
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		recommend.Shuffle(connectionRank, 8)
+
+		cursorPositions := make(map[persist.DBID]int64, len(connectionRank))
+		cursorIDs := make([]persist.DBID, len(connectionRank))
+		users := make([]db.User, len(connectionRank))
+
+		for i, u := range connectionRank {
+			cursorPositions[u.User.ID] = int64(i)
+			cursorIDs[i] = u.User.ID
+			users[i] = u.User
+		}
+
+		cursor := cursors.NewPositionCursor()
+		cursor.IDs = cursorIDs
+		cursor.Positions = cursorPositions
 		paginator = api.paginatorFromResults(ctx, cursor, users)
 	}
 

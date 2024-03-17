@@ -637,7 +637,7 @@ func (BlockUserPayload) IsBlockUserPayloadOrError() {}
 type ChainAddressTokenInput struct {
 	ChainAddress *persist.ChainAddress `json:"chainAddress"`
 	// Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
-	TokenID persist.TokenID `json:"tokenId"`
+	TokenID persist.HexTokenID `json:"tokenId"`
 }
 
 type ChainTokens struct {
@@ -1021,9 +1021,11 @@ type DisconnectSocialAccountPayload struct {
 func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
 
 type EmailNotificationSettings struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
-	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool  `json:"unsubscribedFromDigest"`
+	UnsubscribedFromMarketing     *bool `json:"unsubscribedFromMarketing"`
+	UnsubscribedFromMembersClub   *bool `json:"unsubscribedFromMembersClub"`
 }
 
 type EnsProfileImage struct {
@@ -2434,6 +2436,18 @@ func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
 
+type SomeoneYouFollowOnFarcasterJoinedNotification struct {
+	HelperSomeoneYouFollowOnFarcasterJoinedNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	User         *GalleryUser `json:"user"`
+}
+
+func (SomeoneYouFollowOnFarcasterJoinedNotification) IsNotification() {}
+func (SomeoneYouFollowOnFarcasterJoinedNotification) IsNode()         {}
+
 type SomeoneYouFollowPostedTheirFirstPostNotification struct {
 	HelperSomeoneYouFollowPostedTheirFirstPostNotificationData
 	Dbid         persist.DBID `json:"dbid"`
@@ -2758,9 +2772,11 @@ type UpdateEmailInput struct {
 }
 
 type UpdateEmailNotificationSettingsInput struct {
-	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
-	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
-	UnsubscribedFromDigest        bool `json:"unsubscribedFromDigest"`
+	UnsubscribedFromAll           bool  `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool  `json:"unsubscribedFromNotifications"`
+	UnsubscribedFromDigest        bool  `json:"unsubscribedFromDigest"`
+	UnsubscribedFromMarketing     *bool `json:"unsubscribedFromMarketing"`
+	UnsubscribedFromMembersClub   *bool `json:"unsubscribedFromMembersClub"`
 }
 
 type UpdateEmailNotificationSettingsPayload struct {
@@ -3006,11 +3022,12 @@ type Viewer struct {
 	Email           *UserEmail       `json:"email"`
 	// Returns a list of notifications in reverse chronological order.
 	// Seen notifications come after unseen notifications
-	Notifications        *NotificationsConnection `json:"notifications"`
-	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
-	UserExperiences      []*UserExperience        `json:"userExperiences"`
-	Persona              *persist.Persona         `json:"persona"`
-	SuggestedUsers       *UsersConnection         `json:"suggestedUsers"`
+	Notifications           *NotificationsConnection `json:"notifications"`
+	NotificationSettings    *NotificationSettings    `json:"notificationSettings"`
+	UserExperiences         []*UserExperience        `json:"userExperiences"`
+	Persona                 *persist.Persona         `json:"persona"`
+	SuggestedUsers          *UsersConnection         `json:"suggestedUsers"`
+	SuggestedUsersFarcaster *UsersConnection         `json:"suggestedUsersFarcaster"`
 }
 
 func (Viewer) IsNode()          {}
@@ -3054,17 +3071,21 @@ const (
 	EmailUnsubscriptionTypeAll           EmailUnsubscriptionType = "All"
 	EmailUnsubscriptionTypeNotifications EmailUnsubscriptionType = "Notifications"
 	EmailUnsubscriptionTypeDigest        EmailUnsubscriptionType = "Digest"
+	EmailUnsubscriptionTypeMarketing     EmailUnsubscriptionType = "Marketing"
+	EmailUnsubscriptionTypeMembersClub   EmailUnsubscriptionType = "MembersClub"
 )
 
 var AllEmailUnsubscriptionType = []EmailUnsubscriptionType{
 	EmailUnsubscriptionTypeAll,
 	EmailUnsubscriptionTypeNotifications,
 	EmailUnsubscriptionTypeDigest,
+	EmailUnsubscriptionTypeMarketing,
+	EmailUnsubscriptionTypeMembersClub,
 }
 
 func (e EmailUnsubscriptionType) IsValid() bool {
 	switch e {
-	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications, EmailUnsubscriptionTypeDigest:
+	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications, EmailUnsubscriptionTypeDigest, EmailUnsubscriptionTypeMarketing, EmailUnsubscriptionTypeMembersClub:
 		return true
 	}
 	return false

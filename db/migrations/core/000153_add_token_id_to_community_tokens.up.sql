@@ -1,0 +1,1 @@
+alter table token_community_memberships add column token_id numeric;

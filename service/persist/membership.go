@@ -17,7 +17,7 @@ type MembershipTier struct {
 	Deleted      NullBool      `json:"-"`
 	LastUpdated  time.Time     `json:"last_updated"`
 	Name         NullString    `json:"name"`
-	TokenID      TokenID       `json:"token_id"`
+	TokenID      HexTokenID    `json:"token_id"`
 	AssetURL     NullString    `json:"asset_url"`
 	Owners       []TokenHolder `json:"owners"`
 }
@@ -42,8 +42,8 @@ func (l *TokenHolderList) Scan(value interface{}) error {
 
 // MembershipRepository represents the interface for interacting with the persisted state of users
 type MembershipRepository interface {
-	UpsertByTokenID(context.Context, TokenID, MembershipTier) error
-	GetByTokenID(context.Context, TokenID) (MembershipTier, error)
+	UpsertByTokenID(context.Context, HexTokenID, MembershipTier) error
+	GetByTokenID(context.Context, HexTokenID) (MembershipTier, error)
 	GetAll(context.Context) ([]MembershipTier, error)
 }
 
@@ -63,7 +63,7 @@ func (o *TokenHolder) Scan(src interface{}) error {
 
 // ErrMembershipNotFoundByTokenID represents an error when a membership is not found by token id
 type ErrMembershipNotFoundByTokenID struct {
-	TokenID TokenID
+	TokenID HexTokenID
 }
 
 // ErrMembershipNotFoundByID represents an error when a membership is not found by its id

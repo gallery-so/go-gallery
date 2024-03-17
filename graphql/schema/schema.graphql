@@ -840,6 +840,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   persona: Persona @goField(forceResolver: true)
   suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
+  suggestedUsersFarcaster(before: String, after: String, first: Int, last: Int): UsersConnection
+    @goField(forceResolver: true)
 }
 
 type NotificationSettings {
@@ -867,6 +869,8 @@ enum EmailUnsubscriptionType {
   All
   Notifications
   Digest
+  Marketing
+  MembersClub
 }
 
 type UserEmail {
@@ -879,12 +883,16 @@ type EmailNotificationSettings {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
   unsubscribedFromDigest: Boolean!
+  unsubscribedFromMarketing: Boolean
+  unsubscribedFromMembersClub: Boolean # TODO make this required once frontend is updated
 }
 
 input UpdateEmailNotificationSettingsInput {
   unsubscribedFromAll: Boolean!
   unsubscribedFromNotifications: Boolean!
   unsubscribedFromDigest: Boolean!
+  unsubscribedFromMarketing: Boolean
+  unsubscribedFromMembersClub: Boolean
 }
 
 input UnsubscribeFromEmailTypeInput {
@@ -2319,6 +2327,15 @@ type SomeoneYouFollowPostedTheirFirstPostNotification implements Notification & 
   updatedTime: Time
 
   post: Post @goField(forceResolver: true)
+}
+
+type SomeoneYouFollowOnFarcasterJoinedNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  user: GalleryUser @goField(forceResolver: true)
 }
 
 type YouReceivedTopActivityBadgeNotification implements Notification & Node {

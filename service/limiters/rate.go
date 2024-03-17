@@ -75,6 +75,7 @@ func (i *KeyRateLimiter) ForKey(ctx context.Context, key string) (bool, time.Dur
 	w, err := bucket.(*limiters.TokenBucket).Limit(ctx)
 	if err == limiters.ErrLimitExhausted {
 		return false, w, nil
+	} else if err == redislock.ErrNotObtained {
 	} else if err != nil {
 		// The limiter failed. This error should be logged and examined.
 		rateErr := fmt.Errorf("rate limiting err: %s", err)

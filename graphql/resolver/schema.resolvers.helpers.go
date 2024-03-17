@@ -86,6 +86,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnSomeoneYouFollowPostedTheirFirstPostNotification: fetchNotificationByID[model.SomeoneYouFollowPostedTheirFirstPostNotification],
 	OnYouReceivedTopActivityBadgeNotification:          fetchNotificationByID[model.YouReceivedTopActivityBadgeNotification],
 	OnGalleryAnnouncementNotification:                  fetchNotificationByID[model.GalleryAnnouncementNotification],
+	OnSomeoneYouFollowOnFarcasterJoinedNotification:    fetchNotificationByID[model.SomeoneYouFollowOnFarcasterJoinedNotification],
 }
 
 // T any is a notification type, will panic if it is not a notification type
@@ -599,6 +600,8 @@ func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
 			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
 			UnsubscribedFromDigest:        user.EmailUnsubscriptions.Digest.Bool(),
+			UnsubscribedFromMarketing:     user.EmailUnsubscriptions.Marketing.BoolPointer(),
+			UnsubscribedFromMembersClub:   user.EmailUnsubscriptions.MembersClub.BoolPointer(),
 		},
 	}
 
@@ -1140,7 +1143,15 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CtaLink:              util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.CTALink),
 			PushNotificationText: util.StringToPointerIfNotEmpty(notif.Data.AnnouncementDetails.PushNotificationText),
 		}, nil
-
+	case persist.ActionUserFromFarcasterJoined:
+		return model.SomeoneYouFollowOnFarcasterJoinedNotification{
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			User:         nil, // handled by dedicated resolver
+			HelperSomeoneYouFollowOnFarcasterJoinedNotificationData: model.HelperSomeoneYouFollowOnFarcasterJoinedNotificationData{UserID: notif.Data.UserFromFarcasterJoinedDetails.UserID},
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
@@ -1337,7 +1348,7 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 }
 
 func resolveMerchTokenByTokenID(ctx context.Context, tokenID string) (*model.MerchToken, error) {
-	token, err := publicapi.For(ctx).Merch.GetMerchTokenByTokenID(ctx, persist.TokenID(tokenID))
+	token, err := publicapi.For(ctx).Merch.GetMerchTokenByTokenID(ctx, persist.HexTokenID(tokenID))
 
 	if err != nil {
 		return nil, err
@@ -1420,6 +1431,8 @@ func updateUserEmailNotificationSettings(ctx context.Context, input model.Update
 		All:           persist.NullBool(input.UnsubscribedFromAll),
 		Notifications: persist.NullBool(input.UnsubscribedFromNotifications),
 		Digest:        persist.NullBool(input.UnsubscribedFromDigest),
+		Marketing:     persist.NullBool(util.FromPointer(input.UnsubscribedFromMarketing)),
+		MembersClub:   persist.NullBool(util.FromPointer(input.UnsubscribedFromMembersClub)),
 	})
 	if err != nil {
 		return nil, err
@@ -1977,11 +1990,11 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 		if contract.Chain == persist.ChainZora {
 			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", contract.Address)
 		} else if contract.Chain == persist.ChainBase {
-			mintURL = fmt.Sprintf("https://mint.fun/base/%s", contract.Address)
+			mintURL = fmt.Sprintf("https://zora.co/collect/base:%s", contract.Address)
 		} else if contract.Chain == persist.ChainOptimism {
-			mintURL = fmt.Sprintf("https://mint.fun/op/%s", contract.Address)
+			mintURL = fmt.Sprintf("https://zora.co/collect/oeth:%s", contract.Address)
 		} else if contract.Chain == persist.ChainETH {
-			mintURL = fmt.Sprintf("https://mint.fun/ethereum/%s", contract.Address)
+			mintURL = fmt.Sprintf("https://zora.co/collect/eth:%s", contract.Address)
 		}
 	}
 

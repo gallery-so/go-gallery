@@ -351,7 +351,6 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		}
 
 		offset += limit
-
 	}
 	logger.For(ctx).Info("tzktBalances: ", len(resultTokens))
 
@@ -359,6 +358,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
+
 	contract := multichain.ChainAgnosticContract{}
 	if len(contracts) > 0 {
 		contract = contracts[0]
@@ -631,14 +631,17 @@ func (p *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 			// Try objkt if token isn't signed yet or has no metadata
 			if !platform.IsFxhashSignedTezos(persist.ChainTezos, token.ContractAddress, token.Descriptors.Name) || !containsTezosKeywords(token.TokenMetadata) {
 				tIDs := multichain.ChainAgnosticIdentifiers{ContractAddress: tzToken.Token.Contract.Address, TokenID: persist.MustTokenID(tzToken.Token.TokenID)}
-				objktToken, objktContract, err := p.objktProvider.GetTokenByTokenIdentifiersAndOwner(ctx, tIDs, tzToken.Account.Address)
-				if err == nil {
-					token = objktToken
+				objktTokens, objktContract, err := p.objktProvider.GetTokensByTokenIdentifiers(ctx, tIDs)
+				if err == nil && len(objktTokens) > 0 {
+					currentOwner := token.OwnerAddress
+					token = objktTokens[0]
+					token.OwnerAddress = currentOwner
+
 					contractsLock.Lock()
 					seenContracts[normalizedContractAddress] = true
 					contractChan <- objktContract
 					contractsLock.Unlock()
-				} else {
+				} else if err != nil {
 					logger.For(ctx).Warnf("could not fetch from objkt: %s", err)
 				}
 			}
@@ -690,7 +693,7 @@ func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {
 	seen := map[string]tzktBalanceToken{}
 	result := make([]tzktBalanceToken, 0, len(tzTokens))
 	for _, t := range tzTokens {
-		id := multichain.ChainAgnosticIdentifiers{ContractAddress: t.Token.Contract.Address, TokenID: persist.TokenID(t.Token.TokenID)}
+		id := multichain.ChainAgnosticIdentifiers{ContractAddress: t.Token.Contract.Address, TokenID: persist.HexTokenID(t.Token.TokenID)}
 		seen[id.String()] = t
 	}
 	for _, t := range seen {

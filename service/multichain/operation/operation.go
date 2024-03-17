@@ -144,6 +144,10 @@ func BulkUpsert(ctx context.Context, q *db.Queries, tokens []UpsertToken, defini
 		params.DefinitionContractAddress = append(params.DefinitionContractAddress, d.ContractAddress.String())
 		params.DefinitionContractID = append(params.DefinitionContractID, d.ContractID.String())
 		params.DefinitionIsFxhash = append(params.DefinitionIsFxhash, d.IsFxhash)
+
+		// Community memberships
+		params.CommunityMembershipDbid = append(params.CommunityMembershipDbid, persist.GenerateID().String())
+		params.CommunityMembershipTokenID = append(params.CommunityMembershipTokenID, d.TokenID.ToDecimalTokenID().Numeric())
 		// Defer error checking until now to keep the code above from being
 		// littered with multiline "if" statements
 		if len(errors) > 0 {

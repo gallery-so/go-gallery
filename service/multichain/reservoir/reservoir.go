@@ -61,7 +61,7 @@ func mustCollectionsEndpoint(baseURL string) *url.URL {
 
 type ErrTokenNotFoundByIdentifiers struct {
 	ContractAddress persist.Address
-	TokenID         persist.TokenID
+	TokenID         persist.HexTokenID
 	OwnerAddress    persist.Address
 }
 
@@ -128,10 +128,11 @@ type Provider struct {
 	// e.g collection data is available for projects within Art Blocks, but not for the Art Blocks
 	// contract itself. We use another fetcher to get that data.
 	cFetcher multichain.ContractFetcher
+	r        *retry.Retryer
 }
 
 // NewProvider creates a new Reservoir provider
-func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
+func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain, l retry.Limiter) (*Provider, func()) {
 	apiURL := map[persist.Chain]string{
 		persist.ChainETH:      ethMainnetBaseURL,
 		persist.ChainOptimism: optimismBaseURL,
@@ -149,19 +150,15 @@ func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
 		panic("no reservoir api key set")
 	}
 
+	r, cleanup := retry.New(l, httpClient)
+
 	return &Provider{
 		apiURL:     apiURL,
 		apiKey:     apiKey,
 		chain:      chain,
 		httpClient: httpClient,
-	}
-}
-
-// NewProvider creates a new Reservoir provider
-func NewProviderContractFetcher(httpClient *http.Client, chain persist.Chain, cFetcher multichain.ContractFetcher) *Provider {
-	p := NewProvider(httpClient, chain)
-	p.cFetcher = cFetcher
-	return p
+		r:          r,
+	}, cleanup
 }
 
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -305,11 +302,15 @@ func (p Provider) GetContractByAddress(ctx context.Context, chain persist.Chain,
 
 // GetTokensByTokenIdentifiersBatch returns a slice tokens from a list of token identifiers
 // Data is returned in the same order as the input. If a token is not found, the zero-value is used instead.
-func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, []error) {
+func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []error) {
+	asTokens := util.MapWithoutError(tIDs, func(ti multichain.ChainAgnosticIdentifiers) persist.TokenIdentifiers {
+		return persist.NewTokenIdentifiers(ti.ContractAddress, ti.TokenID, p.chain)
+	})
+
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
-		p.streamAssetsForTokens(ctx, tIDs, outCh)
+		p.streamAssetsForTokens(ctx, asTokens, outCh)
 	}()
 
 	ret := make([]multichain.ChainAgnosticToken, len(tIDs))
@@ -333,9 +334,9 @@ func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []p
 		}] = t
 	}
 
-	for i, tID := range tIDs {
-		if r, ok := lookup[tID]; !ok {
-			errs[i] = fmt.Errorf("reservoir unable to find token(chain=%d, contract=%s, tokenId=%s)", tID.Chain, tID.ContractAddress, tID.TokenID)
+	for i, t := range asTokens {
+		if r, ok := lookup[t]; !ok {
+			errs[i] = fmt.Errorf("reservoir unable to find token(chain=%d, contract=%s, tokenId=%s)", t.Chain, t.ContractAddress, t.TokenID)
 		} else {
 			ret[i] = r
 		}
@@ -344,9 +345,9 @@ func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []p
 	return ret, errs
 }
 
-func paginateTokens(ctx context.Context, client *http.Client, req *http.Request, outCh chan<- pageResult) {
+func (p *Provider) paginateTokens(ctx context.Context, req *http.Request, outCh chan<- pageResult) {
 	for {
-		resp, err := retry.RetryRequest(client, req)
+		resp, err := p.r.Do(req)
 		if err != nil {
 			outCh <- pageResult{Err: err}
 			return
@@ -384,10 +385,10 @@ func paginateTokens(ctx context.Context, client *http.Client, req *http.Request,
 	}
 }
 
-func (p *Provider) streamAssetsForToken(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, outCh chan<- pageResult) {
+func (p *Provider) streamAssetsForToken(ctx context.Context, contractAddress persist.Address, tokenID persist.HexTokenID, outCh chan<- pageResult) {
 	endpoint := mustTokensEndpoint(p.apiURL)
 	setToken(endpoint, contractAddress, tokenID)
-	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+	p.paginateTokens(ctx, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
 }
 
 func (p *Provider) streamAssetsForTokens(ctx context.Context, tIDs []persist.TokenIdentifiers, outCh chan<- pageResult) {
@@ -398,28 +399,28 @@ func (p *Provider) streamAssetsForTokens(ctx context.Context, tIDs []persist.Tok
 			outCh <- pageResult{Err: err}
 			return
 		}
-		paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+		p.paginateTokens(ctx, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
 	}
 }
 
 func (p *Provider) streamAssetsForWallet(ctx context.Context, addr persist.Address, outCh chan<- pageResult) {
 	endpoint := mustUserTokensEndpoint(p.apiURL, addr)
 	setPagingParams(endpoint, "acquiredAt")
-	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+	p.paginateTokens(ctx, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
 }
 
-func (p *Provider) streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, tokenID persist.TokenID, outCh chan<- pageResult) {
+func (p *Provider) streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.Address, tokenID persist.HexTokenID, outCh chan<- pageResult) {
 	endpoint := mustUserTokensEndpoint(p.apiURL, ownerAddress)
 	setLimit(endpoint, 1)
 	setToken(endpoint, contractAddress, tokenID)
-	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+	p.paginateTokens(ctx, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
 }
 
 func (p *Provider) streamAssetsForContract(ctx context.Context, contractAddress persist.Address, outCh chan<- pageResult) {
 	endpoint := mustTokensEndpoint(p.apiURL)
 	setCollection(endpoint, contractAddress)
 	setPagingParams(endpoint, "tokenId")
-	paginateTokens(ctx, p.httpClient, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
+	p.paginateTokens(ctx, mustAuthRequest(ctx, endpoint, p.apiKey), outCh)
 }
 
 func (p *Provider) fetchCollectionByAddress(ctx context.Context, contractAddress persist.Address) (Collection, error) {
@@ -643,7 +644,7 @@ func setLimit(url *url.URL, limit int) {
 	url.RawQuery = query.Encode()
 }
 
-func setToken(url *url.URL, contractAddress persist.Address, tokenID persist.TokenID) {
+func setToken(url *url.URL, contractAddress persist.Address, tokenID persist.HexTokenID) {
 	setTokens(url, []persist.TokenIdentifiers{{ContractAddress: contractAddress, TokenID: tokenID}})
 }
 
