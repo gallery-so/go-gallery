@@ -329,6 +329,7 @@ type digestEmailDynamicTemplateData struct {
 	DigestValues     DigestValues `json:"digest_values"`
 	Username         string       `json:"username"`
 	UnsubscribeToken string       `json:"unsubscribe_token"`
+	Subject          string       `json:"subject"`
 }
 
 func sendDigestEmails(queries *coredb.Queries, s *sendgrid.Client, r *redis.Cache, b *store.BucketStorer, gql *graphql.Client) gin.HandlerFunc {
@@ -429,6 +430,8 @@ func sendDigestTestEmail(q *coredb.Queries, s *sendgrid.Client, b *store.BucketS
 			return
 		}
 
+		logger.For(ctx).Infof("sending digest email to %s with values: %+v", userWithPII.Username.String, template)
+
 		r, err := sendDigestEmailToUser(ctx, userWithPII, userWithPII.PiiVerifiedEmailAddress, gidInt, template, s)
 		if err != nil {
 			util.ErrResponse(ctx, http.StatusInternalServerError, err)
@@ -480,11 +483,15 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
 	}
+	if digestValues.Subject == nil || *digestValues.Subject == "" {
+		digestValues.Subject = util.ToPointer(defaultSubject())
+	}
 
 	data := digestEmailDynamicTemplateData{
 		DigestValues:     digestValues,
 		Username:         u.Username.String,
 		UnsubscribeToken: j,
+		Subject:          *digestValues.Subject,
 	}
 
 	if data.DigestValues.IntroText == nil || *data.DigestValues.IntroText == "" {
@@ -498,6 +505,8 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 
 	asMap := make(map[string]interface{})
 
+	logger.For(c).Debugf("sending digest email to %s with values: %+v", u.Username.String, digestValues)
+
 	err = json.Unmarshal(asJSON, &asMap)
 	if err != nil {
 		return nil, err
@@ -509,13 +518,6 @@ func sendDigestEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipie
 	m := mail.NewV3Mail()
 	m.SetFrom(from)
 	p := mail.NewPersonalization()
-
-	if digestValues.Subject != nil {
-		m.Subject = *digestValues.Subject
-		// personalization subject always overrides the mail subject, might as well just set both just in case
-		p.Subject = *digestValues.Subject
-	}
-
 	m.SetTemplateID(env.GetString("SENDGRID_DIGEST_TEMPLATE_ID"))
 	p.DynamicTemplateData = asMap
 	m.AddPersonalizations(p)
