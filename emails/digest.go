@@ -132,6 +132,8 @@ func updateDigestValues(b *store.BucketStorer) gin.HandlerFunc {
 			return
 		}
 
+		logger.For(ctx).Infof("writing overrides: %s", string(byt))
+
 		_, err = b.Write(ctx, overrideFile, byt)
 		if err != nil {
 			util.ErrResponse(ctx, http.StatusInternalServerError, fmt.Errorf("failed to write overrides: %s", err))
@@ -656,4 +658,8 @@ func defaultIntroText(username string) string {
 		return "This is your weekly digest."
 	}
 	return fmt.Sprintf("Hey %s, this is your weekly digest.", username)
+}
+
+func defaultSubject() string {
+	return "Your Weekly Digest"
 }
