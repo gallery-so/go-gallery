@@ -58,10 +58,10 @@ func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization, neynar *farcaster.NeynarAPI) {
-	handler := graphqlHandler(repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, recommender, p, neynar)
-	parent.Any("/query", middleware.ContinueSession(queries, authRefreshCache), handler)
-	parent.Any("/query/:operationName", middleware.ContinueSession(queries, authRefreshCache), handler)
-	parent.GET("/playground", graphqlPlaygroundHandler())
+	//handler := graphqlHandler(repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, recommender, p, neynar)
+	//parent.Any("/query", middleware.ContinueSession(queries, authRefreshCache), handler)
+	//parent.Any("/query/:operationName", middleware.ContinueSession(queries, authRefreshCache), handler)
+	//parent.GET("/playground", graphqlPlaygroundHandler())
 }
 
 func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker, taskClient *task.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender, p *userpref.Personalization, neynar *farcaster.NeynarAPI) gin.HandlerFunc {
