@@ -2,6 +2,7 @@ package activitystats
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"net/http"
 	"os"
 
@@ -50,8 +51,9 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 	pub := gcp.NewClient(ctx)
 	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
 	tc := task.NewClient(ctx)
+	neynar := farcaster.NewNeynarAPI(http.DefaultClient, nil, queries)
 
-	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger(), useEventHandler(queries, pub, tc, lock))
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger(), useEventHandler(queries, pub, tc, lock, neynar))
 	router.POST("/calculate_activity_badges", middleware.CloudSchedulerMiddleware, autoCalculateTopActivityBadges(queries, stg, pgx))
 	router.POST("/recalculate_activity_badges", middleware.RetoolAuthRequired, recalculateTopActivityBadges(queries, stg, pgx))
 	router.POST("/update_top_conf", middleware.RetoolAuthRequired, updateTopActivityConfiguration(stg))
@@ -126,9 +128,9 @@ func InitSentry() {
 	}
 }
 
-func useEventHandler(q *coredb.Queries, p *pubsub.Client, t *task.Client, l *redislock.Client) gin.HandlerFunc {
+func useEventHandler(q *coredb.Queries, p *pubsub.Client, t *task.Client, l *redislock.Client, n *farcaster.NeynarAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		event.AddTo(c, false, notifications.New(q, p, t, l, false), q, t)
+		event.AddTo(c, false, notifications.New(q, p, t, l, false), q, t, n)
 		c.Next()
 	}
 }
