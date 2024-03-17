@@ -45,6 +45,7 @@ type DigestValues struct {
 	PostCount      int              `json:"post_count"`
 	CommunityCount int              `json:"community_count"`
 	GalleryCount   int              `json:"gallery_count"`
+	Subject        *string          `json:"subject"`
 }
 
 type IncludedSelected struct {
@@ -63,6 +64,7 @@ type DigestValueOverrides struct {
 	IncludeTopCommunities *bool          `json:"include_top_communities,omitempty"`
 	IncludeTopGalleries   *bool          `json:"include_top_galleries,omitempty"`
 	IntroText             *string        `json:"intro_text,omitempty"`
+	Subject               *string        `json:"subject,omitempty"`
 }
 
 type TokenDigestEntity struct {
@@ -209,6 +211,7 @@ func buildDigestTemplate(ctx context.Context, b *store.BucketStorer, q *db.Queri
 	return DigestValues{
 		Date:           time.Now().Format("2 January 2006"),
 		IntroText:      overrides.IntroText,
+		Subject:        overrides.Subject,
 		PostCount:      postCount,
 		CommunityCount: communityCount,
 		GalleryCount:   galleryCount,
