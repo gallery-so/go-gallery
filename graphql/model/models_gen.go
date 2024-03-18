@@ -3177,17 +3177,19 @@ const (
 	HighlightTxStatusTxPending   HighlightTxStatus = "TX_PENDING"
 	HighlightTxStatusTxComplete  HighlightTxStatus = "TX_COMPLETE"
 	HighlightTxStatusTokenSynced HighlightTxStatus = "TOKEN_SYNCED"
+	HighlightTxStatusMintFailed  HighlightTxStatus = "MINT_FAILED"
 )
 
 var AllHighlightTxStatus = []HighlightTxStatus{
 	HighlightTxStatusTxPending,
 	HighlightTxStatusTxComplete,
 	HighlightTxStatusTokenSynced,
+	HighlightTxStatusMintFailed,
 }
 
 func (e HighlightTxStatus) IsValid() bool {
 	switch e {
-	case HighlightTxStatusTxPending, HighlightTxStatusTxComplete, HighlightTxStatusTokenSynced:
+	case HighlightTxStatusTxPending, HighlightTxStatusTxComplete, HighlightTxStatusTokenSynced, HighlightTxStatusMintFailed:
 		return true
 	}
 	return false

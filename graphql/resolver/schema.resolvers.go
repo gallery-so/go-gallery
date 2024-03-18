@@ -2918,7 +2918,11 @@ func (r *queryResolver) HighlightMintClaimStatus(ctx context.Context, claimID pe
 	case highlight.ClaimStatusTxFailed:
 		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
 	case highlight.ClaimStatusFailedInternal:
-		return nil, fmt.Errorf("internal error handling mint claim: %s", claim.ErrorMessage.String)
+		return model.HighlightMintClaimStatusPayload{
+			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
+			Status: model.HighlightTxStatusMintFailed,
+			Token:  nil, // handled by dedicated resolver
+		}, fmt.Errorf("internal error handling mint claim: %s", claim.ErrorMessage.String)
 	case highlight.ClaimStatusMediaProcessed:
 		return model.HighlightMintClaimStatusPayload{
 			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
