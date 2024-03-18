@@ -96,8 +96,7 @@ func setDefaults() {
 	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
 	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
-	viper.SetDefault("ALCHEMY_ETH_NFT_API_URL", "")
-	viper.SetDefault("ALCHEMY_POLYGON_NFT_API_URL", "")
+	viper.SetDefault("ALCHEMY_BASE_SEPOLIA_API_URL", "")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
@@ -114,6 +113,7 @@ func setDefaults() {
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ARBITRUM", "")
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ETH", "")
 	viper.SetDefault("OPENSEA_WEBHOOK_SECRET", "")
+	viper.SetDefault("MINT_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/mint-processing")
 
 	viper.AutomaticEnv()
 

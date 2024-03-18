@@ -1548,6 +1548,9 @@ type Query {
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
+  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError
+    @authRequired
+    @goField(forceResolver: true)
 }
 
 type SocialQueries {
@@ -1824,6 +1827,10 @@ type ErrUsernameNotAvailable implements Error {
 }
 
 type ErrAddressOwnedByUser implements Error {
+  message: String!
+}
+
+type ErrAddressNotOwnedByUser implements Error {
   message: String!
 }
 
@@ -2986,6 +2993,53 @@ union UnblockUserPayloadOrError =
   | ErrNotAuthorized
   | ErrInvalidInput
 
+input HighlightClaimMintInput {
+  collectionId: String!
+  recipientWalletId: DBID!
+}
+
+type HighlightClaimMintPayload {
+  claimId: DBID!
+}
+
+type ErrHighlightTxnFailed implements Error {
+  message: String!
+}
+
+type ErrHighlightMintUnavailable implements Error {
+  message: String!
+}
+
+type ErrHighlightChainNotSupported implements Error {
+  message: String!
+}
+
+union HighlightClaimMintPayloadOrError =
+    HighlightClaimMintPayload
+  | ErrHighlightTxnFailed
+  | ErrHighlightMintUnavailable
+  | ErrHighlightChainNotSupported
+  | ErrAddressNotOwnedByUser
+  | ErrNotAuthorized
+
+enum HighlightTxStatus {
+  TX_PENDING
+  TX_COMPLETE
+  TOKEN_SYNCED
+  MINT_FAILED
+}
+
+type HighlightMintClaimStatusPayload @goEmbedHelper {
+  status: HighlightTxStatus!
+  token: Token @goField(forceResolver: true)
+}
+
+union HighlightMintClaimStatusPayloadOrError =
+    HighlightMintClaimStatusPayload
+  | ErrHighlightTxnFailed
+  | ErrHighlightMintUnavailable
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -3093,6 +3147,9 @@ type Mutation {
   referralPostToken(input: ReferralPostTokenInput!): ReferralPostTokenPayloadOrError @authRequired
   referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
+
+  highlightClaimMint(input: HighlightClaimMintInput!): HighlightClaimMintPayloadOrError
+    @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
   viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError

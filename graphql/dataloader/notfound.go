@@ -139,7 +139,7 @@ func (*GetUserByUsernameBatch) getNotFoundError(key string) error {
 }
 
 func (*GetWalletByIDBatch) getNotFoundError(key persist.DBID) error {
-	return pgx.ErrNoRows
+	return persist.ErrWalletNotFoundByID{ID: key}
 }
 
 func (*GetContractCreatorsByIds) getNotFoundError(key string) error {

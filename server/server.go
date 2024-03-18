@@ -228,7 +228,7 @@ func SetDefaults() {
 	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
 	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
-	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
+	viper.SetDefault("ALCHEMY_BASE_SEPOLIA_API_URL", "")
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
@@ -242,9 +242,11 @@ func SetDefaults() {
 	viper.SetDefault("AUTOSOCIAL_QUEUE", "projects/gallery-local/locations/here/queues/autosocial")
 	viper.SetDefault("AUTOSOCIAL_POLL_QUEUE", "projects/gallery-local/locations/here/queues/autosocial-poll")
 	viper.SetDefault("ACTIVITY_QUEUE", "projects/gallery-local/locations/here/queues/activity")
-
 	viper.SetDefault("FARCASTER_MNEMONIC", "")
 	viper.SetDefault("FARCASTER_APP_ID", "")
+	viper.SetDefault("HIGHLIGHT_APP_ID", "")
+	viper.SetDefault("HIGHLIGHT_APP_SECRET", "")
+	viper.SetDefault("MINT_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/mint-processing")
 
 	viper.AutomaticEnv()
 

@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -886,6 +887,14 @@ func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model
 // IsMemberOfCommunity is the resolver for the isMemberOfCommunity field.
 func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error) {
 	return publicapi.For(ctx).User.IsMemberOfCommunity(ctx, obj.Dbid, communityID)
+}
+
+// Token is the resolver for the token field.
+func (r *highlightMintClaimStatusPayloadResolver) Token(ctx context.Context, obj *model.HighlightMintClaimStatusPayload) (*model.Token, error) {
+	if obj.TokenID == "" {
+		return nil, nil
+	}
+	return resolveTokenByTokenID(ctx, obj.HelperHighlightMintClaimStatusPayloadData.TokenID)
 }
 
 // Entity is the resolver for the entity field.
@@ -1775,6 +1784,15 @@ func (r *mutationResolver) DeletePost(ctx context.Context, postID persist.DBID) 
 		},
 	}
 	return output, nil
+}
+
+// HighlightClaimMint is the resolver for the highlightClaimMint field.
+func (r *mutationResolver) HighlightClaimMint(ctx context.Context, input model.HighlightClaimMintInput) (model.HighlightClaimMintPayloadOrError, error) {
+	claimID, err := publicapi.For(ctx).Mint.ClaimHighlightMint(ctx, input.CollectionID, input.RecipientWalletID)
+	if err != nil {
+		return nil, err
+	}
+	return model.HighlightClaimMintPayload{ClaimID: claimID}, nil
 }
 
 // ViewGallery is the resolver for the viewGallery field.
@@ -2886,6 +2904,36 @@ func (r *queryResolver) ArtBlocksCommunityByKey(ctx context.Context, key model.A
 	return communityToModel(ctx, *community), nil
 }
 
+// HighlightMintClaimStatus is the resolver for the highlightMintClaimStatus field.
+func (r *queryResolver) HighlightMintClaimStatus(ctx context.Context, claimID persist.DBID) (model.HighlightMintClaimStatusPayloadOrError, error) {
+	claim, err := publicapi.For(ctx).Mint.GetHighlightMintClaimByID(ctx, claimID)
+	if err != nil {
+		return nil, err
+	}
+	switch claim.Status {
+	case highlight.ClaimStatusTxPending:
+		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxStatusTxPending}, nil
+	case highlight.ClaimStatusTxSucceeded:
+		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxStatusTxComplete}, nil
+	case highlight.ClaimStatusTxFailed:
+		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
+	case highlight.ClaimStatusFailedInternal:
+		return model.HighlightMintClaimStatusPayload{
+			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
+			Status: model.HighlightTxStatusMintFailed,
+			Token:  nil, // handled by dedicated resolver
+		}, fmt.Errorf("internal error handling mint claim: %s", claim.ErrorMessage.String)
+	case highlight.ClaimStatusMediaProcessed:
+		return model.HighlightMintClaimStatusPayload{
+			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
+			Status: model.HighlightTxStatusTokenSynced,
+			Token:  nil, // handled by dedicated resolver
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown mint claim status: %s", claim.Status)
+	}
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {
@@ -3690,6 +3738,11 @@ func (r *Resolver) GalleryUpdatedFeedEventData() generated.GalleryUpdatedFeedEve
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
+// HighlightMintClaimStatusPayload returns generated.HighlightMintClaimStatusPayloadResolver implementation.
+func (r *Resolver) HighlightMintClaimStatusPayload() generated.HighlightMintClaimStatusPayloadResolver {
+	return &highlightMintClaimStatusPayloadResolver{r}
+}
+
 // Mention returns generated.MentionResolver implementation.
 func (r *Resolver) Mention() generated.MentionResolver { return &mentionResolver{r} }
 
@@ -3900,6 +3953,7 @@ type galleryResolver struct{ *Resolver }
 type galleryInfoUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
+type highlightMintClaimStatusPayloadResolver struct{ *Resolver }
 type mentionResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type newTokensNotificationResolver struct{ *Resolver }

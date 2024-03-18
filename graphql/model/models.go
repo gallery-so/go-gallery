@@ -228,6 +228,10 @@ type HelperSomeoneYouFollowOnFarcasterJoinedNotificationData struct {
 	UserID persist.DBID
 }
 
+type HelperHighlightMintClaimStatusPayloadData struct {
+	TokenID persist.DBID
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

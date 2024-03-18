@@ -70,6 +70,7 @@ type ResolverRoot interface {
 	GalleryInfoUpdatedFeedEventData() GalleryInfoUpdatedFeedEventDataResolver
 	GalleryUpdatedFeedEventData() GalleryUpdatedFeedEventDataResolver
 	GalleryUser() GalleryUserResolver
+	HighlightMintClaimStatusPayload() HighlightMintClaimStatusPayloadResolver
 	Mention() MentionResolver
 	Mutation() MutationResolver
 	NewTokensNotification() NewTokensNotificationResolver
@@ -488,6 +489,10 @@ type ComplexityRoot struct {
 		FindPostByDbid      func(childComplexity int, dbid persist.DBID) int
 	}
 
+	ErrAddressNotOwnedByUser struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrAddressOwnedByUser struct {
 		Message func(childComplexity int) int
 	}
@@ -533,6 +538,18 @@ type ComplexityRoot struct {
 	}
 
 	ErrGalleryNotFound struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrHighlightChainNotSupported struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrHighlightMintUnavailable struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrHighlightTxnFailed struct {
 		Message func(childComplexity int) int
 	}
 
@@ -792,6 +809,15 @@ type ComplexityRoot struct {
 		PreviewURLs func(childComplexity int) int
 	}
 
+	HighlightClaimMintPayload struct {
+		ClaimID func(childComplexity int) int
+	}
+
+	HighlightMintClaimStatusPayload struct {
+		Status func(childComplexity int) int
+		Token  func(childComplexity int) int
+	}
+
 	HtmlMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
@@ -935,6 +961,7 @@ type ComplexityRoot struct {
 		FollowUser                                      func(childComplexity int, userID persist.DBID) int
 		GenerateQRCodeLoginToken                        func(childComplexity int) int
 		GetAuthNonce                                    func(childComplexity int, chainAddress persist.ChainAddress) int
+		HighlightClaimMint                              func(childComplexity int, input model.HighlightClaimMintInput) int
 		Login                                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                                          func(childComplexity int, pushTokenToUnregister *string) int
 		MintPremiumCardToWallet                         func(childComplexity int, input model.MintPremiumCardToWalletInput) int
@@ -1149,6 +1176,7 @@ type ComplexityRoot struct {
 		GeneralAllowlist           func(childComplexity int) int
 		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
 		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		HighlightMintClaimStatus   func(childComplexity int, claimID persist.DBID) int
 		IsEmailAddressAvailable    func(childComplexity int, emailAddress persist.Email) int
 		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
 		Node                       func(childComplexity int, id model.GqlID) int
@@ -1980,6 +2008,9 @@ type GalleryUserResolver interface {
 	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error)
 }
+type HighlightMintClaimStatusPayloadResolver interface {
+	Token(ctx context.Context, obj *model.HighlightMintClaimStatusPayload) (*model.Token, error)
+}
 type MentionResolver interface {
 	Entity(ctx context.Context, obj *model.Mention) (model.MentionEntity, error)
 }
@@ -2035,6 +2066,7 @@ type MutationResolver interface {
 	ReferralPostToken(ctx context.Context, input model.ReferralPostTokenInput) (model.ReferralPostTokenPayloadOrError, error)
 	ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error)
 	DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error)
+	HighlightClaimMint(ctx context.Context, input model.HighlightClaimMintInput) (model.HighlightClaimMintPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
 	ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.ViewTokenPayloadOrError, error)
 	UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error)
@@ -2131,6 +2163,7 @@ type QueryResolver interface {
 	PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error)
 	ContractCommunityByKey(ctx context.Context, key model.ContractCommunityKeyInput) (model.CommunityByKeyOrError, error)
 	ArtBlocksCommunityByKey(ctx context.Context, key model.ArtBlocksCommunityKeyInput) (model.CommunityByKeyOrError, error)
+	HighlightMintClaimStatus(ctx context.Context, claimID persist.DBID) (model.HighlightMintClaimStatusPayloadOrError, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -3708,6 +3741,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Entity.FindPostByDbid(childComplexity, args["dbid"].(persist.DBID)), true
 
+	case "ErrAddressNotOwnedByUser.message":
+		if e.complexity.ErrAddressNotOwnedByUser.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrAddressNotOwnedByUser.Message(childComplexity), true
+
 	case "ErrAddressOwnedByUser.message":
 		if e.complexity.ErrAddressOwnedByUser.Message == nil {
 			break
@@ -3791,6 +3831,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrGalleryNotFound.Message(childComplexity), true
+
+	case "ErrHighlightChainNotSupported.message":
+		if e.complexity.ErrHighlightChainNotSupported.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrHighlightChainNotSupported.Message(childComplexity), true
+
+	case "ErrHighlightMintUnavailable.message":
+		if e.complexity.ErrHighlightMintUnavailable.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrHighlightMintUnavailable.Message(childComplexity), true
+
+	case "ErrHighlightTxnFailed.message":
+		if e.complexity.ErrHighlightTxnFailed.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrHighlightTxnFailed.Message(childComplexity), true
 
 	case "ErrInvalidInput.message":
 		if e.complexity.ErrInvalidInput.Message == nil {
@@ -4794,6 +4855,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.HTTPSProfileImage.PreviewURLs(childComplexity), true
 
+	case "HighlightClaimMintPayload.claimId":
+		if e.complexity.HighlightClaimMintPayload.ClaimID == nil {
+			break
+		}
+
+		return e.complexity.HighlightClaimMintPayload.ClaimID(childComplexity), true
+
+	case "HighlightMintClaimStatusPayload.status":
+		if e.complexity.HighlightMintClaimStatusPayload.Status == nil {
+			break
+		}
+
+		return e.complexity.HighlightMintClaimStatusPayload.Status(childComplexity), true
+
+	case "HighlightMintClaimStatusPayload.token":
+		if e.complexity.HighlightMintClaimStatusPayload.Token == nil {
+			break
+		}
+
+		return e.complexity.HighlightMintClaimStatusPayload.Token(childComplexity), true
+
 	case "HtmlMedia.contentRenderURL":
 		if e.complexity.HtmlMedia.ContentRenderURL == nil {
 			break
@@ -5524,6 +5606,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
+
+	case "Mutation.highlightClaimMint":
+		if e.complexity.Mutation.HighlightClaimMint == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_highlightClaimMint_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.HighlightClaimMint(childComplexity, args["input"].(model.HighlightClaimMintInput)), true
 
 	case "Mutation.login":
 		if e.complexity.Mutation.Login == nil {
@@ -6930,6 +7024,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
+
+	case "Query.highlightMintClaimStatus":
+		if e.complexity.Query.HighlightMintClaimStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Query_highlightMintClaimStatus_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.HighlightMintClaimStatus(childComplexity, args["claimId"].(persist.DBID)), true
 
 	case "Query.isEmailAddressAvailable":
 		if e.complexity.Query.IsEmailAddressAvailable == nil {
@@ -9634,6 +9740,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputFarcasterAuth,
 		ec.unmarshalInputGalleryPositionInput,
 		ec.unmarshalInputGnosisSafeAuth,
+		ec.unmarshalInputHighlightClaimMintInput,
 		ec.unmarshalInputIntervalInput,
 		ec.unmarshalInputLensAuth,
 		ec.unmarshalInputMagicLinkAuth,
@@ -11341,6 +11448,9 @@ type Query {
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
+  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError
+    @authRequired
+    @goField(forceResolver: true)
 }
 
 type SocialQueries {
@@ -11617,6 +11727,10 @@ type ErrUsernameNotAvailable implements Error {
 }
 
 type ErrAddressOwnedByUser implements Error {
+  message: String!
+}
+
+type ErrAddressNotOwnedByUser implements Error {
   message: String!
 }
 
@@ -12779,6 +12893,53 @@ union UnblockUserPayloadOrError =
   | ErrNotAuthorized
   | ErrInvalidInput
 
+input HighlightClaimMintInput {
+  collectionId: String!
+  recipientWalletId: DBID!
+}
+
+type HighlightClaimMintPayload {
+  claimId: DBID!
+}
+
+type ErrHighlightTxnFailed implements Error {
+  message: String!
+}
+
+type ErrHighlightMintUnavailable implements Error {
+  message: String!
+}
+
+type ErrHighlightChainNotSupported implements Error {
+  message: String!
+}
+
+union HighlightClaimMintPayloadOrError =
+    HighlightClaimMintPayload
+  | ErrHighlightTxnFailed
+  | ErrHighlightMintUnavailable
+  | ErrHighlightChainNotSupported
+  | ErrAddressNotOwnedByUser
+  | ErrNotAuthorized
+
+enum HighlightTxStatus {
+  TX_PENDING
+  TX_COMPLETE
+  TOKEN_SYNCED
+  MINT_FAILED
+}
+
+type HighlightMintClaimStatusPayload @goEmbedHelper {
+  status: HighlightTxStatus!
+  token: Token @goField(forceResolver: true)
+}
+
+union HighlightMintClaimStatusPayloadOrError =
+    HighlightMintClaimStatusPayload
+  | ErrHighlightTxnFailed
+  | ErrHighlightMintUnavailable
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -12886,6 +13047,9 @@ type Mutation {
   referralPostToken(input: ReferralPostTokenInput!): ReferralPostTokenPayloadOrError @authRequired
   referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
+
+  highlightClaimMint(input: HighlightClaimMintInput!): HighlightClaimMintPayloadOrError
+    @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
   viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
@@ -14326,6 +14490,21 @@ func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_highlightClaimMint_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.HighlightClaimMintInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNHighlightClaimMintInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightClaimMintInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -15706,6 +15885,21 @@ func (ec *executionContext) field_Query_globalFeed_args(ctx context.Context, raw
 		}
 	}
 	args["includePosts"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_highlightMintClaimStatus_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["claimId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("claimId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["claimId"] = arg0
 	return args, nil
 }
 
@@ -27103,6 +27297,50 @@ func (ec *executionContext) fieldContext_Entity_findPostByDbid(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _ErrAddressNotOwnedByUser_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAddressNotOwnedByUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrAddressNotOwnedByUser_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrAddressNotOwnedByUser_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrAddressNotOwnedByUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ErrAddressOwnedByUser_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAddressOwnedByUser) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ErrAddressOwnedByUser_message(ctx, field)
 	if err != nil {
@@ -27621,6 +27859,138 @@ func (ec *executionContext) _ErrGalleryNotFound_message(ctx context.Context, fie
 func (ec *executionContext) fieldContext_ErrGalleryNotFound_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ErrGalleryNotFound",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrHighlightChainNotSupported_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrHighlightChainNotSupported) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrHighlightChainNotSupported_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrHighlightChainNotSupported_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrHighlightChainNotSupported",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrHighlightMintUnavailable_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrHighlightMintUnavailable) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrHighlightMintUnavailable_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrHighlightMintUnavailable_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrHighlightMintUnavailable",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrHighlightTxnFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrHighlightTxnFailed) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrHighlightTxnFailed_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrHighlightTxnFailed_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrHighlightTxnFailed",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -34434,6 +34804,197 @@ func (ec *executionContext) fieldContext_HTTPSProfileImage_previewURLs(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _HighlightClaimMintPayload_claimId(ctx context.Context, field graphql.CollectedField, obj *model.HighlightClaimMintPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_HighlightClaimMintPayload_claimId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ClaimID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_HighlightClaimMintPayload_claimId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HighlightClaimMintPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HighlightMintClaimStatusPayload_status(ctx context.Context, field graphql.CollectedField, obj *model.HighlightMintClaimStatusPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_HighlightMintClaimStatusPayload_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.HighlightTxStatus)
+	fc.Result = res
+	return ec.marshalNHighlightTxStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_HighlightMintClaimStatusPayload_status(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HighlightMintClaimStatusPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HighlightTxStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HighlightMintClaimStatusPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.HighlightMintClaimStatusPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_HighlightMintClaimStatusPayload_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.HighlightMintClaimStatusPayload().Token(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_HighlightMintClaimStatusPayload_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HighlightMintClaimStatusPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Token_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Token_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Token_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Token_lastUpdated(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Token_collectorsNote(ctx, field)
+			case "quantity":
+				return ec.fieldContext_Token_quantity(ctx, field)
+			case "owner":
+				return ec.fieldContext_Token_owner(ctx, field)
+			case "ownedByWallets":
+				return ec.fieldContext_Token_ownedByWallets(ctx, field)
+			case "ownershipHistory":
+				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "definition":
+				return ec.fieldContext_Token_definition(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "admires":
+				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
+			case "contract":
+				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_Token_externalUrl(ctx, field)
+			case "isSpamByProvider":
+				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Token_creatorAddress(ctx, field)
+			case "openseaCollectionName":
+				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
+			case "openseaId":
+				return ec.fieldContext_Token_openseaId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _HtmlMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_HtmlMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -40790,6 +41351,78 @@ func (ec *executionContext) fieldContext_Mutation_deletePost(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_deletePost_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_highlightClaimMint(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_highlightClaimMint(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().HighlightClaimMint(rctx, fc.Args["input"].(model.HighlightClaimMintInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.HighlightClaimMintPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.HighlightClaimMintPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.HighlightClaimMintPayloadOrError)
+	fc.Result = res
+	return ec.marshalOHighlightClaimMintPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightClaimMintPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_highlightClaimMint(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HighlightClaimMintPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_highlightClaimMint_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -48876,6 +49509,78 @@ func (ec *executionContext) fieldContext_Query_artBlocksCommunityByKey(ctx conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_artBlocksCommunityByKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_highlightMintClaimStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_highlightMintClaimStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().HighlightMintClaimStatus(rctx, fc.Args["claimId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.HighlightMintClaimStatusPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.HighlightMintClaimStatusPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.HighlightMintClaimStatusPayloadOrError)
+	fc.Result = res
+	return ec.marshalOHighlightMintClaimStatusPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightMintClaimStatusPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_highlightMintClaimStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HighlightMintClaimStatusPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_highlightMintClaimStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -68654,7 +69359,7 @@ func (ec *executionContext) unmarshalInputChainAddressTokenInput(ctx context.Con
 			it.ChainAddress = data
 		case "tokenId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenId"))
-			data, err := ec.unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx, v)
+			data, err := ec.unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐHexTokenID(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -69492,6 +70197,40 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 				return it, err
 			}
 			it.Nonce = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputHighlightClaimMintInput(ctx context.Context, obj interface{}) (model.HighlightClaimMintInput, error) {
+	var it model.HighlightClaimMintInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"collectionId", "recipientWalletId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "collectionId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CollectionID = data
+		case "recipientWalletId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("recipientWalletId"))
+			data, err := ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RecipientWalletID = data
 		}
 	}
 
@@ -72123,6 +72862,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
+	case model.ErrAddressNotOwnedByUser:
+		return ec._ErrAddressNotOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressNotOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressNotOwnedByUser(ctx, sel, obj)
 	case model.ErrUserNotFound:
 		return ec._ErrUserNotFound(ctx, sel, &obj)
 	case *model.ErrUserNotFound:
@@ -72228,6 +72974,27 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrNoAvatarRecordSet(ctx, sel, obj)
+	case model.ErrHighlightTxnFailed:
+		return ec._ErrHighlightTxnFailed(ctx, sel, &obj)
+	case *model.ErrHighlightTxnFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightTxnFailed(ctx, sel, obj)
+	case model.ErrHighlightMintUnavailable:
+		return ec._ErrHighlightMintUnavailable(ctx, sel, &obj)
+	case *model.ErrHighlightMintUnavailable:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightMintUnavailable(ctx, sel, obj)
+	case model.ErrHighlightChainNotSupported:
+		return ec._ErrHighlightChainNotSupported(ctx, sel, &obj)
+	case *model.ErrHighlightChainNotSupported:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightChainNotSupported(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -72656,6 +73423,94 @@ func (ec *executionContext) _GroupedNotification(ctx context.Context, sel ast.Se
 			return graphql.Null
 		}
 		return ec._NewTokensNotification(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _HighlightClaimMintPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.HighlightClaimMintPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ErrHighlightTxnFailed:
+		return ec._ErrHighlightTxnFailed(ctx, sel, &obj)
+	case *model.ErrHighlightTxnFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightTxnFailed(ctx, sel, obj)
+	case model.ErrHighlightMintUnavailable:
+		return ec._ErrHighlightMintUnavailable(ctx, sel, &obj)
+	case *model.ErrHighlightMintUnavailable:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightMintUnavailable(ctx, sel, obj)
+	case model.ErrHighlightChainNotSupported:
+		return ec._ErrHighlightChainNotSupported(ctx, sel, &obj)
+	case *model.ErrHighlightChainNotSupported:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightChainNotSupported(ctx, sel, obj)
+	case model.ErrAddressNotOwnedByUser:
+		return ec._ErrAddressNotOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressNotOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressNotOwnedByUser(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.HighlightClaimMintPayload:
+		return ec._HighlightClaimMintPayload(ctx, sel, &obj)
+	case *model.HighlightClaimMintPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._HighlightClaimMintPayload(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _HighlightMintClaimStatusPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.HighlightMintClaimStatusPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ErrHighlightTxnFailed:
+		return ec._ErrHighlightTxnFailed(ctx, sel, &obj)
+	case *model.ErrHighlightTxnFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightTxnFailed(ctx, sel, obj)
+	case model.ErrHighlightMintUnavailable:
+		return ec._ErrHighlightMintUnavailable(ctx, sel, &obj)
+	case *model.ErrHighlightMintUnavailable:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightMintUnavailable(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.HighlightMintClaimStatusPayload:
+		return ec._HighlightMintClaimStatusPayload(ctx, sel, &obj)
+	case *model.HighlightMintClaimStatusPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._HighlightMintClaimStatusPayload(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -79842,6 +80697,45 @@ func (ec *executionContext) _Entity(ctx context.Context, sel ast.SelectionSet) g
 	return out
 }
 
+var errAddressNotOwnedByUserImplementors = []string{"ErrAddressNotOwnedByUser", "Error", "HighlightClaimMintPayloadOrError"}
+
+func (ec *executionContext) _ErrAddressNotOwnedByUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressNotOwnedByUser) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errAddressNotOwnedByUserImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrAddressNotOwnedByUser")
+		case "message":
+			out.Values[i] = ec._ErrAddressNotOwnedByUser_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error", "AdminAddWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressOwnedByUser) graphql.Marshaler {
@@ -80310,6 +81204,123 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var errHighlightChainNotSupportedImplementors = []string{"ErrHighlightChainNotSupported", "Error", "HighlightClaimMintPayloadOrError"}
+
+func (ec *executionContext) _ErrHighlightChainNotSupported(ctx context.Context, sel ast.SelectionSet, obj *model.ErrHighlightChainNotSupported) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errHighlightChainNotSupportedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrHighlightChainNotSupported")
+		case "message":
+			out.Values[i] = ec._ErrHighlightChainNotSupported_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var errHighlightMintUnavailableImplementors = []string{"ErrHighlightMintUnavailable", "Error", "HighlightClaimMintPayloadOrError", "HighlightMintClaimStatusPayloadOrError"}
+
+func (ec *executionContext) _ErrHighlightMintUnavailable(ctx context.Context, sel ast.SelectionSet, obj *model.ErrHighlightMintUnavailable) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errHighlightMintUnavailableImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrHighlightMintUnavailable")
+		case "message":
+			out.Values[i] = ec._ErrHighlightMintUnavailable_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var errHighlightTxnFailedImplementors = []string{"ErrHighlightTxnFailed", "Error", "HighlightClaimMintPayloadOrError", "HighlightMintClaimStatusPayloadOrError"}
+
+func (ec *executionContext) _ErrHighlightTxnFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrHighlightTxnFailed) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errHighlightTxnFailedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrHighlightTxnFailed")
+		case "message":
+			out.Values[i] = ec._ErrHighlightTxnFailed_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "SetPersonaPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
@@ -80520,7 +81531,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "SetPersonaPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "SetPersonaPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError", "HighlightClaimMintPayloadOrError", "HighlightMintClaimStatusPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -83119,6 +84130,117 @@ func (ec *executionContext) _HTTPSProfileImage(ctx context.Context, sel ast.Sele
 	return out
 }
 
+var highlightClaimMintPayloadImplementors = []string{"HighlightClaimMintPayload", "HighlightClaimMintPayloadOrError"}
+
+func (ec *executionContext) _HighlightClaimMintPayload(ctx context.Context, sel ast.SelectionSet, obj *model.HighlightClaimMintPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, highlightClaimMintPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HighlightClaimMintPayload")
+		case "claimId":
+			out.Values[i] = ec._HighlightClaimMintPayload_claimId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var highlightMintClaimStatusPayloadImplementors = []string{"HighlightMintClaimStatusPayload", "HighlightMintClaimStatusPayloadOrError"}
+
+func (ec *executionContext) _HighlightMintClaimStatusPayload(ctx context.Context, sel ast.SelectionSet, obj *model.HighlightMintClaimStatusPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, highlightMintClaimStatusPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HighlightMintClaimStatusPayload")
+		case "status":
+			out.Values[i] = ec._HighlightMintClaimStatusPayload_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "token":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._HighlightMintClaimStatusPayload_token(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var htmlMediaImplementors = []string{"HtmlMedia", "MediaSubtype", "Media"}
 
 func (ec *executionContext) _HtmlMedia(ctx context.Context, sel ast.SelectionSet, obj *model.HTMLMedia) graphql.Marshaler {
@@ -84167,6 +85289,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "deletePost":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deletePost(ctx, field)
+			})
+		case "highlightClaimMint":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_highlightClaimMint(ctx, field)
 			})
 		case "viewGallery":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -86315,6 +87441,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_artBlocksCommunityByKey(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "highlightMintClaimStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_highlightMintClaimStatus(ctx, field)
 				return res
 			}
 
@@ -93952,6 +95097,21 @@ func (ec *executionContext) marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgo�
 	return ec._GalleryUser(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNHighlightClaimMintInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightClaimMintInput(ctx context.Context, v interface{}) (model.HighlightClaimMintInput, error) {
+	res, err := ec.unmarshalInputHighlightClaimMintInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNHighlightTxStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxStatus(ctx context.Context, v interface{}) (model.HighlightTxStatus, error) {
+	var res model.HighlightTxStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHighlightTxStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxStatus(ctx context.Context, sel ast.SelectionSet, v model.HighlightTxStatus) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx context.Context, v interface{}) (model.GqlID, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := model.GqlID(tmp)
@@ -94353,13 +95513,13 @@ func (ec *executionContext) marshalNTokenDefinition2ᚖgithubᚗcomᚋmikeydub�
 	return ec._TokenDefinition(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, v interface{}) (persist.HexTokenID, error) {
+func (ec *executionContext) unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐHexTokenID(ctx context.Context, v interface{}) (persist.HexTokenID, error) {
 	var res persist.HexTokenID
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, sel ast.SelectionSet, v persist.HexTokenID) graphql.Marshaler {
+func (ec *executionContext) marshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐHexTokenID(ctx context.Context, sel ast.SelectionSet, v persist.HexTokenID) graphql.Marshaler {
 	return v
 }
 
@@ -96987,6 +98147,20 @@ func (ec *executionContext) marshalOHTTPSProfileImage2ᚖgithubᚗcomᚋmikeydub
 		return graphql.Null
 	}
 	return ec._HTTPSProfileImage(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOHighlightClaimMintPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightClaimMintPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.HighlightClaimMintPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._HighlightClaimMintPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOHighlightMintClaimStatusPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightMintClaimStatusPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.HighlightMintClaimStatusPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._HighlightMintClaimStatusPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚕᚖint(ctx context.Context, v interface{}) ([]*int, error) {

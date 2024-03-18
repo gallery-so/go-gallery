@@ -2139,6 +2139,7 @@ func (v *definitionFragMediaVideoMedia) __premarshalJSON() (*__premarshaldefinit
 // errorFrag includes the GraphQL fields of Error requested by the fragment errorFrag.
 //
 // errorFrag is implemented by the following types:
+// errorFragErrAddressNotOwnedByUser
 // errorFragErrAddressOwnedByUser
 // errorFragErrAdmireAlreadyExists
 // errorFragErrAdmireNotFound
@@ -2151,6 +2152,9 @@ func (v *definitionFragMediaVideoMedia) __premarshalJSON() (*__premarshaldefinit
 // errorFragErrEmailUnverified
 // errorFragErrFeedEventNotFound
 // errorFragErrGalleryNotFound
+// errorFragErrHighlightChainNotSupported
+// errorFragErrHighlightMintUnavailable
+// errorFragErrHighlightTxnFailed
 // errorFragErrInvalidInput
 // errorFragErrInvalidToken
 // errorFragErrNeedsToReconnectSocial
@@ -2174,6 +2178,7 @@ type errorFrag interface {
 	GetTypename() *string
 }
 
+func (v *errorFragErrAddressNotOwnedByUser) implementsGraphQLInterfaceerrorFrag()         {}
 func (v *errorFragErrAddressOwnedByUser) implementsGraphQLInterfaceerrorFrag()            {}
 func (v *errorFragErrAdmireAlreadyExists) implementsGraphQLInterfaceerrorFrag()           {}
 func (v *errorFragErrAdmireNotFound) implementsGraphQLInterfaceerrorFrag()                {}
@@ -2186,6 +2191,9 @@ func (v *errorFragErrEmailAlreadyUsed) implementsGraphQLInterfaceerrorFrag()    
 func (v *errorFragErrEmailUnverified) implementsGraphQLInterfaceerrorFrag()               {}
 func (v *errorFragErrFeedEventNotFound) implementsGraphQLInterfaceerrorFrag()             {}
 func (v *errorFragErrGalleryNotFound) implementsGraphQLInterfaceerrorFrag()               {}
+func (v *errorFragErrHighlightChainNotSupported) implementsGraphQLInterfaceerrorFrag()    {}
+func (v *errorFragErrHighlightMintUnavailable) implementsGraphQLInterfaceerrorFrag()      {}
+func (v *errorFragErrHighlightTxnFailed) implementsGraphQLInterfaceerrorFrag()            {}
 func (v *errorFragErrInvalidInput) implementsGraphQLInterfaceerrorFrag()                  {}
 func (v *errorFragErrInvalidToken) implementsGraphQLInterfaceerrorFrag()                  {}
 func (v *errorFragErrNeedsToReconnectSocial) implementsGraphQLInterfaceerrorFrag()        {}
@@ -2216,6 +2224,9 @@ func __unmarshalerrorFrag(b []byte, v *errorFrag) error {
 	}
 
 	switch tn.TypeName {
+	case "ErrAddressNotOwnedByUser":
+		*v = new(errorFragErrAddressNotOwnedByUser)
+		return json.Unmarshal(b, *v)
 	case "ErrAddressOwnedByUser":
 		*v = new(errorFragErrAddressOwnedByUser)
 		return json.Unmarshal(b, *v)
@@ -2251,6 +2262,15 @@ func __unmarshalerrorFrag(b []byte, v *errorFrag) error {
 		return json.Unmarshal(b, *v)
 	case "ErrGalleryNotFound":
 		*v = new(errorFragErrGalleryNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrHighlightChainNotSupported":
+		*v = new(errorFragErrHighlightChainNotSupported)
+		return json.Unmarshal(b, *v)
+	case "ErrHighlightMintUnavailable":
+		*v = new(errorFragErrHighlightMintUnavailable)
+		return json.Unmarshal(b, *v)
+	case "ErrHighlightTxnFailed":
+		*v = new(errorFragErrHighlightTxnFailed)
 		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(errorFragErrInvalidInput)
@@ -2310,6 +2330,14 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 
 	var typename string
 	switch v := (*v).(type) {
+	case *errorFragErrAddressNotOwnedByUser:
+		typename = "ErrAddressNotOwnedByUser"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrAddressNotOwnedByUser
+		}{typename, v}
+		return json.Marshal(result)
 	case *errorFragErrAddressOwnedByUser:
 		typename = "ErrAddressOwnedByUser"
 
@@ -2404,6 +2432,30 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 		result := struct {
 			TypeName string `json:"__typename"`
 			*errorFragErrGalleryNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrHighlightChainNotSupported:
+		typename = "ErrHighlightChainNotSupported"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrHighlightChainNotSupported
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrHighlightMintUnavailable:
+		typename = "ErrHighlightMintUnavailable"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrHighlightMintUnavailable
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrHighlightTxnFailed:
+		typename = "ErrHighlightTxnFailed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrHighlightTxnFailed
 		}{typename, v}
 		return json.Marshal(result)
 	case *errorFragErrInvalidInput:
@@ -2533,6 +2585,18 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 			`unexpected concrete type for errorFrag: "%T"`, v)
 	}
 }
+
+// errorFrag includes the GraphQL fields of ErrAddressNotOwnedByUser requested by the fragment errorFrag.
+type errorFragErrAddressNotOwnedByUser struct {
+	Message  string  `json:"message"`
+	Typename *string `json:"__typename"`
+}
+
+// GetMessage returns errorFragErrAddressNotOwnedByUser.Message, and is useful for accessing the field via an interface.
+func (v *errorFragErrAddressNotOwnedByUser) GetMessage() string { return v.Message }
+
+// GetTypename returns errorFragErrAddressNotOwnedByUser.Typename, and is useful for accessing the field via an interface.
+func (v *errorFragErrAddressNotOwnedByUser) GetTypename() *string { return v.Typename }
 
 // errorFrag includes the GraphQL fields of ErrAddressOwnedByUser requested by the fragment errorFrag.
 type errorFragErrAddressOwnedByUser struct {
@@ -2677,6 +2741,42 @@ func (v *errorFragErrGalleryNotFound) GetMessage() string { return v.Message }
 
 // GetTypename returns errorFragErrGalleryNotFound.Typename, and is useful for accessing the field via an interface.
 func (v *errorFragErrGalleryNotFound) GetTypename() *string { return v.Typename }
+
+// errorFrag includes the GraphQL fields of ErrHighlightChainNotSupported requested by the fragment errorFrag.
+type errorFragErrHighlightChainNotSupported struct {
+	Message  string  `json:"message"`
+	Typename *string `json:"__typename"`
+}
+
+// GetMessage returns errorFragErrHighlightChainNotSupported.Message, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightChainNotSupported) GetMessage() string { return v.Message }
+
+// GetTypename returns errorFragErrHighlightChainNotSupported.Typename, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightChainNotSupported) GetTypename() *string { return v.Typename }
+
+// errorFrag includes the GraphQL fields of ErrHighlightMintUnavailable requested by the fragment errorFrag.
+type errorFragErrHighlightMintUnavailable struct {
+	Message  string  `json:"message"`
+	Typename *string `json:"__typename"`
+}
+
+// GetMessage returns errorFragErrHighlightMintUnavailable.Message, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightMintUnavailable) GetMessage() string { return v.Message }
+
+// GetTypename returns errorFragErrHighlightMintUnavailable.Typename, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightMintUnavailable) GetTypename() *string { return v.Typename }
+
+// errorFrag includes the GraphQL fields of ErrHighlightTxnFailed requested by the fragment errorFrag.
+type errorFragErrHighlightTxnFailed struct {
+	Message  string  `json:"message"`
+	Typename *string `json:"__typename"`
+}
+
+// GetMessage returns errorFragErrHighlightTxnFailed.Message, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightTxnFailed) GetMessage() string { return v.Message }
+
+// GetTypename returns errorFragErrHighlightTxnFailed.Typename, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightTxnFailed) GetTypename() *string { return v.Typename }
 
 // errorFrag includes the GraphQL fields of ErrInvalidInput requested by the fragment errorFrag.
 type errorFragErrInvalidInput struct {

@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/metric"
@@ -51,42 +50,32 @@ func (e ErrContractFlaking) Error() string {
 	return fmt.Sprintf("runs of chain=%d; contract=%s are paused for %s because of too many failed runs; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
 }
 
+type TickToken func(db.TokenDefinition) (time.Duration, error)
+
 type Manager struct {
 	ProcessRegistry *Registry
 	taskClient      *task.Client
 	throttle        *throttle.Locker
 	errorCounter    *limiters.KeyRateLimiter
-	enableRetries   bool
-	markTokenRan    func(db.TokenDefinition) (time.Duration, error)
+	tickToken       TickToken
 	metricReporter  metric.MetricReporter
+	maxRetries      func(db.TokenDefinition) int
 }
 
-func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Manager {
-	slowRetry := limiters.NewKeyRateLimiter(ctx, cache, "retrySlow", 1, 5*time.Minute)
-	fastRetry := limiters.NewKeyRateLimiter(ctx, cache, "retryFast", 1, 30*time.Second)
-
-	markTokenRan := func(td db.TokenDefinition) (time.Duration, error) {
-		if shareToGalleryEnabled(td) {
-			_, delay, err := fastRetry.ForKey(ctx, td.ID.String())
-			return delay, err
-		}
-		_, delay, err := slowRetry.ForKey(ctx, td.ID.String())
-		return delay, err
-	}
-
+func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache, tickToken TickToken) *Manager {
 	return &Manager{
 		ProcessRegistry: &Registry{cache},
 		taskClient:      taskClient,
 		throttle:        throttle.NewThrottleLocker(cache, 30*time.Minute),
 		metricReporter:  metric.NewLogMetricReporter(),
 		errorCounter:    limiters.NewKeyRateLimiter(ctx, cache, "errorCount", 100, 3*time.Hour),
-		markTokenRan:    markTokenRan,
+		tickToken:       tickToken,
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache) *Manager {
-	m := New(ctx, taskClient, cache)
-	m.enableRetries = true
+func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, maxRetries func(db.TokenDefinition) int, tickToken TickToken) *Manager {
+	m := New(ctx, taskClient, cache, tickToken)
+	m.maxRetries = maxRetries
 	return m
 }
 
@@ -150,7 +139,7 @@ func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, att
 	callback := func(tm db.TokenMedia, err error) error {
 		close(stop)
 		<-done
-		m.markTokenRan(td) // mark that the token ran so if an error occured tryRetry delays the next run appropriately
+		m.tickToken(td) // mark that the token ran so if an error occured tryRetry delays the next run appropriately
 		m.recordError(ctx, td, err)
 		m.tryRetry(ctx, td, err, attempts)
 		m.throttle.Unlock(ctx, "lock:"+td.ID.String())
@@ -159,17 +148,6 @@ func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, att
 	}
 
 	return callback, err
-}
-
-func shareToGalleryEnabled(td db.TokenDefinition) bool {
-	return platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash
-}
-
-func maxRetriesFor(td db.TokenDefinition) int {
-	if shareToGalleryEnabled(td) {
-		return 24
-	}
-	return 2
 }
 
 func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, originalErr error) {
@@ -218,25 +196,29 @@ func (m Manager) tryRetry(ctx context.Context, td db.TokenDefinition, err error,
 		return nil
 	}
 
-	if err == nil || !m.enableRetries || attempts >= maxRetriesFor(td) {
+	if err == nil || m.maxRetries == nil || attempts >= m.maxRetries(td) {
 		m.ProcessRegistry.finish(ctx, td.ID)
 		return nil
 	}
 
-	delay, err := m.markTokenRan(td)
+	delay, err := m.tickToken(td)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to get retry delay, not retrying: %s", err)
 		m.ProcessRegistry.finish(ctx, td.ID)
 		return err
 	}
 
-	m.ProcessRegistry.setEnqueue(ctx, td.ID)
+	m.ProcessRegistry.SetEnqueue(ctx, td.ID)
 	message := task.TokenProcessingTokenMessage{TokenDefinitionID: td.ID, Attempts: attempts + 1}
 	return m.taskClient.CreateTaskForTokenTokenProcessing(ctx, message, delay)
 }
 
 // Registry handles the storing of object state managed by Manager
 type Registry struct{ Cache *redis.Cache }
+
+func (r Registry) SetEnqueue(ctx context.Context, tDefID persist.DBID) error {
+	return r.setManyEnqueue(ctx, []persist.DBID{tDefID})
+}
 
 func (r Registry) processing(ctx context.Context, tDefID persist.DBID) (bool, error) {
 	_, err := r.Cache.Get(ctx, processingKey(tDefID))
@@ -245,10 +227,6 @@ func (r Registry) processing(ctx context.Context, tDefID persist.DBID) (bool, er
 
 func (r Registry) finish(ctx context.Context, tDefID persist.DBID) error {
 	return r.Cache.Delete(ctx, processingKey(tDefID))
-}
-
-func (r Registry) setEnqueue(ctx context.Context, tDefID persist.DBID) error {
-	return r.setManyEnqueue(ctx, []persist.DBID{tDefID})
 }
 
 func (r Registry) setManyEnqueue(ctx context.Context, tDefIDs []persist.DBID) error {

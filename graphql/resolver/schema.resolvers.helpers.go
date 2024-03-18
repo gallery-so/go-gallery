@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -167,6 +168,14 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
 	case errors.Is(err, eth.ErrNoAvatarRecord) || errors.Is(err, eth.ErrNoResolution):
 		mappedErr = model.ErrNoAvatarRecordSet{Message: message}
+	case util.ErrorIs[persist.ErrAddressNotOwnedByUser](err):
+		mappedErr = model.ErrAddressNotOwnedByUser{Message: message}
+	case errors.Is(err, highlight.ErrHighlightChainNotSupported) || util.ErrorIs[highlight.ErrHighlightTxnFailed](err):
+		mappedErr = model.ErrHighlightTxnFailed{Message: message}
+	case util.ErrorIs[highlight.ErrHighlightCollectionMintUnavailable](err):
+		mappedErr = model.ErrHighlightMintUnavailable{Message: message}
+	case errors.Is(err, highlight.ErrHighlightChainNotSupported):
+		mappedErr = model.ErrHighlightChainNotSupported{Message: message}
 	}
 
 	if mappedErr != nil {

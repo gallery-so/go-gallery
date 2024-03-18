@@ -7,14 +7,15 @@ import (
 type ProviderLookup map[persist.Chain]any
 
 type ChainProvider struct {
-	Ethereum *EthereumProvider
-	Tezos    *TezosProvider
-	Optimism *OptimismProvider
-	Arbitrum *ArbitrumProvider
-	Poap     *PoapProvider
-	Zora     *ZoraProvider
-	Base     *BaseProvider
-	Polygon  *PolygonProvider
+	Ethereum    *EthereumProvider
+	Tezos       *TezosProvider
+	Optimism    *OptimismProvider
+	Arbitrum    *ArbitrumProvider
+	Poap        *PoapProvider
+	Zora        *ZoraProvider
+	Base        *BaseProvider
+	BaseSepolia *BaseSepoliaProvider
+	Polygon     *PolygonProvider
 }
 
 type EthereumProvider struct {
@@ -81,6 +82,16 @@ type ZoraProvider struct {
 }
 
 type BaseProvider struct {
+	TokenDescriptorsFetcher
+	TokenMetadataFetcher
+	TokensIncrementalContractFetcher
+	TokensIncrementalOwnerFetcher
+	TokenIdentifierOwnerFetcher
+	TokenMetadataBatcher
+	TokensByTokenIdentifiersFetcher
+}
+
+type BaseSepoliaProvider struct {
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher

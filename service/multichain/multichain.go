@@ -386,9 +386,9 @@ outer:
 	}
 
 	for i, t := range tIDs {
-		tokenNoOwner := ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
+		tokenID := ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
 
-		tokens, contract, err := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher).GetTokensByTokenIdentifiers(ctx, tokenNoOwner)
+		tokens, contract, err := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher).GetTokensByTokenIdentifiers(ctx, tokenID)
 		// Exit early if a token in the batch is not found
 		if err != nil {
 			err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s): %s", t.Chain, t.ContractAddress, t.TokenID, err)
@@ -1452,11 +1452,11 @@ func chainContractsToUpsertableContracts(chain persist.Chain, contracts []ChainA
 	}
 	for _, c := range contracts {
 		result[c.Address] = mergeContracts(result[c.Address], db.Contract{
-			Symbol:               util.ToSQLNullString(&c.Descriptors.Symbol),
-			Name:                 util.ToSQLNullString(&c.Descriptors.Name),
+			Symbol:               util.ToNullStringEmptyNull(c.Descriptors.Symbol),
+			Name:                 util.ToNullStringEmptyNull(c.Descriptors.Name),
 			OwnerAddress:         c.Descriptors.OwnerAddress,
-			ProfileImageUrl:      util.ToSQLNullString(&c.Descriptors.ProfileImageURL),
-			Description:          util.ToSQLNullString(&c.Descriptors.Description),
+			ProfileImageUrl:      util.ToNullStringEmptyNull(c.Descriptors.ProfileImageURL),
+			Description:          util.ToNullStringEmptyNull(c.Descriptors.Description),
 			IsProviderMarkedSpam: util.FromPointer(c.IsSpam),
 		})
 	}

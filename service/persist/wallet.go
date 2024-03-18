@@ -85,9 +85,9 @@ func (c *ChainAddress) Chain() Chain {
 }
 
 func (c *ChainAddress) updateCasing() {
-	switch c.chain {
+	switch c.chain.L1Chain() {
 	// TODO: Add an IsCaseSensitive to the Chain type?
-	case ChainETH:
+	case L1Chain(ChainETH):
 		c.address = Address(strings.ToLower(c.address.String()))
 	}
 }
@@ -424,16 +424,25 @@ type ErrWalletAlreadyExists struct {
 	OwnerID        DBID
 }
 
-// ErrWalletNotFound is an error type for when a wallet is not found
-type ErrWalletNotFound struct {
-	WalletID       DBID
-	L1ChainAddress L1ChainAddress
-}
-
 func (e ErrWalletAlreadyExists) Error() string {
 	return fmt.Sprintf("wallet already exists: wallet ID: %s | chain address: %s | chain: %d | owner ID: %s", e.WalletID, e.L1ChainAddress.Address(), e.L1ChainAddress.L1Chain(), e.OwnerID)
 }
 
-func (e ErrWalletNotFound) Error() string {
-	return fmt.Sprintf("wallet not found: walletID: %s | chain address: %s | chain: %d ", e.WalletID, e.L1ChainAddress.Address(), e.L1ChainAddress.L1Chain())
+var errWalletNotFound ErrWalletNotFound
+
+type ErrWalletNotFound struct{}
+
+func (e ErrWalletNotFound) Unwrap() error { return notFoundError }
+func (e ErrWalletNotFound) Error() string { return "wallet not found" }
+
+type ErrWalletNotFoundByID struct{ ID DBID }
+
+func (e ErrWalletNotFoundByID) Unwrap() error { return errWalletNotFound }
+func (e ErrWalletNotFoundByID) Error() string { return "wallet not found by id: " + e.ID.String() }
+
+type ErrWalletNotFoundByAddress struct{ Address L1ChainAddress }
+
+func (e ErrWalletNotFoundByAddress) Unwrap() error { return errWalletNotFound }
+func (e ErrWalletNotFoundByAddress) Error() string {
+	return fmt.Sprintf("wallet not found by chain=%d; address = %s", e.Address.L1Chain(), e.Address.Address())
 }
