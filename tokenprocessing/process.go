@@ -484,17 +484,19 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 	}
 }
 
-func processHighlightMintClaim(
-	mc *multichain.Provider,
-	highlightProvider *highlight.Provider,
-	tp *tokenProcessor,
-	tm *tokenmanage.Manager,
-	attemptsForTxn int,
-	pollTimeForTxn time.Duration,
-	attemptsForSync int,
-	pollTimeForSync time.Duration,
-) gin.HandlerFunc {
-	mcPipe := *mc
+func processHighlightMintClaim(mc *multichain.Provider, highlightProvider *highlight.Provider, tp *tokenProcessor, tm *tokenmanage.Manager, taskClient *task.Client, maxHandlerAttempts int) gin.HandlerFunc {
+	removeMessageFromQueue := func(ctx *gin.Context, err error) {
+		util.ErrResponse(ctx, http.StatusOK, err)
+	}
+
+	retryMessage := func(ctx *gin.Context, msg task.HighlightMintClaimMessage, err error) {
+		msg.Attempts += 1
+		taskClient.CreateTaskForHighlightMintClaim(ctx, msg)
+		removeMessageFromQueue(ctx, err)
+	}
+
+	tracker := mintTracker{mc.Queries}
+
 	return func(ctx *gin.Context) {
 		var msg task.HighlightMintClaimMessage
 
@@ -504,166 +506,159 @@ func processHighlightMintClaim(
 			return
 		}
 
-		claim, err := mcPipe.Queries.GetHighlightMintClaim(ctx, msg.ClaimID)
-		if err != nil {
-			// Remove from queue if non-existent claim
-			logger.For(ctx).Warnf("removing non-existent mint claimID=%s from queue", msg.ClaimID)
-			util.ErrResponse(ctx, http.StatusOK, err)
+		if msg.Attempts >= maxHandlerAttempts {
+			logger.For(ctx).Warnf("hightlight mint claimID=%s max retries reached", msg.ClaimID)
+			tracker.setStatusFailed(ctx, msg.ClaimID, errHightMintMaxRetriesReached)
+			removeMessageFromQueue(ctx, errHightMintMaxRetriesReached)
 			return
 		}
 
-		mintDAG := mintState{mcPipe.Queries, claim.ID}
-
-		recipientWallet, err := mcPipe.Queries.GetWalletByID(ctx, claim.RecipientWalletID)
-		if err != nil {
-			logger.For(ctx).Warnf("walletID=%s does not exist for mint claimID=%s", claim.RecipientWalletID, msg.ClaimID)
-			mintDAG.updateClaimStatusFailed(ctx, highlight.ClaimStatusFailedUnknownStatus, err)
-			util.ErrResponse(ctx, http.StatusOK, err)
+		err := trackMint(ctx, mc, tp, tm, highlightProvider, &tracker, msg.ClaimID)
+		if errors.Is(err, errHighlightTxStillPending) {
+			logger.For(ctx).Infof("hightlight mint claimID=%s transaction is still pending, retrying later", msg.ClaimID)
+			retryMessage(ctx, msg, err)
 			return
 		}
-
-		switch claim.Status {
-		// Shouldn't receive claims with these statuses, but gracefully handle them anyway
-		case highlight.ClaimStatusTxFailed,
-			highlight.ClaimStatusTokenSyncFailed,
-			highlight.ClaimStatusTokenProcessingSucceeded,
-			highlight.ClaimStatusTokenProcessingFailed,
-			highlight.ClaimStatusFailedUnknownStatus:
-			logger.For(ctx).Infof("highlight mint claimID=%s has status [%s], removing from queue", claim.ID, claim.Status)
-			ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		if errors.Is(err, errHighlightTokenStillSyncing) {
+			logger.For(ctx).Infof("hightlight mint claimID=%s is not available from providers yet, retrying later", msg.ClaimID)
+			retryMessage(ctx, msg, err)
 			return
-		case highlight.ClaimStatusTxSucceeded, highlight.ClaimStatusTokenSyncing:
-			err = syncMint(ctx, *mc, tp, tm, claim, attemptsForSync, pollTimeForSync, recipientWallet.Address, claim.TokenID, claim.TokenMetadata, &mintDAG)
-			if err != nil {
-				if errors.Is(err, errHighlightMintStillSyncing) {
-					util.ErrResponse(ctx, http.StatusInternalServerError, err)
-					return
-				}
-				sentryutil.ReportError(ctx, err)
-				util.ErrResponse(ctx, http.StatusOK, err)
-				return
-			}
-
-			err = processMintMedia()
-
-			ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		}
+		if util.ErrorIs[tokenmanage.ErrBadToken](err) {
+			logger.For(ctx).Infof("hightlight mint claimID=%s failed media processing, retrying later: %s", msg.ClaimID, err)
+			retryMessage(ctx, msg, err)
 			return
-		case highlight.ClaimStatusTxPending:
-			tokenID, metadata, err := pollHighlightTransaction(ctx, highlightProvider, claim.HighlightCollectionID, claim.Status, attemptsForTxn, pollTimeForTxn, &mintDAG)
-			if err != nil {
-				if errors.Is(err, errHighlightTxStillPending) {
-					util.ErrResponse(ctx, http.StatusInternalServerError, err)
-					return
-				}
-				sentryutil.ReportError(ctx, err)
-				util.ErrResponse(ctx, http.StatusOK, err)
-				return
-			}
-
-			err = syncMint(ctx, *mc, tp, tm, claim, attemptsForSync, pollTimeForSync, recipientWallet.Address, tokenID, metadata, &mintDAG)
-			if err != nil {
-				if errors.Is(err, errHighlightMintStillSyncing) {
-					util.ErrResponse(ctx, http.StatusInternalServerError, err)
-					return
-				}
-				sentryutil.ReportError(ctx, err)
-				util.ErrResponse(ctx, http.StatusOK, err)
-				return
-			}
-
-			err = processMintMedia()
-
-			ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-			return
-		default:
-			err := fmt.Errorf("highlight mint claimID=%s has an unexpected status [%s], removing from queue", claim.ID, claim.Status)
-			mintDAG.updateClaimStatusFailed(ctx, highlight.ClaimStatusFailedUnknownStatus, err)
-			logger.For(ctx).Warn(err)
+		}
+		if err != nil {
+			logger.For(ctx).Errorf("highlight mint claimID=%s unexpected error while handling mint: %s", msg.ClaimID, err)
 			sentryutil.ReportError(ctx, err)
-			util.ErrResponse(ctx, http.StatusOK, err)
+			removeMessageFromQueue(ctx, err)
 			return
 		}
+
+		logger.For(ctx).Infof("succesfully handled highlight mint claimID=%s", msg.ClaimID)
+		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+		return
 	}
 }
 
-var errHighlightTxStillPending = fmt.Errorf("transaction is still pending")
+var (
+	errHighlightTxStillPending    = fmt.Errorf("transaction is still pending")
+	errHighlightTokenStillSyncing = fmt.Errorf("minted token is still syncing")
+	errHightMintMaxRetriesReached = fmt.Errorf("max retries reached handling mint")
+)
 
-func pollHighlightTransaction(
-	ctx context.Context,
-	highlightProvider *highlight.Provider,
-	highlightCollectionID string,
-	startingStatus highlight.ClaimStatus,
-	attemptsForTxn int,
-	pollTimeForTxn time.Duration,
-	mintDAG *mintState,
-) (persist.DecimalTokenID, persist.TokenMetadata, error) {
-	status := startingStatus
-	var tokenID persist.DecimalTokenID
-	var metadata persist.TokenMetadata
-	var err error
+func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor, tm *tokenmanage.Manager, h *highlight.Provider, tracker *mintTracker, claimID persist.DBID) error {
+	claim, err := mc.Queries.GetHighlightMintClaim(ctx, claimID)
+	if err != nil {
+		return err
+	}
 
-	for i := 0; i < attemptsForTxn; i++ {
-		status, tokenID, metadata, err = highlightProvider.GetClaimStatus(ctx, highlightCollectionID)
+	// The default behavior of SubmitTokens is to send the new token to tokenprocessing by a queue.
+	// We want to run the token as soon as we get it and also to accurately track the minting state,
+	// so SubmitTokens is updated to a noop so the token isn't processed twice.
+	mc = &(*mc)
+	mc.SubmitTokens = func(context.Context, []persist.DBID) error { return nil }
 
+	// Sanity check that processing doesn't fall into an infinite loop
+	maxDepth := 10
+	for i := 0; i <= maxDepth; i++ {
+		switch claim.Status {
+		case highlight.ClaimStatusTxPending:
+			mintedTokenID, metadata, err := waitForMinted(ctx, claim.ID, h, claim.HighlightCollectionID, 15, 5*time.Second)
+			if err != nil {
+				return err
+			}
+
+			claim, err = tracker.setStatusTxSucceeded(ctx, claim.ID, mintedTokenID, metadata)
+			if err != nil {
+				return err
+			}
+		case highlight.ClaimStatusTxSucceeded:
+			recipientWallet, err := mc.Queries.GetWalletByID(ctx, claim.RecipientWalletID)
+			if err != nil {
+				return err
+			}
+			mintedToken := persist.TokenUniqueIdentifiers{
+				OwnerAddress:    recipientWallet.Address,
+				TokenID:         claim.TokenID.ToHexTokenID(),
+				ContractAddress: claim.ContractAddress,
+				Chain:           claim.Chain,
+			}
+			tokenDBID, err := waitForSynced(ctx, mc, claim.UserID, claim.ID, mintedToken, 15, 5*time.Second)
+			if err != nil {
+				return err
+			}
+			claim, err = tracker.setStatusTokenSynced(ctx, claimID, tokenDBID)
+			if err != nil {
+				return err
+			}
+		case highlight.ClaimStatusTokenSynced:
+			t, err := mc.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
+				OwnerID:         claim.UserID,
+				TokenID:         claim.TokenID.ToHexTokenID(),
+				Chain:           claim.Chain,
+				ContractAddress: claim.ContractAddress,
+			})
+			if err != nil {
+				return err
+			}
+			_, err = runManagedPipeline(ctx, tp, tm, t.TokenDefinition, t.Contract, persist.ProcessingCauseAppMint, 0,
+				PipelineOpts.WithRequireImage(),
+				PipelineOpts.WithMetadata(claim.TokenMetadata),
+			)
+			if err != nil {
+				return err
+			}
+			logger.For(ctx).Infof("succesfully processed media for highlight claimID=%s", claimID)
+			_, err = tracker.setStatusMediaProcessed(ctx, claimID)
+			return err
+		case highlight.ClaimStatusFailedInternal, highlight.ClaimStatusTxFailed, highlight.ClaimStatusMediaProcessed:
+			// These statuses shouldn't be in the queue, but handled them gracefully anyway
+			return nil
+		default:
+			err := fmt.Errorf("highlight mint claimID=%s has an unexpected status=%s", claim.ID, claim.Status)
+			return err
+		}
+	}
+
+	return fmt.Errorf("pipeline for highlight mint claimID=%s never exited, recursed %d times", claimID, maxDepth)
+}
+
+func waitForMinted(ctx context.Context, claimID persist.DBID, h *highlight.Provider, highlightCollectionID string, maxAttempts int, retryDelay time.Duration) (persist.DecimalTokenID, persist.TokenMetadata, error) {
+	for i := 0; i < maxAttempts; i++ {
+		status, tokenID, metadata, err := h.GetClaimStatus(ctx, highlightCollectionID)
 		if err != nil {
-			logger.For(ctx).Errorf("highlight mint claimID=%s transaction failed with status=%s: %s", mintDAG.claimID, status, err)
-			mintDAG.updateClaimStatusFailed(ctx, status, err)
 			return "", persist.TokenMetadata{}, err
 		}
 
 		if status == highlight.ClaimStatusTxPending {
-			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting %s (attempt=%d/%d)", mintDAG.claimID, pollTimeForTxn, i+1, attemptsForTxn)
-			<-time.After(pollTimeForTxn)
+			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting %s (attempt=%d/%d)", claimID, retryDelay, i+1, maxAttempts)
+			<-time.After(retryDelay)
 			continue
 		}
 
-		mustExpectedStatus(highlight.ClaimStatusTxSucceeded, status)
-		mintDAG.updateClaimStatusTxSucceeded(ctx, tokenID, metadata)
+		if status != highlight.ClaimStatusTxSucceeded {
+			return "", persist.TokenMetadata{}, fmt.Errorf("unexpected status; expected=%s; got=%s", highlight.ClaimStatusTxSucceeded, status)
+
+		}
+
 		return tokenID, metadata, nil
 	}
-
-	logger.For(ctx).Infof("hightlight mint claimID=%s transaction is still pending, retrying later", &mintDAG.claimID)
-	mustExpectedStatus(highlight.ClaimStatusTxPending, status)
-	mintDAG.updateClaimStatusTxPending(ctx)
 	return "", persist.TokenMetadata{}, errHighlightTxStillPending
 }
 
-var errHighlightMintStillSyncing = fmt.Errorf("mint is still syncing")
-
-func syncMint(
-	ctx context.Context,
-	mc multichain.Provider,
-	tp *tokenProcessor,
-	tm *tokenmanage.Manager,
-	claim db.HighlightMintClaim,
-	attemptsForSync int,
-	pollTimeForSync time.Duration,
-	recipientWallet persist.Address,
-	tokenID persist.DecimalTokenID,
-	tokenMetadata persist.TokenMetadata,
-	mintDAG *mintState,
-) error {
-	// The default behavior of syncing is to send new tokens to tokenprocessing via a queue, but
-	// we want finer control of how and when a token is processed in order to keep track of the
-	// minting state, so the submit function is updated to run the tokenprocessing pipeline immediately.
-	mc.SubmitTokens = runPipelineImmediatelyForHighlight(tp, tm, mc.Queries, claim.ID, tokenMetadata)
-	newTokenID := persist.TokenUniqueIdentifiers{
-		OwnerAddress:    recipientWallet,
-		TokenID:         tokenID.ToHexTokenID(),
-		ContractAddress: claim.ContractAddress,
-		Chain:           claim.Chain,
-	}
-
+func waitForSynced(ctx context.Context, mc *multichain.Provider, userID, claimID persist.DBID, mintedToken persist.TokenUniqueIdentifiers, maxAttempts int, retryDelay time.Duration) (persist.DBID, error) {
 	var newTokens []operation.TokenFullDetails
 	var err error
 
 	// There's some delay from when the transaction completes to when the token is indexed by providers.
-	for i := 0; i < attemptsForSync; i++ {
-		newTokens, err = mc.AddTokensToUserUnchecked(ctx, claim.UserID, []persist.TokenUniqueIdentifiers{newTokenID}, []persist.HexString{"1"})
+	for i := 0; i < maxAttempts; i++ {
+		newTokens, err = mc.AddTokensToUserUnchecked(ctx, userID, []persist.TokenUniqueIdentifiers{mintedToken}, []persist.HexString{"1"})
 		if err != nil {
-			err := fmt.Errorf("failed to sync token for highlight mint claimID=%s, retrying on err: %s; waiting %s (attempt=%d/%d)", claim.ID, err, pollTimeForSync, i+1, attemptsForSync)
+			err := fmt.Errorf("failed to sync token for highlight mint claimID=%s, retrying on err: %s; waiting %s (attempt=%d/%d)", claimID, err, retryDelay, i+1, maxAttempts)
 			logger.For(ctx).Error(err)
-			<-time.After(pollTimeForSync)
+			<-time.After(retryDelay)
 			continue
 		}
 		break
@@ -671,122 +666,63 @@ func syncMint(
 
 	// Providers don't have the token yet, put back in the queue to try again later
 	if err != nil {
-		logger.For(ctx).Warnf("unable to find minted token=%s from providers for claimID=%s, retrying later: %s", tokenID, claim.ID, err)
-		mintDAG.updateClaimStatusTokenSyncing(ctx)
-		return errHighlightMintStillSyncing
+		return "", errHighlightTokenStillSyncing
 	}
-
-	var newToken db.Token
 
 	// Token may have been already been synced, verify that the token does exist
 	if len(newTokens) <= 0 {
-		token, err := mc.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
-			OwnerID:         claim.UserID,
-			TokenID:         tokenID.ToHexTokenID(),
-			Chain:           claim.Chain,
-			ContractAddress: claim.ContractAddress,
+		existingToken, err := mc.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
+			OwnerID:         userID,
+			TokenID:         mintedToken.TokenID,
+			Chain:           mintedToken.Chain,
+			ContractAddress: mintedToken.ContractAddress,
 		})
 		if err != nil {
-			logger.For(ctx).Errorf("token should already exist for highlight mint claimID=%s, but was not found: %s", claim.ID, err)
-			mintDAG.updateClaimStatusFailed(ctx, highlight.ClaimStatusFailedUnknownStatus, err)
-			return err
+			return "", err
 		}
-		newToken = token.Token
-	} else {
-		newToken = newTokens[0].Instance
-		logger.For(ctx).Infof("synced tokenID=%s for claimID=%s", newToken.ID, claim.ID)
+		return existingToken.Token.ID, nil
 	}
 
-	// Write complete status
-	err = mintDAG.updateClaimStatusTokenProcessingSucceeded(ctx, newToken.ID)
-	if err != nil {
-		return err
-	}
-
-	logger.For(ctx).Infof("added tokenDBID=%s to highlight mint claimID=%s", newToken.ID, claim.ID)
-	return nil
+	return newTokens[0].Instance.ID, nil
 }
 
-func mustExpectedStatus(expected, got highlight.ClaimStatus) {
-	if expected != got {
-		panic(fmt.Sprintf("unexpected status; expected=%s; got=%s", expected, got))
-	}
-}
+type mintTracker struct{ q *db.Queries }
 
-type mintState struct {
-	q       *db.Queries
-	claimID persist.DBID
-}
-
-func (m *mintState) updateClaimStatusTxSucceeded(ctx context.Context, tokenID persist.DecimalTokenID, tokenMetadata persist.TokenMetadata) {
-	mustExpectedStatus(highlight.ClaimStatusTxSucceeded, highlight.ClaimStatusTxSucceeded)
-	panic("not implemented")
-}
-
-func (m *mintState) updateClaimStatusTxPending(ctx context.Context) {
-	m.updateClaimStatus(ctx, highlight.ClaimStatusTxPending, "")
-}
-
-func (m *mintState) updateClaimStatusFailed(ctx context.Context, status highlight.ClaimStatus, err error) {
-	m.updateClaimStatus(ctx, status, err.Error())
-}
-
-func (m *mintState) updateClaimStatusTokenSyncing(ctx context.Context) {
-	m.updateClaimStatus(ctx, highlight.ClaimStatusTokenSyncing, "")
-}
-
-func (m *mintState) updateClaimStatusTokenProcessingSucceeded(ctx context.Context, tokenID persist.DBID) error {
-	err := m.q.UpdateHighlightMintClaimStatusCompleted(ctx, db.UpdateHighlightMintClaimStatusCompletedParams{
-		Status:  highlight.ClaimStatusTokenProcessingSucceeded,
-		TokenID: tokenID,
-		ID:      m.claimID,
+func (m *mintTracker) setStatusTxSucceeded(ctx context.Context, claimID persist.DBID, tokenID persist.DecimalTokenID, tokenMetadata persist.TokenMetadata) (db.HighlightMintClaim, error) {
+	return m.q.UpdateHighlightMintClaimStatusTxSucceeded(ctx, db.UpdateHighlightMintClaimStatusTxSucceededParams{
+		Status:        highlight.ClaimStatusTxSucceeded,
+		TokenID:       tokenID,
+		TokenMetadata: tokenMetadata,
+		ID:            claimID,
 	})
-	if err != nil {
-		logger.For(ctx).Errorf("unexpected status writing success status for claimID=%s: %s", err)
-		m.updateClaimStatusFailed(ctx, highlight.ClaimStatusFailedUnknownStatus, err)
-		sentryutil.ReportError(ctx, err)
-	}
-	return err
 }
 
-func (m *mintState) updateClaimStatus(ctx context.Context, status highlight.ClaimStatus, errorMsg string) {
-	err := m.q.UpdateHighlightMintClaimStatus(ctx, db.UpdateHighlightMintClaimStatusParams{
-		ID:           m.claimID,
+func (m *mintTracker) setStatusTokenSynced(ctx context.Context, claimID, tokenDBID persist.DBID) (db.HighlightMintClaim, error) {
+	return m.q.UpdateHighlightMintClaimStatusTokenSynced(ctx, db.UpdateHighlightMintClaimStatusTokenSyncedParams{
+		Status:          highlight.ClaimStatusTokenSynced,
+		TokenInstanceID: tokenDBID,
+		ID:              claimID,
+	})
+}
+
+func (m *mintTracker) setStatusTxPending(ctx context.Context, claimID persist.DBID) (db.HighlightMintClaim, error) {
+	return m.setStatus(ctx, claimID, highlight.ClaimStatusTxPending, "")
+}
+
+func (m *mintTracker) setStatusFailed(ctx context.Context, claimID persist.DBID, err error) (db.HighlightMintClaim, error) {
+	return m.setStatus(ctx, claimID, highlight.ClaimStatusFailedInternal, err.Error())
+}
+
+func (m *mintTracker) setStatusMediaProcessed(ctx context.Context, claimID persist.DBID) (db.HighlightMintClaim, error) {
+	return m.setStatus(ctx, claimID, highlight.ClaimStatusMediaProcessed, "")
+}
+
+func (m *mintTracker) setStatus(ctx context.Context, claimID persist.DBID, status highlight.ClaimStatus, errorMsg string) (db.HighlightMintClaim, error) {
+	return m.q.UpdateHighlightMintClaimStatus(ctx, db.UpdateHighlightMintClaimStatusParams{
+		ID:           claimID,
 		Status:       status,
 		ErrorMessage: util.ToNullStringEmptyNull(errorMsg),
 	})
-	if err != nil {
-		logger.For(ctx).Errorf("highlight mint claimID=%s failed to update claim status: %s", m.claimID, err)
-		sentryutil.ReportError(ctx, err)
-	}
-}
-
-func runPipelineImmediatelyForHighlight(tp *tokenProcessor, tm *tokenmanage.Manager, q *db.Queries, claimID persist.DBID, metadata persist.TokenMetadata) multichain.SubmitTokensF {
-	return func(ctx context.Context, tDefIDs []persist.DBID) error {
-		tm.ProcessRegistry.SetEnqueue(ctx, tDefIDs[0])
-
-		td, err := q.GetTokenDefinitionById(ctx, tDefIDs[0])
-		if err != nil {
-			return err
-		}
-
-		c, err := q.GetContractByID(ctx, td.ContractID)
-		if err != nil {
-			return err
-		}
-
-		_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseAppMint, 0,
-			PipelineOpts.WithRequireImage(),
-			PipelineOpts.WithMetadata(metadata),
-		)
-
-		// runManagedPipeline handles retries, so just the log the error
-		if err != nil {
-			logger.For(ctx).Errorf("pipeline failed for highlight mint claimID=%s: %s", claimID, err)
-		}
-
-		return err
-	}
 }
 
 func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td db.TokenDefinition, c db.Contract, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (db.TokenMedia, error) {

@@ -15,21 +15,19 @@ import (
 )
 
 const (
-	baseURL                                         = "https://api.highlight.xyz:8080"
-	txCodeInitiated                                 = "INITIATED"
-	txCodeSent                                      = "TX_SENT"
-	txCodeReverted                                  = "TX_REVERTED"
-	txCodeCancelled                                 = "TX_CANCELLED"
-	txCodeComplete                                  = "TX_COMPLETE"
-	claimCodeMintUnavailable                        = "MINT_UNAVAILABLE"
-	ClaimStatusTxPending                ClaimStatus = "CLAIM_STATE_TX_PENDING"                 // Waiting for transaction to complete
-	ClaimStatusTxFailed                 ClaimStatus = "CLAIM_STATE_TX_FAILED"                  // Transaction reverted or was cancelled
-	ClaimStatusTxSucceeded              ClaimStatus = "CLAIM_STATE_TX_SUCCEEDED"               // Transaction completed successfully
-	ClaimStatusTokenSyncing             ClaimStatus = "CLAIM_STATE_TOKEN_SYNCING"              // Waiting for providers to index token
-	ClaimStatusTokenSyncFailed          ClaimStatus = "CLAIM_STATE_TOKEN_FAILED"               // Providers do not have the token
-	ClaimStatusTokenProcessingSucceeded ClaimStatus = "CLAIM_STATE_TOKEN_PROCESSING_SUCCEEDED" // Succesfully processed media for the token
-	ClaimStatusTokenProcessingFailed    ClaimStatus = "CLAIM_STATE_TOKEN_PROCESSING_FAILED"    // Failed to process media for the token
-	ClaimStatusFailedUnknownStatus      ClaimStatus = "CLAIM_STATE_FAILED_UNKNOWN_STATUS"      // Unexpected error occurred in processing
+	baseURL                               = "https://api.highlight.xyz:8080"
+	txCodeInitiated                       = "INITIATED"
+	txCodeSent                            = "TX_SENT"
+	txCodeReverted                        = "TX_REVERTED"
+	txCodeCancelled                       = "TX_CANCELLED"
+	txCodeComplete                        = "TX_COMPLETE"
+	claimCodeMintUnavailable              = "MINT_UNAVAILABLE"
+	ClaimStatusTxPending      ClaimStatus = "TX_PENDING"
+	ClaimStatusTxFailed       ClaimStatus = "TX_FAILED"
+	ClaimStatusTxSucceeded    ClaimStatus = "TX_SUCCEEDED"
+	ClaimStatusTokenSynced    ClaimStatus = "TOKEN_SYNCED"
+	ClaimStatusMediaProcessed ClaimStatus = "TOKEN_MEDIA_PROCESSED"
+	ClaimStatusFailedInternal ClaimStatus = "FAILED_INTERNAL"
 )
 
 var ErrHighlightChainNotSupported = errors.New("chain is not supported by highlight")
@@ -176,7 +174,7 @@ func (api *Provider) GetClaimStatus(ctx context.Context, claimID string) (ClaimS
 
 	err := api.gql.Query(ctx, &q, map[string]any{"claimId": graphql.String(claimID)})
 	if err != nil {
-		return ClaimStatusFailedUnknownStatus, "", persist.TokenMetadata{}, err
+		return ClaimStatusFailedInternal, "", persist.TokenMetadata{}, err
 	}
 
 	status := q.ClaimStatusApp.Status
@@ -191,12 +189,12 @@ func (api *Provider) GetClaimStatus(ctx context.Context, claimID string) (ClaimS
 	}
 
 	if status != txCodeComplete {
-		err = fmt.Errorf("claimID=%s as an unknown status: %s; revertCode: %s", claimID, status, revertCode)
-		return ClaimStatusFailedUnknownStatus, "", persist.TokenMetadata{}, err
+		err = fmt.Errorf("claimID=%s has an unknown status: '%s'; revertCode: %s", claimID, status, revertCode)
+		return ClaimStatusFailedInternal, "", persist.TokenMetadata{}, err
 	}
 
 	if len(q.ClaimStatusApp.Nfts) <= 0 {
-		return ClaimStatusFailedUnknownStatus, "", persist.TokenMetadata{}, fmt.Errorf("no tokens were minted from claimID=%s, but transaction succeeded", claimID)
+		return ClaimStatusFailedInternal, "", persist.TokenMetadata{}, fmt.Errorf("no tokens were minted from claimID=%s, but transaction succeeded", claimID)
 	}
 
 	// It's possible to mint more than one NFT in a transaction, but we only support claiming a single NFT for now.

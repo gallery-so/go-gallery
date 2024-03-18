@@ -70,7 +70,8 @@ type PostPreflightMessage struct {
 }
 
 type HighlightMintClaimMessage struct {
-	ClaimID persist.DBID `json:"claim_id" binding:"required"`
+	ClaimID  persist.DBID `json:"claim_id" binding:"required"`
+	Attempts int          `json:"attempts" binding:"required"`
 }
 
 type AutosocialProcessUsersMessage struct {

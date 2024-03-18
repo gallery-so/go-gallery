@@ -335,41 +335,6 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 	return p.Queries.RemoveStaleCreatorStatusFromTokens(ctx, userID)
 }
 
-func (p *Provider) AddTokensToUserDangerous(ctx context.Context, userID persist.DBID, tIDs []persist.TokenUniqueIdentifiers, newQuantities []persist.HexString) ([]op.TokenFullDetails, error) {
-	// Validate
-	err := validate.Validate(validate.ValidationMap{
-		"userID":        validate.WithTag(userID, "required"),
-		"tokensToAdd":   validate.WithTag(tIDs, "required,gt=0,unique"),
-		"newQuantities": validate.WithTag(newQuantities, fmt.Sprintf("len=%d,dive,gt=0", len(tIDs))),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	page := chainTokensAndContracts{}
-
-	// Validate that the requested owner address is a wallet owned by the user
-outer:
-	for _, t := range tIDs {
-		for _, w := range user.Wallets {
-			if (w.Address == t.OwnerAddress) && (w.Chain.L1Chain() == t.Chain.L1Chain()) {
-				continue outer
-			}
-		}
-		// Return an error if the requested owner address is not owned by the user
-		err := fmt.Errorf("token(chain=%d, contract=%s; tokenID=%s) requested owner address=%s, but address is not owned by user", t.Chain, t.ContractAddress, t.TokenID, t.OwnerAddress)
-		logger.For(ctx).Error(err)
-		return nil, err
-	}
-
-	return nil, err
-}
-
 // AddTokensToUserUnchecked adds tokens to a user with the requested quantities. AddTokensToUserUnchecked does not make any effort to validate
 // that the user owns the tokens, only that the tokens exist and are fetchable on chain. This is useful for adding tokens to a user when it's
 // already known beforehand that the user owns the token via a trusted source, skipping the potentially expensive operation of fetching a token by its owner.

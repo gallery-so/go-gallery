@@ -7200,8 +7200,8 @@ func (q *Queries) UpdateGalleryPositions(ctx context.Context, arg UpdateGalleryP
 	return err
 }
 
-const updateHighlightMintClaimStatus = `-- name: UpdateHighlightMintClaimStatus :exec
-update highlight_mint_claims set last_updated = now(), status = $1, error_message = $2 where id = $3
+const updateHighlightMintClaimStatus = `-- name: UpdateHighlightMintClaimStatus :one
+update highlight_mint_claims set last_updated = now(), status = $1, error_message = $2 where id = $3 returning id, user_id, chain, contract_address, token_id, token_metadata, recipient_wallet_id, highlight_collection_id, token_instance_id, claim_id, status, error_message, created_at, last_updated, deleted
 `
 
 type UpdateHighlightMintClaimStatusParams struct {
@@ -7210,24 +7210,99 @@ type UpdateHighlightMintClaimStatusParams struct {
 	ID           persist.DBID          `db:"id" json:"id"`
 }
 
-func (q *Queries) UpdateHighlightMintClaimStatus(ctx context.Context, arg UpdateHighlightMintClaimStatusParams) error {
-	_, err := q.db.Exec(ctx, updateHighlightMintClaimStatus, arg.Status, arg.ErrorMessage, arg.ID)
-	return err
+func (q *Queries) UpdateHighlightMintClaimStatus(ctx context.Context, arg UpdateHighlightMintClaimStatusParams) (HighlightMintClaim, error) {
+	row := q.db.QueryRow(ctx, updateHighlightMintClaimStatus, arg.Status, arg.ErrorMessage, arg.ID)
+	var i HighlightMintClaim
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Chain,
+		&i.ContractAddress,
+		&i.TokenID,
+		&i.TokenMetadata,
+		&i.RecipientWalletID,
+		&i.HighlightCollectionID,
+		&i.TokenInstanceID,
+		&i.ClaimID,
+		&i.Status,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
 }
 
-const updateHighlightMintClaimStatusCompleted = `-- name: UpdateHighlightMintClaimStatusCompleted :exec
-update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2, error_message = null where id = $3
+const updateHighlightMintClaimStatusTokenSynced = `-- name: UpdateHighlightMintClaimStatusTokenSynced :one
+update highlight_mint_claims set last_updated = now(), status = $1, token_instance_id = $2 where id = $3 returning id, user_id, chain, contract_address, token_id, token_metadata, recipient_wallet_id, highlight_collection_id, token_instance_id, claim_id, status, error_message, created_at, last_updated, deleted
 `
 
-type UpdateHighlightMintClaimStatusCompletedParams struct {
-	Status  highlight.ClaimStatus  `db:"status" json:"status"`
-	TokenID persist.DecimalTokenID `db:"token_id" json:"token_id"`
-	ID      persist.DBID           `db:"id" json:"id"`
+type UpdateHighlightMintClaimStatusTokenSyncedParams struct {
+	Status          highlight.ClaimStatus `db:"status" json:"status"`
+	TokenInstanceID persist.DBID          `db:"token_instance_id" json:"token_instance_id"`
+	ID              persist.DBID          `db:"id" json:"id"`
 }
 
-func (q *Queries) UpdateHighlightMintClaimStatusCompleted(ctx context.Context, arg UpdateHighlightMintClaimStatusCompletedParams) error {
-	_, err := q.db.Exec(ctx, updateHighlightMintClaimStatusCompleted, arg.Status, arg.TokenID, arg.ID)
-	return err
+func (q *Queries) UpdateHighlightMintClaimStatusTokenSynced(ctx context.Context, arg UpdateHighlightMintClaimStatusTokenSyncedParams) (HighlightMintClaim, error) {
+	row := q.db.QueryRow(ctx, updateHighlightMintClaimStatusTokenSynced, arg.Status, arg.TokenInstanceID, arg.ID)
+	var i HighlightMintClaim
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Chain,
+		&i.ContractAddress,
+		&i.TokenID,
+		&i.TokenMetadata,
+		&i.RecipientWalletID,
+		&i.HighlightCollectionID,
+		&i.TokenInstanceID,
+		&i.ClaimID,
+		&i.Status,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
+}
+
+const updateHighlightMintClaimStatusTxSucceeded = `-- name: UpdateHighlightMintClaimStatusTxSucceeded :one
+update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2, token_metadata = $3 where id = $4 returning id, user_id, chain, contract_address, token_id, token_metadata, recipient_wallet_id, highlight_collection_id, token_instance_id, claim_id, status, error_message, created_at, last_updated, deleted
+`
+
+type UpdateHighlightMintClaimStatusTxSucceededParams struct {
+	Status        highlight.ClaimStatus  `db:"status" json:"status"`
+	TokenID       persist.DecimalTokenID `db:"token_id" json:"token_id"`
+	TokenMetadata persist.TokenMetadata  `db:"token_metadata" json:"token_metadata"`
+	ID            persist.DBID           `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateHighlightMintClaimStatusTxSucceeded(ctx context.Context, arg UpdateHighlightMintClaimStatusTxSucceededParams) (HighlightMintClaim, error) {
+	row := q.db.QueryRow(ctx, updateHighlightMintClaimStatusTxSucceeded,
+		arg.Status,
+		arg.TokenID,
+		arg.TokenMetadata,
+		arg.ID,
+	)
+	var i HighlightMintClaim
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Chain,
+		&i.ContractAddress,
+		&i.TokenID,
+		&i.TokenMetadata,
+		&i.RecipientWalletID,
+		&i.HighlightCollectionID,
+		&i.TokenInstanceID,
+		&i.ClaimID,
+		&i.Status,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const updateNotification = `-- name: UpdateNotification :exec

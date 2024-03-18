@@ -26,15 +26,11 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	// Handles retries and token state
 	fastRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "retryFast", 1, 30*time.Second)
 	slowRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "retrySlow", 1, 5*time.Minute)
-	appMintRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "retryMint", 1, 10*time.Second)
+	mintRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "retryMint", 1, 10*time.Second)
 	refreshManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenSync(ctx, fastRetry, slowRetry))
 	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesSync, tickTokenSync(ctx, fastRetry, slowRetry))
 	highlightProvider := highlight.NewProvider(http.DefaultClient)
-	highlightManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesMint, tickTokenMint(ctx, appMintRetry))
-	mintAttemptsForTxn := 12
-	mintPollTimeForTxn := 5 * time.Second
-	mintAttemptsForSync := 12
-	mintPollTimeForSync := 5 * time.Second
+	mintManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesMint, tickTokenMint(ctx, mintRetry))
 
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/process", func(c *gin.Context) {
@@ -46,7 +42,7 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, refreshManager))
 	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, taskClient, syncManager))
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, mc, repos.UserRepository, taskClient, syncManager))
-	mediaGroup.POST("/process/highlight-mint-claim", processHighlightMintClaim(mc, highlightProvider, tp, highlightManager, mintAttemptsForTxn, mintPollTimeForTxn, mintAttemptsForSync, mintPollTimeForSync))
+	mediaGroup.POST("/process/highlight-mint-claim", processHighlightMintClaim(mc, highlightProvider, tp, mintManager, taskClient, 10))
 
 	authOpts := middleware.BasicAuthOptionBuilder{}
 

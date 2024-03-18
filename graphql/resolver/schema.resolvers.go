@@ -3579,11 +3579,11 @@ func (r *viewerResolver) HighlightMintClaimStatus(ctx context.Context, obj *mode
 		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxnStatusTxnComplete}, nil
 	case highlight.ClaimStatusTxFailed:
 		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
-	case highlight.ClaimStatusFailedUnknownStatus:
+	case highlight.ClaimStatusFailedInternal:
 		return nil, err
-	case highlight.ClaimStatusTokenSyncCompleted:
+	case highlight.ClaimStatusMediaProcessed:
 		return model.HighlightMintClaimStatusPayload{
-			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
+			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenInstanceID},
 			Status: model.HighlightTxnStatusTokenSynced,
 			Token:  nil, // handled by dedicated resolver
 		}, nil
