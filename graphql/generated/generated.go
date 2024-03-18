@@ -549,10 +549,6 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrHighlightTokenSyncFailed struct {
-		Message func(childComplexity int) int
-	}
-
 	ErrHighlightTxnFailed struct {
 		Message func(childComplexity int) int
 	}
@@ -3849,13 +3845,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrHighlightMintUnavailable.Message(childComplexity), true
-
-	case "ErrHighlightTokenSyncFailed.message":
-		if e.complexity.ErrHighlightTokenSyncFailed.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrHighlightTokenSyncFailed.Message(childComplexity), true
 
 	case "ErrHighlightTxnFailed.message":
 		if e.complexity.ErrHighlightTxnFailed.Message == nil {
@@ -12921,10 +12910,6 @@ type ErrHighlightMintUnavailable implements Error {
   message: String!
 }
 
-type ErrHighlightTokenSyncFailed implements Error {
-  message: String!
-}
-
 type ErrHighlightChainNotSupported implements Error {
   message: String!
 }
@@ -12937,14 +12922,14 @@ union HighlightClaimMintPayloadOrError =
   | ErrAddressNotOwnedByUser
   | ErrNotAuthorized
 
-enum HighlightTxnStatus {
-  TXN_PENDING
-  TXN_COMPLETE
+enum HighlightTxStatus {
+  TX_PENDING
+  TX_COMPLETE
   TOKEN_SYNCED
 }
 
 type HighlightMintClaimStatusPayload @goEmbedHelper {
-  status: HighlightTxnStatus!
+  status: HighlightTxStatus!
   token: Token @goField(forceResolver: true)
 }
 
@@ -12952,7 +12937,6 @@ union HighlightMintClaimStatusPayloadOrError =
     HighlightMintClaimStatusPayload
   | ErrHighlightTxnFailed
   | ErrHighlightMintUnavailable
-  | ErrHighlightTokenSyncFailed
   | ErrNotAuthorized
 
 type Mutation {
@@ -27972,50 +27956,6 @@ func (ec *executionContext) fieldContext_ErrHighlightMintUnavailable_message(ctx
 	return fc, nil
 }
 
-func (ec *executionContext) _ErrHighlightTokenSyncFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrHighlightTokenSyncFailed) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ErrHighlightTokenSyncFailed_message(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ErrHighlightTokenSyncFailed_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ErrHighlightTokenSyncFailed",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _ErrHighlightTxnFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrHighlightTxnFailed) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ErrHighlightTxnFailed_message(ctx, field)
 	if err != nil {
@@ -34933,9 +34873,9 @@ func (ec *executionContext) _HighlightMintClaimStatusPayload_status(ctx context.
 		}
 		return graphql.Null
 	}
-	res := resTmp.(model.HighlightTxnStatus)
+	res := resTmp.(model.HighlightTxStatus)
 	fc.Result = res
-	return ec.marshalNHighlightTxnStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxnStatus(ctx, field.Selections, res)
+	return ec.marshalNHighlightTxStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxStatus(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_HighlightMintClaimStatusPayload_status(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -34945,7 +34885,7 @@ func (ec *executionContext) fieldContext_HighlightMintClaimStatusPayload_status(
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type HighlightTxnStatus does not have child fields")
+			return nil, errors.New("field of type HighlightTxStatus does not have child fields")
 		},
 	}
 	return fc, nil
@@ -73047,13 +72987,6 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrHighlightMintUnavailable(ctx, sel, obj)
-	case model.ErrHighlightTokenSyncFailed:
-		return ec._ErrHighlightTokenSyncFailed(ctx, sel, &obj)
-	case *model.ErrHighlightTokenSyncFailed:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrHighlightTokenSyncFailed(ctx, sel, obj)
 	case model.ErrHighlightChainNotSupported:
 		return ec._ErrHighlightChainNotSupported(ctx, sel, &obj)
 	case *model.ErrHighlightChainNotSupported:
@@ -73563,13 +73496,6 @@ func (ec *executionContext) _HighlightMintClaimStatusPayloadOrError(ctx context.
 			return graphql.Null
 		}
 		return ec._ErrHighlightMintUnavailable(ctx, sel, obj)
-	case model.ErrHighlightTokenSyncFailed:
-		return ec._ErrHighlightTokenSyncFailed(ctx, sel, &obj)
-	case *model.ErrHighlightTokenSyncFailed:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrHighlightTokenSyncFailed(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -81329,45 +81255,6 @@ func (ec *executionContext) _ErrHighlightMintUnavailable(ctx context.Context, se
 			out.Values[i] = graphql.MarshalString("ErrHighlightMintUnavailable")
 		case "message":
 			out.Values[i] = ec._ErrHighlightMintUnavailable_message(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var errHighlightTokenSyncFailedImplementors = []string{"ErrHighlightTokenSyncFailed", "Error", "HighlightMintClaimStatusPayloadOrError"}
-
-func (ec *executionContext) _ErrHighlightTokenSyncFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrHighlightTokenSyncFailed) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errHighlightTokenSyncFailedImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrHighlightTokenSyncFailed")
-		case "message":
-			out.Values[i] = ec._ErrHighlightTokenSyncFailed_message(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -95214,13 +95101,13 @@ func (ec *executionContext) unmarshalNHighlightClaimMintInput2githubᚗcomᚋmik
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNHighlightTxnStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxnStatus(ctx context.Context, v interface{}) (model.HighlightTxnStatus, error) {
-	var res model.HighlightTxnStatus
+func (ec *executionContext) unmarshalNHighlightTxStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxStatus(ctx context.Context, v interface{}) (model.HighlightTxStatus, error) {
+	var res model.HighlightTxStatus
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNHighlightTxnStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxnStatus(ctx context.Context, sel ast.SelectionSet, v model.HighlightTxnStatus) graphql.Marshaler {
+func (ec *executionContext) marshalNHighlightTxStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightTxStatus(ctx context.Context, sel ast.SelectionSet, v model.HighlightTxStatus) graphql.Marshaler {
 	return v
 }
 

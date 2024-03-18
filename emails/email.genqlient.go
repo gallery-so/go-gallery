@@ -2154,7 +2154,6 @@ func (v *definitionFragMediaVideoMedia) __premarshalJSON() (*__premarshaldefinit
 // errorFragErrGalleryNotFound
 // errorFragErrHighlightChainNotSupported
 // errorFragErrHighlightMintUnavailable
-// errorFragErrHighlightTokenSyncFailed
 // errorFragErrHighlightTxnFailed
 // errorFragErrInvalidInput
 // errorFragErrInvalidToken
@@ -2194,7 +2193,6 @@ func (v *errorFragErrFeedEventNotFound) implementsGraphQLInterfaceerrorFrag()   
 func (v *errorFragErrGalleryNotFound) implementsGraphQLInterfaceerrorFrag()               {}
 func (v *errorFragErrHighlightChainNotSupported) implementsGraphQLInterfaceerrorFrag()    {}
 func (v *errorFragErrHighlightMintUnavailable) implementsGraphQLInterfaceerrorFrag()      {}
-func (v *errorFragErrHighlightTokenSyncFailed) implementsGraphQLInterfaceerrorFrag()      {}
 func (v *errorFragErrHighlightTxnFailed) implementsGraphQLInterfaceerrorFrag()            {}
 func (v *errorFragErrInvalidInput) implementsGraphQLInterfaceerrorFrag()                  {}
 func (v *errorFragErrInvalidToken) implementsGraphQLInterfaceerrorFrag()                  {}
@@ -2270,9 +2268,6 @@ func __unmarshalerrorFrag(b []byte, v *errorFrag) error {
 		return json.Unmarshal(b, *v)
 	case "ErrHighlightMintUnavailable":
 		*v = new(errorFragErrHighlightMintUnavailable)
-		return json.Unmarshal(b, *v)
-	case "ErrHighlightTokenSyncFailed":
-		*v = new(errorFragErrHighlightTokenSyncFailed)
 		return json.Unmarshal(b, *v)
 	case "ErrHighlightTxnFailed":
 		*v = new(errorFragErrHighlightTxnFailed)
@@ -2453,14 +2448,6 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 		result := struct {
 			TypeName string `json:"__typename"`
 			*errorFragErrHighlightMintUnavailable
-		}{typename, v}
-		return json.Marshal(result)
-	case *errorFragErrHighlightTokenSyncFailed:
-		typename = "ErrHighlightTokenSyncFailed"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*errorFragErrHighlightTokenSyncFailed
 		}{typename, v}
 		return json.Marshal(result)
 	case *errorFragErrHighlightTxnFailed:
@@ -2778,18 +2765,6 @@ func (v *errorFragErrHighlightMintUnavailable) GetMessage() string { return v.Me
 
 // GetTypename returns errorFragErrHighlightMintUnavailable.Typename, and is useful for accessing the field via an interface.
 func (v *errorFragErrHighlightMintUnavailable) GetTypename() *string { return v.Typename }
-
-// errorFrag includes the GraphQL fields of ErrHighlightTokenSyncFailed requested by the fragment errorFrag.
-type errorFragErrHighlightTokenSyncFailed struct {
-	Message  string  `json:"message"`
-	Typename *string `json:"__typename"`
-}
-
-// GetMessage returns errorFragErrHighlightTokenSyncFailed.Message, and is useful for accessing the field via an interface.
-func (v *errorFragErrHighlightTokenSyncFailed) GetMessage() string { return v.Message }
-
-// GetTypename returns errorFragErrHighlightTokenSyncFailed.Typename, and is useful for accessing the field via an interface.
-func (v *errorFragErrHighlightTokenSyncFailed) GetTypename() *string { return v.Typename }
 
 // errorFrag includes the GraphQL fields of ErrHighlightTxnFailed requested by the fragment errorFrag.
 type errorFragErrHighlightTxnFailed struct {

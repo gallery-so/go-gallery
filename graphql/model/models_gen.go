@@ -1187,13 +1187,6 @@ func (ErrHighlightMintUnavailable) IsError()                                  {}
 func (ErrHighlightMintUnavailable) IsHighlightClaimMintPayloadOrError()       {}
 func (ErrHighlightMintUnavailable) IsHighlightMintClaimStatusPayloadOrError() {}
 
-type ErrHighlightTokenSyncFailed struct {
-	Message string `json:"message"`
-}
-
-func (ErrHighlightTokenSyncFailed) IsError()                                  {}
-func (ErrHighlightTokenSyncFailed) IsHighlightMintClaimStatusPayloadOrError() {}
-
 type ErrHighlightTxnFailed struct {
 	Message string `json:"message"`
 }
@@ -1745,8 +1738,8 @@ func (HighlightClaimMintPayload) IsHighlightClaimMintPayloadOrError() {}
 
 type HighlightMintClaimStatusPayload struct {
 	HelperHighlightMintClaimStatusPayloadData
-	Status HighlightTxnStatus `json:"status"`
-	Token  *Token             `json:"token"`
+	Status HighlightTxStatus `json:"status"`
+	Token  *Token            `json:"token"`
 }
 
 func (HighlightMintClaimStatusPayload) IsHighlightMintClaimStatusPayloadOrError() {}
@@ -3178,46 +3171,46 @@ func (e EmailUnsubscriptionType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
-type HighlightTxnStatus string
+type HighlightTxStatus string
 
 const (
-	HighlightTxnStatusTxnPending  HighlightTxnStatus = "TXN_PENDING"
-	HighlightTxnStatusTxnComplete HighlightTxnStatus = "TXN_COMPLETE"
-	HighlightTxnStatusTokenSynced HighlightTxnStatus = "TOKEN_SYNCED"
+	HighlightTxStatusTxPending   HighlightTxStatus = "TX_PENDING"
+	HighlightTxStatusTxComplete  HighlightTxStatus = "TX_COMPLETE"
+	HighlightTxStatusTokenSynced HighlightTxStatus = "TOKEN_SYNCED"
 )
 
-var AllHighlightTxnStatus = []HighlightTxnStatus{
-	HighlightTxnStatusTxnPending,
-	HighlightTxnStatusTxnComplete,
-	HighlightTxnStatusTokenSynced,
+var AllHighlightTxStatus = []HighlightTxStatus{
+	HighlightTxStatusTxPending,
+	HighlightTxStatusTxComplete,
+	HighlightTxStatusTokenSynced,
 }
 
-func (e HighlightTxnStatus) IsValid() bool {
+func (e HighlightTxStatus) IsValid() bool {
 	switch e {
-	case HighlightTxnStatusTxnPending, HighlightTxnStatusTxnComplete, HighlightTxnStatusTokenSynced:
+	case HighlightTxStatusTxPending, HighlightTxStatusTxComplete, HighlightTxStatusTokenSynced:
 		return true
 	}
 	return false
 }
 
-func (e HighlightTxnStatus) String() string {
+func (e HighlightTxStatus) String() string {
 	return string(e)
 }
 
-func (e *HighlightTxnStatus) UnmarshalGQL(v interface{}) error {
+func (e *HighlightTxStatus) UnmarshalGQL(v interface{}) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("enums must be strings")
 	}
 
-	*e = HighlightTxnStatus(str)
+	*e = HighlightTxStatus(str)
 	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid HighlightTxnStatus", str)
+		return fmt.Errorf("%s is not a valid HighlightTxStatus", str)
 	}
 	return nil
 }
 
-func (e HighlightTxnStatus) MarshalGQL(w io.Writer) {
+func (e HighlightTxStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

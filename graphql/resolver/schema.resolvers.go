@@ -2912,9 +2912,9 @@ func (r *queryResolver) HighlightMintClaimStatus(ctx context.Context, claimID pe
 	}
 	switch claim.Status {
 	case highlight.ClaimStatusTxPending:
-		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxnStatusTxnPending}, nil
+		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxStatusTxPending}, nil
 	case highlight.ClaimStatusTxSucceeded:
-		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxnStatusTxnComplete}, nil
+		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxStatusTxComplete}, nil
 	case highlight.ClaimStatusTxFailed:
 		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
 	case highlight.ClaimStatusFailedInternal:
@@ -2922,7 +2922,7 @@ func (r *queryResolver) HighlightMintClaimStatus(ctx context.Context, claimID pe
 	case highlight.ClaimStatusMediaProcessed:
 		return model.HighlightMintClaimStatusPayload{
 			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
-			Status: model.HighlightTxnStatusTokenSynced,
+			Status: model.HighlightTxStatusTokenSynced,
 			Token:  nil, // handled by dedicated resolver
 		}, nil
 	default:

@@ -3010,10 +3010,6 @@ type ErrHighlightMintUnavailable implements Error {
   message: String!
 }
 
-type ErrHighlightTokenSyncFailed implements Error {
-  message: String!
-}
-
 type ErrHighlightChainNotSupported implements Error {
   message: String!
 }
@@ -3026,14 +3022,14 @@ union HighlightClaimMintPayloadOrError =
   | ErrAddressNotOwnedByUser
   | ErrNotAuthorized
 
-enum HighlightTxnStatus {
-  TXN_PENDING
-  TXN_COMPLETE
+enum HighlightTxStatus {
+  TX_PENDING
+  TX_COMPLETE
   TOKEN_SYNCED
 }
 
 type HighlightMintClaimStatusPayload @goEmbedHelper {
-  status: HighlightTxnStatus!
+  status: HighlightTxStatus!
   token: Token @goField(forceResolver: true)
 }
 
@@ -3041,7 +3037,6 @@ union HighlightMintClaimStatusPayloadOrError =
     HighlightMintClaimStatusPayload
   | ErrHighlightTxnFailed
   | ErrHighlightMintUnavailable
-  | ErrHighlightTokenSyncFailed
   | ErrNotAuthorized
 
 type Mutation {
