@@ -842,8 +842,6 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     @goField(forceResolver: true)
   suggestedUsersFarcaster(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
-  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError
-    @goField(forceResolver: true)
 }
 
 type NotificationSettings {
@@ -1550,6 +1548,9 @@ type Query {
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
+  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError
+    @authRequired
+    @goField(forceResolver: true)
 }
 
 type SocialQueries {

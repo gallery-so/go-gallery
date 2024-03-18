@@ -2904,6 +2904,32 @@ func (r *queryResolver) ArtBlocksCommunityByKey(ctx context.Context, key model.A
 	return communityToModel(ctx, *community), nil
 }
 
+// HighlightMintClaimStatus is the resolver for the highlightMintClaimStatus field.
+func (r *queryResolver) HighlightMintClaimStatus(ctx context.Context, claimID persist.DBID) (model.HighlightMintClaimStatusPayloadOrError, error) {
+	claim, err := publicapi.For(ctx).Mint.GetHighlightMintClaimByID(ctx, claimID)
+	if err != nil {
+		return nil, err
+	}
+	switch claim.Status {
+	case highlight.ClaimStatusTxPending:
+		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxnStatusTxnPending}, nil
+	case highlight.ClaimStatusTxSucceeded:
+		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxnStatusTxnComplete}, nil
+	case highlight.ClaimStatusTxFailed:
+		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
+	case highlight.ClaimStatusFailedInternal:
+		return nil, fmt.Errorf("internal error handling mint claim: %s", claim.ErrorMessage.String)
+	case highlight.ClaimStatusMediaProcessed:
+		return model.HighlightMintClaimStatusPayload{
+			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
+			Status: model.HighlightTxnStatusTokenSynced,
+			Token:  nil, // handled by dedicated resolver
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown mint claim status: %s", claim.Status)
+	}
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {
@@ -3567,32 +3593,6 @@ func (r *viewerResolver) SuggestedUsersFarcaster(ctx context.Context, obj *model
 		Edges:    usersToEdges(ctx, users),
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
-}
-
-// HighlightMintClaimStatus is the resolver for the highlightMintClaimStatus field.
-func (r *viewerResolver) HighlightMintClaimStatus(ctx context.Context, obj *model.Viewer, claimID persist.DBID) (model.HighlightMintClaimStatusPayloadOrError, error) {
-	claim, err := publicapi.For(ctx).Mint.GetHighlightMintClaimByID(ctx, claimID)
-	if err != nil {
-		return nil, err
-	}
-	switch claim.Status {
-	case highlight.ClaimStatusTxPending:
-		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxnStatusTxnPending}, nil
-	case highlight.ClaimStatusTxSucceeded:
-		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxnStatusTxnComplete}, nil
-	case highlight.ClaimStatusTxFailed:
-		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
-	case highlight.ClaimStatusFailedInternal:
-		return nil, fmt.Errorf("internal error handling mint claim: %s", claim.ErrorMessage.String)
-	case highlight.ClaimStatusMediaProcessed:
-		return model.HighlightMintClaimStatusPayload{
-			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
-			Status: model.HighlightTxnStatusTokenSynced,
-			Token:  nil, // handled by dedicated resolver
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown mint claim status: %s", claim.Status)
-	}
 }
 
 // Tokens is the resolver for the tokens field.

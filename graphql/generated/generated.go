@@ -1180,6 +1180,7 @@ type ComplexityRoot struct {
 		GeneralAllowlist           func(childComplexity int) int
 		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
 		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		HighlightMintClaimStatus   func(childComplexity int, claimID persist.DBID) int
 		IsEmailAddressAvailable    func(childComplexity int, emailAddress persist.Email) int
 		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
 		Node                       func(childComplexity int, id model.GqlID) int
@@ -1808,19 +1809,18 @@ type ComplexityRoot struct {
 	}
 
 	Viewer struct {
-		Email                    func(childComplexity int) int
-		Feed                     func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
-		HighlightMintClaimStatus func(childComplexity int, claimID persist.DBID) int
-		ID                       func(childComplexity int) int
-		NotificationSettings     func(childComplexity int) int
-		Notifications            func(childComplexity int, before *string, after *string, first *int, last *int) int
-		Persona                  func(childComplexity int) int
-		SocialAccounts           func(childComplexity int) int
-		SuggestedUsers           func(childComplexity int, before *string, after *string, first *int, last *int) int
-		SuggestedUsersFarcaster  func(childComplexity int, before *string, after *string, first *int, last *int) int
-		User                     func(childComplexity int) int
-		UserExperiences          func(childComplexity int) int
-		ViewerGalleries          func(childComplexity int) int
+		Email                   func(childComplexity int) int
+		Feed                    func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
+		ID                      func(childComplexity int) int
+		NotificationSettings    func(childComplexity int) int
+		Notifications           func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Persona                 func(childComplexity int) int
+		SocialAccounts          func(childComplexity int) int
+		SuggestedUsers          func(childComplexity int, before *string, after *string, first *int, last *int) int
+		SuggestedUsersFarcaster func(childComplexity int, before *string, after *string, first *int, last *int) int
+		User                    func(childComplexity int) int
+		UserExperiences         func(childComplexity int) int
+		ViewerGalleries         func(childComplexity int) int
 	}
 
 	ViewerGallery struct {
@@ -2167,6 +2167,7 @@ type QueryResolver interface {
 	PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error)
 	ContractCommunityByKey(ctx context.Context, key model.ContractCommunityKeyInput) (model.CommunityByKeyOrError, error)
 	ArtBlocksCommunityByKey(ctx context.Context, key model.ArtBlocksCommunityKeyInput) (model.CommunityByKeyOrError, error)
+	HighlightMintClaimStatus(ctx context.Context, claimID persist.DBID) (model.HighlightMintClaimStatusPayloadOrError, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -2314,7 +2315,6 @@ type ViewerResolver interface {
 	Persona(ctx context.Context, obj *model.Viewer) (*persist.Persona, error)
 	SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SuggestedUsersFarcaster(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
-	HighlightMintClaimStatus(ctx context.Context, obj *model.Viewer, claimID persist.DBID) (model.HighlightMintClaimStatusPayloadOrError, error)
 }
 type WalletResolver interface {
 	Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error)
@@ -7036,6 +7036,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
+	case "Query.highlightMintClaimStatus":
+		if e.complexity.Query.HighlightMintClaimStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Query_highlightMintClaimStatus_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.HighlightMintClaimStatus(childComplexity, args["claimId"].(persist.DBID)), true
+
 	case "Query.isEmailAddressAvailable":
 		if e.complexity.Query.IsEmailAddressAvailable == nil {
 			break
@@ -9527,18 +9539,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Viewer.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
-	case "Viewer.highlightMintClaimStatus":
-		if e.complexity.Viewer.HighlightMintClaimStatus == nil {
-			break
-		}
-
-		args, err := ec.field_Viewer_highlightMintClaimStatus_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Viewer.HighlightMintClaimStatus(childComplexity, args["claimId"].(persist.DBID)), true
-
 	case "Viewer.id":
 		if e.complexity.Viewer.ID == nil {
 			break
@@ -10753,8 +10753,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     @goField(forceResolver: true)
   suggestedUsersFarcaster(before: String, after: String, first: Int, last: Int): UsersConnection
     @goField(forceResolver: true)
-  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError @goField(forceResolver: true)
-} 
+}
 
 type NotificationSettings {
   someoneFollowedYou: Boolean
@@ -11460,6 +11459,9 @@ type Query {
   # Community lookups
   contractCommunityByKey(key: ContractCommunityKeyInput!): CommunityByKeyOrError
   artBlocksCommunityByKey(key: ArtBlocksCommunityKeyInput!): CommunityByKeyOrError
+  highlightMintClaimStatus(claimId: DBID!): HighlightMintClaimStatusPayloadOrError
+    @authRequired
+    @goField(forceResolver: true)
 }
 
 type SocialQueries {
@@ -12946,7 +12948,7 @@ type HighlightMintClaimStatusPayload @goEmbedHelper {
   token: Token @goField(forceResolver: true)
 }
 
-union HighlightMintClaimStatusPayloadOrError = 
+union HighlightMintClaimStatusPayloadOrError =
     HighlightMintClaimStatusPayload
   | ErrHighlightTxnFailed
   | ErrHighlightMintUnavailable
@@ -13061,7 +13063,8 @@ type Mutation {
   referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
-  highlightClaimMint(input: HighlightClaimMintInput!):  HighlightClaimMintPayloadOrError @authRequired
+  highlightClaimMint(input: HighlightClaimMintInput!): HighlightClaimMintPayloadOrError
+    @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
   viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
@@ -15900,6 +15903,21 @@ func (ec *executionContext) field_Query_globalFeed_args(ctx context.Context, raw
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_highlightMintClaimStatus_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["claimId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("claimId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["claimId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_isEmailAddressAvailable_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -16923,21 +16941,6 @@ func (ec *executionContext) field_Viewer_feed_args(ctx context.Context, rawArgs 
 	return args, nil
 }
 
-func (ec *executionContext) field_Viewer_highlightMintClaimStatus_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["claimId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("claimId"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["claimId"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Viewer_notifications_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -17162,8 +17165,6 @@ func (ec *executionContext) fieldContext_AddUserWalletPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -17624,8 +17625,6 @@ func (ec *executionContext) fieldContext_AdmireCommentPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -17817,8 +17816,6 @@ func (ec *executionContext) fieldContext_AdmireFeedEventPayload_viewer(ctx conte
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -18004,8 +18001,6 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -18199,8 +18194,6 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_viewer(ctx context.C
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -22972,8 +22965,6 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -23242,8 +23233,6 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -25424,8 +25413,6 @@ func (ec *executionContext) fieldContext_ConnectSocialAccountPayload_viewer(ctx 
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -26429,8 +26416,6 @@ func (ec *executionContext) fieldContext_CreateUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -26741,8 +26726,6 @@ func (ec *executionContext) fieldContext_DisconnectSocialAccountPayload_viewer(c
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -30529,8 +30512,6 @@ func (ec *executionContext) fieldContext_FollowAllOnboardingRecommendationsPaylo
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -30598,8 +30579,6 @@ func (ec *executionContext) fieldContext_FollowAllSocialConnectionsPayload_viewe
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -30799,8 +30778,6 @@ func (ec *executionContext) fieldContext_FollowUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36917,8 +36894,6 @@ func (ec *executionContext) fieldContext_LoginPayload_viewer(ctx context.Context
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36986,8 +36961,6 @@ func (ec *executionContext) fieldContext_LogoutPayload_viewer(ctx context.Contex
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -49601,6 +49574,78 @@ func (ec *executionContext) fieldContext_Query_artBlocksCommunityByKey(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_highlightMintClaimStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_highlightMintClaimStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().HighlightMintClaimStatus(rctx, fc.Args["claimId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.HighlightMintClaimStatusPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.HighlightMintClaimStatusPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.HighlightMintClaimStatusPayloadOrError)
+	fc.Result = res
+	return ec.marshalOHighlightMintClaimStatusPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightMintClaimStatusPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_highlightMintClaimStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HighlightMintClaimStatusPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_highlightMintClaimStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query__entities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query__entities(ctx, field)
 	if err != nil {
@@ -50295,8 +50340,6 @@ func (ec *executionContext) fieldContext_RegisterUserPushTokenPayload_viewer(ctx
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -50364,8 +50407,6 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -50608,8 +50649,6 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -50811,8 +50850,6 @@ func (ec *executionContext) fieldContext_RemoveProfileImagePayload_viewer(ctx co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -50880,8 +50917,6 @@ func (ec *executionContext) fieldContext_RemoveUserWalletsPayload_viewer(ctx con
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -50993,8 +51028,6 @@ func (ec *executionContext) fieldContext_ResendVerificationEmailPayload_viewer(c
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -51288,8 +51321,6 @@ func (ec *executionContext) fieldContext_SetPersonaPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -51357,8 +51388,6 @@ func (ec *executionContext) fieldContext_SetProfileImagePayload_viewer(ctx conte
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -57649,8 +57678,6 @@ func (ec *executionContext) fieldContext_SyncCreatedTokensForExistingContractPay
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -57718,8 +57745,6 @@ func (ec *executionContext) fieldContext_SyncCreatedTokensForNewContractsPayload
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -57919,8 +57944,6 @@ func (ec *executionContext) fieldContext_SyncTokensPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -62747,8 +62770,6 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -63185,8 +63206,6 @@ func (ec *executionContext) fieldContext_UnregisterUserPushTokenPayload_viewer(c
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -63254,8 +63273,6 @@ func (ec *executionContext) fieldContext_UnsubscribeFromEmailTypePayload_viewer(
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -63569,8 +63586,6 @@ func (ec *executionContext) fieldContext_UpdateEmailNotificationSettingsPayload_
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -63638,8 +63653,6 @@ func (ec *executionContext) fieldContext_UpdateEmailPayload_viewer(ctx context.C
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -63707,8 +63720,6 @@ func (ec *executionContext) fieldContext_UpdateFeaturedGalleryPayload_viewer(ctx
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -63959,8 +63970,6 @@ func (ec *executionContext) fieldContext_UpdateGalleryOrderPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -64089,8 +64098,6 @@ func (ec *executionContext) fieldContext_UpdatePrimaryWalletPayload_viewer(ctx c
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -64158,8 +64165,6 @@ func (ec *executionContext) fieldContext_UpdateSocialAccountDisplayedPayload_vie
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -64330,8 +64335,6 @@ func (ec *executionContext) fieldContext_UpdateUserExperiencePayload_viewer(ctx 
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -64399,8 +64402,6 @@ func (ec *executionContext) fieldContext_UpdateUserInfoPayload_viewer(ctx contex
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			case "suggestedUsersFarcaster":
 				return ec.fieldContext_Viewer_suggestedUsersFarcaster(ctx, field)
-			case "highlightMintClaimStatus":
-				return ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -66742,58 +66743,6 @@ func (ec *executionContext) fieldContext_Viewer_suggestedUsersFarcaster(ctx cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Viewer_suggestedUsersFarcaster_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Viewer_highlightMintClaimStatus(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Viewer_highlightMintClaimStatus(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Viewer().HighlightMintClaimStatus(rctx, obj, fc.Args["claimId"].(persist.DBID))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.HighlightMintClaimStatusPayloadOrError)
-	fc.Result = res
-	return ec.marshalOHighlightMintClaimStatusPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHighlightMintClaimStatusPayloadOrError(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Viewer_highlightMintClaimStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Viewer",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type HighlightMintClaimStatusPayloadOrError does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Viewer_highlightMintClaimStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -87613,6 +87562,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "highlightMintClaimStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_highlightMintClaimStatus(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "_entities":
 			field := field
 
@@ -94186,39 +94154,6 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Viewer_suggestedUsersFarcaster(ctx, field, obj)
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "highlightMintClaimStatus":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Viewer_highlightMintClaimStatus(ctx, field, obj)
 				return res
 			}
 
