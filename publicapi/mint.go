@@ -58,8 +58,6 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 		return "", err
 	}
 
-	// TODO: Check if user already claimed, or should this be enforced by the contract
-
 	// Validate the user owns the wallet
 	chainAddress := persist.NewChainAddress(wallet.Address, wallet.Chain)
 	_, owns := util.FindFirst(user.Wallets, func(w persist.Wallet) bool { return w.ID == walletID })
