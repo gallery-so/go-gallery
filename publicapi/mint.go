@@ -83,7 +83,7 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 		ContractAddress:       contract.Address(),
 		RecipientWalletID:     wallet.ID,
 		HighlightCollectionID: collectionID,
-		ClaimID:               util.ToNullString(claimID, true),
+		ClaimID:               claimID,
 		Status:                status,
 	}
 	if claimErr != nil {
@@ -104,7 +104,7 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 	}
 
 	// Create task to track transaction
-	err = api.taskClient.CreateTaskForHighlightMintClaim(ctx, task.HighlightMintClaimMessage{ClaimID: claimDBID})
+	err = api.taskClient.CreateTaskForHighlightMintClaim(ctx, task.HighlightMintClaimMessage{ClaimID: claimDBID, Attempts: 0})
 	if err != nil {
 		err = fmt.Errorf("failed to save create highlight mint claim task for claimID=%s: %s", claimID, err)
 		logger.For(ctx).Error(err)

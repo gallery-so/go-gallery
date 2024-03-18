@@ -71,7 +71,7 @@ type PostPreflightMessage struct {
 
 type HighlightMintClaimMessage struct {
 	ClaimID  persist.DBID `json:"claim_id" binding:"required"`
-	Attempts int          `json:"attempts" binding:"required"`
+	Attempts int          `json:"attempts"`
 }
 
 type AutosocialProcessUsersMessage struct {
@@ -152,7 +152,7 @@ func (c *Client) CreateTaskForFeed(ctx context.Context, message FeedMessage) err
 	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEED_URL"))
 	secret := env.GetString("FEED_SECRET")
 	delay := time.Duration(env.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second
-	return c.submitTask(ctx, queue, url, withDelay(delay), withJSON(message), withTrace(span), withBasicAuth(secret))
+	return c.submitTask(ctx, queue, url, WithDelay(delay), withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func (c *Client) CreateTaskForFeedbot(ctx context.Context, message FeedbotMessage) error {
@@ -178,7 +178,7 @@ func (c *Client) CreateTaskForTokenTokenProcessing(ctx context.Context, message 
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/tokenmanage/process/token", env.GetString("TOKEN_PROCESSING_URL"))
-	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withDelay(delay))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), WithDelay(delay))
 }
 
 func (c *Client) CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage) error {
@@ -223,12 +223,13 @@ func (c *Client) CreateTaskForPostPreflight(ctx context.Context, message PostPre
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
-func (c *Client) CreateTaskForHighlightMintClaim(ctx context.Context, message HighlightMintClaimMessage) error {
+func (c *Client) CreateTaskForHighlightMintClaim(ctx context.Context, message HighlightMintClaimMessage, opts ...func(*taskspb.Task) error) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForHighlightMintClaim")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("MINT_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process/highlight-mint-claim", env.GetString("TOKEN_PROCESSING_URL"))
-	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
+	opts = append(opts, withJSON(message), withTrace(span))
+	return c.submitTask(ctx, queue, url, opts...)
 }
 
 func (c *Client) CreateTaskForAutosocialProcessUsers(ctx context.Context, message AutosocialProcessUsersMessage) error {
@@ -253,7 +254,7 @@ func (c *Client) CreateTaskForSlackPostFeedBot(ctx context.Context, message Feed
 	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	url := fmt.Sprintf("%s/tasks/slack-post", env.GetString("FEEDBOT_URL"))
 	secret := env.GetString("FEEDBOT_SECRET")
-	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), withDelay(2*time.Minute))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), WithDelay(2*time.Minute))
 }
 
 // NewClient returns a new task client with tracing enabled.
@@ -337,7 +338,7 @@ func newGCPClient(ctx context.Context) *gcptasks.Client {
 	return client
 }
 
-func withDelay(delay time.Duration) func(*taskspb.Task) error {
+func WithDelay(delay time.Duration) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
 		scheduleOn := time.Now().Add(delay)
 		t.ScheduleTime = timestamppb.New(scheduleOn)

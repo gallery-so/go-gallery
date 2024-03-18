@@ -113,6 +113,7 @@ func setDefaults() {
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ARBITRUM", "")
 	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ETH", "")
 	viper.SetDefault("OPENSEA_WEBHOOK_SECRET", "")
+	viper.SetDefault("MINT_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/mint-processing")
 
 	viper.AutomaticEnv()
 

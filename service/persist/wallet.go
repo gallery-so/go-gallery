@@ -85,9 +85,9 @@ func (c *ChainAddress) Chain() Chain {
 }
 
 func (c *ChainAddress) updateCasing() {
-	switch c.chain {
+	switch c.chain.L1Chain() {
 	// TODO: Add an IsCaseSensitive to the Chain type?
-	case ChainETH:
+	case L1Chain(ChainETH):
 		c.address = Address(strings.ToLower(c.address.String()))
 	}
 }

@@ -891,6 +891,9 @@ func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *mode
 
 // Token is the resolver for the token field.
 func (r *highlightMintClaimStatusPayloadResolver) Token(ctx context.Context, obj *model.HighlightMintClaimStatusPayload) (*model.Token, error) {
+	if obj.TokenID == "" {
+		return nil, nil
+	}
 	return resolveTokenByTokenID(ctx, obj.HelperHighlightMintClaimStatusPayloadData.TokenID)
 }
 
@@ -3580,10 +3583,10 @@ func (r *viewerResolver) HighlightMintClaimStatus(ctx context.Context, obj *mode
 	case highlight.ClaimStatusTxFailed:
 		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
 	case highlight.ClaimStatusFailedInternal:
-		return nil, err
+		return nil, fmt.Errorf("internal error handling mint claim: %s", claim.ErrorMessage.String)
 	case highlight.ClaimStatusMediaProcessed:
 		return model.HighlightMintClaimStatusPayload{
-			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenInstanceID},
+			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
 			Status: model.HighlightTxnStatusTokenSynced,
 			Token:  nil, // handled by dedicated resolver
 		}, nil

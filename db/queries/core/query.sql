@@ -2026,7 +2026,7 @@ select * from highlight_mint_claims where id = $1 and not deleted;
 update highlight_mint_claims set last_updated = now(), status = $1, error_message = $2 where id = @id returning *;
 
 -- name: UpdateHighlightMintClaimStatusTxSucceeded :one
-update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2, token_metadata = $3 where id = @id returning *;
+update highlight_mint_claims set last_updated = now(), status = $1, token_mint_id = $2, token_metadata = $3 where id = @id returning *;
 
 -- name: UpdateHighlightMintClaimStatusTokenSynced :one
-update highlight_mint_claims set last_updated = now(), status = $1, token_instance_id = $2 where id = @id returning *;
+update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2 where id = @id returning *;
