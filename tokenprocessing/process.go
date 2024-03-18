@@ -608,7 +608,7 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 			}
 			mintedToken := persist.TokenUniqueIdentifiers{
 				OwnerAddress:    recipientWallet.Address,
-				TokenID:         claim.TokenMintID.ToHexTokenID(),
+				TokenID:         claim.TokenMintID,
 				ContractAddress: claim.ContractAddress,
 				Chain:           claim.Chain,
 			}
@@ -623,7 +623,7 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 		case highlight.ClaimStatusTokenSynced:
 			t, err := mc.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
 				OwnerID:         claim.UserID,
-				TokenID:         claim.TokenMintID.ToHexTokenID(),
+				TokenID:         claim.TokenMintID,
 				Chain:           claim.Chain,
 				ContractAddress: claim.ContractAddress,
 			})
@@ -716,7 +716,7 @@ type highlightTracker struct{ q *db.Queries }
 func (m *highlightTracker) setStatusTxSucceeded(ctx context.Context, claimID persist.DBID, tokenMintID persist.DecimalTokenID, tokenMetadata persist.TokenMetadata) (db.HighlightMintClaim, error) {
 	return m.q.UpdateHighlightMintClaimStatusTxSucceeded(ctx, db.UpdateHighlightMintClaimStatusTxSucceededParams{
 		Status:        highlight.ClaimStatusTxSucceeded,
-		TokenMintID:   tokenMintID,
+		TokenMintID:   tokenMintID.ToHexTokenID(),
 		TokenMetadata: tokenMetadata,
 		ID:            claimID,
 	})

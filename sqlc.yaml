@@ -216,7 +216,7 @@ sql:
           - column: 'highlight_mint_claims.claim_id'
             go_type: 'string'
           - column: 'highlight_mint_claims.token_mint_id'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.DecimalTokenID'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenID'
           - column: 'highlight_mint_claims.status'
             go_type: 'github.com/mikeydub/go-gallery/service/multichain/highlight.ClaimStatus'
           - column: 'highlight_mint_claims.token_metadata'

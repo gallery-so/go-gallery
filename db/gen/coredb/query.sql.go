@@ -7271,10 +7271,10 @@ update highlight_mint_claims set last_updated = now(), status = $1, token_mint_i
 `
 
 type UpdateHighlightMintClaimStatusTxSucceededParams struct {
-	Status        highlight.ClaimStatus  `db:"status" json:"status"`
-	TokenMintID   persist.DecimalTokenID `db:"token_mint_id" json:"token_mint_id"`
-	TokenMetadata persist.TokenMetadata  `db:"token_metadata" json:"token_metadata"`
-	ID            persist.DBID           `db:"id" json:"id"`
+	Status        highlight.ClaimStatus `db:"status" json:"status"`
+	TokenMintID   persist.HexTokenID    `db:"token_mint_id" json:"token_mint_id"`
+	TokenMetadata persist.TokenMetadata `db:"token_metadata" json:"token_metadata"`
+	ID            persist.DBID          `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateHighlightMintClaimStatusTxSucceeded(ctx context.Context, arg UpdateHighlightMintClaimStatusTxSucceededParams) (HighlightMintClaim, error) {

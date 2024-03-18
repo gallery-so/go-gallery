@@ -3,7 +3,7 @@ create table if not exists highlight_mint_claims (
   user_id varchar(255) references users(id),
   chain int,
   contract_address varchar,
-  token_mint_id numeric,
+  token_mint_id varchar,
   token_metadata jsonb,
   recipient_wallet_id varchar not null references wallets(id),
   highlight_collection_id varchar not null,
