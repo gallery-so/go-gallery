@@ -706,9 +706,14 @@ func (id *DecimalTokenID) Scan(src interface{}) error {
 		return fmt.Errorf("cannot convert %T to pgtype.Numeric", src)
 	}
 
-	if err := num.AssignTo(id); err != nil {
-		return fmt.Errorf("cannot assign pgtype.Numeric to DecimalTokenID: %w", err)
+	// Convert pgtype.Numeric to big.Rat, because pgtype.Numeric has built-in support for this conversion
+	var rat big.Rat
+	if err := num.AssignTo(&rat); err != nil {
+		return fmt.Errorf("cannot assign pgtype.Numeric to big.Rat: %w", err)
 	}
+
+	// Use FloatString with 0 decimal places to convert the big.Rat to a whole number
+	*id = DecimalTokenID(rat.FloatString(0))
 
 	return nil
 }
