@@ -691,24 +691,20 @@ func (id DecimalTokenID) Value() (driver.Value, error) {
 	return num, nil
 }
 
-// Scan implements the sql.Scanner interface for token IDs
-func (id *DecimalTokenID) Scan(src interface{}) error {
-	if src == nil {
-		*id = ""
-		return nil
+func (id *DecimalTokenID) DecodeBinary(ci *pgtype.ConnInfo, src []byte) error {
+	// Using the db/sql Scanner interface to get Postgres "numeric" types is complicated because
+	// Postgres will output values as strings in scientific notation. Using pgx's DecodeBinary
+	// interface avoids this issue and lets us decode directly to a pgtype.Numeric without an
+	// intermediate string or the need to parse scientific notation.
+	var numeric pgtype.Numeric
+	err := numeric.DecodeBinary(ci, src)
+	if err != nil {
+		return err
 	}
 
-	var num pgtype.Numeric
-	switch src := src.(type) {
-	case pgtype.Numeric:
-		num = src
-	default:
-		return fmt.Errorf("cannot convert %T to pgtype.Numeric", src)
-	}
-
-	// Convert pgtype.Numeric to big.Rat, because pgtype.Numeric has built-in support for this conversion
+	// Assign pgtype.Numeric to big.Rat, because pgtype.Numeric has built-in support for this conversion
 	var rat big.Rat
-	if err := num.AssignTo(&rat); err != nil {
+	if err := numeric.AssignTo(&rat); err != nil {
 		return fmt.Errorf("cannot assign pgtype.Numeric to big.Rat: %w", err)
 	}
 
@@ -716,6 +712,58 @@ func (id *DecimalTokenID) Scan(src interface{}) error {
 	*id = DecimalTokenID(rat.FloatString(0))
 
 	return nil
+}
+
+func expandNumericString(s string) (string, error) {
+	// Split the string on 'e'. If 'e' is not present, parts will contain the original string as its only element.
+	parts := strings.Split(s, "e")
+	if len(parts) == 1 {
+		// No 'e' in the string, return it as is.
+		return s, nil
+	} else if len(parts) != 2 {
+		// More than one 'e' found, or some unexpected format.
+		return "", fmt.Errorf("string does not contain a valid format: %s", s)
+	}
+
+	base := parts[0]
+	expPart := parts[1]
+
+	// Convert the exponent part to an integer.
+	exponent, err := strconv.Atoi(expPart)
+	if err != nil {
+		return "", fmt.Errorf("invalid exponent: %s", expPart)
+	}
+
+	// If the exponent is negative or zero, the original string format might not make sense for simple expansion.
+	if exponent < 0 {
+		return "", fmt.Errorf("negative exponent not handled: %d", exponent)
+	}
+
+	// Append the required number of zeros to the base.
+	for i := 0; i < exponent; i++ {
+		base += "0"
+	}
+
+	return base, nil
+}
+
+// Scan implements the sql.Scanner interface for token IDs
+func (id *DecimalTokenID) Scan(src interface{}) error {
+	if src == nil {
+		*id = ""
+		return nil
+	}
+
+	if str, ok := src.(string); ok {
+		expanded, err := expandNumericString(str)
+		if err != nil {
+			return err
+		}
+		*id = DecimalTokenID(expanded)
+		return nil
+	}
+
+	return fmt.Errorf("cannot convert %T to DecimalTokenID", src)
 }
 
 func (id DecimalTokenID) Numeric() pgtype.Numeric {
