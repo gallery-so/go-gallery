@@ -1,7 +1,7 @@
 package persist
 
 import (
-	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -14,11 +14,75 @@ type TokenIdentifiers struct {
 	Chain           Chain      `json:"chain"`
 }
 
+func (t TokenIdentifiers) String() string {
+	return fmt.Sprintf("token(chain=%d, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID.ToDecimalTokenID())
+}
+
+// NewTokenIdentifiers creates a new token identifiers
+func NewTokenIdentifiers(pContractAddress Address, pTokenID HexTokenID, pChain Chain) TokenIdentifiers {
+	return TokenIdentifiers{
+		TokenID:         HexTokenID(pTokenID.BigInt().Text(16)),
+		ContractAddress: pContractAddress,
+		Chain:           pChain,
+	}
+}
+
 type TokenUniqueIdentifiers struct {
 	Chain           Chain      `json:"chain"`
 	ContractAddress Address    `json:"contract_address"`
 	TokenID         HexTokenID `json:"token_id"`
 	OwnerAddress    Address    `json:"owner_address"`
+}
+
+func (t TokenUniqueIdentifiers) String() string {
+	return fmt.Sprintf("token(chain=%d, contract=%s, tokenID=%s, owner=%s)", t.Chain, t.ContractAddress, t.TokenID.ToDecimalTokenID(), t.OwnerAddress)
+}
+
+func (t TokenUniqueIdentifiers) AsJSONKey() string {
+	return fmt.Sprintf("%s+%s+%s+%d", t.ContractAddress, t.TokenID, t.OwnerAddress, t.Chain)
+}
+
+func (t *TokenUniqueIdentifiers) FromJSONKey(key string) error {
+	res := strings.Split(key, "+")
+	if len(res) != 4 {
+		return fmt.Errorf("invalid token unique identifiers: %v", key)
+	}
+	chain, err := strconv.Atoi(res[3])
+	if err != nil {
+		return err
+	}
+	t.Chain = Chain(chain)
+	t.ContractAddress = Address(res[0])
+	t.TokenID = HexTokenID(res[1])
+	t.OwnerAddress = Address(res[2])
+	return nil
+}
+
+func (t *TokenUniqueIdentifiers) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"chain":            t.Chain,
+		"contract_address": t.ContractAddress,
+		"token_id":         t.TokenID,
+		"owner_address":    t.OwnerAddress,
+	})
+}
+
+func (t *TokenUniqueIdentifiers) UnmarshalJSON(data []byte) error {
+	var tmp struct {
+		Chain           Chain      `json:"chain"`
+		ContractAddress Address    `json:"contract_address"`
+		TokenID         HexTokenID `json:"token_id"`
+		OwnerAddress    Address    `json:"owner_address"`
+	}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	t.Chain = tmp.Chain
+	t.ContractAddress = tmp.ContractAddress
+	t.TokenID = tmp.TokenID
+	t.OwnerAddress = tmp.OwnerAddress
+	return nil
 }
 
 // ContractIdentifiers represents a unique identifier for a contract
@@ -27,65 +91,8 @@ type ContractIdentifiers struct {
 	Chain           Chain   `json:"chain"`
 }
 
-// NewTokenIdentifiers creates a new token identifiers
-func NewTokenIdentifiers(pContractAddress Address, pTokenID HexTokenID, pChain Chain) TokenIdentifiers {
-	return TokenIdentifiers{
-		TokenID:         HexTokenID(pTokenID.BigInt().Text(16)),
-		ContractAddress: Address(pChain.NormalizeAddress(pContractAddress)),
-		Chain:           pChain,
-	}
-}
-
-func (t TokenIdentifiers) String() string {
-	return fmt.Sprintf("%s+%s+%d", t.Chain.NormalizeAddress(t.ContractAddress), t.TokenID, t.Chain)
-}
-
-// Value implements the driver.Valuer interface
-func (t TokenIdentifiers) Value() (driver.Value, error) {
-	return t.String(), nil
-}
-
-// Scan implements the database/sql Scanner interface for the TokenIdentifiers type
-func (t *TokenIdentifiers) Scan(i interface{}) error {
-	if i == nil {
-		*t = TokenIdentifiers{}
-		return nil
-	}
-	res := strings.Split(i.(string), "+")
-	if len(res) != 2 {
-		return fmt.Errorf("invalid token identifiers: %v - %T", i, i)
-	}
-	chain, err := strconv.Atoi(res[2])
-	if err != nil {
-		return err
-	}
-	*t = TokenIdentifiers{
-		TokenID:         HexTokenID(res[1]),
-		ContractAddress: Address(res[0]),
-		Chain:           Chain(chain),
-	}
-	return nil
-}
-
-func (t TokenUniqueIdentifiers) String() string {
-	return fmt.Sprintf("%s+%s+%s+%d", t.Chain.NormalizeAddress(t.ContractAddress), t.TokenID, t.Chain.NormalizeAddress(t.OwnerAddress), t.Chain)
-}
-
-func TokenUniqueIdentifiersFromString(s string) (TokenUniqueIdentifiers, error) {
-	res := strings.Split(s, "+")
-	if len(res) != 4 {
-		return TokenUniqueIdentifiers{}, fmt.Errorf("invalid token unique identifiers: %v", s)
-	}
-	chain, err := strconv.Atoi(res[3])
-	if err != nil {
-		return TokenUniqueIdentifiers{}, err
-	}
-	return TokenUniqueIdentifiers{
-		TokenID:         HexTokenID(res[1]),
-		ContractAddress: Address(res[0]),
-		Chain:           Chain(chain),
-		OwnerAddress:    Address(res[2]),
-	}, nil
+func (c *ContractIdentifiers) String() string {
+	return fmt.Sprintf("contract(chain=%d, address=%s)", c.Chain, c.ContractAddress)
 }
 
 // NewContractIdentifiers creates a new contract identifiers

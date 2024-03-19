@@ -102,7 +102,7 @@ type ChainAgnosticIdentifiers struct {
 }
 
 func (t ChainAgnosticIdentifiers) String() string {
-	return fmt.Sprintf("token(address=%s; id=%s)", t.ContractAddress, t.TokenID)
+	return fmt.Sprintf("token(address=%s, tokenID=%s)", t.ContractAddress, t.TokenID.ToDecimalTokenID())
 }
 
 type ErrProviderFailed struct{ Err error }
@@ -1294,8 +1294,9 @@ func chainTokensToUpsertableTokenDefinitions(ctx context.Context, chain persist.
 		contracts[ca] = c
 	}
 	for _, t := range tokens {
-		ti := persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, chain)
-		ca := persist.NewChainAddress(t.ContractAddress, chain)
+		normalizedAddress := persist.Address(chain.NormalizeAddress(t.ContractAddress))
+		ti := persist.NewTokenIdentifiers(normalizedAddress, t.TokenID, chain)
+		ca := persist.NewChainAddress(normalizedAddress, chain)
 		c, ok := contracts[ca]
 		if !ok {
 			panic(fmt.Sprintf("contract %s should have already been inserted", ca))
@@ -1320,7 +1321,7 @@ func tokenToTokenDefinitionDB(t ChainAgnosticToken, c db.Contract) db.TokenDefin
 		Chain:           c.Chain,
 		Metadata:        t.TokenMetadata,
 		FallbackMedia:   t.FallbackMedia,
-		ContractAddress: t.ContractAddress,
+		ContractAddress: persist.Address(c.Chain.NormalizeAddress(t.ContractAddress)),
 		ContractID:      c.ID,
 		TokenMediaID:    "", // Upsert will handle this in the db if the definition already exists
 		IsFxhash:        platform.IsFxhash(c),
@@ -1391,12 +1392,11 @@ func chainTokensToUpsertableTokens(chain persist.Chain, tokens []ChainAgnosticTo
 			continue
 		}
 
-		ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chain)
-
-		contractAddress := chain.NormalizeAddress(token.ContractAddress)
-		contract, ok := addressToContract[contractAddress]
+		normalizedAddress := chain.NormalizeAddress(token.ContractAddress)
+		ti := persist.NewTokenIdentifiers(persist.Address(normalizedAddress), token.TokenID, chain)
+		contract, ok := addressToContract[normalizedAddress]
 		if !ok {
-			panic(fmt.Sprintf("no persisted contract for chain=%d, address=%s", chain, contractAddress))
+			panic(fmt.Sprintf("no persisted contract for chain=%d, address=%s", chain, normalizedAddress))
 		}
 
 		// Duplicate tokens will have the same values for these fields, so we only need to set them once
@@ -1406,7 +1406,7 @@ func chainTokensToUpsertableTokens(chain persist.Chain, tokens []ChainAgnosticTo
 				Token: db.Token{
 					OwnerUserID:    ownerUser.ID,
 					BlockNumber:    sql.NullInt64{Int64: token.BlockNumber.BigInt().Int64(), Valid: true},
-					IsCreatorToken: createdContracts[persist.Address(contractAddress)],
+					IsCreatorToken: createdContracts[persist.Address(normalizedAddress)],
 					ContractID:     contract.ID,
 				},
 			}
@@ -1455,7 +1455,8 @@ func chainContractsToUpsertableContracts(chain persist.Chain, contracts []ChainA
 		result[c.Address] = c
 	}
 	for _, c := range contracts {
-		result[c.Address] = mergeContracts(result[c.Address], db.Contract{
+		normalizedAddress := persist.Address(chain.NormalizeAddress(c.Address))
+		result[normalizedAddress] = mergeContracts(result[normalizedAddress], db.Contract{
 			Symbol:               util.ToNullStringEmptyNull(c.Descriptors.Symbol),
 			Name:                 util.ToNullStringEmptyNull(c.Descriptors.Name),
 			OwnerAddress:         c.Descriptors.OwnerAddress,

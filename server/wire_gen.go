@@ -115,7 +115,7 @@ func ethInjector(serverEnvInit envInit, contextContext context.Context, client *
 	ethclientClient := rpc.NewEthClient()
 	provider := indexer.NewProvider(client, ethclientClient)
 	chain := _wireChainValue
-	simplehashProvider := simplehash.NewProvider(chain)
+	simplehashProvider := simplehash.NewProvider(chain, client)
 	ethereumProvider := ethProviderInjector(contextContext, provider, simplehashProvider)
 	return ethereumProvider, func() {
 	}

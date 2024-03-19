@@ -25,7 +25,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/publicapi"
+	// "github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/limiters"
@@ -61,9 +61,10 @@ func Init() {
 	ctx := context.Background()
 	c := ClientInit(ctx)
 	provider, _ := NewMultichainProvider(ctx, SetDefaults)
-	recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
-	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
-	router := CoreInit(ctx, c, provider, recommender, p)
+	// recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
+	// p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
+	// router := CoreInit(ctx, c, provider, recommender, p)
+	router := CoreInit(ctx, c, provider, nil, nil)
 	http.Handle("/", router)
 }
 
@@ -137,8 +138,8 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	neynar := farcaster.NewNeynarAPI(c.HTTPClient, socialCache, c.Queries)
 	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
 
-	recommender.Loop(ctx, time.NewTicker(time.Hour))
-	p.Loop(ctx, time.NewTicker(time.Minute*15))
+	// recommender.Loop(ctx, time.NewTicker(time.Hour))
+	// p.Loop(ctx, time.NewTicker(time.Minute*15))
 
 	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar, mintLimiter)
 }
@@ -249,6 +250,7 @@ func SetDefaults() {
 	viper.SetDefault("HIGHLIGHT_APP_ID", "")
 	viper.SetDefault("HIGHLIGHT_APP_SECRET", "")
 	viper.SetDefault("MINT_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/mint-processing")
+	viper.SetDefault("SIMPLEHASH_API_KEY", "")
 
 	viper.AutomaticEnv()
 
