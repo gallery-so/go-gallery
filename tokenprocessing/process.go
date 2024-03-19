@@ -566,16 +566,6 @@ func processHighlightMintClaim(mc *multichain.Provider, highlightProvider *highl
 			return
 		}
 
-		// Notify downstream that the claim has been processed
-		claim, err = tracker.setStatusMediaProcessed(ctx, claim.ID)
-		if err != nil {
-			logger.For(ctx).Errorf("highlight mint claimID=%s unexpected error writing success status: %s", msg.ClaimID, err)
-			sentryutil.ReportError(ctx, err)
-			tracker.setStatusFailed(ctx, msg.ClaimID, err)
-			removeMessageFromQueue(ctx, err)
-			return
-		}
-
 		logger.For(ctx).Infof("succesfully handled highlight mint claimID=%s", msg.ClaimID)
 		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 		return
@@ -641,10 +631,13 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 				PipelineOpts.WithRequireImage(),
 				PipelineOpts.WithMetadata(claim.TokenMetadata),
 			)
+			if err != nil {
+				return err
+			}
+			// Notify downstream that the claim has been processed
+			_, err = tracker.setStatusMediaProcessed(ctx, claim.ID)
 			return err
-		case highlight.ClaimStatusFailedInternal, highlight.ClaimStatusTxFailed, highlight.ClaimStatusMediaFailed:
-			return fmt.Errorf(claim.ErrorMessage.String)
-		case highlight.ClaimStatusMediaProcessed:
+		case highlight.ClaimStatusFailedInternal, highlight.ClaimStatusTxFailed, highlight.ClaimStatusMediaFailed, highlight.ClaimStatusMediaProcessed:
 			return nil
 		default:
 			err := fmt.Errorf("highlight mint claimID=%s has an unexpected status=%s", claim.ID, claim.Status)
