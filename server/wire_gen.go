@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
+	"github.com/mikeydub/go-gallery/service/multichain/simplehash"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
 	"github.com/mikeydub/go-gallery/service/multichain/wrapper"
@@ -114,16 +115,9 @@ func ethInjector(serverEnvInit envInit, contextContext context.Context, client *
 	ethclientClient := rpc.NewEthClient()
 	provider := indexer.NewProvider(client, ethclientClient)
 	chain := _wireChainValue
-	openseaProvider, cleanup := openseaProviderInjector(contextContext, client, chain, serverOpenseaLimiter)
-	alchemyProvider := alchemy.NewProvider(client, chain)
-	syncPipelineWrapper, cleanup2 := ethSyncPipelineInjector(contextContext, client, chain, openseaProvider, alchemyProvider, serverReservoirLimiter)
-	contractFetcher := ethContractFetcherInjector(openseaProvider, alchemyProvider)
-	tokenDescriptorsFetcher := ethTokenDescriptorsFetcherInjector(openseaProvider, alchemyProvider)
-	tokenMetadataFetcher := ethTokenMetadataFetcherInjector(openseaProvider, alchemyProvider)
-	ethereumProvider := ethProviderInjector(contextContext, provider, syncPipelineWrapper, contractFetcher, tokenDescriptorsFetcher, tokenMetadataFetcher)
+	simplehashProvider := simplehash.NewProvider(chain)
+	ethereumProvider := ethProviderInjector(contextContext, provider, simplehashProvider)
 	return ethereumProvider, func() {
-		cleanup2()
-		cleanup()
 	}
 }
 
@@ -131,18 +125,18 @@ var (
 	_wireChainValue = persist.ChainETH
 )
 
-func ethProviderInjector(ctx context.Context, indexerProvider *indexer.Provider, syncPipeline *wrapper.SyncPipelineWrapper, contractFetcher multichain.ContractFetcher, tokenDescriptorsFetcher multichain.TokenDescriptorsFetcher, tokenMetadataFetcher multichain.TokenMetadataFetcher) *multichain.EthereumProvider {
+func ethProviderInjector(ctx context.Context, indexerProvider *indexer.Provider, simplehashProvider *simplehash.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
 		ContractRefresher:                indexerProvider,
-		ContractFetcher:                  contractFetcher,
+		ContractFetcher:                  simplehashProvider,
 		ContractsOwnerFetcher:            indexerProvider,
-		TokenDescriptorsFetcher:          tokenDescriptorsFetcher,
-		TokenMetadataFetcher:             tokenMetadataFetcher,
-		TokensIncrementalContractFetcher: syncPipeline,
-		TokensIncrementalOwnerFetcher:    syncPipeline,
-		TokenIdentifierOwnerFetcher:      syncPipeline,
-		TokenMetadataBatcher:             syncPipeline,
-		TokensByTokenIdentifiersFetcher:  syncPipeline,
+		TokenDescriptorsFetcher:          simplehashProvider,
+		TokenMetadataFetcher:             simplehashProvider,
+		TokensIncrementalContractFetcher: simplehashProvider,
+		TokensIncrementalOwnerFetcher:    simplehashProvider,
+		TokenIdentifierOwnerFetcher:      simplehashProvider,
+		TokenMetadataBatcher:             simplehashProvider,
+		TokensByTokenIdentifiersFetcher:  simplehashProvider,
 		Verifier:                         indexerProvider,
 	}
 	return ethereumProvider

@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
+	"github.com/mikeydub/go-gallery/service/multichain/simplehash"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
 	"github.com/mikeydub/go-gallery/service/multichain/wrapper"
@@ -204,34 +205,39 @@ func ethInjector(envInit, context.Context, *http.Client, *openseaLimiter, *reser
 		rpc.NewEthClient,
 		wire.Value(persist.ChainETH),
 		indexer.NewProvider,
-		alchemy.NewProvider,
-		openseaProviderInjector,
+		simplehash.NewProvider,
+		// alchemy.NewProvider,
+		// openseaProviderInjector,
 		ethProviderInjector,
-		ethSyncPipelineInjector,
-		ethContractFetcherInjector,
-		ethTokenMetadataFetcherInjector,
-		ethTokenDescriptorsFetcherInjector,
+		// ethSyncPipelineInjector,
+		// ethContractFetcherInjector,
+		// ethTokenMetadataFetcherInjector,
+		// ethTokenDescriptorsFetcherInjector,
 	))
 }
 
 func ethProviderInjector(
 	ctx context.Context,
 	indexerProvider *indexer.Provider,
-	syncPipeline *wrapper.SyncPipelineWrapper,
-	contractFetcher multichain.ContractFetcher,
-	tokenDescriptorsFetcher multichain.TokenDescriptorsFetcher,
-	tokenMetadataFetcher multichain.TokenMetadataFetcher,
+	simplehashProvider *simplehash.Provider,
+	// syncPipeline *wrapper.SyncPipelineWrapper,
+	// contractFetcher multichain.ContractFetcher,
+	// tokenDescriptorsFetcher multichain.TokenDescriptorsFetcher,
+	// tokenMetadataFetcher multichain.TokenMetadataFetcher,
 ) *multichain.EthereumProvider {
 	panic(wire.Build(
 		wire.Struct(new(multichain.EthereumProvider), "*"),
 		wire.Bind(new(multichain.Verifier), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(indexerProvider)),
-		wire.Bind(new(multichain.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
+		wire.Bind(new(multichain.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(multichain.ContractFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(simplehashProvider)),
 	))
 }
 
