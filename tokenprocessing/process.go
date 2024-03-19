@@ -520,6 +520,13 @@ func processHighlightMintClaim(mc *multichain.Provider, highlightProvider *highl
 			logger.For(ctx).Warnf("hightlight mint claimID=%s max retries reached", msg.ClaimID)
 			err = fmt.Errorf("max retries reached; last error: %s", claim.ErrorMessage.String)
 			sentryutil.ReportError(ctx, err)
+
+			if claim.Status == highlight.ClaimStatusMediaProcessing {
+				tracker.setStatus(ctx, msg.ClaimID, highlight.ClaimStatusMediaFailed, err.Error())
+				removeMessageFromQueue(ctx, err)
+				return
+			}
+
 			tracker.setStatusFailed(ctx, msg.ClaimID, err)
 			removeMessageFromQueue(ctx, err)
 			return
@@ -541,13 +548,13 @@ func processHighlightMintClaim(mc *multichain.Provider, highlightProvider *highl
 		}
 		if util.ErrorIs[tokenmanage.ErrBadToken](err) {
 			logger.For(ctx).Infof("hightlight mint claimID=%s failed media processing, retrying later: %s", msg.ClaimID, err)
-			tracker.setStatus(ctx, claim.ID, highlight.ClaimStatusTokenSynced, err.Error())
+			tracker.setStatus(ctx, claim.ID, highlight.ClaimStatusMediaProcessing, err.Error())
 			retryMessage(ctx, msg, err)
 			return
 		}
 		if util.ErrorIs[throttle.ErrThrottleLocked](err) {
 			logger.For(ctx).Infof("hightlight mint claimID=%s other process holds media processing lock, retrying later", msg.ClaimID)
-			tracker.setStatus(ctx, claim.ID, highlight.ClaimStatusTokenSynced, err.Error())
+			tracker.setStatus(ctx, claim.ID, highlight.ClaimStatusMediaProcessing, err.Error())
 			retryMessage(ctx, msg, err)
 			return
 		}
@@ -616,11 +623,11 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 			if err != nil {
 				return err
 			}
-			claim, err = tracker.setStatusTokenSynced(ctx, claim.ID, tokenDBID)
+			claim, err = tracker.setStatusMediaProcessing(ctx, claim.ID, tokenDBID)
 			if err != nil {
 				return err
 			}
-		case highlight.ClaimStatusTokenSynced:
+		case highlight.ClaimStatusMediaProcessing:
 			t, err := mc.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
 				OwnerID:         claim.UserID,
 				TokenID:         claim.TokenMintID,
@@ -635,9 +642,7 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 				PipelineOpts.WithMetadata(claim.TokenMetadata),
 			)
 			return err
-		case highlight.ClaimStatusFailedInternal:
-			return fmt.Errorf(claim.ErrorMessage.String)
-		case highlight.ClaimStatusTxFailed:
+		case highlight.ClaimStatusFailedInternal, highlight.ClaimStatusTxFailed, highlight.ClaimStatusMediaFailed:
 			return fmt.Errorf(claim.ErrorMessage.String)
 		case highlight.ClaimStatusMediaProcessed:
 			return nil
@@ -722,9 +727,9 @@ func (m *highlightTracker) setStatusTxSucceeded(ctx context.Context, claimID per
 	})
 }
 
-func (m *highlightTracker) setStatusTokenSynced(ctx context.Context, claimID, tokenID persist.DBID) (db.HighlightMintClaim, error) {
-	return m.q.UpdateHighlightMintClaimStatusTokenSynced(ctx, db.UpdateHighlightMintClaimStatusTokenSyncedParams{
-		Status:  highlight.ClaimStatusTokenSynced,
+func (m *highlightTracker) setStatusMediaProcessing(ctx context.Context, claimID, tokenID persist.DBID) (db.HighlightMintClaim, error) {
+	return m.q.UpdateHighlightMintClaimStatusMediaProcessing(ctx, db.UpdateHighlightMintClaimStatusMediaProcessingParams{
+		Status:  highlight.ClaimStatusMediaProcessing,
 		TokenID: tokenID,
 		ID:      claimID,
 	})

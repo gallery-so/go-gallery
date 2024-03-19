@@ -2028,5 +2028,5 @@ update highlight_mint_claims set last_updated = now(), status = $1, error_messag
 -- name: UpdateHighlightMintClaimStatusTxSucceeded :one
 update highlight_mint_claims set last_updated = now(), status = $1, token_mint_id = $2, token_metadata = $3 where id = @id returning *;
 
--- name: UpdateHighlightMintClaimStatusTokenSynced :one
+-- name: UpdateHighlightMintClaimStatusMediaProcessing :one
 update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2 where id = @id returning *;
