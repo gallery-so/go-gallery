@@ -12926,7 +12926,6 @@ enum HighlightTxStatus {
   TX_PENDING
   TX_COMPLETE
   TOKEN_SYNCED
-  MINT_FAILED
 }
 
 type HighlightMintClaimStatusPayload @goEmbedHelper {
