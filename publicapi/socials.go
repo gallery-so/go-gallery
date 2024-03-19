@@ -71,7 +71,7 @@ func (api SocialAPI) GetFarcasterFollowingByUserID(ctx context.Context, userID p
 	}); err != nil {
 		return nil, err
 	}
-	fID, err := api.neynarAPI.FarcasterIDByGalleryID(ctx, userID)
+	fID, err := api.neynarAPI.FarcasterIDByUserID(ctx, userID)
 	if err != nil && errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
 		return []farcaster.NeynarUser{}, nil
 	}

@@ -620,37 +620,53 @@ type userCreatedNotificationHandler struct {
 }
 
 func (u userCreatedNotificationHandler) handleDelayed(ctx context.Context, e db.Event) error {
-	fID, err := u.fc.FarcasterIDByGalleryID(ctx, e.UserID)
+	fID, err := u.fc.FarcasterIDByUserID(ctx, e.UserID)
 	if err != nil && errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
+		logger.For(ctx).Warnf("joined user %s not on farcaster; skipping sending notification", e.UserID)
 		return nil
 	}
 	if err != nil {
+		logger.For(ctx).Errorf("failed to get farcaster ID for user=%s: %s", e.UserID, err)
+		sentryutil.ReportError(ctx, err)
 		return err
 	}
 
-	fcUsers, err := u.fc.FollowersByUserID(ctx, fID)
+	farcasterFollowers, err := u.fc.FollowersByUserID(ctx, fID)
 	if err != nil {
+		logger.For(ctx).Errorf("failed to get farcaster followers for user=%s: %s", e.UserID, err)
+		sentryutil.ReportError(ctx, err)
 		return err
 	}
 
-	followerFIDs := util.MapWithoutError(fcUsers, func(u farcaster.NeynarUser) string { return u.Fid.String() })
-	fcUsersOnGallery, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
+	followerFIDs := util.MapWithoutError(farcasterFollowers, func(u farcaster.NeynarUser) string { return u.Fid.String() })
+	farcasterFollowersOnGallery, err := u.q.GetUsersByFarcasterIDs(ctx, followerFIDs)
 	if err != nil {
+		logger.For(ctx).Errorf("failed to get users by farcaster IDs: %s", err)
 		return err
 	}
 
-	followers, err := u.dataloaders.GetFollowersByUserIdBatch.Load(e.UserID)
+	if len(farcasterFollowersOnGallery) == 0 {
+		logger.For(ctx).Infof("no farcaster followers on gallery for user=%s; skipping sending notification", e.UserID)
+		return nil
+	}
+
+	// It's unlikely the user has any followers on Gallery, but in case they do or the message was delayed,
+	// we don't want to send them a notification if they're already following the user.
+	currentFollowers, err := u.dataloaders.GetFollowersByUserIdBatch.Load(e.UserID)
 	if err != nil {
+		logger.For(ctx).Errorf("failed to get followers for user=%s", err)
 		return err
 	}
 
-	isFollowing := make(map[persist.DBID]bool, len(followers))
-	for _, f := range followers {
-		isFollowing[f.ID] = true
+	alreadyFollowing := make(map[persist.DBID]bool, len(currentFollowers))
+	for _, f := range currentFollowers {
+		alreadyFollowing[f.ID] = true
 	}
 
-	for _, f := range fcUsersOnGallery {
-		if isFollowing[f.ID] {
+	var totalSent int
+	for _, f := range farcasterFollowersOnGallery {
+		// Don't notify them if they're already following the user
+		if alreadyFollowing[f.ID] {
 			continue
 		}
 		err = u.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
@@ -661,9 +677,13 @@ func (u userCreatedNotificationHandler) handleDelayed(ctx context.Context, e db.
 		})
 		if err != nil {
 			logger.For(ctx).Errorf("failed to send farcaster user joined notification: %s", err)
+			sentryutil.ReportError(ctx, err)
+			continue
 		}
+		totalSent++
 	}
 
+	logger.For(ctx).Infof("sent %d farcaster user joined notifications on behalf of user=%s", totalSent, e.UserID)
 	return nil
 }
 
@@ -776,7 +796,7 @@ func (u userPostedNotificationHandler) receipientsOfUserPostedFirstPostNotificat
 		return recipients, err
 	}
 
-	fID, err := u.fc.FarcasterIDByGalleryID(ctx, actorID)
+	fID, err := u.fc.FarcasterIDByUserID(ctx, actorID)
 	if err != nil && !errors.Is(err, farcaster.ErrUserNotOnFarcaster) {
 		return recipients, err
 	}
