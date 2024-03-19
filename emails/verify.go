@@ -104,7 +104,8 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		err = addEmailToSendgridList(c, verifiedEmail.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		lists := []string{env.GetString("SENDGRID_DEFAULT_LIST_ID"), env.GetString("SENDGRID_MARKETING_LIST_ID")}
+		err = addEmailToSendgridList(c, verifiedEmail.String(), lists)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -138,7 +139,8 @@ func processAddToMailingList(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		err = addEmailToSendgridList(c, userWithPII.PiiVerifiedEmailAddress.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		lists := []string{env.GetString("SENDGRID_DEFAULT_LIST_ID"), env.GetString("SENDGRID_MARKETING_LIST_ID")}
+		err = addEmailToSendgridList(c, userWithPII.PiiVerifiedEmailAddress.String(), lists)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -185,13 +187,13 @@ type sendgridContact struct {
 	CustomFields map[string]interface{} `json:"custom_fields"`
 }
 
-func addEmailToSendgridList(ctx context.Context, email string, listID string) error {
+func addEmailToSendgridList(ctx context.Context, email string, listIDs []string) error {
 
 	request := sendgrid.GetRequest(env.GetString("SENDGRID_API_KEY"), "/v3/marketing/contacts", "https://api.sendgrid.com")
 	request.Method = "PUT"
 
 	contacts := sendgridContacts{
-		ListIDs: []string{listID},
+		ListIDs: listIDs,
 		Contacts: []sendgridContact{
 			{
 				Email: email,
