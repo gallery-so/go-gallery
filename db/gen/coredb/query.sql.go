@@ -7233,18 +7233,18 @@ func (q *Queries) UpdateHighlightMintClaimStatus(ctx context.Context, arg Update
 	return i, err
 }
 
-const updateHighlightMintClaimStatusTokenSynced = `-- name: UpdateHighlightMintClaimStatusTokenSynced :one
+const updateHighlightMintClaimStatusMediaProcessing = `-- name: UpdateHighlightMintClaimStatusMediaProcessing :one
 update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2 where id = $3 returning id, user_id, chain, contract_address, token_mint_id, token_metadata, recipient_wallet_id, highlight_collection_id, token_id, claim_id, status, error_message, created_at, last_updated, deleted
 `
 
-type UpdateHighlightMintClaimStatusTokenSyncedParams struct {
+type UpdateHighlightMintClaimStatusMediaProcessingParams struct {
 	Status  highlight.ClaimStatus `db:"status" json:"status"`
 	TokenID persist.DBID          `db:"token_id" json:"token_id"`
 	ID      persist.DBID          `db:"id" json:"id"`
 }
 
-func (q *Queries) UpdateHighlightMintClaimStatusTokenSynced(ctx context.Context, arg UpdateHighlightMintClaimStatusTokenSyncedParams) (HighlightMintClaim, error) {
-	row := q.db.QueryRow(ctx, updateHighlightMintClaimStatusTokenSynced, arg.Status, arg.TokenID, arg.ID)
+func (q *Queries) UpdateHighlightMintClaimStatusMediaProcessing(ctx context.Context, arg UpdateHighlightMintClaimStatusMediaProcessingParams) (HighlightMintClaim, error) {
+	row := q.db.QueryRow(ctx, updateHighlightMintClaimStatusMediaProcessing, arg.Status, arg.TokenID, arg.ID)
 	var i HighlightMintClaim
 	err := row.Scan(
 		&i.ID,

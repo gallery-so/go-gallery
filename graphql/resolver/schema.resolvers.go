@@ -2913,17 +2913,14 @@ func (r *queryResolver) HighlightMintClaimStatus(ctx context.Context, claimID pe
 	switch claim.Status {
 	case highlight.ClaimStatusTxPending:
 		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxStatusTxPending}, nil
-	case highlight.ClaimStatusTxSucceeded:
+	case highlight.ClaimStatusTxSucceeded, highlight.ClaimStatusMediaProcessing:
 		return model.HighlightMintClaimStatusPayload{Status: model.HighlightTxStatusTxComplete}, nil
 	case highlight.ClaimStatusTxFailed:
 		return nil, highlight.ErrHighlightTxnFailed{Msg: claim.ErrorMessage.String}
 	case highlight.ClaimStatusFailedInternal:
-		return model.HighlightMintClaimStatusPayload{
-			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
-			Status: model.HighlightTxStatusMintFailed,
-			Token:  nil, // handled by dedicated resolver
-		}, fmt.Errorf("internal error handling mint claim: %s", claim.ErrorMessage.String)
-	case highlight.ClaimStatusMediaProcessed:
+		return nil, fmt.Errorf("error handling mint claim: %s", claim.ErrorMessage.String)
+		// ClaimStatusMediaFailed included since there might be a fallback image and to let the user refresh the token themselves
+	case highlight.ClaimStatusMediaProcessed, highlight.ClaimStatusMediaFailed:
 		return model.HighlightMintClaimStatusPayload{
 			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
 			Status: model.HighlightTxStatusTokenSynced,

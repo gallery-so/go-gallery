@@ -15,19 +15,21 @@ import (
 )
 
 const (
-	baseURL                               = "https://api.highlight.xyz:8080"
-	txCodeInitiated                       = "INITIATED"
-	txCodeSent                            = "TX_SENT"
-	txCodeReverted                        = "TX_REVERTED"
-	txCodeCancelled                       = "TX_CANCELLED"
-	txCodeComplete                        = "TX_COMPLETE"
-	claimCodeMintUnavailable              = "MINT_UNAVAILABLE"
-	ClaimStatusTxPending      ClaimStatus = "TX_PENDING"
-	ClaimStatusTxFailed       ClaimStatus = "TX_FAILED"
-	ClaimStatusTxSucceeded    ClaimStatus = "TX_SUCCEEDED"
-	ClaimStatusTokenSynced    ClaimStatus = "TOKEN_SYNCED"
-	ClaimStatusMediaProcessed ClaimStatus = "TOKEN_MEDIA_PROCESSED"
-	ClaimStatusFailedInternal ClaimStatus = "FAILED_INTERNAL"
+	baseURL                  = "https://api.highlight.xyz:8080"
+	txCodeInitiated          = "INITIATED"
+	txCodeSent               = "TX_SENT"
+	txCodeReverted           = "TX_REVERTED"
+	txCodeCancelled          = "TX_CANCELLED"
+	txCodeComplete           = "TX_COMPLETE"
+	claimCodeMintUnavailable = "MINT_UNAVAILABLE"
+	// Lifecycle of a highlight mint
+	ClaimStatusTxPending       ClaimStatus = "TX_PENDING"
+	ClaimStatusTxFailed        ClaimStatus = "TX_FAILED"
+	ClaimStatusTxSucceeded     ClaimStatus = "TX_SUCCEEDED"
+	ClaimStatusMediaProcessing ClaimStatus = "MEDIA_PROCESSING"
+	ClaimStatusMediaProcessed  ClaimStatus = "MEDIA_PROCESSED"
+	ClaimStatusMediaFailed     ClaimStatus = "MEDIA_FAILED"
+	ClaimStatusFailedInternal  ClaimStatus = "FAILED_INTERNAL"
 )
 
 var ErrHighlightChainNotSupported = errors.New("chain is not supported by highlight")
