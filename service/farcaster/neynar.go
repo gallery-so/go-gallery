@@ -17,12 +17,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
-	"github.com/jackc/pgx/v4"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
@@ -160,60 +158,49 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 	return neynarResp.Result.User, nil
 }
 
-// FarcasterIDByGalleryID returns the FID of a user via the user's Gallery ID. ErrUserNotOnFarcaster is returned
+// FarcasterIDByUserID returns the FID of a user via the user's Gallery ID. ErrUserNotOnFarcaster is returned
 // if the user is not on Farcaster based off their connected wallets.
-func (n *NeynarAPI) FarcasterIDByGalleryID(ctx context.Context, userID persist.DBID) (NeynarID, error) {
-	socials, err := n.q.GetSocialsByUserID(ctx, userID)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return "", err
+func (n *NeynarAPI) FarcasterIDByUserID(ctx context.Context, userID persist.DBID) (NeynarID, error) {
+	socials, _ := n.q.GetSocialsByUserID(ctx, userID)
+
+	if fid := socials[persist.SocialProviderFarcaster].ID; fid != "" {
+		return NeynarID(fid), nil
 	}
 
-	p, ok := socials[persist.SocialProviderFarcaster]
-	if !ok {
-		return "", ErrUserNotOnFarcaster
-	}
-	if ok && p.ID == "" {
-		return "", errors.New("cached farcaster profile has no associated FID")
-	}
-	if p.ID != "" {
-		return NeynarID(p.ID), nil
-	}
-
-	// Socials not cached yet. Socials are fetched when a user is created, so this should be a rare case.
 	user, err := n.q.GetUserById(ctx, userID)
 	if err != nil {
 		return "", err
 	}
+
 	wallets, err := n.q.GetWalletsByUserID(ctx, userID)
 	if err != nil {
 		return "", err
 	}
 
-	ethAddresses := make([]persist.Address, 0)
-	var primaryAddress persist.Address
-
+	walletsToCheck := make([]persist.Address, 0)
+	var primary persist.Address
 	for _, w := range wallets {
+		// Can users signup for farcaster with a wallet from another chain?
 		if w.Chain == persist.ChainETH {
-			ethAddresses = append(ethAddresses, w.Address)
+			walletsToCheck = append(walletsToCheck, w.Address)
 			if w.ID == user.PrimaryWalletID {
-				primaryAddress = w.Address
+				primary = w.Address
 			}
 		}
 	}
 
-	if len(ethAddresses) == 0 {
+	if len(walletsToCheck) == 0 {
 		return "", ErrUserNotOnFarcaster
 	}
 
-	fUsers, err := n.UsersByAddresses(ctx, ethAddresses)
+	farcasterUsers, err := n.UsersByAddresses(ctx, walletsToCheck)
 	if err != nil {
 		return "", err
 	}
 
-	searchOrder := append([]persist.Address{primaryAddress}, util.MapKeys(fUsers)...)
-
+	searchOrder := append([]persist.Address{primary}, util.MapKeys(farcasterUsers)...)
 	for _, w := range searchOrder {
-		for _, u := range fUsers[w] {
+		for _, u := range farcasterUsers[w] {
 			return u.Fid, nil
 		}
 	}
@@ -225,7 +212,6 @@ func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Ad
 	addressesJoined := strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ",")
 	urlEnconded := url.QueryEscape(addressesJoined)
 	u := fmt.Sprintf("%s/user/bulk-by-address/?addresses=%s", neynarV2BaseURL, urlEnconded)
-	logger.For(ctx).Infof("neynar url: %s", u)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
