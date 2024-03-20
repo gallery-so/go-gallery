@@ -34,7 +34,7 @@ const (
 
 var ErrHighlightChainNotSupported = errors.New("chain is not supported by highlight")
 
-// ClaimStatus represents the current progress of a Highlight mint
+// ClaimStatus represents the progress of a Highlight mint
 type ClaimStatus string
 
 type ErrHighlightTxnFailed struct{ Msg string }

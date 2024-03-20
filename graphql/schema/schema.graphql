@@ -3014,12 +3014,22 @@ type ErrHighlightChainNotSupported implements Error {
   message: String!
 }
 
+type ErrHighlightClaimInProgress implements Error {
+  message: String!
+}
+
+type ErrHighlightClaimAlreadyMinted implements Error {
+  message: String!
+}
+
 union HighlightClaimMintPayloadOrError =
     HighlightClaimMintPayload
   | ErrHighlightTxnFailed
   | ErrHighlightMintUnavailable
   | ErrHighlightChainNotSupported
   | ErrAddressNotOwnedByUser
+  | ErrHighlightClaimInProgress
+  | ErrHighlightClaimAlreadyMinted
   | ErrNotAuthorized
 
 enum HighlightTxStatus {

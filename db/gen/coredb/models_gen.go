@@ -302,15 +302,17 @@ type GalleryRelevance struct {
 
 type HighlightMintClaim struct {
 	ID                    persist.DBID          `db:"id" json:"id"`
-	UserID                persist.DBID          `db:"user_id" json:"user_id"`
-	Chain                 persist.Chain         `db:"chain" json:"chain"`
-	ContractAddress       persist.Address       `db:"contract_address" json:"contract_address"`
-	TokenMintID           persist.HexTokenID    `db:"token_mint_id" json:"token_mint_id"`
-	TokenMetadata         persist.TokenMetadata `db:"token_metadata" json:"token_metadata"`
+	RecipientUserID       persist.DBID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientL1Chain      persist.L1Chain       `db:"recipient_l1_chain" json:"recipient_l1_chain"`
+	RecipientAddress      persist.Address       `db:"recipient_address" json:"recipient_address"`
 	RecipientWalletID     persist.DBID          `db:"recipient_wallet_id" json:"recipient_wallet_id"`
+	InternalTokenID       persist.DBID          `db:"internal_token_id" json:"internal_token_id"`
 	HighlightCollectionID string                `db:"highlight_collection_id" json:"highlight_collection_id"`
-	TokenID               persist.DBID          `db:"token_id" json:"token_id"`
-	ClaimID               string                `db:"claim_id" json:"claim_id"`
+	HighlightClaimID      string                `db:"highlight_claim_id" json:"highlight_claim_id"`
+	CollectionAddress     persist.Address       `db:"collection_address" json:"collection_address"`
+	CollectionChain       persist.Chain         `db:"collection_chain" json:"collection_chain"`
+	MintedTokenID         persist.HexTokenID    `db:"minted_token_id" json:"minted_token_id"`
+	MintedTokenMetadata   persist.TokenMetadata `db:"minted_token_metadata" json:"minted_token_metadata"`
 	Status                highlight.ClaimStatus `db:"status" json:"status"`
 	ErrorMessage          sql.NullString        `db:"error_message" json:"error_message"`
 	CreatedAt             time.Time             `db:"created_at" json:"created_at"`

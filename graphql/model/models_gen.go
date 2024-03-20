@@ -1179,6 +1179,20 @@ type ErrHighlightChainNotSupported struct {
 func (ErrHighlightChainNotSupported) IsError()                            {}
 func (ErrHighlightChainNotSupported) IsHighlightClaimMintPayloadOrError() {}
 
+type ErrHighlightClaimAlreadyMinted struct {
+	Message string `json:"message"`
+}
+
+func (ErrHighlightClaimAlreadyMinted) IsError()                            {}
+func (ErrHighlightClaimAlreadyMinted) IsHighlightClaimMintPayloadOrError() {}
+
+type ErrHighlightClaimInProgress struct {
+	Message string `json:"message"`
+}
+
+func (ErrHighlightClaimInProgress) IsError()                            {}
+func (ErrHighlightClaimInProgress) IsHighlightClaimMintPayloadOrError() {}
+
 type ErrHighlightMintUnavailable struct {
 	Message string `json:"message"`
 }

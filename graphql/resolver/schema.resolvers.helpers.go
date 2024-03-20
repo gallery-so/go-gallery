@@ -176,6 +176,10 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrHighlightMintUnavailable{Message: message}
 	case errors.Is(err, highlight.ErrHighlightChainNotSupported):
 		mappedErr = model.ErrHighlightChainNotSupported{Message: message}
+	case errors.Is(err, publicapi.ErrMintTxPending):
+		mappedErr = model.ErrHighlightClaimInProgress{Message: message}
+	case errors.Is(err, publicapi.ErrMintAlreadyClaimed):
+		mappedErr = model.ErrHighlightClaimInProgress{Message: message}
 	}
 
 	if mappedErr != nil {

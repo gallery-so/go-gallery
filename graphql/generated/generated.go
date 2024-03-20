@@ -545,6 +545,14 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrHighlightClaimAlreadyMinted struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrHighlightClaimInProgress struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrHighlightMintUnavailable struct {
 		Message func(childComplexity int) int
 	}
@@ -3838,6 +3846,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrHighlightChainNotSupported.Message(childComplexity), true
+
+	case "ErrHighlightClaimAlreadyMinted.message":
+		if e.complexity.ErrHighlightClaimAlreadyMinted.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrHighlightClaimAlreadyMinted.Message(childComplexity), true
+
+	case "ErrHighlightClaimInProgress.message":
+		if e.complexity.ErrHighlightClaimInProgress.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrHighlightClaimInProgress.Message(childComplexity), true
 
 	case "ErrHighlightMintUnavailable.message":
 		if e.complexity.ErrHighlightMintUnavailable.Message == nil {
@@ -12914,12 +12936,22 @@ type ErrHighlightChainNotSupported implements Error {
   message: String!
 }
 
+type ErrHighlightClaimInProgress implements Error {
+  message: String!
+}
+
+type ErrHighlightClaimAlreadyMinted implements Error {
+  message: String!
+}
+
 union HighlightClaimMintPayloadOrError =
     HighlightClaimMintPayload
   | ErrHighlightTxnFailed
   | ErrHighlightMintUnavailable
   | ErrHighlightChainNotSupported
   | ErrAddressNotOwnedByUser
+  | ErrHighlightClaimInProgress
+  | ErrHighlightClaimAlreadyMinted
   | ErrNotAuthorized
 
 enum HighlightTxStatus {
@@ -27903,6 +27935,94 @@ func (ec *executionContext) _ErrHighlightChainNotSupported_message(ctx context.C
 func (ec *executionContext) fieldContext_ErrHighlightChainNotSupported_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ErrHighlightChainNotSupported",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrHighlightClaimAlreadyMinted_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrHighlightClaimAlreadyMinted) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrHighlightClaimAlreadyMinted_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrHighlightClaimAlreadyMinted_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrHighlightClaimAlreadyMinted",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrHighlightClaimInProgress_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrHighlightClaimInProgress) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrHighlightClaimInProgress_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrHighlightClaimInProgress_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrHighlightClaimInProgress",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -73005,6 +73125,20 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrHighlightChainNotSupported(ctx, sel, obj)
+	case model.ErrHighlightClaimInProgress:
+		return ec._ErrHighlightClaimInProgress(ctx, sel, &obj)
+	case *model.ErrHighlightClaimInProgress:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightClaimInProgress(ctx, sel, obj)
+	case model.ErrHighlightClaimAlreadyMinted:
+		return ec._ErrHighlightClaimAlreadyMinted(ctx, sel, &obj)
+	case *model.ErrHighlightClaimAlreadyMinted:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightClaimAlreadyMinted(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -73470,6 +73604,20 @@ func (ec *executionContext) _HighlightClaimMintPayloadOrError(ctx context.Contex
 			return graphql.Null
 		}
 		return ec._ErrAddressNotOwnedByUser(ctx, sel, obj)
+	case model.ErrHighlightClaimInProgress:
+		return ec._ErrHighlightClaimInProgress(ctx, sel, &obj)
+	case *model.ErrHighlightClaimInProgress:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightClaimInProgress(ctx, sel, obj)
+	case model.ErrHighlightClaimAlreadyMinted:
+		return ec._ErrHighlightClaimAlreadyMinted(ctx, sel, &obj)
+	case *model.ErrHighlightClaimAlreadyMinted:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrHighlightClaimAlreadyMinted(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -81227,6 +81375,84 @@ func (ec *executionContext) _ErrHighlightChainNotSupported(ctx context.Context, 
 			out.Values[i] = graphql.MarshalString("ErrHighlightChainNotSupported")
 		case "message":
 			out.Values[i] = ec._ErrHighlightChainNotSupported_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var errHighlightClaimAlreadyMintedImplementors = []string{"ErrHighlightClaimAlreadyMinted", "Error", "HighlightClaimMintPayloadOrError"}
+
+func (ec *executionContext) _ErrHighlightClaimAlreadyMinted(ctx context.Context, sel ast.SelectionSet, obj *model.ErrHighlightClaimAlreadyMinted) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errHighlightClaimAlreadyMintedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrHighlightClaimAlreadyMinted")
+		case "message":
+			out.Values[i] = ec._ErrHighlightClaimAlreadyMinted_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var errHighlightClaimInProgressImplementors = []string{"ErrHighlightClaimInProgress", "Error", "HighlightClaimMintPayloadOrError"}
+
+func (ec *executionContext) _ErrHighlightClaimInProgress(ctx context.Context, sel ast.SelectionSet, obj *model.ErrHighlightClaimInProgress) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errHighlightClaimInProgressImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrHighlightClaimInProgress")
+		case "message":
+			out.Values[i] = ec._ErrHighlightClaimInProgress_message(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
