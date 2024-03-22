@@ -109,7 +109,7 @@ func testCreateUser(t *testing.T) {
 	c := defaultHandlerClient(t)
 	username := "user" + persist.GenerateID().String()
 
-	response, err := createUserMutation(context.Background(), c, authMechanismInput(nonceF.Wallet, nonceF.Nonce),
+	response, err := createUserMutation(context.Background(), c, authMechanismInput(nonceF.Wallet, nonceF.Nonce, nonceF.Message),
 		CreateUserInput{
 			Username: username,
 		},
@@ -197,9 +197,9 @@ func testAddWallet(t *testing.T) {
 	walletToAdd := newWallet(t)
 	ctx := context.Background()
 	c := authedHandlerClient(t, userF.ID)
-	nonce := newNonce(t, ctx, c, walletToAdd)
+	nonce, message := newNonce(t, ctx, c)
 
-	response, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToAdd.Address.String()), authMechanismInput(walletToAdd, nonce))
+	response, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToAdd.Address.String()), authMechanismInput(walletToAdd, nonce, message))
 
 	require.NoError(t, err)
 	payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
@@ -214,8 +214,8 @@ func testRemoveWallet(t *testing.T) {
 	walletToRemove := newWallet(t)
 	ctx := context.Background()
 	c := authedHandlerClient(t, userF.ID)
-	nonce := newNonce(t, ctx, c, walletToRemove)
-	addResponse, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToRemove.Address.String()), authMechanismInput(walletToRemove, nonce))
+	nonce, message := newNonce(t, ctx, c)
+	addResponse, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToRemove.Address.String()), authMechanismInput(walletToRemove, nonce, message))
 	require.NoError(t, err)
 	wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
 	lastWallet := wallets[len(wallets)-1]
@@ -233,9 +233,9 @@ func testLogin(t *testing.T) {
 	userF := newUserFixture(t)
 	ctx := context.Background()
 	c := defaultHandlerClient(t)
-	nonce := newNonce(t, ctx, c, userF.Wallet)
+	nonce, message := newNonce(t, ctx, c)
 
-	response, err := loginMutation(ctx, c, authMechanismInput(userF.Wallet, nonce))
+	response, err := loginMutation(ctx, c, authMechanismInput(userF.Wallet, nonce, message))
 
 	require.NoError(t, err)
 	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
@@ -1320,11 +1320,12 @@ func assertSyncedTokens(t *testing.T, response *syncTokensMutationResponse, err 
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
-func authMechanismInput(w wallet, nonce string) AuthMechanism {
+func authMechanismInput(w wallet, nonce string, message string) AuthMechanism {
 	return AuthMechanism{
 		Eoa: &EoaAuth{
 			Nonce:     nonce,
-			Signature: w.Sign(nonce),
+			Message:   message,
+			Signature: w.Sign(message),
 			ChainPubKey: ChainPubKeyInput{
 				PubKey: w.Address.String(),
 				Chain:  "Ethereum",
@@ -1367,12 +1368,12 @@ func newWallet(t *testing.T) wallet {
 	}
 }
 
-func newNonce(t *testing.T, ctx context.Context, c genql.Client, w wallet) string {
+func newNonce(t *testing.T, ctx context.Context, c genql.Client) (string, string) {
 	t.Helper()
-	response, err := getAuthNonceMutation(ctx, c, chainAddressInput(w.Address.String()))
+	response, err := getAuthNonceMutation(ctx, c)
 	require.NoError(t, err)
 	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
-	return *payload.Nonce
+	return *payload.Nonce, *payload.Message
 }
 
 // registerPushtoken makes a GraphQL request to register a push token for an authenticated user
@@ -1385,10 +1386,10 @@ func registerPushToken(t *testing.T, ctx context.Context, c genql.Client) {
 // newUser makes a GraphQL request to generate a new user
 func newUser(t *testing.T, ctx context.Context, c genql.Client, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
-	nonce := newNonce(t, ctx, c, w)
+	nonce, message := newNonce(t, ctx, c)
 	username = "user" + persist.GenerateID().String()
 
-	response, err := createUserMutation(ctx, c, authMechanismInput(w, nonce),
+	response, err := createUserMutation(ctx, c, authMechanismInput(w, nonce, message),
 		CreateUserInput{Username: username},
 	)
 

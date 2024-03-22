@@ -1951,7 +1951,7 @@ func createNewUserParamsWithAuth(ctx context.Context, authenticator auth.Authent
 		return persist.CreateUserInput{}, auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	if authResult.User != nil && !authResult.User.Universal.Bool() {
+	if authResult.User != nil && !authResult.User.Universal {
 		if _, ok := authenticator.(auth.MagicLinkAuthenticator); ok {
 			// TODO: We currently only use MagicLink for email, but we may use it for other login methods like SMS later,
 			// so this error may not always be applicable in the future.

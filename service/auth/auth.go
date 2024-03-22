@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v4"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -16,8 +18,6 @@ import (
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/magiclabs/magic-admin-go/token"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-
 	"github.com/mikeydub/go-gallery/service/logger"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -35,9 +35,6 @@ type AuthenticatedAddress struct {
 
 	// The WalletType of the verified ChainAddress
 	WalletType persist.WalletType
-
-	// The ID of an existing Wallet entity in our database, or an empty string if the wallet is not in the database
-	WalletID persist.DBID
 }
 
 const (
@@ -53,11 +50,8 @@ const (
 // Note that browsers can still cap this expiration time (e.g. Brave limits cookies to 6 months).
 const cookieMaxAge int = 60 * 60 * 24 * 365 * 10
 
-// NoncePrepend is what is prepended to every nonce
-const NoncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
-
-// NewNoncePrepend is what will now be prepended to every nonce
-const NewNoncePrepend = "Gallery uses this cryptographic signature in place of a password: "
+// NoncePrepend is prepended to a nonce to make our default signing message
+const NoncePrepend = "Gallery uses this cryptographic signature in place of a password: "
 
 // AuthCookieKey is the key used to store the auth token in the cookie
 const AuthCookieKey = "GLRY_JWT"
@@ -70,6 +64,9 @@ var ErrAddressSignatureMismatch = errors.New("address does not match signature")
 
 // ErrNonceMismatch is returned when the nonce does not match the expected nonce
 var ErrNonceMismatch = errors.New("incorrect nonce input")
+
+// ErrMessageDoesNotContainNonce is returned when a nonce authenticator's message does not contain its nonce
+var ErrMessageDoesNotContainNonce = errors.New("message does not contain nonce")
 
 // ErrInvalidJWT is returned when the JWT is invalid
 var ErrInvalidJWT = errors.New("invalid or expired auth token")
@@ -99,7 +96,7 @@ type Authenticator interface {
 }
 
 type AuthResult struct {
-	User      *persist.User
+	User      *db.User
 	Addresses []AuthenticatedAddress
 	Email     *persist.Email
 	PrivyDID  *string
@@ -156,44 +153,42 @@ func (e ErrNonceNotFound) Error() string {
 }
 
 // GenerateNonce generates a random nonce to be signed by a wallet
-func GenerateNonce() string {
-	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	nonceInt := seededRand.Int()
-	nonceStr := fmt.Sprintf("%d", nonceInt)
-	return nonceStr
+func GenerateNonce() (string, error) {
+	nonceBytes := make([]byte, 16)
+	_, err := rand.Read(nonceBytes)
+	if err != nil {
+		return "", err
+	}
+	// Encode to a hex string
+	nonceStr := hex.EncodeToString(nonceBytes)
+	return nonceStr, nil
 }
 
 type NonceAuthenticator struct {
 	ChainPubKey        persist.ChainPubKey
 	Nonce              string
+	Message            string
 	Signature          string
 	WalletType         persist.WalletType
-	UserRepo           *postgres.UserRepository
-	NonceRepo          *postgres.NonceRepository
-	WalletRepo         *postgres.WalletRepository
 	EthClient          *ethclient.Client
 	MultichainProvider *multichain.Provider
+	Queries            *db.Queries
 }
 
 func (e NonceAuthenticator) GetDescription() string {
-	return fmt.Sprintf("NonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.ChainPubKey, e.Nonce, e.Signature, e.WalletType)
+	return fmt.Sprintf("NonceAuthenticator(address: %s, nonce: %s, message: %s, signature: %s, walletType: %v)", e.ChainPubKey, e.Nonce, e.Message, e.Signature, e.WalletType)
 }
 
-func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
+func (e NonceAuthenticator) Authenticate(ctx context.Context) (*AuthResult, error) {
 	asChainAddress := e.ChainPubKey.ToChainAddress()
 	asL1 := asChainAddress.ToL1ChainAddress()
-	nonce, user, _ := GetUserWithNonce(pCtx, asL1, e.UserRepo, e.NonceRepo, e.WalletRepo)
-	if nonce == "" {
-		return nil, ErrNonceNotFound{L1ChainAddress: asL1}
+
+	// The message can be arbitrary, but it must contain the nonce
+	if !strings.Contains(e.Message, e.Nonce) {
+		return nil, ErrMessageDoesNotContainNonce
 	}
 
-	if e.WalletType != persist.WalletTypeEOA {
-		if NewNoncePrepend+nonce != e.Nonce && NoncePrepend+nonce != e.Nonce {
-			return nil, ErrNonceMismatch
-		}
-	}
-
-	sigValid, err := e.MultichainProvider.VerifySignature(pCtx, e.Signature, nonce, e.ChainPubKey, e.WalletType)
+	sigValid, err := e.MultichainProvider.VerifySignature(ctx, e.Signature, e.Message, e.ChainPubKey, e.WalletType)
 	if err != nil {
 		return nil, ErrSignatureVerificationFailed{err}
 	}
@@ -202,19 +197,27 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
 
-	err = NonceRotate(pCtx, asChainAddress, e.NonceRepo)
+	err = ConsumeAuthNonce(ctx, e.Queries, e.Nonce)
 	if err != nil {
 		return nil, err
 	}
 
-	walletID := persist.DBID("")
-	wallet, err := e.WalletRepo.GetByChainAddress(pCtx, asL1)
+	var user *db.User
+	u, err := e.Queries.GetUserByAddressAndL1(ctx, db.GetUserByAddressAndL1Params{
+		Address: asL1.Address(),
+		L1Chain: asL1.L1Chain(),
+	})
+
 	if err != nil {
-		walletID = wallet.ID
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+	} else {
+		user = &u
 	}
 
 	authResult := AuthResult{
-		Addresses: []AuthenticatedAddress{{ChainAddress: asChainAddress, WalletType: e.WalletType, WalletID: walletID}},
+		Addresses: []AuthenticatedAddress{{ChainAddress: asChainAddress, WalletType: e.WalletType}},
 		User:      user,
 	}
 
@@ -224,7 +227,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 type MagicLinkAuthenticator struct {
 	Token       token.Token
 	MagicClient *magicclient.API
-	UserRepo    *postgres.UserRepository
+	Queries     *db.Queries
 }
 
 func (e MagicLinkAuthenticator) GetDescription() string {
@@ -249,7 +252,7 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 		Email:     &authedEmail,
 	}
 
-	user, err := e.UserRepo.GetByVerifiedEmail(pCtx, authedEmail)
+	user, err := e.Queries.GetUserByVerifiedEmailAddress(pCtx, authedEmail.String())
 	if err != nil {
 		return &authResult, err
 	}
@@ -265,7 +268,7 @@ func NewMagicLinkClient() *magicclient.API {
 
 type OneTimeLoginTokenAuthenticator struct {
 	ConsumedTokenCache *redis.Cache
-	UserRepo           *postgres.UserRepository
+	Queries            *db.Queries
 	LoginToken         string
 }
 
@@ -290,7 +293,7 @@ func (a OneTimeLoginTokenAuthenticator) Authenticate(ctx context.Context) (*Auth
 		return nil, errors.New("token already used")
 	}
 
-	user, err := a.UserRepo.GetByID(ctx, userID)
+	user, err := a.Queries.GetUserById(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +315,7 @@ func Login(ctx context.Context, queries *db.Queries, authenticator Authenticator
 		return "", ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	if authResult.User == nil || authResult.User.Universal.Bool() {
+	if authResult.User == nil || authResult.User.Universal {
 		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
@@ -338,76 +341,55 @@ func Logout(ctx context.Context, queries *db.Queries, authRefreshCache *redis.Ca
 	EndSession(gc, queries, authRefreshCache)
 }
 
-// GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository,
-	walletRepository *postgres.WalletRepository, earlyAccessRepo *postgres.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
+func GenerateAuthNonce(ctx context.Context, queries *db.Queries) (nonce string, message string, err error) {
+	var errs []error
 
-	asL1 := pChainAddress.ToL1ChainAddress()
-	user, err := userRepo.GetByChainAddress(pCtx, asL1)
-	if err != nil {
-		logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
-	}
-
-	userExists = user.ID != "" && !user.Universal.Bool()
-
-	if userExists {
-		dbNonce, err := nonceRepo.Get(pCtx, asL1)
-		if err != nil {
-			return "", false, err
+	// Retry up to 4 times, though we wouldn't typically expect any failures
+	for i := 0; i < 4; i++ {
+		if i > 0 {
+			time.Sleep(50 * time.Millisecond)
 		}
 
-		nonce = NewNoncePrepend + dbNonce.Value.String()
-		return nonce, userExists, nil
-	}
-
-	dbNonce, err := nonceRepo.Get(pCtx, asL1)
-	if err != nil || dbNonce.ID == "" {
-		err = nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
+		nonce, err = GenerateNonce()
 		if err != nil {
-			return "", false, err
+			err = fmt.Errorf("error generating nonce: %w", err)
+			logger.For(ctx).Error(err)
+			errs = append(errs, err)
+			continue
 		}
 
-		dbNonce, err = nonceRepo.Get(pCtx, asL1)
-		if err != nil {
-			return "", false, err
+		params := db.InsertNonceParams{
+			ID:    persist.GenerateID(),
+			Value: nonce,
 		}
+
+		_, err = queries.InsertNonce(ctx, params)
+		if err != nil {
+			// The query returns pgx.ErrNoRows if the nonce already exists
+			if errors.Is(err, pgx.ErrNoRows) {
+				err = fmt.Errorf("nonce value %s already exists", nonce)
+			}
+			err = fmt.Errorf("error inserting nonce: %w", err)
+			logger.For(ctx).Error(err)
+			errs = append(errs, err)
+			continue
+		}
+
+		return nonce, NoncePrepend + nonce, nil
 	}
 
-	nonce = NewNoncePrepend + dbNonce.Value.String()
-	return nonce, userExists, nil
+	return "", "", util.MultiErr(errs)
 }
 
-// NonceRotate will rotate a nonce for a user
-func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, nonceRepo *postgres.NonceRepository) error {
-	err := nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+func ConsumeAuthNonce(ctx context.Context, queries *db.Queries, nonce string) error {
+	_, err := queries.ConsumeNonce(ctx, nonce)
 
-// GetUserWithNonce returns nonce value string, user id
-// will return empty strings and error if no nonce found
-// will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pChainAddress persist.L1ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository, walletRepository *postgres.WalletRepository) (nonceValue string, user *persist.User, err error) {
-	nonce, err := nonceRepo.Get(pCtx, pChainAddress)
-	if err != nil {
-		return nonceValue, user, err
+	// The query returns pgx.ErrNoRows if a nonce with this value could not be found or consumed
+	if err != nil && errors.Is(err, pgx.ErrNoRows) {
+		err = errors.New("nonce does not exist or is expired")
 	}
 
-	nonceValue = nonce.Value.String()
-
-	dbUser, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
-	if err != nil {
-		return nonceValue, user, err
-	}
-	if dbUser.ID != "" {
-		user = &dbUser
-	} else {
-		return nonceValue, user, persist.ErrUserNotFound{L1ChainAddress: pChainAddress}
-	}
-
-	return nonceValue, user, nil
+	return err
 }
 
 // GetSessionIDFromCtx returns the session ID from the context

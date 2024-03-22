@@ -183,15 +183,11 @@ mutation createUserMutation($authMechanism: AuthMechanism!, $input: CreateUserIn
   }
 }
 
-mutation getAuthNonceMutation($input: ChainAddressInput!) {
-  getAuthNonce(chainAddress: $input) {
-    ... on Error {
-      __typename
-      message
-    }
+mutation getAuthNonceMutation {
+  getAuthNonce {
     ... on AuthNonce {
       nonce
-      userExists
+      message
     }
   }
 }

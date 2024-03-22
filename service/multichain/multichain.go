@@ -969,9 +969,9 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 }
 
 // VerifySignature verifies a signature for a wallet address
-func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
+func (p *Provider) VerifySignature(ctx context.Context, pSig string, pMessage string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
 	if verifier, ok := p.Chains[pChainAddress.Chain()].(Verifier); ok {
-		if valid, err := verifier.VerifySignature(ctx, pChainAddress.PubKey(), pWalletType, pNonce, pSig); err != nil || !valid {
+		if valid, err := verifier.VerifySignature(ctx, pChainAddress.PubKey(), pWalletType, pMessage, pSig); err != nil || !valid {
 			return false, err
 		}
 	}

@@ -198,7 +198,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Hex
 	// verify signature
 
 	// user should have signed the tokenIDs in place of the usual nonce
-	valid, err := api.multichainProvider.VerifySignature(ctx, sig, fmt.Sprintf("%v", tokenIDs), persist.NewChainPubKey(persist.PubKey(address.Address()), address.Chain()), walletType)
+	valid, err := api.multichainProvider.VerifySignature(ctx, sig, fmt.Sprintf("%s%v", auth.NoncePrepend, tokenIDs), persist.NewChainPubKey(persist.PubKey(address.Address()), address.Chain()), walletType)
 	if err != nil {
 		return nil, err
 	}

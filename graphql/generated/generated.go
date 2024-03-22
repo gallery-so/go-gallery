@@ -186,8 +186,8 @@ type ComplexityRoot struct {
 	}
 
 	AuthNonce struct {
-		Nonce      func(childComplexity int) int
-		UserExists func(childComplexity int) int
+		Message func(childComplexity int) int
+		Nonce   func(childComplexity int) int
 	}
 
 	Badge struct {
@@ -960,7 +960,7 @@ type ComplexityRoot struct {
 		FollowAllSocialConnections                      func(childComplexity int, accountType persist.SocialProvider) int
 		FollowUser                                      func(childComplexity int, userID persist.DBID) int
 		GenerateQRCodeLoginToken                        func(childComplexity int) int
-		GetAuthNonce                                    func(childComplexity int, chainAddress persist.ChainAddress) int
+		GetAuthNonce                                    func(childComplexity int) int
 		HighlightClaimMint                              func(childComplexity int, input model.HighlightClaimMintInput) int
 		Login                                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                                          func(childComplexity int, pushTokenToUnregister *string) int
@@ -2039,7 +2039,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
-	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
+	GetAuthNonce(ctx context.Context) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, input model.CreateUserInput) (model.CreateUserPayloadOrError, error)
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
 	ResendVerificationEmail(ctx context.Context) (model.ResendVerificationEmailPayloadOrError, error)
@@ -2561,19 +2561,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AudioMedia.PreviewURLs(childComplexity), true
 
+	case "AuthNonce.message":
+		if e.complexity.AuthNonce.Message == nil {
+			break
+		}
+
+		return e.complexity.AuthNonce.Message(childComplexity), true
+
 	case "AuthNonce.nonce":
 		if e.complexity.AuthNonce.Nonce == nil {
 			break
 		}
 
 		return e.complexity.AuthNonce.Nonce(childComplexity), true
-
-	case "AuthNonce.userExists":
-		if e.complexity.AuthNonce.UserExists == nil {
-			break
-		}
-
-		return e.complexity.AuthNonce.UserExists(childComplexity), true
 
 	case "Badge.contract":
 		if e.complexity.Badge.Contract == nil {
@@ -5600,12 +5600,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_getAuthNonce_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
+		return e.complexity.Mutation.GetAuthNonce(childComplexity), true
 
 	case "Mutation.highlightClaimMint":
 		if e.complexity.Mutation.HighlightClaimMint == nil {
@@ -11701,10 +11696,10 @@ type RefreshContractPayload {
 
 type AuthNonce {
   nonce: String
-  userExists: Boolean
+  message: String
 }
 
-union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
+union GetAuthNoncePayloadOrError = AuthNonce
 
 type ErrAuthenticationFailed implements Error {
   message: String!
@@ -11812,6 +11807,7 @@ input AuthMechanism {
 input EoaAuth {
   chainPubKey: ChainPubKeyInput!
   nonce: String!
+  message: String!
   signature: String! @scrub
 }
 
@@ -11840,6 +11836,7 @@ input DebugAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
+  message: String!
 }
 
 input MagicLinkAuth {
@@ -12986,7 +12983,7 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
+  getAuthNonce: GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
   updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
@@ -14471,21 +14468,6 @@ func (ec *executionContext) field_Mutation_followUser_args(ctx context.Context, 
 		}
 	}
 	args["userId"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 persist.ChainAddress
-	if tmp, ok := rawArgs["chainAddress"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
-		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chainAddress"] = arg0
 	return args, nil
 }
 
@@ -18905,8 +18887,8 @@ func (ec *executionContext) fieldContext_AuthNonce_nonce(ctx context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field graphql.CollectedField, obj *model.AuthNonce) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AuthNonce_userExists(ctx, field)
+func (ec *executionContext) _AuthNonce_message(ctx context.Context, field graphql.CollectedField, obj *model.AuthNonce) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthNonce_message(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -18919,7 +18901,7 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.UserExists, nil
+		return obj.Message, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -18928,19 +18910,19 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_AuthNonce_userExists(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AuthNonce_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AuthNonce",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -39553,7 +39535,7 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().GetAuthNonce(rctx, fc.Args["chainAddress"].(persist.ChainAddress))
+		return ec.resolvers.Mutation().GetAuthNonce(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -39576,17 +39558,6 @@ func (ec *executionContext) fieldContext_Mutation_getAuthNonce(ctx context.Conte
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type GetAuthNoncePayloadOrError does not have child fields")
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_getAuthNonce_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -70066,7 +70037,7 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"chainPubKey", "nonce", "signature"}
+	fieldsInOrder := [...]string{"chainPubKey", "nonce", "message", "signature"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -70087,6 +70058,13 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 				return it, err
 			}
 			it.Nonce = data
+		case "message":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Message = data
 		case "signature":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -70175,7 +70153,7 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address", "nonce"}
+	fieldsInOrder := [...]string{"address", "nonce", "message"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -70196,6 +70174,13 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 				return it, err
 			}
 			it.Nonce = data
+		case "message":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Message = data
 		}
 	}
 
@@ -73343,13 +73328,6 @@ func (ec *executionContext) _GetAuthNoncePayloadOrError(ctx context.Context, sel
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.ErrDoesNotOwnRequiredToken:
-		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredToken:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
 	case model.AuthNonce:
 		return ec._AuthNonce(ctx, sel, &obj)
 	case *model.AuthNonce:
@@ -77192,8 +77170,8 @@ func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet
 			out.Values[i] = graphql.MarshalString("AuthNonce")
 		case "nonce":
 			out.Values[i] = ec._AuthNonce_nonce(ctx, field, obj)
-		case "userExists":
-			out.Values[i] = ec._AuthNonce_userExists(ctx, field, obj)
+		case "message":
+			out.Values[i] = ec._AuthNonce_message(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -81008,7 +80986,7 @@ func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errDoesNotOwnRequiredTokenImplementors = []string{"ErrDoesNotOwnRequiredToken", "GetAuthNoncePayloadOrError", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
+var errDoesNotOwnRequiredTokenImplementors = []string{"ErrDoesNotOwnRequiredToken", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDoesNotOwnRequiredToken) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errDoesNotOwnRequiredTokenImplementors)

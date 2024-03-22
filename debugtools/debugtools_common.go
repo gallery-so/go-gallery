@@ -5,6 +5,7 @@ package debugtools
 
 import (
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -18,7 +19,7 @@ func IsDebugEnv() bool {
 }
 
 type DebugAuthenticator struct {
-	User               *persist.User
+	User               *db.User
 	ChainAddresses     []persist.ChainAddress
 	DebugToolsPassword string
 }
@@ -27,7 +28,7 @@ func (d DebugAuthenticator) GetDescription() string {
 	return fmt.Sprintf("DebugAuthenticator(user: %+v, addresses: %v)", d.User, d.ChainAddresses)
 }
 
-func NewDebugAuthenticator(user *persist.User, chainAddresses []persist.ChainAddress, debugToolsPassword string) auth.Authenticator {
+func NewDebugAuthenticator(user *db.User, chainAddresses []persist.ChainAddress, debugToolsPassword string) auth.Authenticator {
 	return DebugAuthenticator{
 		User:               user,
 		ChainAddresses:     chainAddresses,

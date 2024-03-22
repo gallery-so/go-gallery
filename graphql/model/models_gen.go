@@ -618,8 +618,8 @@ type AuthMechanism struct {
 }
 
 type AuthNonce struct {
-	Nonce      *string `json:"nonce"`
-	UserExists *bool   `json:"userExists"`
+	Nonce   *string `json:"nonce"`
+	Message *string `json:"message"`
 }
 
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
@@ -1048,6 +1048,7 @@ func (EnsProfileImage) IsProfileImage() {}
 type EoaAuth struct {
 	ChainPubKey *persist.ChainPubKey `json:"chainPubKey"`
 	Nonce       string               `json:"nonce"`
+	Message     string               `json:"message"`
 	Signature   string               `json:"signature"`
 }
 
@@ -1132,11 +1133,10 @@ type ErrDoesNotOwnRequiredToken struct {
 	Message string `json:"message"`
 }
 
-func (ErrDoesNotOwnRequiredToken) IsGetAuthNoncePayloadOrError() {}
-func (ErrDoesNotOwnRequiredToken) IsAuthorizationError()         {}
-func (ErrDoesNotOwnRequiredToken) IsError()                      {}
-func (ErrDoesNotOwnRequiredToken) IsLoginPayloadOrError()        {}
-func (ErrDoesNotOwnRequiredToken) IsCreateUserPayloadOrError()   {}
+func (ErrDoesNotOwnRequiredToken) IsAuthorizationError()       {}
+func (ErrDoesNotOwnRequiredToken) IsError()                    {}
+func (ErrDoesNotOwnRequiredToken) IsLoginPayloadOrError()      {}
+func (ErrDoesNotOwnRequiredToken) IsCreateUserPayloadOrError() {}
 
 type ErrEmailAlreadyUsed struct {
 	Message string `json:"message"`
@@ -1709,6 +1709,7 @@ func (GltfMedia) IsMedia()        {}
 type GnosisSafeAuth struct {
 	Address persist.Address `json:"address"`
 	Nonce   string          `json:"nonce"`
+	Message string          `json:"message"`
 }
 
 type GroupNotificationUserEdge struct {

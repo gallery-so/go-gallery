@@ -1363,18 +1363,15 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 }
 
 // GetAuthNonce is the resolver for the getAuthNonce field.
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {
-	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, chainAddress)
-	if err != nil {
-		return nil, err
-	}
+func (r *mutationResolver) GetAuthNonce(ctx context.Context) (model.GetAuthNoncePayloadOrError, error) {
+	nonce, message, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.AuthNonce{
-		Nonce:      &nonce,
-		UserExists: &userExists,
+		Nonce:   &nonce,
+		Message: &message,
 	}
 
 	return output, nil

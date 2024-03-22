@@ -1801,10 +1801,10 @@ type RefreshContractPayload {
 
 type AuthNonce {
   nonce: String
-  userExists: Boolean
+  message: String
 }
 
-union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
+union GetAuthNoncePayloadOrError = AuthNonce
 
 type ErrAuthenticationFailed implements Error {
   message: String!
@@ -1912,6 +1912,7 @@ input AuthMechanism {
 input EoaAuth {
   chainPubKey: ChainPubKeyInput!
   nonce: String!
+  message: String!
   signature: String! @scrub
 }
 
@@ -1940,6 +1941,7 @@ input DebugAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
+  message: String!
 }
 
 input MagicLinkAuth {
@@ -3086,7 +3088,7 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
+  getAuthNonce: GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
   updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
