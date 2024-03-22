@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -319,14 +318,6 @@ const (
 	// WalletTypeGnosis represents a smart contract gnosis safe
 	WalletTypeGnosis
 )
-
-// WalletRepository represents a repository for interacting with persisted wallets
-type WalletRepository interface {
-	GetByID(context.Context, DBID) (Wallet, error)
-	GetByChainAddress(context.Context, ChainAddress) (Wallet, error)
-	GetByUserID(context.Context, DBID) ([]Wallet, error)
-	Insert(context.Context, ChainAddress, WalletType) (DBID, error)
-}
 
 func (l WalletList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
