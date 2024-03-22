@@ -113,7 +113,6 @@ type NeynarUser struct {
 			Text string `json:"text"`
 		} `json:"bio"`
 	} `json:"profile"`
-	ActiveStatus string `json:"active_status"`
 }
 
 type NeynarUserByVerificationResponse struct {
