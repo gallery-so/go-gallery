@@ -2499,6 +2499,29 @@ func (r *queryResolver) UserByAddress(ctx context.Context, chainAddress persist.
 	return resolveGalleryUserByAddress(ctx, chainAddress)
 }
 
+// UsersByAddresses is the resolver for the usersByAddresses field.
+func (r *queryResolver) UsersByAddresses(ctx context.Context, chainAddresses []*persist.ChainAddress) (model.UsersByAddressesPayloadOrError, error) {
+	addresses := make([]persist.ChainAddress, len(chainAddresses))
+	for i, addr := range chainAddresses {
+		addresses[i] = *addr
+	}
+
+	users, err := publicapi.For(ctx).User.GetUsersByAddresses(ctx, addresses)
+	if err != nil {
+		return nil, err
+	}
+
+	output := model.UsersByAddressesPayload{
+		Users: make([]*model.GalleryUser, len(users)),
+	}
+
+	for i, user := range users {
+		output.Users[i] = userToModel(ctx, user)
+	}
+
+	return &output, nil
+}
+
 // UsersWithTrait is the resolver for the usersWithTrait field.
 func (r *queryResolver) UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error) {
 	return resolveGalleryUsersWithTrait(ctx, trait)

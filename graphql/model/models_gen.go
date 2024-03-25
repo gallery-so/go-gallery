@@ -491,6 +491,10 @@ type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
 
+type UsersByAddressesPayloadOrError interface {
+	IsUsersByAddressesPayloadOrError()
+}
+
 type VerifyEmailMagicLinkPayloadOrError interface {
 	IsVerifyEmailMagicLinkPayloadOrError()
 }
@@ -1204,6 +1208,7 @@ type ErrInvalidInput struct {
 func (ErrInvalidInput) IsUserByUsernameOrError()                                         {}
 func (ErrInvalidInput) IsUserByIDOrError()                                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                                          {}
+func (ErrInvalidInput) IsUsersByAddressesPayloadOrError()                                {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                                         {}
 func (ErrInvalidInput) IsCommunityByIDOrError()                                          {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                                     {}
@@ -3016,6 +3021,12 @@ func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
 type UserSearchResult struct {
 	User *GalleryUser `json:"user"`
 }
+
+type UsersByAddressesPayload struct {
+	Users []*GalleryUser `json:"users"`
+}
+
+func (UsersByAddressesPayload) IsUsersByAddressesPayloadOrError() {}
 
 type UsersConnection struct {
 	Edges    []*UserEdge `json:"edges"`
