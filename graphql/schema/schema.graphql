@@ -1442,7 +1442,7 @@ type Query {
   userByUsername(username: String!): UserByUsernameOrError
   userById(id: DBID!): UserByIdOrError
   userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
-  usersByAddresses(chainAddresses:[ChainAddressInput!]!): UsersByAddressesPayloadOrError
+  usersByAddresses(chainAddresses: [ChainAddressInput!]!): UsersByAddressesPayloadOrError
   usersWithTrait(trait: String!): [GalleryUser]
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
   collectionById(id: DBID!): CollectionByIdOrError
