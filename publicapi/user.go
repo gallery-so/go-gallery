@@ -554,7 +554,7 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 	})
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, importFarcasterWallets bool) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username": validate.WithTag(username, "required,username"),
@@ -624,6 +624,11 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 			userID: {
 				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
 				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
+			},
+		},
+		ImportSocialWallets: map[persist.DBID]map[persist.SocialProvider]bool{
+			userID: {
+				persist.SocialProviderFarcaster: importFarcasterWallets,
 			},
 		},
 	})

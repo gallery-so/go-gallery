@@ -2018,6 +2018,11 @@ type LoginPayload {
 type LogoutPayload {
   viewer: Viewer
 }
+
+enum ImportWalletSource {
+  Farcaster
+}
+
 input CreateUserInput {
   username: String!
   bio: String
@@ -2025,6 +2030,7 @@ input CreateUserInput {
   galleryName: String
   galleryDescription: String
   galleryPosition: String
+  importWallets: [ImportWalletSource!]
 }
 
 union CreateUserPayloadOrError =

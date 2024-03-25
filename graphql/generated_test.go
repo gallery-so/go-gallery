@@ -205,12 +205,13 @@ func (v *CreateGalleryInput) GetDescription() *string { return v.Description }
 func (v *CreateGalleryInput) GetPosition() string { return v.Position }
 
 type CreateUserInput struct {
-	Username           string  `json:"username"`
-	Bio                *string `json:"bio"`
-	Email              *string `json:"email"`
-	GalleryName        *string `json:"galleryName"`
-	GalleryDescription *string `json:"galleryDescription"`
-	GalleryPosition    *string `json:"galleryPosition"`
+	Username           string               `json:"username"`
+	Bio                *string              `json:"bio"`
+	Email              *string              `json:"email"`
+	GalleryName        *string              `json:"galleryName"`
+	GalleryDescription *string              `json:"galleryDescription"`
+	GalleryPosition    *string              `json:"galleryPosition"`
+	ImportWallets      []ImportWalletSource `json:"importWallets"`
 }
 
 // GetUsername returns CreateUserInput.Username, and is useful for accessing the field via an interface.
@@ -230,6 +231,9 @@ func (v *CreateUserInput) GetGalleryDescription() *string { return v.GalleryDesc
 
 // GetGalleryPosition returns CreateUserInput.GalleryPosition, and is useful for accessing the field via an interface.
 func (v *CreateUserInput) GetGalleryPosition() *string { return v.GalleryPosition }
+
+// GetImportWallets returns CreateUserInput.ImportWallets, and is useful for accessing the field via an interface.
+func (v *CreateUserInput) GetImportWallets() []ImportWalletSource { return v.ImportWallets }
 
 type DebugAuth struct {
 	AsUsername         *string             `json:"asUsername"`
@@ -315,6 +319,12 @@ func (v *GnosisSafeAuth) GetNonce() string { return v.Nonce }
 
 // GetMessage returns GnosisSafeAuth.Message, and is useful for accessing the field via an interface.
 func (v *GnosisSafeAuth) GetMessage() string { return v.Message }
+
+type ImportWalletSource string
+
+const (
+	ImportWalletSourceFarcaster ImportWalletSource = "Farcaster"
+)
 
 type IntervalInput struct {
 	Start  int `json:"start"`

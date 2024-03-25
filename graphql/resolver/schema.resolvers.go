@@ -1407,7 +1407,12 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 		email = &it
 	}
 
-	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, input.Username, email, bioStr, nameStr, descStr, positionStr)
+	importFarcasterWallets := false
+	if util.Contains(input.ImportWallets, model.ImportWalletSourceFarcaster) {
+		importFarcasterWallets = true
+	}
+
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, input.Username, email, bioStr, nameStr, descStr, positionStr, importFarcasterWallets)
 	if err != nil {
 		return nil, err
 	}

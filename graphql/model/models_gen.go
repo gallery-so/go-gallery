@@ -968,12 +968,13 @@ type CreateGalleryPayload struct {
 func (CreateGalleryPayload) IsCreateGalleryPayloadOrError() {}
 
 type CreateUserInput struct {
-	Username           string         `json:"username"`
-	Bio                *string        `json:"bio"`
-	Email              *persist.Email `json:"email"`
-	GalleryName        *string        `json:"galleryName"`
-	GalleryDescription *string        `json:"galleryDescription"`
-	GalleryPosition    *string        `json:"galleryPosition"`
+	Username           string               `json:"username"`
+	Bio                *string              `json:"bio"`
+	Email              *persist.Email       `json:"email"`
+	GalleryName        *string              `json:"galleryName"`
+	GalleryDescription *string              `json:"galleryDescription"`
+	GalleryPosition    *string              `json:"galleryPosition"`
+	ImportWallets      []ImportWalletSource `json:"importWallets"`
 }
 
 type CreateUserPayload struct {
@@ -3223,6 +3224,45 @@ func (e *HighlightTxStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e HighlightTxStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ImportWalletSource string
+
+const (
+	ImportWalletSourceFarcaster ImportWalletSource = "Farcaster"
+)
+
+var AllImportWalletSource = []ImportWalletSource{
+	ImportWalletSourceFarcaster,
+}
+
+func (e ImportWalletSource) IsValid() bool {
+	switch e {
+	case ImportWalletSourceFarcaster:
+		return true
+	}
+	return false
+}
+
+func (e ImportWalletSource) String() string {
+	return string(e)
+}
+
+func (e *ImportWalletSource) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ImportWalletSource(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ImportWalletSource", str)
+	}
+	return nil
+}
+
+func (e ImportWalletSource) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

@@ -113,6 +113,10 @@ type NeynarUser struct {
 			Text string `json:"text"`
 		} `json:"bio"`
 	} `json:"profile"`
+	VerifiedAddresses struct {
+		EthAddresses []persist.Address `json:"eth_addresses"`
+		SolAddresses []persist.Address `json:"sol_addresses"`
+	} `json:"verified_addresses"`
 }
 
 type NeynarUserByVerificationResponse struct {

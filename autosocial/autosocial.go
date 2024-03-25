@@ -39,12 +39,14 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 
 	router := gin.Default()
 	pgx := postgres.NewPgxClient()
+	db := postgres.MustCreateClient()
 	queries := coredb.New(pgx)
 
 	// no cache for now, but we should add one if we ever do anything with followers here
 	ney := farcaster.NewNeynarAPI(http.DefaultClient, nil, queries)
+	repos := postgres.NewRepositories(db, pgx)
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
-	router.POST("/process/users", processUsers(queries, ney, lens.NewAPI(http.DefaultClient)))
+	router.POST("/process/users", processUsers(queries, ney, lens.NewAPI(http.DefaultClient), repos))
 	router.POST("/checkFarcasterApproval", checkFarcasterApproval(queries, ney))
 	return router
 }
