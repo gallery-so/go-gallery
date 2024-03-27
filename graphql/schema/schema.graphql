@@ -3148,6 +3148,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   highlightClaimMint(input: HighlightClaimMintInput!): HighlightClaimMintPayloadOrError
+    @restrictEnvironment(allowed: ["local", "development", "sandbox"])
     @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
