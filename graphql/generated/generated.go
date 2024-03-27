@@ -10356,6 +10356,7 @@ enum Chain {
   POAP
   Zora
   Base
+  BaseSepolia
 }
 
 enum TokenOwnershipType {

@@ -179,7 +179,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	case errors.Is(err, publicapi.ErrMintTxPending):
 		mappedErr = model.ErrHighlightClaimInProgress{Message: message}
 	case errors.Is(err, publicapi.ErrMintAlreadyClaimed):
-		mappedErr = model.ErrHighlightClaimInProgress{Message: message}
+		mappedErr = model.ErrHighlightClaimAlreadyMinted{Message: message}
 	}
 
 	if mappedErr != nil {

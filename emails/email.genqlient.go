@@ -14,14 +14,15 @@ import (
 type Chain string
 
 const (
-	ChainEthereum Chain = "Ethereum"
-	ChainArbitrum Chain = "Arbitrum"
-	ChainPolygon  Chain = "Polygon"
-	ChainOptimism Chain = "Optimism"
-	ChainTezos    Chain = "Tezos"
-	ChainPoap     Chain = "POAP"
-	ChainZora     Chain = "Zora"
-	ChainBase     Chain = "Base"
+	ChainEthereum    Chain = "Ethereum"
+	ChainArbitrum    Chain = "Arbitrum"
+	ChainPolygon     Chain = "Polygon"
+	ChainOptimism    Chain = "Optimism"
+	ChainTezos       Chain = "Tezos"
+	ChainPoap        Chain = "POAP"
+	ChainZora        Chain = "Zora"
+	ChainBase        Chain = "Base"
+	ChainBasesepolia Chain = "BaseSepolia"
 )
 
 // __communityDigestEntityQueryInput is used internally by genqlient
@@ -2153,6 +2154,8 @@ func (v *definitionFragMediaVideoMedia) __premarshalJSON() (*__premarshaldefinit
 // errorFragErrFeedEventNotFound
 // errorFragErrGalleryNotFound
 // errorFragErrHighlightChainNotSupported
+// errorFragErrHighlightClaimAlreadyMinted
+// errorFragErrHighlightClaimInProgress
 // errorFragErrHighlightMintUnavailable
 // errorFragErrHighlightTxnFailed
 // errorFragErrInvalidInput
@@ -2192,6 +2195,8 @@ func (v *errorFragErrEmailUnverified) implementsGraphQLInterfaceerrorFrag()     
 func (v *errorFragErrFeedEventNotFound) implementsGraphQLInterfaceerrorFrag()             {}
 func (v *errorFragErrGalleryNotFound) implementsGraphQLInterfaceerrorFrag()               {}
 func (v *errorFragErrHighlightChainNotSupported) implementsGraphQLInterfaceerrorFrag()    {}
+func (v *errorFragErrHighlightClaimAlreadyMinted) implementsGraphQLInterfaceerrorFrag()   {}
+func (v *errorFragErrHighlightClaimInProgress) implementsGraphQLInterfaceerrorFrag()      {}
 func (v *errorFragErrHighlightMintUnavailable) implementsGraphQLInterfaceerrorFrag()      {}
 func (v *errorFragErrHighlightTxnFailed) implementsGraphQLInterfaceerrorFrag()            {}
 func (v *errorFragErrInvalidInput) implementsGraphQLInterfaceerrorFrag()                  {}
@@ -2265,6 +2270,12 @@ func __unmarshalerrorFrag(b []byte, v *errorFrag) error {
 		return json.Unmarshal(b, *v)
 	case "ErrHighlightChainNotSupported":
 		*v = new(errorFragErrHighlightChainNotSupported)
+		return json.Unmarshal(b, *v)
+	case "ErrHighlightClaimAlreadyMinted":
+		*v = new(errorFragErrHighlightClaimAlreadyMinted)
+		return json.Unmarshal(b, *v)
+	case "ErrHighlightClaimInProgress":
+		*v = new(errorFragErrHighlightClaimInProgress)
 		return json.Unmarshal(b, *v)
 	case "ErrHighlightMintUnavailable":
 		*v = new(errorFragErrHighlightMintUnavailable)
@@ -2440,6 +2451,22 @@ func __marshalerrorFrag(v *errorFrag) ([]byte, error) {
 		result := struct {
 			TypeName string `json:"__typename"`
 			*errorFragErrHighlightChainNotSupported
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrHighlightClaimAlreadyMinted:
+		typename = "ErrHighlightClaimAlreadyMinted"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrHighlightClaimAlreadyMinted
+		}{typename, v}
+		return json.Marshal(result)
+	case *errorFragErrHighlightClaimInProgress:
+		typename = "ErrHighlightClaimInProgress"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*errorFragErrHighlightClaimInProgress
 		}{typename, v}
 		return json.Marshal(result)
 	case *errorFragErrHighlightMintUnavailable:
@@ -2753,6 +2780,30 @@ func (v *errorFragErrHighlightChainNotSupported) GetMessage() string { return v.
 
 // GetTypename returns errorFragErrHighlightChainNotSupported.Typename, and is useful for accessing the field via an interface.
 func (v *errorFragErrHighlightChainNotSupported) GetTypename() *string { return v.Typename }
+
+// errorFrag includes the GraphQL fields of ErrHighlightClaimAlreadyMinted requested by the fragment errorFrag.
+type errorFragErrHighlightClaimAlreadyMinted struct {
+	Message  string  `json:"message"`
+	Typename *string `json:"__typename"`
+}
+
+// GetMessage returns errorFragErrHighlightClaimAlreadyMinted.Message, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightClaimAlreadyMinted) GetMessage() string { return v.Message }
+
+// GetTypename returns errorFragErrHighlightClaimAlreadyMinted.Typename, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightClaimAlreadyMinted) GetTypename() *string { return v.Typename }
+
+// errorFrag includes the GraphQL fields of ErrHighlightClaimInProgress requested by the fragment errorFrag.
+type errorFragErrHighlightClaimInProgress struct {
+	Message  string  `json:"message"`
+	Typename *string `json:"__typename"`
+}
+
+// GetMessage returns errorFragErrHighlightClaimInProgress.Message, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightClaimInProgress) GetMessage() string { return v.Message }
+
+// GetTypename returns errorFragErrHighlightClaimInProgress.Typename, and is useful for accessing the field via an interface.
+func (v *errorFragErrHighlightClaimInProgress) GetTypename() *string { return v.Typename }
 
 // errorFrag includes the GraphQL fields of ErrHighlightMintUnavailable requested by the fragment errorFrag.
 type errorFragErrHighlightMintUnavailable struct {

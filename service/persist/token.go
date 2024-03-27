@@ -139,7 +139,7 @@ var L1Chains = map[Chain]L1Chain{
 	ChainArbitrum:    L1Chain(ChainETH),
 	ChainZora:        L1Chain(ChainETH),
 	ChainBase:        L1Chain(ChainETH),
-	ChainBaseSepolia: L1Chain(ChainETH),
+	ChainBaseSepolia: L1Chain(ChainETH), // Perhaps this should be an ethereum testnet instead
 	ChainETH:         L1Chain(ChainETH),
 	ChainTezos:       L1Chain(ChainTezos),
 }
@@ -513,6 +513,8 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 			*c = ChainZora
 		case "base":
 			*c = ChainBase
+		case "base_sepolia":
+			*c = ChainBaseSepolia
 		}
 		return nil
 	}
@@ -544,6 +546,8 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 		*c = ChainZora
 	case "base":
 		*c = ChainBase
+	case "baseSepolia":
+		*c = ChainBaseSepolia
 	}
 	return nil
 }
@@ -567,6 +571,8 @@ func (c Chain) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"Zora"`))
 	case ChainBase:
 		w.Write([]byte(`"Base"`))
+	case ChainBaseSepolia:
+		w.Write([]byte(`"BaseSepolia"`))
 	}
 }
 

@@ -2035,11 +2035,15 @@ values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id;
 -- name: GetHighlightMintClaimByID :one
 select * from highlight_mint_claims where id = $1 and not deleted;
 
--- name: GetHighlightCollectionClaimByUserID :one
-select * from highlight_mint_claims where recipient_user_id = $1 and highlight_collection_id = $2 and not deleted;
+-- name: HasMintedClaimsByUserID :one
+with minted  as ( select 1 from highlight_mint_claims m where m.recipient_user_id = $1 and m.highlight_collection_id = $2 and m.status = any(@minted_statuses::varchar[]) and not m.deleted ),
+     pending as ( select 1 from highlight_mint_claims p where p.recipient_user_id = $1 and p.highlight_collection_id = $2 and p.status = any(@pending_statuses::varchar[]) and not p.deleted )
+select exists(select 1 from minted) has_minted, exists(select 1 from pending) has_pending;
 
--- name: GetHighlightCollectionClaimByWalletAddress :one
-select * from highlight_mint_claims where recipient_l1_chain = $1 and recipient_address = $2 and not deleted;
+-- name: HasMintedClaimsByWalletAddress :one
+with minted  as ( select 1 from highlight_mint_claims m where m.recipient_l1_chain = $1 and m.recipient_address = $2 and m.highlight_collection_id = $3 and m.status = any(@minted_statuses::varchar[]) and not m.deleted ),
+     pending as ( select 1 from highlight_mint_claims p where p.recipient_l1_chain = $1 and p.recipient_address = $2 and p.highlight_collection_id = $3 and p.status = any(@pending_statuses::varchar[]) and not p.deleted )
+select exists(select 1 from minted) has_minted, exists(select 1 from pending) has_pending;
 
 -- name: UpdateHighlightMintClaimStatus :one
 update highlight_mint_claims set last_updated = now(), status = $1, error_message = $2 where id = @id returning *;

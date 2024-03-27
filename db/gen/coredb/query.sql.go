@@ -2812,74 +2812,6 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 	return gallery_id, err
 }
 
-const getHighlightCollectionClaimByUserID = `-- name: GetHighlightCollectionClaimByUserID :one
-select id, recipient_user_id, recipient_l1_chain, recipient_address, recipient_wallet_id, internal_token_id, highlight_collection_id, highlight_claim_id, collection_address, collection_chain, minted_token_id, minted_token_metadata, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where recipient_user_id = $1 and highlight_collection_id = $2 and not deleted
-`
-
-type GetHighlightCollectionClaimByUserIDParams struct {
-	RecipientUserID       persist.DBID `db:"recipient_user_id" json:"recipient_user_id"`
-	HighlightCollectionID string       `db:"highlight_collection_id" json:"highlight_collection_id"`
-}
-
-func (q *Queries) GetHighlightCollectionClaimByUserID(ctx context.Context, arg GetHighlightCollectionClaimByUserIDParams) (HighlightMintClaim, error) {
-	row := q.db.QueryRow(ctx, getHighlightCollectionClaimByUserID, arg.RecipientUserID, arg.HighlightCollectionID)
-	var i HighlightMintClaim
-	err := row.Scan(
-		&i.ID,
-		&i.RecipientUserID,
-		&i.RecipientL1Chain,
-		&i.RecipientAddress,
-		&i.RecipientWalletID,
-		&i.InternalTokenID,
-		&i.HighlightCollectionID,
-		&i.HighlightClaimID,
-		&i.CollectionAddress,
-		&i.CollectionChain,
-		&i.MintedTokenID,
-		&i.MintedTokenMetadata,
-		&i.Status,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Deleted,
-	)
-	return i, err
-}
-
-const getHighlightCollectionClaimByWalletAddress = `-- name: GetHighlightCollectionClaimByWalletAddress :one
-select id, recipient_user_id, recipient_l1_chain, recipient_address, recipient_wallet_id, internal_token_id, highlight_collection_id, highlight_claim_id, collection_address, collection_chain, minted_token_id, minted_token_metadata, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where recipient_l1_chain = $1 and recipient_address = $2 and not deleted
-`
-
-type GetHighlightCollectionClaimByWalletAddressParams struct {
-	RecipientL1Chain persist.L1Chain `db:"recipient_l1_chain" json:"recipient_l1_chain"`
-	RecipientAddress persist.Address `db:"recipient_address" json:"recipient_address"`
-}
-
-func (q *Queries) GetHighlightCollectionClaimByWalletAddress(ctx context.Context, arg GetHighlightCollectionClaimByWalletAddressParams) (HighlightMintClaim, error) {
-	row := q.db.QueryRow(ctx, getHighlightCollectionClaimByWalletAddress, arg.RecipientL1Chain, arg.RecipientAddress)
-	var i HighlightMintClaim
-	err := row.Scan(
-		&i.ID,
-		&i.RecipientUserID,
-		&i.RecipientL1Chain,
-		&i.RecipientAddress,
-		&i.RecipientWalletID,
-		&i.InternalTokenID,
-		&i.HighlightCollectionID,
-		&i.HighlightClaimID,
-		&i.CollectionAddress,
-		&i.CollectionChain,
-		&i.MintedTokenID,
-		&i.MintedTokenMetadata,
-		&i.Status,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Deleted,
-	)
-	return i, err
-}
-
 const getHighlightMintClaimByID = `-- name: GetHighlightMintClaimByID :one
 select id, recipient_user_id, recipient_l1_chain, recipient_address, recipient_wallet_id, internal_token_id, highlight_collection_id, highlight_claim_id, collection_address, collection_chain, minted_token_id, minted_token_metadata, status, error_message, created_at, last_updated, deleted from highlight_mint_claims where id = $1 and not deleted
 `
@@ -6019,6 +5951,68 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const hasMintedClaimsByUserID = `-- name: HasMintedClaimsByUserID :one
+with minted  as ( select 1 from highlight_mint_claims m where m.recipient_user_id = $1 and m.highlight_collection_id = $2 and m.status = any($3::varchar[]) and not m.deleted ),
+     pending as ( select 1 from highlight_mint_claims p where p.recipient_user_id = $1 and p.highlight_collection_id = $2 and p.status = any($4::varchar[]) and not p.deleted )
+select exists(select 1 from minted) has_minted, exists(select 1 from pending) has_pending
+`
+
+type HasMintedClaimsByUserIDParams struct {
+	RecipientUserID       persist.DBID `db:"recipient_user_id" json:"recipient_user_id"`
+	HighlightCollectionID string       `db:"highlight_collection_id" json:"highlight_collection_id"`
+	MintedStatuses        []string     `db:"minted_statuses" json:"minted_statuses"`
+	PendingStatuses       []string     `db:"pending_statuses" json:"pending_statuses"`
+}
+
+type HasMintedClaimsByUserIDRow struct {
+	HasMinted  bool `db:"has_minted" json:"has_minted"`
+	HasPending bool `db:"has_pending" json:"has_pending"`
+}
+
+func (q *Queries) HasMintedClaimsByUserID(ctx context.Context, arg HasMintedClaimsByUserIDParams) (HasMintedClaimsByUserIDRow, error) {
+	row := q.db.QueryRow(ctx, hasMintedClaimsByUserID,
+		arg.RecipientUserID,
+		arg.HighlightCollectionID,
+		arg.MintedStatuses,
+		arg.PendingStatuses,
+	)
+	var i HasMintedClaimsByUserIDRow
+	err := row.Scan(&i.HasMinted, &i.HasPending)
+	return i, err
+}
+
+const hasMintedClaimsByWalletAddress = `-- name: HasMintedClaimsByWalletAddress :one
+with minted  as ( select 1 from highlight_mint_claims m where m.recipient_l1_chain = $1 and m.recipient_address = $2 and m.highlight_collection_id = $3 and m.status = any($4::varchar[]) and not m.deleted ),
+     pending as ( select 1 from highlight_mint_claims p where p.recipient_l1_chain = $1 and p.recipient_address = $2 and p.highlight_collection_id = $3 and p.status = any($5::varchar[]) and not p.deleted )
+select exists(select 1 from minted) has_minted, exists(select 1 from pending) has_pending
+`
+
+type HasMintedClaimsByWalletAddressParams struct {
+	RecipientL1Chain      persist.L1Chain `db:"recipient_l1_chain" json:"recipient_l1_chain"`
+	RecipientAddress      persist.Address `db:"recipient_address" json:"recipient_address"`
+	HighlightCollectionID string          `db:"highlight_collection_id" json:"highlight_collection_id"`
+	MintedStatuses        []string        `db:"minted_statuses" json:"minted_statuses"`
+	PendingStatuses       []string        `db:"pending_statuses" json:"pending_statuses"`
+}
+
+type HasMintedClaimsByWalletAddressRow struct {
+	HasMinted  bool `db:"has_minted" json:"has_minted"`
+	HasPending bool `db:"has_pending" json:"has_pending"`
+}
+
+func (q *Queries) HasMintedClaimsByWalletAddress(ctx context.Context, arg HasMintedClaimsByWalletAddressParams) (HasMintedClaimsByWalletAddressRow, error) {
+	row := q.db.QueryRow(ctx, hasMintedClaimsByWalletAddress,
+		arg.RecipientL1Chain,
+		arg.RecipientAddress,
+		arg.HighlightCollectionID,
+		arg.MintedStatuses,
+		arg.PendingStatuses,
+	)
+	var i HasMintedClaimsByWalletAddressRow
+	err := row.Scan(&i.HasMinted, &i.HasPending)
+	return i, err
 }
 
 const insertComment = `-- name: InsertComment :one
