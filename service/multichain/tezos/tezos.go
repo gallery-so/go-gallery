@@ -9,7 +9,6 @@ import (
 	tezospkg "blockwatch.cc/tzgo/tezos"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -41,7 +40,7 @@ func NewProvider() *Provider {
 
 // VerifySignature will verify a signature using the ed25519 algorithm
 // the address provided must be the tezos public key, not the hashed address
-func (p *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+func (p *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pMessage string, pSignatureStr string) (bool, error) {
 	key, err := tezospkg.ParseKey(pPubKey.String())
 	if err != nil {
 		return false, err
@@ -50,8 +49,8 @@ func (p *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey,
 	if err != nil {
 		return false, err
 	}
-	nonce := tezosNoncePrepend + auth.NewNoncePrepend + pNonce
-	asBytes := []byte(nonce)
+	message := tezosNoncePrepend + pMessage
+	asBytes := []byte(message)
 	asHex := hex.EncodeToString(asBytes)
 	lenHexBytes := []byte(fmt.Sprintf("%d", len(asHex)))
 

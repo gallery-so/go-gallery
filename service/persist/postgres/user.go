@@ -176,14 +176,16 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *db.Que
 	walletID := wallet.ID
 
 	if walletID != "" {
-
 		user, err := queries.GetUserByWalletID(ctx, walletID.String())
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return "", err
 		}
 
-		// If the wallet belongs to a user, its address can't be used to create a new wallet. Return an error.
 		if user.ID != "" {
+			if user.ID == userID {
+				// Wallet already belongs to the user; do nothing
+				return walletID, nil
+			}
 			if user.Universal {
 				err = queries.DeleteUserByID(ctx, user.ID)
 				if err != nil {

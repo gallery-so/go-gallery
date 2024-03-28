@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -51,17 +50,6 @@ type CreateLoginAttemptInput struct {
 	SignatureValid bool       `json:"signature_valid"`
 	ReqHostAddr    string     `json:"req_host_addr"`
 	ReqHeaders     ReqHeaders `json:"req_headers"`
-}
-
-// NonceRepository is the interface for interacting with the auth nonce persistence layer
-type NonceRepository interface {
-	Get(context.Context, ChainAddress) (UserNonce, error)
-	Create(context.Context, string, ChainAddress) error
-}
-
-// LoginAttemptRepository is the interface for interacting with the auth login attempt persistence layer
-type LoginAttemptRepository interface {
-	Create(context.Context, CreateLoginAttemptInput) (DBID, error)
 }
 
 // Scan implements the sql.Scanner interface for the ReqHeaders type

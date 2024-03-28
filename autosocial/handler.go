@@ -3,6 +3,9 @@ package autosocial
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/user"
 	"net/http"
 	"strings"
 	"time"
@@ -19,7 +22,7 @@ import (
 	"github.com/sourcegraph/conc/pool"
 )
 
-func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gin.HandlerFunc {
+func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI, repos *postgres.Repositories) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var in task.AutosocialProcessUsersMessage
 		if err := c.ShouldBindJSON(&in); err != nil {
@@ -31,6 +34,13 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 
 		lp := pool.New().WithMaxGoroutines(3).WithErrors().WithContext(c)
 		fp := pool.New().WithMaxGoroutines(3).WithErrors().WithContext(c)
+
+		fcImportWalletsLookup := make(map[persist.DBID]bool)
+		for u, s := range in.ImportSocialWallets {
+			if _, ok := s[persist.SocialProviderFarcaster]; ok {
+				fcImportWalletsLookup[u] = s[persist.SocialProviderFarcaster]
+			}
+		}
 
 		// chunk users in groups of 350 for farcaster
 		userLookup := make(map[persist.Address]persist.DBID, 350)
@@ -45,7 +55,7 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 						copylookup := userLookup
 						copychunked := chunkedAddresses
 						fp.Go(func(ctx context.Context) error {
-							return addFarcasterProfilesToUsers(c, n, copychunked, q, copylookup)
+							return addFarcasterProfilesToUsers(c, n, copychunked, q, copylookup, fcImportWalletsLookup, repos.UserRepository)
 						})
 						userLookup = make(map[persist.Address]persist.DBID, 350)
 						chunkedAddresses = make([]persist.Address, 0, 350)
@@ -60,7 +70,7 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 
 		if cur > 0 {
 			fp.Go(func(ctx context.Context) error {
-				return addFarcasterProfilesToUsers(c, n, chunkedAddresses, q, userLookup)
+				return addFarcasterProfilesToUsers(c, n, chunkedAddresses, q, userLookup, fcImportWalletsLookup, repos.UserRepository)
 			})
 		}
 
@@ -188,7 +198,8 @@ func addLensProfileToUser(ctx context.Context, l *lens.LensAPI, address []persis
 	return nil
 }
 
-func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, addresses []persist.Address, q *coredb.Queries, userLookup map[persist.Address]persist.DBID) error {
+func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, addresses []persist.Address, q *coredb.Queries, userLookup map[persist.Address]persist.DBID,
+	importWalletsLookup map[persist.DBID]bool, userRepo *postgres.UserRepository) error {
 	users, err := n.UsersByAddresses(ctx, addresses)
 	if err != nil {
 		return err
@@ -239,6 +250,37 @@ func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, ad
 		if err != nil {
 			return err
 		}
+
+		if importWalletsLookup[guser] {
+			// Neynar says the addresses are verified, so we'll use a trivial wrapper authenticator that
+			// accepts what Neynar says and doesn't require further verification of addresses
+			authenticator := addressAuthenticator{u.VerifiedAddresses.EthAddresses}
+			for _, addr := range u.VerifiedAddresses.EthAddresses {
+				err = user.AddWalletToUser(ctx, guser, persist.NewChainAddress(addr, persist.ChainETH), authenticator, userRepo, nil)
+				if err != nil {
+					err = fmt.Errorf("failed to add Neynar verified wallet (address: %s) to user (id: %s): %w", addr, guser, err)
+					logger.For(ctx).Error(err)
+				}
+			}
+		}
 	}
 	return nil
+}
+
+type addressAuthenticator struct {
+	addresses []persist.Address
+}
+
+func (a addressAuthenticator) GetDescription() string { return "Autosocial Address Authenticator" }
+
+func (a addressAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult, error) {
+	result := &auth.AuthResult{}
+	for _, address := range a.addresses {
+		result.Addresses = append(result.Addresses, auth.AuthenticatedAddress{
+			ChainAddress: persist.NewChainAddress(address, persist.ChainETH),
+			WalletType:   persist.WalletTypeEOA,
+		})
+	}
+
+	return result, nil
 }

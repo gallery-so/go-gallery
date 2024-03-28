@@ -186,8 +186,8 @@ type ComplexityRoot struct {
 	}
 
 	AuthNonce struct {
-		Nonce      func(childComplexity int) int
-		UserExists func(childComplexity int) int
+		Message func(childComplexity int) int
+		Nonce   func(childComplexity int) int
 	}
 
 	Badge struct {
@@ -960,7 +960,7 @@ type ComplexityRoot struct {
 		FollowAllSocialConnections                      func(childComplexity int, accountType persist.SocialProvider) int
 		FollowUser                                      func(childComplexity int, userID persist.DBID) int
 		GenerateQRCodeLoginToken                        func(childComplexity int) int
-		GetAuthNonce                                    func(childComplexity int, chainAddress persist.ChainAddress) int
+		GetAuthNonce                                    func(childComplexity int) int
 		HighlightClaimMint                              func(childComplexity int, input model.HighlightClaimMintInput) int
 		Login                                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                                          func(childComplexity int, pushTokenToUnregister *string) int
@@ -1194,6 +1194,7 @@ type ComplexityRoot struct {
 		UserByAddress              func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                   func(childComplexity int, id persist.DBID) int
 		UserByUsername             func(childComplexity int, username string) int
+		UsersByAddresses           func(childComplexity int, chainAddresses []*persist.ChainAddress) int
 		UsersByRole                func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
 		UsersWithTrait             func(childComplexity int, trait string) int
 		Viewer                     func(childComplexity int) int
@@ -1767,6 +1768,10 @@ type ComplexityRoot struct {
 		User func(childComplexity int) int
 	}
 
+	UsersByAddressesPayload struct {
+		Users func(childComplexity int) int
+	}
+
 	UsersConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
@@ -2039,7 +2044,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
-	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
+	GetAuthNonce(ctx context.Context) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, input model.CreateUserInput) (model.CreateUserPayloadOrError, error)
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
 	ResendVerificationEmail(ctx context.Context) (model.ResendVerificationEmailPayloadOrError, error)
@@ -2133,6 +2138,7 @@ type QueryResolver interface {
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error)
 	UserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (model.UserByAddressOrError, error)
+	UsersByAddresses(ctx context.Context, chainAddresses []*persist.ChainAddress) (model.UsersByAddressesPayloadOrError, error)
 	UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
@@ -2561,19 +2567,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AudioMedia.PreviewURLs(childComplexity), true
 
+	case "AuthNonce.message":
+		if e.complexity.AuthNonce.Message == nil {
+			break
+		}
+
+		return e.complexity.AuthNonce.Message(childComplexity), true
+
 	case "AuthNonce.nonce":
 		if e.complexity.AuthNonce.Nonce == nil {
 			break
 		}
 
 		return e.complexity.AuthNonce.Nonce(childComplexity), true
-
-	case "AuthNonce.userExists":
-		if e.complexity.AuthNonce.UserExists == nil {
-			break
-		}
-
-		return e.complexity.AuthNonce.UserExists(childComplexity), true
 
 	case "Badge.contract":
 		if e.complexity.Badge.Contract == nil {
@@ -5600,12 +5606,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_getAuthNonce_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
+		return e.complexity.Mutation.GetAuthNonce(childComplexity), true
 
 	case "Mutation.highlightClaimMint":
 		if e.complexity.Mutation.HighlightClaimMint == nil {
@@ -7235,6 +7236,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.UserByUsername(childComplexity, args["username"].(string)), true
+
+	case "Query.usersByAddresses":
+		if e.complexity.Query.UsersByAddresses == nil {
+			break
+		}
+
+		args, err := ec.field_Query_usersByAddresses_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UsersByAddresses(childComplexity, args["chainAddresses"].([]*persist.ChainAddress)), true
 
 	case "Query.usersByRole":
 		if e.complexity.Query.UsersByRole == nil {
@@ -9397,6 +9410,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserSearchResult.User(childComplexity), true
 
+	case "UsersByAddressesPayload.users":
+		if e.complexity.UsersByAddressesPayload.Users == nil {
+			break
+		}
+
+		return e.complexity.UsersByAddressesPayload.Users(childComplexity), true
+
 	case "UsersConnection.edges":
 		if e.complexity.UsersConnection.Edges == nil {
 			break
@@ -10829,6 +10849,12 @@ union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByAddressOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
+type UsersByAddressesPayload {
+  users: [GalleryUser!]
+}
+
+union UsersByAddressesPayloadOrError = UsersByAddressesPayload | ErrInvalidInput
+
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
@@ -11336,6 +11362,7 @@ type Query {
   userByUsername(username: String!): UserByUsernameOrError
   userById(id: DBID!): UserByIdOrError
   userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
+  usersByAddresses(chainAddresses:[ChainAddressInput!]!): UsersByAddressesPayloadOrError
   usersWithTrait(trait: String!): [GalleryUser]
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
   collectionById(id: DBID!): CollectionByIdOrError
@@ -11701,10 +11728,10 @@ type RefreshContractPayload {
 
 type AuthNonce {
   nonce: String
-  userExists: Boolean
+  message: String
 }
 
-union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
+union GetAuthNoncePayloadOrError = AuthNonce
 
 type ErrAuthenticationFailed implements Error {
   message: String!
@@ -11812,6 +11839,7 @@ input AuthMechanism {
 input EoaAuth {
   chainPubKey: ChainPubKeyInput!
   nonce: String!
+  message: String!
   signature: String! @scrub
 }
 
@@ -11840,6 +11868,7 @@ input DebugAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
+  message: String!
 }
 
 input MagicLinkAuth {
@@ -11909,6 +11938,11 @@ type LoginPayload {
 type LogoutPayload {
   viewer: Viewer
 }
+
+enum ImportWalletSource {
+  Farcaster
+}
+
 input CreateUserInput {
   username: String!
   bio: String
@@ -11916,6 +11950,7 @@ input CreateUserInput {
   galleryName: String
   galleryDescription: String
   galleryPosition: String
+  importWallets: [ImportWalletSource!]
 }
 
 union CreateUserPayloadOrError =
@@ -12986,7 +13021,7 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
+  getAuthNonce: GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
   updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
@@ -14472,21 +14507,6 @@ func (ec *executionContext) field_Mutation_followUser_args(ctx context.Context, 
 		}
 	}
 	args["userId"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 persist.ChainAddress
-	if tmp, ok := rawArgs["chainAddress"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
-		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chainAddress"] = arg0
 	return args, nil
 }
 
@@ -16356,6 +16376,21 @@ func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context,
 		}
 	}
 	args["username"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_usersByAddresses_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []*persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddresses"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddresses"))
+		arg0, err = ec.unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chainAddresses"] = arg0
 	return args, nil
 }
 
@@ -18906,8 +18941,8 @@ func (ec *executionContext) fieldContext_AuthNonce_nonce(ctx context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field graphql.CollectedField, obj *model.AuthNonce) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AuthNonce_userExists(ctx, field)
+func (ec *executionContext) _AuthNonce_message(ctx context.Context, field graphql.CollectedField, obj *model.AuthNonce) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthNonce_message(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -18920,7 +18955,7 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.UserExists, nil
+		return obj.Message, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -18929,19 +18964,19 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_AuthNonce_userExists(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AuthNonce_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AuthNonce",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -39554,7 +39589,7 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().GetAuthNonce(rctx, fc.Args["chainAddress"].(persist.ChainAddress))
+		return ec.resolvers.Mutation().GetAuthNonce(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -39577,17 +39612,6 @@ func (ec *executionContext) fieldContext_Mutation_getAuthNonce(ctx context.Conte
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type GetAuthNoncePayloadOrError does not have child fields")
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_getAuthNonce_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -47772,6 +47796,58 @@ func (ec *executionContext) fieldContext_Query_userByAddress(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_userByAddress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_usersByAddresses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_usersByAddresses(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().UsersByAddresses(rctx, fc.Args["chainAddresses"].([]*persist.ChainAddress))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UsersByAddressesPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUsersByAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersByAddressesPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_usersByAddresses(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UsersByAddressesPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_usersByAddresses_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -65240,6 +65316,97 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _UsersByAddressesPayload_users(ctx context.Context, field graphql.CollectedField, obj *model.UsersByAddressesPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UsersByAddressesPayload_users(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Users, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UsersByAddressesPayload_users(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UsersByAddressesPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GalleryUser_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_GalleryUser_dbid(ctx, field)
+			case "username":
+				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
+			case "bio":
+				return ec.fieldContext_GalleryUser_bio(ctx, field)
+			case "universal":
+				return ec.fieldContext_GalleryUser_universal(ctx, field)
+			case "roles":
+				return ec.fieldContext_GalleryUser_roles(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
+			case "tokens":
+				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensBookmarked":
+				return ec.fieldContext_GalleryUser_tokensBookmarked(ctx, field)
+			case "wallets":
+				return ec.fieldContext_GalleryUser_wallets(ctx, field)
+			case "primaryWallet":
+				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
+			case "featuredGallery":
+				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
+			case "galleries":
+				return ec.fieldContext_GalleryUser_galleries(ctx, field)
+			case "badges":
+				return ec.fieldContext_GalleryUser_badges(ctx, field)
+			case "isAuthenticatedUser":
+				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
+			case "followers":
+				return ec.fieldContext_GalleryUser_followers(ctx, field)
+			case "following":
+				return ec.fieldContext_GalleryUser_following(ctx, field)
+			case "feed":
+				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			case "sharedFollowers":
+				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
+			case "sharedCommunities":
+				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _UsersConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.UsersConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UsersConnection_edges(ctx, field)
 	if err != nil {
@@ -69740,7 +69907,7 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"username", "bio", "email", "galleryName", "galleryDescription", "galleryPosition"}
+	fieldsInOrder := [...]string{"username", "bio", "email", "galleryName", "galleryDescription", "galleryPosition", "importWallets"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -69789,6 +69956,13 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.GalleryPosition = data
+		case "importWallets":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("importWallets"))
+			data, err := ec.unmarshalOImportWalletSource2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImportWalletSourceᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ImportWallets = data
 		}
 	}
 
@@ -70077,7 +70251,7 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"chainPubKey", "nonce", "signature"}
+	fieldsInOrder := [...]string{"chainPubKey", "nonce", "message", "signature"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -70098,6 +70272,13 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 				return it, err
 			}
 			it.Nonce = data
+		case "message":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Message = data
 		case "signature":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -70186,7 +70367,7 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address", "nonce"}
+	fieldsInOrder := [...]string{"address", "nonce", "message"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -70207,6 +70388,13 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 				return it, err
 			}
 			it.Nonce = data
+		case "message":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Message = data
 		}
 	}
 
@@ -73354,13 +73542,6 @@ func (ec *executionContext) _GetAuthNoncePayloadOrError(ctx context.Context, sel
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.ErrDoesNotOwnRequiredToken:
-		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredToken:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
 	case model.AuthNonce:
 		return ec._AuthNonce(ctx, sel, &obj)
 	case *model.AuthNonce:
@@ -76262,6 +76443,29 @@ func (ec *executionContext) _UserByUsernameOrError(ctx context.Context, sel ast.
 	}
 }
 
+func (ec *executionContext) _UsersByAddressesPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UsersByAddressesPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.UsersByAddressesPayload:
+		return ec._UsersByAddressesPayload(ctx, sel, &obj)
+	case *model.UsersByAddressesPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UsersByAddressesPayload(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _VerifyEmailMagicLinkPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.VerifyEmailMagicLinkPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -77203,8 +77407,8 @@ func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet
 			out.Values[i] = graphql.MarshalString("AuthNonce")
 		case "nonce":
 			out.Values[i] = ec._AuthNonce_nonce(ctx, field, obj)
-		case "userExists":
-			out.Values[i] = ec._AuthNonce_userExists(ctx, field, obj)
+		case "message":
+			out.Values[i] = ec._AuthNonce_message(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -81019,7 +81223,7 @@ func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errDoesNotOwnRequiredTokenImplementors = []string{"ErrDoesNotOwnRequiredToken", "GetAuthNoncePayloadOrError", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
+var errDoesNotOwnRequiredTokenImplementors = []string{"ErrDoesNotOwnRequiredToken", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDoesNotOwnRequiredToken) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errDoesNotOwnRequiredTokenImplementors)
@@ -81331,7 +81535,7 @@ func (ec *executionContext) _ErrHighlightTxnFailed(ctx context.Context, sel ast.
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "SetPersonaPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "UsersByAddressesPayloadOrError", "CollectionByIdOrError", "CommunityByIdOrError", "CommunityByAddressOrError", "CommunityByKeyOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "SetPersonaPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "FollowAllOnboardingRecommendationsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "AdmireCommentPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError", "ReportPostPayloadOrError", "BlockUserPayloadOrError", "UnblockUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -86881,6 +87085,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_userByAddress(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "usersByAddresses":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_usersByAddresses(ctx, field)
 				return res
 			}
 
@@ -93417,6 +93640,42 @@ func (ec *executionContext) _UserSearchResult(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var usersByAddressesPayloadImplementors = []string{"UsersByAddressesPayload", "UsersByAddressesPayloadOrError"}
+
+func (ec *executionContext) _UsersByAddressesPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UsersByAddressesPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, usersByAddressesPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UsersByAddressesPayload")
+		case "users":
+			out.Values[i] = ec._UsersByAddressesPayload_users(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var usersConnectionImplementors = []string{"UsersConnection"}
 
 func (ec *executionContext) _UsersConnection(ctx context.Context, sel ast.SelectionSet, obj *model.UsersConnection) graphql.Marshaler {
@@ -94853,6 +95112,23 @@ func (ec *executionContext) unmarshalNChainAddressInput2githubᚗcomᚋmikeydub�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx context.Context, v interface{}) ([]*persist.ChainAddress, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.ChainAddress, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 func (ec *executionContext) unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, v interface{}) (*persist.ChainAddress, error) {
 	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
@@ -95136,6 +95412,16 @@ func (ec *executionContext) marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋ
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNImportWalletSource2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImportWalletSource(ctx context.Context, v interface{}) (model.ImportWalletSource, error) {
+	var res model.ImportWalletSource
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNImportWalletSource2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImportWalletSource(ctx context.Context, sel ast.SelectionSet, v model.ImportWalletSource) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
@@ -98173,6 +98459,73 @@ func (ec *executionContext) marshalOHighlightMintClaimStatusPayloadOrError2githu
 	return ec._HighlightMintClaimStatusPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalOImportWalletSource2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImportWalletSourceᚄ(ctx context.Context, v interface{}) ([]model.ImportWalletSource, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]model.ImportWalletSource, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNImportWalletSource2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImportWalletSource(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOImportWalletSource2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImportWalletSourceᚄ(ctx context.Context, sel ast.SelectionSet, v []model.ImportWalletSource) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNImportWalletSource2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImportWalletSource(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalOInt2ᚕᚖint(ctx context.Context, v interface{}) ([]*int, error) {
 	if v == nil {
 		return nil, nil
@@ -100287,6 +100640,13 @@ func (ec *executionContext) marshalOUserSearchResult2ᚕᚖgithubᚗcomᚋmikeyd
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalOUsersByAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersByAddressesPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UsersByAddressesPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UsersByAddressesPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx context.Context, sel ast.SelectionSet, v *model.UsersConnection) graphql.Marshaler {

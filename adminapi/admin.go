@@ -134,14 +134,8 @@ func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username stri
 	}
 
 	authMethod := func(ctx context.Context) (*auth.AuthResult, error) {
-		err := auth.NonceRotate(ctx, chainAddress, api.repos.NonceRepository)
-		if err != nil {
-			return nil, err
-		}
-
 		authedAddress := auth.AuthenticatedAddress{
 			ChainAddress: chainAddress,
-			WalletID:     "",
 			WalletType:   walletType,
 		}
 
