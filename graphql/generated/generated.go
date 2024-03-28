@@ -13083,6 +13083,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   highlightClaimMint(input: HighlightClaimMintInput!): HighlightClaimMintPayloadOrError
+    @restrictEnvironment(allowed: ["local", "development", "sandbox"])
     @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
@@ -41398,13 +41399,23 @@ func (ec *executionContext) _Mutation_highlightClaimMint(ctx context.Context, fi
 			return ec.resolvers.Mutation().HighlightClaimMint(rctx, fc.Args["input"].(model.HighlightClaimMintInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
+			allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.RestrictEnvironment == nil {
+				return nil, errors.New("directive restrictEnvironment is not implemented")
+			}
+			return ec.directives.RestrictEnvironment(ctx, nil, directive0, allowed)
+		}
+		directive2 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
 				return nil, errors.New("directive authRequired is not implemented")
 			}
-			return ec.directives.AuthRequired(ctx, nil, directive0)
+			return ec.directives.AuthRequired(ctx, nil, directive1)
 		}
 
-		tmp, err := directive1(rctx)
+		tmp, err := directive2(rctx)
 		if err != nil {
 			return nil, graphql.ErrorOnPath(ctx, err)
 		}

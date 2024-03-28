@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -2791,11 +2792,21 @@ func (r *queryResolver) SearchCommunities(ctx context.Context, query string, lim
 		return nil, err
 	}
 
-	results := make([]*model.CommunitySearchResult, len(communities))
-	for i, community := range communities {
-		results[i] = &model.CommunitySearchResult{
-			Community: communityToModel(ctx, community),
+	results := make([]*model.CommunitySearchResult, 0, len(communities))
+	for _, community := range communities {
+		// Filter out communities with invalid chain values that we might be using for internal
+		// testing (such as testnets)
+		if community.CommunityType == persist.CommunityTypeContract {
+			if chain, err := strconv.Atoi(community.Key1); err == nil {
+				if chain > int(persist.MaxChainValue) {
+					continue
+				}
+			}
 		}
+
+		results = append(results, &model.CommunitySearchResult{
+			Community: communityToModel(ctx, community),
+		})
 	}
 
 	return model.SearchCommunitiesPayload{Results: results}, nil
