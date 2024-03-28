@@ -18,3 +18,4 @@ create table if not exists highlight_mint_claims (
   deleted boolean not null default false
 );
 create unique index highlight_mint_claims_chain_contract_token on highlight_mint_claims (collection_chain, collection_address, minted_token_id) where minted_token_id is not null and not deleted;
+create index highlight_mint_claims_user_id_collection_id on highlight_mint_claims(user_id, highlight_collection_id);
