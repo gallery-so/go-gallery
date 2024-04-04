@@ -213,13 +213,13 @@ sql:
           # Highlight mint claims
           - column: 'highlight_mint_claims.highlight_collection_id'
             go_type: 'string'
-          - column: 'highlight_mint_claims.claim_id'
+          - column: 'highlight_mint_claims.highlight_claim_id'
             go_type: 'string'
-          - column: 'highlight_mint_claims.token_mint_id'
+          - column: 'highlight_mint_claims.minted_token_id'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenID'
           - column: 'highlight_mint_claims.status'
             go_type: 'github.com/mikeydub/go-gallery/service/multichain/highlight.ClaimStatus'
-          - column: 'highlight_mint_claims.token_metadata'
+          - column: 'highlight_mint_claims.minted_token_metadata'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenMetadata'
 
           # Wildcards

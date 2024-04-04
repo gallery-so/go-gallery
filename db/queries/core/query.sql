@@ -2017,16 +2017,39 @@ insert into privy_users (id, user_id, privy_did)
     on conflict (user_id) where not deleted do update set privy_did = excluded.privy_did, last_updated = now();
 
 -- name: SaveHighlightMintClaim :one
-insert into highlight_mint_claims(id, user_id, chain, contract_address, recipient_wallet_id, highlight_collection_id, claim_id, status, error_message) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;
+insert into highlight_mint_claims(
+    id
+    , recipient_user_id
+    , recipient_l1_chain
+    , recipient_address
+    , recipient_wallet_id
+    , highlight_collection_id
+    , highlight_claim_id
+    , collection_address
+    , collection_chain
+    , status
+    , error_message
+)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id;
 
--- name: GetHighlightMintClaim :one
+-- name: GetHighlightMintClaimByID :one
 select * from highlight_mint_claims where id = $1 and not deleted;
+
+-- name: HasMintedClaimsByUserID :one
+with minted  as ( select 1 from highlight_mint_claims m where m.recipient_user_id = $1 and m.highlight_collection_id = $2 and m.status = any(@minted_statuses::varchar[]) and not m.deleted ),
+     pending as ( select 1 from highlight_mint_claims p where p.recipient_user_id = $1 and p.highlight_collection_id = $2 and p.status = any(@pending_statuses::varchar[]) and not p.deleted )
+select exists(select 1 from minted) has_minted, exists(select 1 from pending) has_pending;
+
+-- name: HasMintedClaimsByWalletAddress :one
+with minted  as ( select 1 from highlight_mint_claims m where m.recipient_l1_chain = $1 and m.recipient_address = $2 and m.highlight_collection_id = $3 and m.status = any(@minted_statuses::varchar[]) and not m.deleted ),
+     pending as ( select 1 from highlight_mint_claims p where p.recipient_l1_chain = $1 and p.recipient_address = $2 and p.highlight_collection_id = $3 and p.status = any(@pending_statuses::varchar[]) and not p.deleted )
+select exists(select 1 from minted) has_minted, exists(select 1 from pending) has_pending;
 
 -- name: UpdateHighlightMintClaimStatus :one
 update highlight_mint_claims set last_updated = now(), status = $1, error_message = $2 where id = @id returning *;
 
 -- name: UpdateHighlightMintClaimStatusTxSucceeded :one
-update highlight_mint_claims set last_updated = now(), status = $1, token_mint_id = $2, token_metadata = $3 where id = @id returning *;
+update highlight_mint_claims set last_updated = now(), status = $1, minted_token_id = $2, minted_token_metadata = $3 where id = @id returning *;
 
 -- name: UpdateHighlightMintClaimStatusMediaProcessing :one
-update highlight_mint_claims set last_updated = now(), status = $1, token_id = $2 where id = @id returning *;
+update highlight_mint_claims set last_updated = now(), status = $1, internal_token_id = $2 where id = @id returning *;

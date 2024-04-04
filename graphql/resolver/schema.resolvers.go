@@ -2958,7 +2958,7 @@ func (r *queryResolver) HighlightMintClaimStatus(ctx context.Context, claimID pe
 		// ClaimStatusMediaFailed included since there might be a fallback image and to let the user refresh the token themselves
 	case highlight.ClaimStatusMediaProcessed, highlight.ClaimStatusMediaFailed:
 		return model.HighlightMintClaimStatusPayload{
-			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.TokenID},
+			HelperHighlightMintClaimStatusPayloadData: model.HelperHighlightMintClaimStatusPayloadData{TokenID: claim.InternalTokenID},
 			Status: model.HighlightTxStatusTokenSynced,
 			Token:  nil, // handled by dedicated resolver
 		}, nil

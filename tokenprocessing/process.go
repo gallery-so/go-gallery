@@ -508,7 +508,7 @@ func processHighlightMintClaim(mc *multichain.Provider, highlightProvider *highl
 			return
 		}
 
-		claim, err := mc.Queries.GetHighlightMintClaim(ctx, msg.ClaimID)
+		claim, err := mc.Queries.GetHighlightMintClaimByID(ctx, msg.ClaimID)
 		if err != nil {
 			tracker.setStatusFailed(ctx, msg.ClaimID, err)
 			removeMessageFromQueue(ctx, err)
@@ -590,7 +590,7 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 	for i := 0; i <= maxDepth; i++ {
 		switch claim.Status {
 		case highlight.ClaimStatusTxPending:
-			mintedTokenID, metadata, err := waitForMinted(ctx, claim.ID, h, claim.ClaimID, 15, 3*time.Second)
+			mintedTokenID, metadata, err := waitForMinted(ctx, claim.ID, h, claim.HighlightClaimID, 15, 3*time.Second)
 			if err != nil {
 				return err
 			}
@@ -605,11 +605,11 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 			}
 			mintedToken := persist.TokenUniqueIdentifiers{
 				OwnerAddress:    recipientWallet.Address,
-				TokenID:         claim.TokenMintID,
-				ContractAddress: claim.ContractAddress,
-				Chain:           claim.Chain,
+				TokenID:         claim.MintedTokenID,
+				ContractAddress: claim.CollectionAddress,
+				Chain:           claim.CollectionChain,
 			}
-			tokenDBID, err := waitForSynced(ctx, mc, claim.UserID, claim.ID, mintedToken, 15, 3*time.Second)
+			tokenDBID, err := waitForSynced(ctx, mc, claim.RecipientUserID, claim.ID, mintedToken, 15, 3*time.Second)
 			if err != nil {
 				return err
 			}
@@ -619,17 +619,17 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 			}
 		case highlight.ClaimStatusMediaProcessing:
 			t, err := mc.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
-				OwnerID:         claim.UserID,
-				TokenID:         claim.TokenMintID,
-				Chain:           claim.Chain,
-				ContractAddress: claim.ContractAddress,
+				OwnerID:         claim.RecipientUserID,
+				TokenID:         claim.MintedTokenID,
+				Chain:           claim.CollectionChain,
+				ContractAddress: claim.CollectionAddress,
 			})
 			if err != nil {
 				return err
 			}
 			_, err = runManagedPipeline(ctx, tp, tm, t.TokenDefinition, t.Contract, persist.ProcessingCauseAppMint, 0,
 				PipelineOpts.WithRequireImage(),
-				PipelineOpts.WithMetadata(claim.TokenMetadata),
+				PipelineOpts.WithMetadata(claim.MintedTokenMetadata),
 			)
 			if err != nil {
 				return err
@@ -713,18 +713,18 @@ type highlightTracker struct{ q *db.Queries }
 
 func (m *highlightTracker) setStatusTxSucceeded(ctx context.Context, claimID persist.DBID, tokenMintID persist.DecimalTokenID, tokenMetadata persist.TokenMetadata) (db.HighlightMintClaim, error) {
 	return m.q.UpdateHighlightMintClaimStatusTxSucceeded(ctx, db.UpdateHighlightMintClaimStatusTxSucceededParams{
-		Status:        highlight.ClaimStatusTxSucceeded,
-		TokenMintID:   tokenMintID.ToHexTokenID(),
-		TokenMetadata: tokenMetadata,
-		ID:            claimID,
+		Status:              highlight.ClaimStatusTxSucceeded,
+		MintedTokenID:       tokenMintID.ToHexTokenID(),
+		MintedTokenMetadata: tokenMetadata,
+		ID:                  claimID,
 	})
 }
 
 func (m *highlightTracker) setStatusMediaProcessing(ctx context.Context, claimID, tokenID persist.DBID) (db.HighlightMintClaim, error) {
 	return m.q.UpdateHighlightMintClaimStatusMediaProcessing(ctx, db.UpdateHighlightMintClaimStatusMediaProcessingParams{
-		Status:  highlight.ClaimStatusMediaProcessing,
-		TokenID: tokenID,
-		ID:      claimID,
+		Status:          highlight.ClaimStatusMediaProcessing,
+		InternalTokenID: tokenID,
+		ID:              claimID,
 	})
 }
 
