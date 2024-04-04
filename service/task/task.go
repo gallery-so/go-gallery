@@ -75,7 +75,8 @@ type HighlightMintClaimMessage struct {
 }
 
 type AutosocialProcessUsersMessage struct {
-	Users map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress `json:"users" binding:"required"`
+	Users               map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress `json:"users" binding:"required"`
+	ImportSocialWallets map[persist.DBID]map[persist.SocialProvider]bool                   `json:"import_social_wallets"`
 }
 
 type AutosocialPollFarcasterMessage struct {

@@ -185,8 +185,9 @@ func newMetadataServerFixture(t *testing.T) serverFixture {
 }
 
 type nonceFixture struct {
-	Wallet wallet
-	Nonce  string
+	Wallet  wallet
+	Nonce   string
+	Message string
 }
 
 // newNonceFixture generates a new nonce
@@ -195,8 +196,8 @@ func newNonceFixture(t *testing.T) nonceFixture {
 	wallet := newWallet(t)
 	ctx := context.Background()
 	c := defaultHandlerClient(t)
-	nonce := newNonce(t, ctx, c, wallet)
-	return nonceFixture{wallet, nonce}
+	nonce, message := newNonce(t, ctx, c)
+	return nonceFixture{wallet, nonce, message}
 }
 
 type userFixture struct {

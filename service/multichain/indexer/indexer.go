@@ -131,34 +131,14 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (d *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	pAddressStr persist.PubKey, pWalletType persist.WalletType, pMessage string, pSignatureStr string) (bool, error) {
 
-	nonce := auth.NewNoncePrepend + pNonce
 	// personal_sign
-	validBool, err := verifySignature(pSignatureStr,
-		nonce,
-		pAddressStr, pWalletType,
-		true, d.ethClient)
+	validBool, err := verifySignature(pSignatureStr, pMessage, pAddressStr, pWalletType, true, d.ethClient)
 
 	if !validBool || err != nil {
 		// eth_sign
-		validBool, err = verifySignature(pSignatureStr,
-			nonce,
-			pAddressStr, pWalletType,
-			false, d.ethClient)
-		if err != nil || !validBool {
-			nonce = auth.NoncePrepend + pNonce
-			validBool, err = verifySignature(pSignatureStr,
-				nonce,
-				pAddressStr, pWalletType,
-				true, d.ethClient)
-			if err != nil || !validBool {
-				validBool, err = verifySignature(pSignatureStr,
-					nonce,
-					pAddressStr, pWalletType,
-					false, d.ethClient)
-			}
-		}
+		validBool, err = verifySignature(pSignatureStr, pMessage, pAddressStr, pWalletType, false, d.ethClient)
 	}
 
 	if err != nil {

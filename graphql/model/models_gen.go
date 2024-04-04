@@ -491,6 +491,10 @@ type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
 
+type UsersByAddressesPayloadOrError interface {
+	IsUsersByAddressesPayloadOrError()
+}
+
 type VerifyEmailMagicLinkPayloadOrError interface {
 	IsVerifyEmailMagicLinkPayloadOrError()
 }
@@ -618,8 +622,8 @@ type AuthMechanism struct {
 }
 
 type AuthNonce struct {
-	Nonce      *string `json:"nonce"`
-	UserExists *bool   `json:"userExists"`
+	Nonce   *string `json:"nonce"`
+	Message *string `json:"message"`
 }
 
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
@@ -964,12 +968,13 @@ type CreateGalleryPayload struct {
 func (CreateGalleryPayload) IsCreateGalleryPayloadOrError() {}
 
 type CreateUserInput struct {
-	Username           string         `json:"username"`
-	Bio                *string        `json:"bio"`
-	Email              *persist.Email `json:"email"`
-	GalleryName        *string        `json:"galleryName"`
-	GalleryDescription *string        `json:"galleryDescription"`
-	GalleryPosition    *string        `json:"galleryPosition"`
+	Username           string               `json:"username"`
+	Bio                *string              `json:"bio"`
+	Email              *persist.Email       `json:"email"`
+	GalleryName        *string              `json:"galleryName"`
+	GalleryDescription *string              `json:"galleryDescription"`
+	GalleryPosition    *string              `json:"galleryPosition"`
+	ImportWallets      []ImportWalletSource `json:"importWallets"`
 }
 
 type CreateUserPayload struct {
@@ -1048,6 +1053,7 @@ func (EnsProfileImage) IsProfileImage() {}
 type EoaAuth struct {
 	ChainPubKey *persist.ChainPubKey `json:"chainPubKey"`
 	Nonce       string               `json:"nonce"`
+	Message     string               `json:"message"`
 	Signature   string               `json:"signature"`
 }
 
@@ -1132,11 +1138,10 @@ type ErrDoesNotOwnRequiredToken struct {
 	Message string `json:"message"`
 }
 
-func (ErrDoesNotOwnRequiredToken) IsGetAuthNoncePayloadOrError() {}
-func (ErrDoesNotOwnRequiredToken) IsAuthorizationError()         {}
-func (ErrDoesNotOwnRequiredToken) IsError()                      {}
-func (ErrDoesNotOwnRequiredToken) IsLoginPayloadOrError()        {}
-func (ErrDoesNotOwnRequiredToken) IsCreateUserPayloadOrError()   {}
+func (ErrDoesNotOwnRequiredToken) IsAuthorizationError()       {}
+func (ErrDoesNotOwnRequiredToken) IsError()                    {}
+func (ErrDoesNotOwnRequiredToken) IsLoginPayloadOrError()      {}
+func (ErrDoesNotOwnRequiredToken) IsCreateUserPayloadOrError() {}
 
 type ErrEmailAlreadyUsed struct {
 	Message string `json:"message"`
@@ -1218,6 +1223,7 @@ type ErrInvalidInput struct {
 func (ErrInvalidInput) IsUserByUsernameOrError()                                         {}
 func (ErrInvalidInput) IsUserByIDOrError()                                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                                          {}
+func (ErrInvalidInput) IsUsersByAddressesPayloadOrError()                                {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                                         {}
 func (ErrInvalidInput) IsCommunityByIDOrError()                                          {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                                     {}
@@ -1723,6 +1729,7 @@ func (GltfMedia) IsMedia()        {}
 type GnosisSafeAuth struct {
 	Address persist.Address `json:"address"`
 	Nonce   string          `json:"nonce"`
+	Message string          `json:"message"`
 }
 
 type GroupNotificationUserEdge struct {
@@ -3030,6 +3037,12 @@ type UserSearchResult struct {
 	User *GalleryUser `json:"user"`
 }
 
+type UsersByAddressesPayload struct {
+	Users []*GalleryUser `json:"users"`
+}
+
+func (UsersByAddressesPayload) IsUsersByAddressesPayloadOrError() {}
+
 type UsersConnection struct {
 	Edges    []*UserEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
@@ -3225,6 +3238,45 @@ func (e *HighlightTxStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e HighlightTxStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ImportWalletSource string
+
+const (
+	ImportWalletSourceFarcaster ImportWalletSource = "Farcaster"
+)
+
+var AllImportWalletSource = []ImportWalletSource{
+	ImportWalletSourceFarcaster,
+}
+
+func (e ImportWalletSource) IsValid() bool {
+	switch e {
+	case ImportWalletSourceFarcaster:
+		return true
+	}
+	return false
+}
+
+func (e ImportWalletSource) String() string {
+	return string(e)
+}
+
+func (e *ImportWalletSource) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ImportWalletSource(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ImportWalletSource", str)
+	}
+	return nil
+}
+
+func (e ImportWalletSource) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

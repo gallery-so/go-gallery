@@ -347,7 +347,6 @@ type Repositories struct {
 	db                    *sql.DB
 	pool                  *pgxpool.Pool
 	UserRepository        *UserRepository
-	NonceRepository       *NonceRepository
 	GalleryRepository     *GalleryRepository
 	CollectionRepository  *CollectionTokenRepository
 	ContractRepository    *ContractGalleryRepository
@@ -366,7 +365,6 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		db:                    pq,
 		pool:                  pgx,
 		UserRepository:        NewUserRepository(pq, queries, pgx),
-		NonceRepository:       NewNonceRepository(pq, queries),
 		CollectionRepository:  NewCollectionTokenRepository(pq, queries),
 		GalleryRepository:     NewGalleryRepository(queries),
 		ContractRepository:    NewContractGalleryRepository(pq, queries),

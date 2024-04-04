@@ -206,12 +206,13 @@ func (v *CreateGalleryInput) GetDescription() *string { return v.Description }
 func (v *CreateGalleryInput) GetPosition() string { return v.Position }
 
 type CreateUserInput struct {
-	Username           string  `json:"username"`
-	Bio                *string `json:"bio"`
-	Email              *string `json:"email"`
-	GalleryName        *string `json:"galleryName"`
-	GalleryDescription *string `json:"galleryDescription"`
-	GalleryPosition    *string `json:"galleryPosition"`
+	Username           string               `json:"username"`
+	Bio                *string              `json:"bio"`
+	Email              *string              `json:"email"`
+	GalleryName        *string              `json:"galleryName"`
+	GalleryDescription *string              `json:"galleryDescription"`
+	GalleryPosition    *string              `json:"galleryPosition"`
+	ImportWallets      []ImportWalletSource `json:"importWallets"`
 }
 
 // GetUsername returns CreateUserInput.Username, and is useful for accessing the field via an interface.
@@ -231,6 +232,9 @@ func (v *CreateUserInput) GetGalleryDescription() *string { return v.GalleryDesc
 
 // GetGalleryPosition returns CreateUserInput.GalleryPosition, and is useful for accessing the field via an interface.
 func (v *CreateUserInput) GetGalleryPosition() *string { return v.GalleryPosition }
+
+// GetImportWallets returns CreateUserInput.ImportWallets, and is useful for accessing the field via an interface.
+func (v *CreateUserInput) GetImportWallets() []ImportWalletSource { return v.ImportWallets }
 
 type DebugAuth struct {
 	AsUsername         *string             `json:"asUsername"`
@@ -273,6 +277,7 @@ func (v *DebugSocialAuth) GetDebugToolsPassword() *string { return v.DebugToolsP
 type EoaAuth struct {
 	ChainPubKey ChainPubKeyInput `json:"chainPubKey"`
 	Nonce       string           `json:"nonce"`
+	Message     string           `json:"message"`
 	Signature   string           `json:"signature"`
 }
 
@@ -281,6 +286,9 @@ func (v *EoaAuth) GetChainPubKey() ChainPubKeyInput { return v.ChainPubKey }
 
 // GetNonce returns EoaAuth.Nonce, and is useful for accessing the field via an interface.
 func (v *EoaAuth) GetNonce() string { return v.Nonce }
+
+// GetMessage returns EoaAuth.Message, and is useful for accessing the field via an interface.
+func (v *EoaAuth) GetMessage() string { return v.Message }
 
 // GetSignature returns EoaAuth.Signature, and is useful for accessing the field via an interface.
 func (v *EoaAuth) GetSignature() string { return v.Signature }
@@ -301,6 +309,7 @@ func (v *FarcasterAuth) GetWithSigner() *bool { return v.WithSigner }
 type GnosisSafeAuth struct {
 	Address string `json:"address"`
 	Nonce   string `json:"nonce"`
+	Message string `json:"message"`
 }
 
 // GetAddress returns GnosisSafeAuth.Address, and is useful for accessing the field via an interface.
@@ -308,6 +317,15 @@ func (v *GnosisSafeAuth) GetAddress() string { return v.Address }
 
 // GetNonce returns GnosisSafeAuth.Nonce, and is useful for accessing the field via an interface.
 func (v *GnosisSafeAuth) GetNonce() string { return v.Nonce }
+
+// GetMessage returns GnosisSafeAuth.Message, and is useful for accessing the field via an interface.
+func (v *GnosisSafeAuth) GetMessage() string { return v.Message }
+
+type ImportWalletSource string
+
+const (
+	ImportWalletSourceFarcaster ImportWalletSource = "Farcaster"
+)
 
 type IntervalInput struct {
 	Start  int `json:"start"`
@@ -713,14 +731,6 @@ type __disconnectSocialAccountInput struct {
 
 // GetAccountType returns __disconnectSocialAccountInput.AccountType, and is useful for accessing the field via an interface.
 func (v *__disconnectSocialAccountInput) GetAccountType() SocialAccountType { return v.AccountType }
-
-// __getAuthNonceMutationInput is used internally by genqlient
-type __getAuthNonceMutationInput struct {
-	Input ChainAddressInput `json:"input"`
-}
-
-// GetInput returns __getAuthNonceMutationInput.Input, and is useful for accessing the field via an interface.
-func (v *__getAuthNonceMutationInput) GetInput() ChainAddressInput { return v.Input }
 
 // __globalFeedQueryInput is used internally by genqlient
 type __globalFeedQueryInput struct {
@@ -4691,9 +4701,9 @@ func (v *disconnectSocialAccountResponse) __premarshalJSON() (*__premarshaldisco
 
 // getAuthNonceMutationGetAuthNonce includes the requested fields of the GraphQL type AuthNonce.
 type getAuthNonceMutationGetAuthNonce struct {
-	Typename   *string `json:"__typename"`
-	Nonce      *string `json:"nonce"`
-	UserExists *bool   `json:"userExists"`
+	Typename *string `json:"__typename"`
+	Nonce    *string `json:"nonce"`
+	Message  *string `json:"message"`
 }
 
 // GetTypename returns getAuthNonceMutationGetAuthNonce.Typename, and is useful for accessing the field via an interface.
@@ -4702,30 +4712,13 @@ func (v *getAuthNonceMutationGetAuthNonce) GetTypename() *string { return v.Type
 // GetNonce returns getAuthNonceMutationGetAuthNonce.Nonce, and is useful for accessing the field via an interface.
 func (v *getAuthNonceMutationGetAuthNonce) GetNonce() *string { return v.Nonce }
 
-// GetUserExists returns getAuthNonceMutationGetAuthNonce.UserExists, and is useful for accessing the field via an interface.
-func (v *getAuthNonceMutationGetAuthNonce) GetUserExists() *bool { return v.UserExists }
-
-// getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken includes the requested fields of the GraphQL type ErrDoesNotOwnRequiredToken.
-type getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken struct {
-	Typename *string `json:"__typename"`
-	Message  string  `json:"message"`
-}
-
-// GetTypename returns getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken.Typename, and is useful for accessing the field via an interface.
-func (v *getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken) GetTypename() *string {
-	return v.Typename
-}
-
-// GetMessage returns getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken.Message, and is useful for accessing the field via an interface.
-func (v *getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken) GetMessage() string {
-	return v.Message
-}
+// GetMessage returns getAuthNonceMutationGetAuthNonce.Message, and is useful for accessing the field via an interface.
+func (v *getAuthNonceMutationGetAuthNonce) GetMessage() *string { return v.Message }
 
 // getAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError includes the requested fields of the GraphQL interface GetAuthNoncePayloadOrError.
 //
 // getAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError is implemented by the following types:
 // getAuthNonceMutationGetAuthNonce
-// getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken
 type getAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError interface {
 	implementsGraphQLInterfacegetAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -4733,8 +4726,6 @@ type getAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError interface {
 }
 
 func (v *getAuthNonceMutationGetAuthNonce) implementsGraphQLInterfacegetAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError() {
-}
-func (v *getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken) implementsGraphQLInterfacegetAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError() {
 }
 
 func __unmarshalgetAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError(b []byte, v *getAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError) error {
@@ -4753,9 +4744,6 @@ func __unmarshalgetAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError(b []b
 	switch tn.TypeName {
 	case "AuthNonce":
 		*v = new(getAuthNonceMutationGetAuthNonce)
-		return json.Unmarshal(b, *v)
-	case "ErrDoesNotOwnRequiredToken":
-		*v = new(getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -4776,14 +4764,6 @@ func __marshalgetAuthNonceMutationGetAuthNonceGetAuthNoncePayloadOrError(v *getA
 		result := struct {
 			TypeName string `json:"__typename"`
 			*getAuthNonceMutationGetAuthNonce
-		}{typename, v}
-		return json.Marshal(result)
-	case *getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken:
-		typename = "ErrDoesNotOwnRequiredToken"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*getAuthNonceMutationGetAuthNonceErrDoesNotOwnRequiredToken
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -12305,16 +12285,12 @@ func disconnectSocialAccount(
 
 // The query or mutation executed by getAuthNonceMutation.
 const getAuthNonceMutation_Operation = `
-mutation getAuthNonceMutation ($input: ChainAddressInput!) {
-	getAuthNonce(chainAddress: $input) {
+mutation getAuthNonceMutation {
+	getAuthNonce {
 		__typename
-		... on Error {
-			__typename
-			message
-		}
 		... on AuthNonce {
 			nonce
-			userExists
+			message
 		}
 	}
 }
@@ -12323,14 +12299,10 @@ mutation getAuthNonceMutation ($input: ChainAddressInput!) {
 func getAuthNonceMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
-	input ChainAddressInput,
 ) (*getAuthNonceMutationResponse, error) {
 	req_ := &graphql.Request{
 		OpName: "getAuthNonceMutation",
 		Query:  getAuthNonceMutation_Operation,
-		Variables: &__getAuthNonceMutationInput{
-			Input: input,
-		},
 	}
 	var err_ error
 

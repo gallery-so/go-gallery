@@ -51,23 +51,32 @@ func (a PrivyAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 		return nil, err
 	}
 
-	var persistUser *persist.User
+	var user *coredb.User
 
 	// Look for an existing user, but don't error if there isn't one
-	dbUser, err := a.queries.GetUserByPrivyDID(ctx, privyDID)
-	if err == nil {
-		// Convert the coredb.User to a persist.User via SQL
-		u, err := a.userRepo.GetByID(ctx, dbUser.ID)
-		if err != nil {
+	u, err := a.queries.GetUserByPrivyDID(ctx, privyDID)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
 			return nil, err
 		}
-		persistUser = &u
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
+	} else {
+		user = &u
+	}
+
+	// If we didn't find a user by Privy DID, see if we can find one by verified email address
+	if user == nil && details.EmailAddress != nil {
+		u, err = a.queries.GetUserByVerifiedEmailAddress(ctx, string(*details.EmailAddress))
+		if err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+		} else {
+			user = &u
+		}
 	}
 
 	authResult := auth.AuthResult{
-		User:     persistUser,
+		User:     user,
 		Email:    details.EmailAddress,
 		PrivyDID: util.ToPointer(privyDID),
 	}

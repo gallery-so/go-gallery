@@ -1364,18 +1364,15 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 }
 
 // GetAuthNonce is the resolver for the getAuthNonce field.
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {
-	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, chainAddress)
-	if err != nil {
-		return nil, err
-	}
+func (r *mutationResolver) GetAuthNonce(ctx context.Context) (model.GetAuthNoncePayloadOrError, error) {
+	nonce, message, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.AuthNonce{
-		Nonce:      &nonce,
-		UserExists: &userExists,
+		Nonce:   &nonce,
+		Message: &message,
 	}
 
 	return output, nil
@@ -1411,7 +1408,12 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 		email = &it
 	}
 
-	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, input.Username, email, bioStr, nameStr, descStr, positionStr)
+	importFarcasterWallets := false
+	if util.Contains(input.ImportWallets, model.ImportWalletSourceFarcaster) {
+		importFarcasterWallets = true
+	}
+
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, input.Username, email, bioStr, nameStr, descStr, positionStr, importFarcasterWallets)
 	if err != nil {
 		return nil, err
 	}
@@ -2501,6 +2503,29 @@ func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.Us
 // UserByAddress is the resolver for the userByAddress field.
 func (r *queryResolver) UserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (model.UserByAddressOrError, error) {
 	return resolveGalleryUserByAddress(ctx, chainAddress)
+}
+
+// UsersByAddresses is the resolver for the usersByAddresses field.
+func (r *queryResolver) UsersByAddresses(ctx context.Context, chainAddresses []*persist.ChainAddress) (model.UsersByAddressesPayloadOrError, error) {
+	addresses := make([]persist.ChainAddress, len(chainAddresses))
+	for i, addr := range chainAddresses {
+		addresses[i] = *addr
+	}
+
+	users, err := publicapi.For(ctx).User.GetUsersByAddresses(ctx, addresses)
+	if err != nil {
+		return nil, err
+	}
+
+	output := model.UsersByAddressesPayload{
+		Users: make([]*model.GalleryUser, len(users)),
+	}
+
+	for i, user := range users {
+		output.Users[i] = userToModel(ctx, user)
+	}
+
+	return &output, nil
 }
 
 // UsersWithTrait is the resolver for the usersWithTrait field.

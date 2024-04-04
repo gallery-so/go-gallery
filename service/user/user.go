@@ -148,7 +148,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return err
 	}
 
-	if authResult.User != nil && !authResult.User.Universal.Bool() {
+	if authResult.User != nil && !authResult.User.Universal {
 		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: authResult.User.ID}
 	}
 
@@ -238,37 +238,6 @@ func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, 
 	}
 	return nil
 }
-
-// Not in use
-// // MergeUsers merges two users together
-// func MergeUsers(pCtx context.Context, userRepo postgres.UserRepository, nonceRepo postgres.NonceRepository, walletRepo postgres.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
-// 	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
-// 	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
-// 	if nonce == "" {
-// 		return auth.ErrNonceNotFound{ChainAddress: chainAddress}
-// 	}
-// 	if id != pInput.SecondUserID {
-// 		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
-// 	}
-
-// 	if pInput.WalletType != persist.WalletTypeEOA {
-// 		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
-// 			return auth.ErrNonceMismatch
-// 		}
-// 	}
-
-// 	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature, nonce, chainAddress, pInput.WalletType)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if !sigValidBool {
-// 		return fmt.Errorf("signature is invalid for address %s", pInput.Address)
-// 	}
-
-// 	return userRepo.MergeUsers(pCtx, pUserID, pInput.SecondUserID)
-
-// }
 
 type ErrUserAlreadyExists struct {
 	Address       persist.Address

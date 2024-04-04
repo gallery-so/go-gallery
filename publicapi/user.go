@@ -262,6 +262,38 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.Ch
 	return &user, nil
 }
 
+func (api UserAPI) GetUsersByAddresses(ctx context.Context, chainAddresses []persist.ChainAddress) ([]db.User, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"chainAddresses": validate.WithTag(chainAddresses, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	keys := make([]db.GetUserByAddressAndL1BatchParams, len(chainAddresses))
+	for i, chainAddress := range chainAddresses {
+		chain := chainAddress.Chain()
+		keys[i] = db.GetUserByAddressAndL1BatchParams{
+			L1Chain: chain.L1Chain(),
+			Address: chainAddress.Address(),
+		}
+	}
+
+	var found []db.User
+	users, errs := api.loaders.GetUserByAddressAndL1Batch.LoadAll(keys)
+	for i, err := range errs {
+		if err != nil {
+			if util.ErrorIs[persist.ErrUserNotFound](err) {
+				continue
+			}
+			return nil, err
+		}
+		found = append(found, users[i])
+	}
+
+	return util.DedupeWithTranslate(found, true, func(u db.User) persist.DBID { return u.ID }), nil
+}
+
 func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -522,7 +554,7 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 	})
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, importFarcasterWallets bool) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username": validate.WithTag(username, "required,username"),
@@ -592,6 +624,11 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 			userID: {
 				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
 				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
+			},
+		},
+		ImportSocialWallets: map[persist.DBID]map[persist.SocialProvider]bool{
+			userID: {
+				persist.SocialProviderFarcaster: importFarcasterWallets,
 			},
 		},
 	})
@@ -1951,7 +1988,7 @@ func createNewUserParamsWithAuth(ctx context.Context, authenticator auth.Authent
 		return persist.CreateUserInput{}, auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	if authResult.User != nil && !authResult.User.Universal.Bool() {
+	if authResult.User != nil && !authResult.User.Universal {
 		if _, ok := authenticator.(auth.MagicLinkAuthenticator); ok {
 			// TODO: We currently only use MagicLink for email, but we may use it for other login methods like SMS later,
 			// so this error may not always be applicable in the future.

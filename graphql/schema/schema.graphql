@@ -930,6 +930,12 @@ union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByAddressOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
+type UsersByAddressesPayload {
+  users: [GalleryUser!]
+}
+
+union UsersByAddressesPayloadOrError = UsersByAddressesPayload | ErrInvalidInput
+
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
@@ -1437,6 +1443,7 @@ type Query {
   userByUsername(username: String!): UserByUsernameOrError
   userById(id: DBID!): UserByIdOrError
   userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
+  usersByAddresses(chainAddresses: [ChainAddressInput!]!): UsersByAddressesPayloadOrError
   usersWithTrait(trait: String!): [GalleryUser]
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
   collectionById(id: DBID!): CollectionByIdOrError
@@ -1802,10 +1809,10 @@ type RefreshContractPayload {
 
 type AuthNonce {
   nonce: String
-  userExists: Boolean
+  message: String
 }
 
-union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
+union GetAuthNoncePayloadOrError = AuthNonce
 
 type ErrAuthenticationFailed implements Error {
   message: String!
@@ -1913,6 +1920,7 @@ input AuthMechanism {
 input EoaAuth {
   chainPubKey: ChainPubKeyInput!
   nonce: String!
+  message: String!
   signature: String! @scrub
 }
 
@@ -1941,6 +1949,7 @@ input DebugAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
+  message: String!
 }
 
 input MagicLinkAuth {
@@ -2010,6 +2019,11 @@ type LoginPayload {
 type LogoutPayload {
   viewer: Viewer
 }
+
+enum ImportWalletSource {
+  Farcaster
+}
+
 input CreateUserInput {
   username: String!
   bio: String
@@ -2017,6 +2031,7 @@ input CreateUserInput {
   galleryName: String
   galleryDescription: String
   galleryPosition: String
+  importWallets: [ImportWalletSource!]
 }
 
 union CreateUserPayloadOrError =
@@ -3097,7 +3112,7 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
+  getAuthNonce: GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
   updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
