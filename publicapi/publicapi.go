@@ -25,6 +25,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/apq"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -67,7 +68,7 @@ type PublicAPI struct {
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI, mintLimiter *limiters.KeyRateLimiter) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	validator := validate.WithCustomValidators()
 	tokenManager := tokenmanage.New(ctx, taskClient, tokenManageCache, nil)
@@ -98,7 +99,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache, httpClient: httpClient, taskClient: taskClient, neynarAPI: neynar},
 		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 		Search:        &SearchAPI{queries: queries, loaders: loaders, validator: validator},
-		Mint:          &MintAPI{validator: validator, highlightProvider: highlightProvider, queries: queries, taskClient: taskClient, throttler: throttler},
+		Mint:          &MintAPI{validator: validator, highlightProvider: highlightProvider, queries: queries, taskClient: taskClient, throttler: throttler, ipRateLimiter: mintLimiter},
 	}
 }
 

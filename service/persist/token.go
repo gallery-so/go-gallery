@@ -104,8 +104,6 @@ const (
 	ChainZora
 	// ChainBase represents the base chain
 	ChainBase
-	// ChainBaseSepolia - Base testnet
-	ChainBaseSepolia
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to
 	// point to the most recently added chain type.
@@ -133,15 +131,14 @@ func MustHexString(s string) HexString {
 }
 
 var L1Chains = map[Chain]L1Chain{
-	ChainPOAP:        L1Chain(ChainETH),
-	ChainOptimism:    L1Chain(ChainETH),
-	ChainPolygon:     L1Chain(ChainETH),
-	ChainArbitrum:    L1Chain(ChainETH),
-	ChainZora:        L1Chain(ChainETH),
-	ChainBase:        L1Chain(ChainETH),
-	ChainBaseSepolia: L1Chain(ChainETH), // Perhaps this should be an ethereum testnet instead
-	ChainETH:         L1Chain(ChainETH),
-	ChainTezos:       L1Chain(ChainTezos),
+	ChainPOAP:     L1Chain(ChainETH),
+	ChainOptimism: L1Chain(ChainETH),
+	ChainPolygon:  L1Chain(ChainETH),
+	ChainArbitrum: L1Chain(ChainETH),
+	ChainZora:     L1Chain(ChainETH),
+	ChainBase:     L1Chain(ChainETH),
+	ChainETH:      L1Chain(ChainETH),
+	ChainTezos:    L1Chain(ChainTezos),
 }
 
 var L1ChainGroups = map[L1Chain][]Chain{
@@ -513,8 +510,6 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 			*c = ChainZora
 		case "base":
 			*c = ChainBase
-		case "base_sepolia":
-			*c = ChainBaseSepolia
 		}
 		return nil
 	}
@@ -546,8 +541,6 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 		*c = ChainZora
 	case "base":
 		*c = ChainBase
-	case "baseSepolia":
-		*c = ChainBaseSepolia
 	}
 	return nil
 }
@@ -571,8 +564,6 @@ func (c Chain) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"Zora"`))
 	case ChainBase:
 		w.Write([]byte(`"Base"`))
-	case ChainBaseSepolia:
-		w.Write([]byte(`"BaseSepolia"`))
 	}
 }
 

@@ -68,8 +68,7 @@ func (t *authT) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 var chainIDtoChain = map[int]persist.Chain{
-	84532: persist.ChainBaseSepolia,
-	8453:  persist.ChainBase,
+	8453: persist.ChainBase,
 }
 
 func mustChainIDToChain(chainID int) persist.Chain {
@@ -140,7 +139,7 @@ func (api *Provider) ClaimMint(ctx context.Context, collectionID string, qty int
 
 	// Txn failed
 	if status := m.ClaimByCollectionApp.ClaimStatus; status == txCodeReverted || status == txCodeCancelled {
-		err := ErrHighlightTxnFailed{fmt.Sprintf("failed to execute mint transaction for collectionID=%s; chain=%d; address=%s: %s", collectionID, persist.ChainBaseSepolia, recipient.Address(), status)}
+		err := ErrHighlightTxnFailed{fmt.Sprintf("failed to execute mint transaction for collectionID=%s; address=%s: %s", collectionID, recipient.Address(), status)}
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 		return "", ClaimStatusTxFailed, chainAddress, err

@@ -28,6 +28,7 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/farcaster"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -134,11 +135,12 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	tokenManageCache := redis.NewCache(redis.TokenManageCache)
 	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
 	neynar := farcaster.NewNeynarAPI(c.HTTPClient, socialCache, c.Queries)
+	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
 
 	recommender.Loop(ctx, time.NewTicker(time.Hour))
 	p.Loop(ctx, time.NewTicker(time.Minute*15))
 
-	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar)
+	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar, mintLimiter)
 }
 
 func newSecretsClient() *secretmanager.Client {

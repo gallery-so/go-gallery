@@ -14,15 +14,14 @@ import (
 type Chain string
 
 const (
-	ChainEthereum    Chain = "Ethereum"
-	ChainArbitrum    Chain = "Arbitrum"
-	ChainPolygon     Chain = "Polygon"
-	ChainOptimism    Chain = "Optimism"
-	ChainTezos       Chain = "Tezos"
-	ChainPoap        Chain = "POAP"
-	ChainZora        Chain = "Zora"
-	ChainBase        Chain = "Base"
-	ChainBasesepolia Chain = "BaseSepolia"
+	ChainEthereum Chain = "Ethereum"
+	ChainArbitrum Chain = "Arbitrum"
+	ChainPolygon  Chain = "Polygon"
+	ChainOptimism Chain = "Optimism"
+	ChainTezos    Chain = "Tezos"
+	ChainPoap     Chain = "POAP"
+	ChainZora     Chain = "Zora"
+	ChainBase     Chain = "Base"
 )
 
 // __communityDigestEntityQueryInput is used internally by genqlient

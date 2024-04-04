@@ -135,13 +135,12 @@ type Provider struct {
 // NewProvider creates a new Reservoir provider
 func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Chain, l retry.Limiter) (*Provider, func()) {
 	apiURL := map[persist.Chain]string{
-		persist.ChainETH:         ethMainnetBaseURL,
-		persist.ChainOptimism:    optimismBaseURL,
-		persist.ChainPolygon:     polygonBaseURL,
-		persist.ChainArbitrum:    arbitrumBaseURL,
-		persist.ChainZora:        zoraBaseURL,
-		persist.ChainBase:        baseBaseURL,
-		persist.ChainBaseSepolia: baseSepoliaBaseURL,
+		persist.ChainETH:      ethMainnetBaseURL,
+		persist.ChainOptimism: optimismBaseURL,
+		persist.ChainPolygon:  polygonBaseURL,
+		persist.ChainArbitrum: arbitrumBaseURL,
+		persist.ChainZora:     zoraBaseURL,
+		persist.ChainBase:     baseBaseURL,
 	}[chain]
 	if apiURL == "" {
 		panic(fmt.Sprintf("no reservoir api url set for chain %d", chain))

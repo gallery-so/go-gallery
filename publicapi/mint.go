@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -25,6 +26,7 @@ type MintAPI struct {
 	queries           *db.Queries
 	taskClient        *task.Client
 	throttler         *throttle.Locker
+	ipRateLimiter     *limiters.KeyRateLimiter
 }
 
 func (api *MintAPI) GetHighlightMintClaimByID(ctx context.Context, id persist.DBID) (db.HighlightMintClaim, error) {
@@ -69,6 +71,18 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 		return "", err
 	}
 
+	gc := util.MustGetGinContext(ctx)
+
+	canContinue, _, err := api.ipRateLimiter.ForKey(ctx, gc.ClientIP())
+	if err != nil {
+		return "", err
+	}
+	if !canContinue {
+		err = fmt.Errorf("user=%s has an IP that has attempted to claim recently, not continuing with mint", userID)
+		logger.For(ctx).Error(err)
+		return "", err
+	}
+
 	err, releaseLock := api.guardMinting(ctx, collectionID, userID, walletID)
 	if util.ErrorIs[throttle.ErrThrottleLocked](err) {
 		return "", ErrMintTxPending
@@ -97,6 +111,8 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 		util.ErrorIs[highlight.ErrHighlightInternalError](claimErr) {
 		return "", claimErr
 	}
+
+	logger.For(ctx).Infof("got highlight internal mint claimID=%s for user=%s", claimID, userID)
 
 	// Save record of transaction
 	storeParams := db.SaveHighlightMintClaimParams{
