@@ -1016,25 +1016,14 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 
 		name := util.TruncateWithEllipsis(td.Name.String, 40)
 
-		amount := n.Data.NewTokenQuantity
-		i := amount.BigInt().Uint64()
-
 		if !nameFound {
-			// name is still empty, use generic
-			name = "token"
-			if i > 1 {
-				name += "s"
-			}
+			data.Actor = "You"
+			data.Action = "just collected an NFT. Tap to share now."
+			return data, nil
 		}
 
-		if i > 1 {
-			data.Actor = "You"
-			data.Action = fmt.Sprintf("just collected %d new %s. Tap to share now.", i, name)
-		} else {
-			data.Actor = "You"
-			data.Action = fmt.Sprintf("just collected %s. Tap to share now.", name)
-		}
-
+		data.Actor = "You"
+		data.Action = fmt.Sprintf("just collected %s. Tap to share now.", name)
 		return data, nil
 	case persist.ActionUserPostedYourWork:
 		post, err := queries.GetPostByID(ctx, n.PostID)
