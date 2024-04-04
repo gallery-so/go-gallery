@@ -63,6 +63,18 @@ func (a PrivyAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 		user = &u
 	}
 
+	// If we didn't find a user by Privy DID, see if we can find one by verified email address
+	if user == nil && details.EmailAddress != nil {
+		u, err = a.queries.GetUserByVerifiedEmailAddress(ctx, string(*details.EmailAddress))
+		if err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+		} else {
+			user = &u
+		}
+	}
+
 	authResult := auth.AuthResult{
 		User:     user,
 		Email:    details.EmailAddress,
