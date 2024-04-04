@@ -254,6 +254,9 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 
 	user, err := e.Queries.GetUserByVerifiedEmailAddress(pCtx, authedEmail.String())
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &authResult, persist.ErrUserNotFound{Email: authedEmail}
+		}
 		return &authResult, err
 	}
 
