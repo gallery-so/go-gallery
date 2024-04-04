@@ -1914,6 +1914,7 @@ input AuthMechanism {
   magicLink: MagicLinkAuth
   oneTimeLoginToken: OneTimeLoginTokenAuth
   privy: PrivyAuth
+  neynar: NeynarAuth
 }
 
 input EoaAuth {
@@ -1961,6 +1962,19 @@ input OneTimeLoginTokenAuth {
 
 input PrivyAuth {
   token: String!
+}
+
+input NeynarAuth {
+  custodyPubKey: ChainPubKeyInput!
+  nonce: String!
+  message: String!
+  signature: String! @scrub
+
+  """
+  primaryPubKey is an optional parameter that lets callers specify a different wallet to use with Gallery, provided
+  that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user
+  """
+  primaryPubKey: ChainPubKeyInput
 }
 
 input SocialAuthMechanism {

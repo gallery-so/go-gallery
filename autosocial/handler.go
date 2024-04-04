@@ -200,7 +200,7 @@ func addLensProfileToUser(ctx context.Context, l *lens.LensAPI, address []persis
 
 func addFarcasterProfilesToUsers(ctx context.Context, n *farcaster.NeynarAPI, addresses []persist.Address, q *coredb.Queries, userLookup map[persist.Address]persist.DBID,
 	importWalletsLookup map[persist.DBID]bool, userRepo *postgres.UserRepository) error {
-	users, err := n.UsersByAddresses(ctx, addresses)
+	users, err := n.UsersByAddresses(ctx, addresses, false)
 	if err != nil {
 		return err
 	}

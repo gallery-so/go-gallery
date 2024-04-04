@@ -9789,6 +9789,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputMentionInput,
 		ec.unmarshalInputMintPremiumCardToWalletInput,
 		ec.unmarshalInputMoveCollectionToGalleryInput,
+		ec.unmarshalInputNeynarAuth,
 		ec.unmarshalInputNotificationSettingsInput,
 		ec.unmarshalInputOneTimeLoginTokenAuth,
 		ec.unmarshalInputPostComposerDraftDetailsInput,
@@ -11856,6 +11857,7 @@ input AuthMechanism {
   magicLink: MagicLinkAuth
   oneTimeLoginToken: OneTimeLoginTokenAuth
   privy: PrivyAuth
+  neynar: NeynarAuth
 }
 
 input EoaAuth {
@@ -11903,6 +11905,17 @@ input OneTimeLoginTokenAuth {
 
 input PrivyAuth {
   token: String!
+}
+
+input NeynarAuth {
+  custodyPubKey: ChainPubKeyInput!
+  nonce: String!
+  message: String!
+  signature: String! @scrub
+
+  """primaryPubKey is an optional parameter that lets callers specify a different wallet to use with Gallery, provided
+  that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user"""
+  primaryPubKey: ChainPubKeyInput
 }
 
 input SocialAuthMechanism {
@@ -69508,7 +69521,7 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink", "oneTimeLoginToken", "privy"}
+	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink", "oneTimeLoginToken", "privy", "neynar"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -69578,6 +69591,13 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 				return it, err
 			}
 			it.Privy = data
+		case "neynar":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("neynar"))
+			data, err := ec.unmarshalONeynarAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNeynarAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Neynar = data
 		}
 	}
 
@@ -70742,6 +70762,61 @@ func (ec *executionContext) unmarshalInputMoveCollectionToGalleryInput(ctx conte
 				return it, err
 			}
 			it.TargetGalleryID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputNeynarAuth(ctx context.Context, obj interface{}) (model.NeynarAuth, error) {
+	var it model.NeynarAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"custodyPubKey", "nonce", "message", "signature", "primaryPubKey"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "custodyPubKey":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("custodyPubKey"))
+			data, err := ec.unmarshalNChainPubKeyInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainPubKey(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CustodyPubKey = data
+		case "nonce":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Nonce = data
+		case "message":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Message = data
+		case "signature":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Signature = data
+		case "primaryPubKey":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("primaryPubKey"))
+			data, err := ec.unmarshalOChainPubKeyInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainPubKey(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PrimaryPubKey = data
 		}
 	}
 
@@ -97084,6 +97159,14 @@ func (ec *executionContext) unmarshalOChainAddressInput2ᚖgithubᚗcomᚋmikeyd
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalOChainPubKeyInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainPubKey(ctx context.Context, v interface{}) (*persist.ChainPubKey, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputChainPubKeyInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOClearAllNotificationsPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐClearAllNotificationsPayload(ctx context.Context, sel ast.SelectionSet, v *model.ClearAllNotificationsPayload) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -99169,6 +99252,14 @@ func (ec *executionContext) marshalOMoveCollectionToGalleryPayloadOrError2github
 		return graphql.Null
 	}
 	return ec._MoveCollectionToGalleryPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalONeynarAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNeynarAuth(ctx context.Context, v interface{}) (*model.NeynarAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputNeynarAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalONode2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNode(ctx context.Context, sel ast.SelectionSet, v model.Node) graphql.Marshaler {

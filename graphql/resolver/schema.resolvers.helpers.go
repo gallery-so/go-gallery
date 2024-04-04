@@ -227,6 +227,10 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 		return authApi.NewPrivyAuthenticator(m.Privy.Token), nil
 	}
 
+	if m.Neynar != nil && m.Neynar.CustodyPubKey != nil {
+		return authApi.NewNeynarAuthenticator(*m.Neynar.CustodyPubKey, m.Neynar.PrimaryPubKey, m.Neynar.Nonce, m.Neynar.Message, m.Neynar.Signature, persist.WalletTypeEOA), nil
+	}
+
 	return nil, errNoAuthMechanismFound
 }
 

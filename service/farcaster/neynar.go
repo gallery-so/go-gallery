@@ -196,7 +196,7 @@ func (n *NeynarAPI) FarcasterIDByUserID(ctx context.Context, userID persist.DBID
 		return "", ErrUserNotOnFarcaster
 	}
 
-	farcasterUsers, err := n.UsersByAddresses(ctx, walletsToCheck)
+	farcasterUsers, err := n.UsersByAddresses(ctx, walletsToCheck, false)
 	if err != nil {
 		return "", err
 	}
@@ -211,10 +211,15 @@ func (n *NeynarAPI) FarcasterIDByUserID(ctx context.Context, userID persist.DBID
 	return "", ErrUserNotOnFarcaster
 }
 
-func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address) (map[persist.Address][]NeynarUser, error) {
+func (n *NeynarAPI) UsersByAddresses(ctx context.Context, addresses []persist.Address, custodyAddressesOnly bool) (map[persist.Address][]NeynarUser, error) {
 	addressesJoined := strings.Join(util.MapWithoutError(addresses, func(a persist.Address) string { return a.String() }), ",")
-	urlEnconded := url.QueryEscape(addressesJoined)
-	u := fmt.Sprintf("%s/user/bulk-by-address/?addresses=%s", neynarV2BaseURL, urlEnconded)
+	urlEncoded := url.QueryEscape(addressesJoined)
+
+	u := fmt.Sprintf("%s/user/bulk-by-address/?addresses=%s", neynarV2BaseURL, urlEncoded)
+	if custodyAddressesOnly {
+		u += "&address_types=custody_address"
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err

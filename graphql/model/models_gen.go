@@ -619,6 +619,7 @@ type AuthMechanism struct {
 	MagicLink         *MagicLinkAuth         `json:"magicLink"`
 	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
 	Privy             *PrivyAuth             `json:"privy"`
+	Neynar            *NeynarAuth            `json:"neynar"`
 }
 
 type AuthNonce struct {
@@ -1951,6 +1952,16 @@ type NewTokensNotification struct {
 func (NewTokensNotification) IsNotification()        {}
 func (NewTokensNotification) IsNode()                {}
 func (NewTokensNotification) IsGroupedNotification() {}
+
+type NeynarAuth struct {
+	CustodyPubKey *persist.ChainPubKey `json:"custodyPubKey"`
+	Nonce         string               `json:"nonce"`
+	Message       string               `json:"message"`
+	Signature     string               `json:"signature"`
+	// primaryPubKey is an optional parameter that lets callers specify a different wallet to use with Gallery, provided
+	//   that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user
+	PrimaryPubKey *persist.ChainPubKey `json:"primaryPubKey"`
+}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
