@@ -29,6 +29,7 @@ type AuthMechanism struct {
 	MagicLink         *MagicLinkAuth         `json:"magicLink"`
 	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
 	Privy             *PrivyAuth             `json:"privy"`
+	Neynar            *NeynarAuth            `json:"neynar"`
 }
 
 // GetEoa returns AuthMechanism.Eoa, and is useful for accessing the field via an interface.
@@ -48,6 +49,9 @@ func (v *AuthMechanism) GetOneTimeLoginToken() *OneTimeLoginTokenAuth { return v
 
 // GetPrivy returns AuthMechanism.Privy, and is useful for accessing the field via an interface.
 func (v *AuthMechanism) GetPrivy() *PrivyAuth { return v.Privy }
+
+// GetNeynar returns AuthMechanism.Neynar, and is useful for accessing the field via an interface.
+func (v *AuthMechanism) GetNeynar() *NeynarAuth { return v.Neynar }
 
 type Chain string
 
@@ -383,6 +387,31 @@ func (v *MoveCollectionToGalleryInput) GetSourceCollectionId() persist.DBID {
 
 // GetTargetGalleryId returns MoveCollectionToGalleryInput.TargetGalleryId, and is useful for accessing the field via an interface.
 func (v *MoveCollectionToGalleryInput) GetTargetGalleryId() persist.DBID { return v.TargetGalleryId }
+
+type NeynarAuth struct {
+	CustodyPubKey ChainPubKeyInput `json:"custodyPubKey"`
+	Nonce         string           `json:"nonce"`
+	Message       string           `json:"message"`
+	Signature     string           `json:"signature"`
+	// primaryPubKey is an optional parameter that lets callers specify a different wallet to use with Gallery, provided
+	// that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user
+	PrimaryPubKey *ChainPubKeyInput `json:"primaryPubKey"`
+}
+
+// GetCustodyPubKey returns NeynarAuth.CustodyPubKey, and is useful for accessing the field via an interface.
+func (v *NeynarAuth) GetCustodyPubKey() ChainPubKeyInput { return v.CustodyPubKey }
+
+// GetNonce returns NeynarAuth.Nonce, and is useful for accessing the field via an interface.
+func (v *NeynarAuth) GetNonce() string { return v.Nonce }
+
+// GetMessage returns NeynarAuth.Message, and is useful for accessing the field via an interface.
+func (v *NeynarAuth) GetMessage() string { return v.Message }
+
+// GetSignature returns NeynarAuth.Signature, and is useful for accessing the field via an interface.
+func (v *NeynarAuth) GetSignature() string { return v.Signature }
+
+// GetPrimaryPubKey returns NeynarAuth.PrimaryPubKey, and is useful for accessing the field via an interface.
+func (v *NeynarAuth) GetPrimaryPubKey() *ChainPubKeyInput { return v.PrimaryPubKey }
 
 type OneTimeLoginTokenAuth struct {
 	Token string `json:"token"`

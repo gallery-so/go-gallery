@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -222,6 +223,81 @@ func (e NonceAuthenticator) Authenticate(ctx context.Context) (*AuthResult, erro
 	}
 
 	return &authResult, nil
+}
+
+type NeynarAuthenticator struct {
+	CustodyAuth    NonceAuthenticator
+	PrimaryAddress *persist.ChainPubKey
+	NeynarClient   *farcaster.NeynarAPI
+	Queries        *db.Queries
+}
+
+func (e NeynarAuthenticator) GetDescription() string {
+	return fmt.Sprintf("NeynarAuthenticator(primaryAddress: %s)", e.PrimaryAddress)
+}
+
+func (e NeynarAuthenticator) Authenticate(ctx context.Context) (*AuthResult, error) {
+	nonceAuthResult, err := e.CustodyAuth.Authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// At this point, we've verified ownership of the custody address. If there's no primary address,
+	// we're done. Otherwise, we'll need to hit the Neynar API to see if the primary address is associated
+	// with the same account as the custody address.
+	if e.PrimaryAddress == nil {
+		return nonceAuthResult, nil
+	}
+
+	custodyChainAddress := e.CustodyAuth.ChainPubKey.ToChainAddress()
+	custodyAddress := custodyChainAddress.Address()
+	primaryChainAddress := e.PrimaryAddress.ToChainAddress()
+	primaryAddress := primaryChainAddress.Address()
+
+	users, err := e.NeynarClient.UsersByAddresses(ctx, []persist.Address{custodyAddress}, true)
+	if err != nil {
+		return nil, err
+	}
+
+	if neynarUsers, ok := users[custodyAddress]; ok {
+		for _, neynarUser := range neynarUsers {
+			for _, verifiedAddress := range neynarUser.VerifiedAddresses.EthAddresses {
+				if strings.EqualFold(verifiedAddress.String(), primaryAddress.String()) {
+					// We've verified that the user owns the primary address
+					if err := e.addPrimaryAddressToAuthResult(ctx, primaryChainAddress, nonceAuthResult); err != nil {
+						return nil, err
+					}
+
+					return nonceAuthResult, nil
+				}
+			}
+		}
+
+		return nil, fmt.Errorf("could not find primary address (%s) in Neynar verified addresses for custody address (%s)", primaryAddress, custodyAddress)
+	}
+
+	return nil, fmt.Errorf("could not find user with custody address: %s", custodyAddress)
+}
+
+func (e NeynarAuthenticator) addPrimaryAddressToAuthResult(ctx context.Context, primaryAddress persist.ChainAddress, authResult *AuthResult) error {
+	asL1 := primaryAddress.ToL1ChainAddress()
+
+	u, err := e.Queries.GetUserByAddressAndL1(ctx, db.GetUserByAddressAndL1Params{
+		Address: asL1.Address(),
+		L1Chain: asL1.L1Chain(),
+	})
+
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+	} else {
+		authResult.User = &u
+	}
+
+	// Put the primary address at the front of the list, since that's what gets used to set up an account
+	authResult.Addresses = append([]AuthenticatedAddress{{ChainAddress: primaryAddress, WalletType: persist.WalletTypeEOA}}, authResult.Addresses...)
+	return nil
 }
 
 type MagicLinkAuthenticator struct {

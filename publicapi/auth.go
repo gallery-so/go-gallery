@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/auth/privy"
+	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"time"
@@ -34,6 +35,7 @@ type AuthAPI struct {
 	oneTimeLoginCache  *redis.Cache
 	authRefreshCache   *redis.Cache
 	privyClient        *privy.Client
+	neynarClient       *farcaster.NeynarAPI
 }
 
 func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce string, message string, signature string, walletType persist.WalletType) auth.Authenticator {
@@ -101,6 +103,31 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 	}
 
 	return debugtools.NewDebugAuthenticator(&user, addresses, password), nil
+}
+
+func (api AuthAPI) NewNeynarAuthenticator(custodyAddress persist.ChainPubKey, primaryAddress *persist.ChainPubKey, nonce string, message string, signature string, walletType persist.WalletType) auth.Authenticator {
+	// If the primary address is the same as the custody address, we don't need to use it
+	if primaryAddress != nil && *primaryAddress == custodyAddress {
+		primaryAddress = nil
+	}
+
+	authenticator := auth.NonceAuthenticator{
+		ChainPubKey:        custodyAddress,
+		Nonce:              nonce,
+		Message:            message,
+		Signature:          signature,
+		WalletType:         walletType,
+		MultichainProvider: api.multiChainProvider,
+		EthClient:          api.ethClient,
+		Queries:            api.queries,
+	}
+
+	return auth.NeynarAuthenticator{
+		CustodyAuth:    authenticator,
+		PrimaryAddress: primaryAddress,
+		NeynarClient:   api.neynarClient,
+		Queries:        api.queries,
+	}
 }
 
 func (api AuthAPI) NewMagicLinkAuthenticator(token token.Token) auth.Authenticator {
