@@ -104,8 +104,10 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 
 	// Mint one token from highlight
 	claimID, status, collectionAddress, claimErr := api.highlightProvider.ClaimMint(ctx, collectionID, 1, recipient)
-
 	// Stop early if a transaction isn't initiated
+	if errors.Is(claimErr, highlight.ErrHighlightMaxClaims) {
+		return "", ErrMintAlreadyClaimed
+	}
 	if errors.Is(claimErr, highlight.ErrHighlightChainNotSupported) ||
 		util.ErrorIs[highlight.ErrHighlightCollectionMintUnavailable](claimErr) ||
 		util.ErrorIs[highlight.ErrHighlightInternalError](claimErr) {

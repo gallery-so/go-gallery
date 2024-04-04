@@ -30,9 +30,11 @@ const (
 	ClaimStatusMediaProcessed  ClaimStatus = "MEDIA_PROCESSED"
 	ClaimStatusMediaFailed     ClaimStatus = "MEDIA_FAILED"
 	ClaimStatusFailedInternal  ClaimStatus = "FAILED_INTERNAL"
+	maxClaimsErrorMessage                  = "User hit max claims"
 )
 
 var ErrHighlightChainNotSupported = errors.New("chain is not supported by highlight")
+var ErrHighlightMaxClaims = errors.New("user hit max claims")
 
 // ClaimStatus represents the progress of a Highlight mint
 type ClaimStatus string
@@ -120,15 +122,20 @@ func (api *Provider) ClaimMint(ctx context.Context, collectionID string, qty int
 		"qty":          graphql.Float(qty),
 		"recipient":    graphql.String(recipient.Address().String()),
 	})
-	// Minting is closed
-	if err != nil && err.Error() == claimCodeMintUnavailable {
-		err = ErrHighlightCollectionMintUnavailable{CollectionID: collectionID}
-		logger.For(ctx).Error(err)
-		sentryutil.ReportError(ctx, err)
-		return "", "", persist.ChainAddress{}, err
-	}
-	// Unknown error
 	if err != nil {
+		// Minting is closed
+		if err.Error() == claimCodeMintUnavailable {
+			err = ErrHighlightCollectionMintUnavailable{CollectionID: collectionID}
+			logger.For(ctx).Error(err)
+			sentryutil.ReportError(ctx, err)
+			return "", "", persist.ChainAddress{}, err
+		}
+		if err.Error() == maxClaimsErrorMessage {
+			err := fmt.Errorf("address=%s already hit max claims: %s", recipient, err)
+			logger.For(ctx).Error(err)
+			sentryutil.ReportError(ctx, err)
+			return "", "", persist.ChainAddress{}, ErrHighlightMaxClaims
+		}
 		err = ErrHighlightInternalError{err}
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
