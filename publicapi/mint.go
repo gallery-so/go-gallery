@@ -71,18 +71,6 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 		return "", err
 	}
 
-	gc := util.MustGetGinContext(ctx)
-
-	canContinue, _, err := api.ipRateLimiter.ForKey(ctx, gc.ClientIP())
-	if err != nil {
-		return "", err
-	}
-	if !canContinue {
-		err = fmt.Errorf("user=%s has an IP that has attempted to claim recently, not continuing with mint", userID)
-		logger.For(ctx).Error(err)
-		return "", err
-	}
-
 	err, releaseLock := api.guardMinting(ctx, collectionID, userID, walletID)
 	if util.ErrorIs[throttle.ErrThrottleLocked](err) {
 		return "", ErrMintTxPending
@@ -99,6 +87,17 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 
 	recipient, err := api.validateClaimableForWallet(ctx, userID, walletID, collectionID)
 	if err != nil {
+		return "", err
+	}
+
+	gc := util.MustGetGinContext(ctx)
+	canContinue, _, err := api.ipRateLimiter.ForKey(ctx, gc.ClientIP())
+	if err != nil {
+		return "", err
+	}
+	if !canContinue {
+		err = fmt.Errorf("user=%s has an IP that has attempted to claim recently, not continuing with mint", userID)
+		logger.For(ctx).Error(err)
 		return "", err
 	}
 
