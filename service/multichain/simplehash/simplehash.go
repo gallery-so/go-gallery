@@ -31,6 +31,7 @@ const (
 	getNftsByTokenListEndpointTemplate   = "%s/api/v0/nfts/assets"
 	getContractsByWalletEndpointTemplate = "%s/api/v0/nfts/contracts_by_wallets"
 	getNftByTokenIDEndpointTemplate      = "%s/api/v0/nfts/%s/%s/%s"
+	getNftsByContractEndpointTemplate    = "%s/api/v0/nfts/%s/%s"
 	spamScoreThreshold                   = 90
 	tokenBatchLimit                      = 50
 	contractBatchLimit                   = 40
@@ -241,6 +242,12 @@ type getNftsByWalletResponse struct {
 	NFTs       []simplehashNFT `json:"nfts"`
 }
 
+type getNftsByContractResponse struct {
+	NextCursor string          `json:"next_cursor"`
+	Next       string          `json:"next"`
+	NFTs       []simplehashNFT `json:"nfts"`
+}
+
 type getNftsByTokenListResponse struct {
 	NFTs []simplehashNFT `json:"nfts"`
 }
@@ -423,7 +430,7 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 				return
 			}
 
-			// Use first-fit binning to find the first bin that can fit the contract
+			// Use first-fit binning to find the first request that can fit the contract
 			for _, contract := range body.Contracts {
 				var placed bool
 				var addedToBinIdx int
@@ -456,11 +463,9 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 			next = body.Next
 		}
 
-		// Flush the remaining bins
+		// Send the remaining bins
 		for _, bin := range requestBins {
-			if len(bin) > 0 {
-				outCh <- bin
-			}
+			outCh <- bin
 		}
 
 	}()
@@ -537,7 +542,46 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan mc.ChainAgnosticTokensAndContracts, <-chan error) {
-	panic("implement me")
+	outCh := make(chan mc.ChainAgnosticTokensAndContracts)
+	errCh := make(chan error)
+
+	go func() {
+		defer close(outCh)
+		defer close(errCh)
+
+		u := checkURL(fmt.Sprintf(getNftsByContractEndpointTemplate, baseURL, chainToSimpleHashChain[p.chain], address))
+		u = setLimit(u, tokenBatchLimit)
+
+		next := u.String()
+		var tokensReceived int
+
+		for next != "" && tokensReceived < maxLimit {
+			var body getNftsByContractResponse
+
+			err := readResponseBodyInto(ctx, p.httpClient, next, &body)
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			var page mc.ChainAgnosticTokensAndContracts
+
+			for i := 0; i < len(body.NFTs) && tokensReceived < maxLimit; i++ {
+				nft := body.NFTs[i]
+				contract := translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
+				token := translateToChainAgnosticToken(nft, persist.Address(address), contract.IsSpam)
+				page.Tokens = append(page.Tokens, token)
+				page.Contracts = append(page.Contracts, contract)
+				tokensReceived++
+			}
+
+			outCh <- page
+
+			next = body.Next
+		}
+	}()
+
+	return outCh, errCh
 }
 
 func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []mc.ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
@@ -602,14 +646,23 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID mc.Chain
 	return []mc.ChainAgnosticToken{token}, contract, nil
 }
 
-func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Address) (mc.ChainAgnosticContract, error) {
-	panic("implement me")
+func (p *Provider) GetContractByAddress(ctx context.Context, address persist.Address) (mc.ChainAgnosticContract, error) {
+	_, contract, err := p.GetTokensByTokenIdentifiers(ctx, mc.ChainAgnosticIdentifiers{ContractAddress: address, TokenID: "1"})
+	return contract, err
 }
 
 func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tID mc.ChainAgnosticIdentifiers) (mc.ChainAgnosticTokenDescriptors, mc.ChainAgnosticContractDescriptors, error) {
-	panic("implement me")
+	tokens, contract, err := p.GetTokensByTokenIdentifiers(ctx, tID)
+	if err != nil {
+		return mc.ChainAgnosticTokenDescriptors{}, mc.ChainAgnosticContractDescriptors{}, err
+	}
+	return tokens[0].Descriptors, contract.Descriptors, nil
 }
 
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, tID mc.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	panic("implement me")
+	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, tID)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+	return tokens[0].TokenMetadata, nil
 }
