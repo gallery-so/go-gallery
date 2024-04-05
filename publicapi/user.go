@@ -727,7 +727,7 @@ func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.
 	return nil
 }
 
-func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) error {
+func (api UserAPI) UpdateUserEmailWithManualVerification(ctx context.Context, email persist.Email) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"email": validate.WithTag(email, "required"),
@@ -748,6 +748,44 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 	}
 
 	err = emails.RequestVerificationEmail(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (api UserAPI) UpdateUserEmailWithAuthenticator(ctx context.Context, email persist.Email, authenticator auth.Authenticator) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"email": validate.WithTag(email, "required"),
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	authResult, err := authenticator.Authenticate(ctx)
+	if err != nil {
+		return err
+	}
+
+	if authResult.Email == nil {
+		return fmt.Errorf("authenticator did not return a verified email address")
+	}
+
+	if email.String() != authResult.Email.String() {
+		return fmt.Errorf("supplied email address (%s) does not match verified email address from authenticator (%s)", email.String(), authResult.Email.String())
+	}
+
+	err = api.queries.UpdateUserVerifiedEmail(ctx, db.UpdateUserVerifiedEmailParams{
+		UserID:       userID,
+		EmailAddress: email,
+	})
+
 	if err != nil {
 		return err
 	}

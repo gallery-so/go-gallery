@@ -1959,7 +1959,7 @@ type NeynarAuth struct {
 	Message       string               `json:"message"`
 	Signature     string               `json:"signature"`
 	// primaryPubKey is an optional parameter that lets callers specify a different wallet to use with Gallery, provided
-	//   that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user
+	// that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user
 	PrimaryPubKey *persist.ChainPubKey `json:"primaryPubKey"`
 }
 
@@ -2860,6 +2860,9 @@ func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
 
 type UpdateEmailInput struct {
 	Email persist.Email `json:"email"`
+	// authMechanism is an optional parameter that can verify a user's email address in lieu of sending
+	//   a verification email to the user. If not provided, a verification email will be sent.
+	AuthMechanism *AuthMechanism `json:"authMechanism"`
 }
 
 type UpdateEmailNotificationSettingsInput struct {

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"strconv"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -1432,7 +1433,17 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 
 // UpdateEmail is the resolver for the updateEmail field.
 func (r *mutationResolver) UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error) {
-	return updateUserEmail(ctx, input.Email)
+	var authenticator *auth.Authenticator
+
+	if input.AuthMechanism != nil {
+		a, err := r.authMechanismToAuthenticator(ctx, *input.AuthMechanism)
+		if err != nil {
+			return nil, err
+		}
+		authenticator = &a
+	}
+
+	return updateUserEmail(ctx, input.Email, authenticator)
 }
 
 // ResendVerificationEmail is the resolver for the resendVerificationEmail field.
