@@ -86,6 +86,24 @@ func (i *KeyRateLimiter) ForKey(ctx context.Context, key string) (bool, time.Dur
 	return true, 0, nil
 }
 
+// Reset resets the limit of a key
+func (i *KeyRateLimiter) Reset(ctx context.Context, key string) error {
+	err := i.lock.Lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := i.lock.Unlock(ctx); err != nil {
+			i.logger.Log(err)
+		}
+	}()
+	// This is a somewhat hacky way to do this. The backing bucket isn't exported on the limiter,
+	// so we create another instance of the bucket in order to reset its backing state in redis.
+	bucketPrefix := i.cache.Prefix() + ":" + i.name + ":" + key
+	tokenBucket := limiters.NewTokenBucketRedis(i.cache.Client(), bucketPrefix, i.timeToRefill, false)
+	return tokenBucket.SetState(ctx, limiters.TokenBucketState{})
+}
+
 // Name returns the name of this limiter
 func (i *KeyRateLimiter) Name() string {
 	return i.name
