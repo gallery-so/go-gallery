@@ -1419,8 +1419,15 @@ func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, 
 
 }
 
-func updateUserEmail(ctx context.Context, email persist.Email) (*model.UpdateEmailPayload, error) {
-	err := publicapi.For(ctx).User.UpdateUserEmail(ctx, email)
+func updateUserEmail(ctx context.Context, email persist.Email, authenticator *auth.Authenticator) (*model.UpdateEmailPayload, error) {
+	var err error
+
+	if authenticator != nil {
+		err = publicapi.For(ctx).User.UpdateUserEmailWithAuthenticator(ctx, email, *authenticator)
+	} else {
+		err = publicapi.For(ctx).User.UpdateUserEmailWithManualVerification(ctx, email)
+	}
+
 	if err != nil {
 		return nil, err
 	}
