@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/env"
 	"sort"
 	"strconv"
 	"strings"
@@ -602,6 +603,14 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	err = tx.Commit(ctx)
 	if err != nil {
 		return "", "", err
+	}
+
+	// Temporary: add the app store notification to the user's notifications
+	if env.GetString("ENV") != "local" {
+		err = api.queries.AddAppMintAnnouncementNotificationToUser(ctx, db.AddAppMintAnnouncementNotificationToUserParams{
+			NotificationID: persist.GenerateID(),
+			UserID:         userID,
+		})
 	}
 
 	// Temporary fix for the mobile app

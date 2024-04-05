@@ -15,6 +15,21 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const addAppMintAnnouncementNotificationToUser = `-- name: AddAppMintAnnouncementNotificationToUser :exec
+insert into notifications (id, deleted, owner_id, last_updated, created_at, action, data, event_ids, seen, amount)
+    values ($1, false, $2, now(), now(), 'Announcement', '{"announcement_details": {"title": "Thank you for downloading the Gallery mobile app", "platform": "Web", "image_url": "https://highlight-creator-assets.highlight.xyz/main/base-dir/5b5d06ee-679c-4ead-90bf-aa784e9aabcc/previews/3.png?d=152x152&attempt=2", "description": "Tap to claim your unique mint of Radiance by MCHX", "internal_id": "apr-2024-mchx-collab"}}', '{2egglIVtSLLWmsPv3szwgkQmCd7}', false, 1)
+`
+
+type AddAppMintAnnouncementNotificationToUserParams struct {
+	NotificationID persist.DBID `db:"notification_id" json:"notification_id"`
+	UserID         persist.DBID `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) AddAppMintAnnouncementNotificationToUser(ctx context.Context, arg AddAppMintAnnouncementNotificationToUserParams) error {
+	_, err := q.db.Exec(ctx, addAppMintAnnouncementNotificationToUser, arg.NotificationID, arg.UserID)
+	return err
+}
+
 const addCollectionToGallery = `-- name: AddCollectionToGallery :exec
 update galleries set collections = array_append(collections, $1), last_updated = now() where id = $2 and deleted = false
 `
