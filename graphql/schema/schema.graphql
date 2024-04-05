@@ -2471,8 +2471,10 @@ union VerifyEmailMagicLinkPayloadOrError = VerifyEmailMagicLinkPayload | ErrInva
 
 input UpdateEmailInput {
   email: Email! @scrub
-  """authMechanism is an optional parameter that can verify a user's email address in lieu of sending
-  a verification email to the user. If not provided, a verification email will be sent."""
+  """
+  authMechanism is an optional parameter that can verify a user's email address in lieu of sending
+  a verification email to the user. If not provided, a verification email will be sent.
+  """
   authMechanism: AuthMechanism
 }
 
