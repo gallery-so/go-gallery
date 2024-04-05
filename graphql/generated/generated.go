@@ -11913,8 +11913,10 @@ input NeynarAuth {
   message: String!
   signature: String! @scrub
 
-  """primaryPubKey is an optional parameter that lets callers specify a different wallet to use with Gallery, provided
-  that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user"""
+  """
+  primaryPubKey is an optional parameter that lets callers specify a different wallet to use with Gallery, provided
+  that both primaryPubKey and the required custodyPubKey are owned by the same Neynar user
+  """
   primaryPubKey: ChainPubKeyInput
 }
 
@@ -12412,6 +12414,9 @@ union VerifyEmailMagicLinkPayloadOrError = VerifyEmailMagicLinkPayload | ErrInva
 
 input UpdateEmailInput {
   email: Email! @scrub
+  """authMechanism is an optional parameter that can verify a user's email address in lieu of sending
+  a verification email to the user. If not provided, a verification email will be sent."""
+  authMechanism: AuthMechanism
 }
 
 type UpdateEmailPayload {
@@ -71676,7 +71681,7 @@ func (ec *executionContext) unmarshalInputUpdateEmailInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"email"}
+	fieldsInOrder := [...]string{"email", "authMechanism"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -71690,6 +71695,13 @@ func (ec *executionContext) unmarshalInputUpdateEmailInput(ctx context.Context, 
 				return it, err
 			}
 			it.Email = data
+		case "authMechanism":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authMechanism"))
+			data, err := ec.unmarshalOAuthMechanism2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AuthMechanism = data
 		}
 	}
 
@@ -96894,6 +96906,14 @@ func (ec *executionContext) marshalOArtBlocksCommunityKey2ᚖgithubᚗcomᚋmike
 		return graphql.Null
 	}
 	return ec._ArtBlocksCommunityKey(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOAuthMechanism2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (*model.AuthMechanism, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
