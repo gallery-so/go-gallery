@@ -97,7 +97,7 @@ func (pOpts) WithRefreshMetadata() PipelineOption {
 	}
 }
 
-func (pOpts) WithMetadata(t persist.TokenMetadata) PipelineOption {
+func (pOpts) WithStartingMetadata(t persist.TokenMetadata) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.startingMetadata = t
 	}
@@ -115,17 +115,12 @@ func (pOpts) WithRequireImage() PipelineOption {
 	}
 }
 
-func (pOpts) WithRequireProhibitionimage(c db.Contract) PipelineOption {
+func (pOpts) WithRequireProhibitionimage(td db.TokenDefinition, c db.Contract) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		if platform.IsProhibition(c.Chain, c.Address) {
 			j.requireImage = true
+			j.refreshMetadata = true
 		}
-	}
-}
-
-func (pOpts) WithIsFxhash(isFxhash bool) PipelineOption {
-	return func(j *tokenProcessingJob) {
-		j.isFxhash = isFxhash
 	}
 }
 
@@ -135,6 +130,17 @@ func (pOpts) WithRequireFxHashSigned(td db.TokenDefinition, c db.Contract) Pipel
 			j.isFxhash = true
 			j.requireFxHashSigned = true
 			j.fxHashIsSignedF = func(m persist.TokenMetadata) bool { return platform.IsFxhashSigned(td, c, m) }
+			j.requireImage = true
+			j.refreshMetadata = true
+		}
+	}
+}
+
+func (pOpts) WithRequireHighlightImage(td db.TokenDefinition, c db.Contract) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		if isHighlight(td) {
+			j.requireImage = true
+			j.refreshMetadata = true
 		}
 	}
 }

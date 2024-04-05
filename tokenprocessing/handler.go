@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/highlight"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -27,8 +28,8 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	fastRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickFast", 1, 30*time.Second)
 	slowRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickSlow", 1, 5*time.Minute)
 	mintRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickMint", 1, 10*time.Second)
-	refreshManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenSync(ctx, fastRetry, slowRetry))
-	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesSync, tickTokenSync(ctx, fastRetry, slowRetry))
+	refreshManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenSync(ctx, fastRetry, slowRetry, mintRetry))
+	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesSync, tickTokenSync(ctx, fastRetry, slowRetry, mintRetry))
 	highlightProvider := highlight.NewProvider(http.DefaultClient)
 	mintManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickToken(ctx, mintRetry))
 
@@ -64,10 +65,14 @@ func tickToken(ctx context.Context, l *limiters.KeyRateLimiter) tokenmanage.Tick
 	}
 }
 
-func tickTokenSync(ctx context.Context, fastRetry, slowRetry *limiters.KeyRateLimiter) tokenmanage.TickToken {
+func tickTokenSync(ctx context.Context, fastRetry, slowRetry, mintRetry *limiters.KeyRateLimiter) tokenmanage.TickToken {
 	return func(td db.TokenDefinition) (time.Duration, error) {
 		if shareToGalleryEnabled(td) {
 			_, delay, err := fastRetry.ForKey(ctx, td.ID.String())
+			return delay, err
+		}
+		if isHighlight(td) {
+			_, delay, err := mintRetry.ForKey(ctx, td.ID.String())
 			return delay, err
 		}
 		_, delay, err := slowRetry.ForKey(ctx, td.ID.String())
@@ -76,7 +81,7 @@ func tickTokenSync(ctx context.Context, fastRetry, slowRetry *limiters.KeyRateLi
 }
 
 func maxRetriesSync(td db.TokenDefinition) int {
-	if shareToGalleryEnabled(td) {
+	if shareToGalleryEnabled(td) || isHighlight(td) {
 		return 24
 	}
 	return 2
@@ -84,4 +89,11 @@ func maxRetriesSync(td db.TokenDefinition) int {
 
 func shareToGalleryEnabled(td db.TokenDefinition) bool {
 	return platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash
+}
+
+func isHighlight(td db.TokenDefinition) bool {
+	if td.ContractAddress == "0x78b92e9afd56b033ead2103f07aced5fac8c0854" && td.Chain == persist.ChainBase {
+		return true
+	}
+	return false
 }

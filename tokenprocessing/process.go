@@ -69,10 +69,7 @@ func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Clie
 				}
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSync, 0,
-					PipelineOpts.WithRequireProhibitionimage(c), // Require image to be processed if Prohibition token
-					PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
-				)
+				_, err = runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCauseSync, 0)
 				return err
 			})
 		}
@@ -456,9 +453,8 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider, userRepo 
 			}
 
 			runManagedPipeline(ctx, tp, tm, td, c, persist.ProcessingCausePostPreflight, 0,
-				PipelineOpts.WithRefreshMetadata(),          // Refresh metadata
-				PipelineOpts.WithRequireImage(),             // Require an image if token is Prohibition token
-				PipelineOpts.WithRequireFxHashSigned(td, c), // Require token to be signed if it is an FxHash token
+				PipelineOpts.WithRefreshMetadata(), // Refresh metadata
+				PipelineOpts.WithRequireImage(),
 			)
 		}
 
@@ -629,7 +625,7 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 			}
 			_, err = runManagedPipeline(ctx, tp, tm, t.TokenDefinition, t.Contract, persist.ProcessingCauseAppMint, 0,
 				PipelineOpts.WithRequireImage(),
-				PipelineOpts.WithMetadata(claim.MintedTokenMetadata),
+				PipelineOpts.WithStartingMetadata(claim.MintedTokenMetadata),
 			)
 			if err != nil {
 				return err
@@ -766,9 +762,11 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	}
 	// Runtime options that should be applied to every run
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
-	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
+	runOpts = append(runOpts, PipelineOpts.WithStartingMetadata(td.Metadata))
 	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
-	runOpts = append(runOpts, PipelineOpts.WithIsFxhash(td.IsFxhash))
+	runOpts = append(runOpts, PipelineOpts.WithRequireFxHashSigned(td, c))
+	runOpts = append(runOpts, PipelineOpts.WithRequireProhibitionimage(td, c))
+	runOpts = append(runOpts, PipelineOpts.WithRequireHighlightImage(td, c))
 	runOpts = append(runOpts, PipelineOpts.WithPlaceholderImageURL(td.FallbackMedia.ImageURL.String()))
 	runOpts = append(runOpts, PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam))
 	runOpts = append(runOpts, opts...)
