@@ -103,6 +103,12 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 
 	// Mint one token from highlight
 	claimID, status, collectionAddress, claimErr := api.highlightProvider.ClaimMint(ctx, collectionID, 1, recipient)
+	if claimErr != nil {
+		// Reset the IP limiter so the user can try again.
+		if err := api.ipRateLimiter.Reset(ctx, gc.ClientIP()); err != nil {
+			logger.For(ctx).Errorf("failed to reset mint IP limit for user=%s: %s", userID, err)
+		}
+	}
 	// Stop early if a transaction isn't initiated
 	if errors.Is(claimErr, highlight.ErrHighlightMaxClaims) {
 		return "", ErrMintAlreadyClaimed
