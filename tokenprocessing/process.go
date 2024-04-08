@@ -19,7 +19,6 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/platform"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/highlight"
@@ -210,7 +209,15 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 
 		incomingToken := in.Payload
 
-		logger.For(c).WithFields(logrus.Fields{"to_address": incomingToken.ToAccount.Address, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "amount": incomingToken.Quantity}).Infof("OPENSEA: %s - Processing Opensea User Tokens Refresh", incomingToken.ToAccount.Address)
+		ctx := logger.NewContextWithFields(c, logrus.Fields{
+			"to_address":       incomingToken.ToAccount.Address,
+			"token_id":         incomingToken.Item.NFTID.TokenID,
+			"contract_address": incomingToken.Item.NFTID.ContractAddress,
+			"chain":            incomingToken.Item.NFTID.Chain,
+			"amount":           incomingToken.Quantity,
+		})
+
+		logger.For(ctx).Infof("OPENSEA: address=%s - Processing Opensea User Tokens Refresh", incomingToken.ToAccount.Address)
 
 		user, _ := queries.GetUserByAddressAndL1(c, db.GetUserByAddressAndL1Params{
 			Address: persist.Address(incomingToken.ToAccount.Address.String()),
@@ -235,8 +242,8 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 			beforeBalance = beforeToken.Token.Quantity
 		}
 
-		l := logger.For(c).WithFields(logrus.Fields{"user_id": user.ID, "token_id": incomingToken.Item.NFTID.TokenID, "contract_address": incomingToken.Item.NFTID.ContractAddress, "chain": incomingToken.Item.NFTID.Chain, "user_address": incomingToken.ToAccount.Address})
-		l.Infof("Processing: %s - Processing Opensea User Tokens Refresh", user.ID)
+		logger.For(ctx).Infof("Processing: user=%s - Processing Opensea User Tokens Refresh", user.ID)
+
 		tokenToAdd := persist.TokenUniqueIdentifiers{
 			Chain:           incomingToken.Item.NFTID.Chain,
 			ContractAddress: incomingToken.Item.NFTID.ContractAddress,
@@ -247,29 +254,30 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 		newQuantity = newQuantity.Add(beforeBalance)
 		newTokens, err := mc.AddTokensToUserUnchecked(c, user.ID, []persist.TokenUniqueIdentifiers{tokenToAdd}, []persist.HexString{newQuantity})
 		if err != nil {
-			l.Errorf("error syncing tokens: %s", err)
+			logger.For(ctx).Errorf("error syncing tokens: %s", err)
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
 		if len(newTokens) == 0 {
-			l.Info("no new tokens found")
+			logger.For(ctx).Infof("no new tokens added for user=%s", user.ID)
 		} else {
-			l.Infof("found %d new tokens", len(newTokens))
+			logger.For(ctx).Infof("added %d new tokens for user=%s", len(newTokens), user.ID)
 		}
 
 		for _, token := range newTokens {
+			logger.For(ctx).Infof("added tokenDBID=%s to user=%s", token.Instance.ID, token.Instance.OwnerUserID)
 
 			dbToken, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
 			if err != nil {
-				l.Errorf("error getting unique token identifiers: %s", err)
+				logger.For(ctx).Errorf("error getting unique token identifiers: %s", err)
 				continue
 			}
 
 			newBalance := big.NewInt(0).Sub(dbToken.Quantity.BigInt(), beforeBalance.BigInt())
 
 			if newBalance.Cmp(big.NewInt(0)) <= 0 {
-				l.Infof("token quantity is 0 or less, skipping")
+				logger.For(ctx).Infof("token quantity is 0 or less, skipping")
 				continue
 			}
 
@@ -288,7 +296,7 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 				},
 			})
 			if err != nil {
-				l.Errorf("error dispatching event: %s", err)
+				logger.For(ctx).Errorf("error dispatching event: %s", err)
 			}
 		}
 
@@ -756,12 +764,9 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	})
 	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
 	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
-	closing, err := tm.StartProcessing(ctx, td, attempts, cause)
-	if err != nil {
-		return db.TokenMedia{}, err
-	}
+
 	// Runtime options that should be applied to every run
-	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
+	runOpts := append([]PipelineOption{}, PipelineOpts.WithEnsProfileImage(c))
 	runOpts = append(runOpts, PipelineOpts.WithStartingMetadata(td.Metadata))
 	runOpts = append(runOpts, PipelineOpts.WithKeywords(td))
 	runOpts = append(runOpts, PipelineOpts.WithRequireFxHashSigned(td, c))
@@ -770,15 +775,43 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	runOpts = append(runOpts, PipelineOpts.WithPlaceholderImageURL(td.FallbackMedia.ImageURL.String()))
 	runOpts = append(runOpts, PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam))
 	runOpts = append(runOpts, opts...)
-	media, err := tp.ProcessToken(ctx, tID, cID, cause, runOpts...)
-	defer closing(media, err)
-	return media, err
-}
 
-// addContractRunOptions adds pipeline options for specific contracts
-func addContractRunOptions(contract persist.ContractIdentifiers) (opts []PipelineOption) {
-	if platform.IsEns(contract.Chain, contract.ContractAddress) {
-		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
+	job := &tokenProcessingJob{
+		id:               persist.GenerateID(),
+		tp:               tp,
+		token:            tID,
+		contract:         cID,
+		cause:            cause,
+		pipelineMetadata: new(persist.PipelineMetadata),
 	}
-	return opts
+
+	for _, opt := range opts {
+		opt(job)
+	}
+
+	closing, err := tm.StartProcessing(ctx, td, attempts, cause)
+	if err != nil {
+		logger.For(ctx).Warnf("error starting job: %s", err)
+		media := persist.Media{MediaType: persist.MediaTypeUnknown}
+		return job.saveResult(ctx, media, job.startingMetadata)
+	}
+
+	jobCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	defer cancel()
+
+	media, metadata, jobErr := job.run(jobCtx)
+	if jobErr != nil {
+		logger.For(ctx).Errorf("error running job: %s", jobErr)
+		reportJobError(ctx, jobErr, *job)
+	}
+
+	savedMedia, err := job.saveResult(ctx, media, metadata)
+	if err != nil {
+		logger.For(ctx).Errorf("error saving job: %s", jobErr)
+		defer closing(savedMedia, err)
+		return savedMedia, err
+	}
+
+	defer closing(savedMedia, jobErr)
+	return savedMedia, jobErr
 }

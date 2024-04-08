@@ -1481,6 +1481,7 @@ with insert_job(id) as (
     set metadata = @new_metadata,
         name = @new_name,
         description = @new_description,
+        last_updated = (select last_updated from insert_new_media),
         token_media_id = case
             -- If there isn't any media, use the new media regardless of its status
             when token_media_id is null then (select id from insert_new_media)

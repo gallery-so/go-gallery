@@ -665,6 +665,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 	upsertTime, upsertedTokens, err := op.BulkUpsert(ctx, p.Queries, uniqueTokens, uniqueDefinitions, upsertParams.SetCreatorFields, upsertParams.SetHolderFields)
 	if err != nil {
+		logger.For(ctx).Errorf("error in bulk upsert of tokens: %s", err)
 		return nil, nil, err
 	}
 
