@@ -3680,11 +3680,10 @@ func (b *GetTokenByIdBatchBatchResults) Close() error {
 }
 
 const getTokenByIdIgnoreDisplayableBatch = `-- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
-join token_medias tm on td.token_media_id = tm.id
-where t.id = $1 and t.deleted = false and td.deleted = false and tm.deleted = false
+where t.id = $1 and t.deleted = false and td.deleted = false
 `
 
 type GetTokenByIdIgnoreDisplayableBatchBatchResults struct {
@@ -3696,7 +3695,6 @@ type GetTokenByIdIgnoreDisplayableBatchBatchResults struct {
 type GetTokenByIdIgnoreDisplayableBatchRow struct {
 	Token           Token           `db:"token" json:"token"`
 	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
-	TokenMedia      TokenMedia      `db:"tokenmedia" json:"tokenmedia"`
 }
 
 func (q *Queries) GetTokenByIdIgnoreDisplayableBatch(ctx context.Context, id []persist.DBID) *GetTokenByIdIgnoreDisplayableBatchBatchResults {
@@ -3756,14 +3754,6 @@ func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) QueryRow(f func(int, Ge
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
-			&i.TokenMedia.ID,
-			&i.TokenMedia.CreatedAt,
-			&i.TokenMedia.LastUpdated,
-			&i.TokenMedia.Version,
-			&i.TokenMedia.Active,
-			&i.TokenMedia.Media,
-			&i.TokenMedia.ProcessingJobID,
-			&i.TokenMedia.Deleted,
 		)
 		if f != nil {
 			f(t, i, err)
