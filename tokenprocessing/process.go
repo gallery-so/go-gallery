@@ -219,18 +219,18 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 
 		logger.For(ctx).Infof("OPENSEA: address=%s - Processing Opensea User Tokens Refresh", incomingToken.ToAccount.Address)
 
-		user, _ := queries.GetUserByAddressAndL1(c, db.GetUserByAddressAndL1Params{
+		user, _ := queries.GetUserByAddressAndL1(ctx, db.GetUserByAddressAndL1Params{
 			Address: persist.Address(incomingToken.ToAccount.Address.String()),
 			L1Chain: incomingToken.Item.NFTID.Chain.L1Chain(),
 		})
 		if user.ID == "" {
-			logger.For(c).Warnf("user not found for address: %s", incomingToken.ToAccount.Address)
+			logger.For(ctx).Warnf("user not found for address: %s", incomingToken.ToAccount.Address)
 			// it is a valid response to not find a user, not every transfer exists on gallery
 			c.String(http.StatusOK, fmt.Sprintf("user not found for address: %s", incomingToken.ToAccount.Address))
 			return
 		}
 
-		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(c, db.GetTokenByUserTokenIdentifiersParams{
+		beforeToken, _ := queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
 			OwnerID:         user.ID,
 			TokenID:         incomingToken.Item.NFTID.TokenID,
 			Chain:           incomingToken.Item.NFTID.Chain,
@@ -252,7 +252,7 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 		}
 		newQuantity := persist.MustHexString(strconv.Itoa(incomingToken.Quantity))
 		newQuantity = newQuantity.Add(beforeBalance)
-		newTokens, err := mc.AddTokensToUserUnchecked(c, user.ID, []persist.TokenUniqueIdentifiers{tokenToAdd}, []persist.HexString{newQuantity})
+		newTokens, err := mc.AddTokensToUserUnchecked(ctx, user.ID, []persist.TokenUniqueIdentifiers{tokenToAdd}, []persist.HexString{newQuantity})
 		if err != nil {
 			logger.For(ctx).Errorf("error syncing tokens: %s", err)
 			util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -282,7 +282,7 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 			}
 
 			// one event per token identifier (grouping ERC-1155s)
-			err = event.Dispatch(c, db.Event{
+			err = event.Dispatch(ctx, db.Event{
 				ID:             persist.GenerateID(),
 				ActorID:        persist.DBIDToNullStr(user.ID),
 				ResourceTypeID: persist.ResourceTypeToken,
