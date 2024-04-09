@@ -785,7 +785,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 		pipelineMetadata: new(persist.PipelineMetadata),
 	}
 
-	for _, opt := range opts {
+	for _, opt := range runOpts {
 		opt(job)
 	}
 
