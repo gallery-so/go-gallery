@@ -166,11 +166,10 @@ join token_definitions td on t.token_definition_id = td.id
 where t.id = $1 and t.displayable and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select sqlc.embed(t), sqlc.embed(td), sqlc.embed(tm)
+select sqlc.embed(t), sqlc.embed(td)
 from tokens t
 join token_definitions td on t.token_definition_id = td.id
-join token_medias tm on td.token_media_id = tm.id
-where t.id = $1 and t.deleted = false and td.deleted = false and tm.deleted = false;
+where t.id = $1 and t.deleted = false and td.deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
 -- Fetch the definition and contract to cache since downstream queries will likely use them
@@ -1481,6 +1480,7 @@ with insert_job(id) as (
     set metadata = @new_metadata,
         name = @new_name,
         description = @new_description,
+        last_updated = (select last_updated from insert_new_media),
         token_media_id = case
             -- If there isn't any media, use the new media regardless of its status
             when token_media_id is null then (select id from insert_new_media)

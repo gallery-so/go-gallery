@@ -355,9 +355,6 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokenByIdIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.GetTokenByIdIgnoreDisplayableBatchRow) {
-		loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(result.TokenMedia), result.TokenMedia)
-	})
 	loaders.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch.RegisterResultSubscriber(func(result coredb.GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchRow) {
 		loaders.GetMediaByMediaIdIgnoringStatusBatch.Prime(loaders.GetMediaByMediaIdIgnoringStatusBatch.getKeyForResult(result.TokenMedia), result.TokenMedia)
 	})
