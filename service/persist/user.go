@@ -61,7 +61,6 @@ type User struct {
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
 type UserUpdateInfoInput struct {
-	LastUpdated        time.Time  `json:"last_updated"`
 	Username           NullString `json:"username"`
 	UsernameIdempotent NullString `json:"username_idempotent"`
 	Bio                NullString `json:"bio"`
