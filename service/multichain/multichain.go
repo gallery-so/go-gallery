@@ -714,15 +714,18 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 		currentUserTokens[userID] = util.DedupeWithTranslate(append(currentUserTokens[userID], existingTokensForUsers[userID]...), false, func(t op.TokenFullDetails) persist.DBID { return t.Instance.ID })
 	}
 
-	ids := make([]persist.DBID, 0, len(upsertedTokens))
-	for _, t := range upsertedTokens {
-		if t.Definition.TokenMediaID == "" {
-			ids = append(ids, t.Definition.ID)
+	// Send tokens to tokenprocessing
+	toSend := map[persist.DBID]bool{}
+	for _, tokens := range currentUserTokens {
+		for _, t := range tokens {
+			if !toSend[t.Definition.ID] && t.Definition.TokenMediaID == "" {
+				toSend[t.Definition.ID] = true
+			}
 		}
 	}
-
-	for _, b := range util.ChunkBy(ids, 50) {
-		if err = p.SubmitTokens(ctx, b); err != nil {
+	for _, b := range util.ChunkBy(util.MapKeys(toSend), 50) {
+		err = p.SubmitTokens(ctx, b)
+		if err != nil {
 			logger.For(ctx).Errorf("failed to submit batch: %s", err)
 			sentryutil.ReportError(ctx, err)
 		}
