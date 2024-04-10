@@ -18,7 +18,6 @@ type KeyRateLimiter struct {
 	capacity     int64
 	refillRate   time.Duration
 	timeToRefill time.Duration
-	reg          *limiters.Registry
 	clock        *limiters.SystemClock
 	logger       limiters.Logger
 	lock         *distributedLock
@@ -29,7 +28,6 @@ type KeyRateLimiter struct {
 // two different limiters in the same cache should NOT have the same name. It is safe to share a single
 // KeyRateLimiter object among multiple consumers to share a limit.
 func NewKeyRateLimiter(ctx context.Context, cache *redis.Cache, name string, amount int64, every time.Duration) *KeyRateLimiter {
-	registry := limiters.NewRegistry()
 	clock := limiters.NewSystemClock()
 
 	// Refill rate is per token, so we have to divide to get the correct rate
@@ -46,33 +44,20 @@ func NewKeyRateLimiter(ctx context.Context, cache *redis.Cache, name string, amo
 		capacity:     amount,
 		refillRate:   refillRate,
 		timeToRefill: timeToRefill,
-		reg:          registry,
 		clock:        clock,
 		logger:       newLogAdapter(ctx),
 		lock:         newDistributedLock(cache, name),
 	}
-
-	go func() {
-		// Garbage collect the old limiters to prevent memory leaks
-		for {
-			// Check for expired limiters every second
-			<-time.After(time.Second)
-			registry.DeleteExpired(clock.Now())
-		}
-	}()
 
 	return limiter
 }
 
 // ForKey will check if the given key has exceeded the rate limit for this named limiter
 func (i *KeyRateLimiter) ForKey(ctx context.Context, key string) (bool, time.Duration, error) {
-	bucket := i.reg.GetOrCreate(key, func() interface{} {
-		bucketPrefix := i.cache.Prefix() + ":" + i.name + ":" + key
-		tokenBucket := limiters.NewTokenBucketRedis(i.cache.Client(), bucketPrefix, i.timeToRefill, false)
-		return limiters.NewTokenBucket(i.capacity, i.refillRate, i.lock, tokenBucket, i.clock, i.logger)
-	}, i.timeToRefill, i.clock.Now())
-
-	w, err := bucket.(*limiters.TokenBucket).Limit(ctx)
+	key = i.cache.Prefix() + ":" + i.name + ":" + key
+	backend := limiters.NewTokenBucketRedis(i.cache.Client(), key, i.timeToRefill, false)
+	bucket := limiters.NewTokenBucket(i.capacity, i.refillRate, i.lock, backend, i.clock, i.logger)
+	w, err := bucket.Limit(ctx)
 	if err == limiters.ErrLimitExhausted {
 		return false, w, nil
 	} else if err == redislock.ErrNotObtained {
