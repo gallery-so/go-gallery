@@ -2861,7 +2861,7 @@ func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
 type UpdateEmailInput struct {
 	Email persist.Email `json:"email"`
 	// authMechanism is an optional parameter that can verify a user's email address in lieu of sending
-	//   a verification email to the user. If not provided, a verification email will be sent.
+	// a verification email to the user. If not provided, a verification email will be sent.
 	AuthMechanism *AuthMechanism `json:"authMechanism"`
 }
 
@@ -3484,6 +3484,7 @@ const (
 	UserExperienceTypePostsBetaAnnouncement                  UserExperienceType = "PostsBetaAnnouncement"
 	UserExperienceTypeCreatorBetaFullscreenAnnouncementModal UserExperienceType = "CreatorBetaFullscreenAnnouncementModal"
 	UserExperienceTypeCreatorBetaMicroAnnouncementModal      UserExperienceType = "CreatorBetaMicroAnnouncementModal"
+	UserExperienceTypeRadianceMintApr2024                    UserExperienceType = "RadianceMintApr2024"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -3502,11 +3503,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypePostsBetaAnnouncement,
 	UserExperienceTypeCreatorBetaFullscreenAnnouncementModal,
 	UserExperienceTypeCreatorBetaMicroAnnouncementModal,
+	UserExperienceTypeRadianceMintApr2024,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeMaintenanceAug2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5, UserExperienceTypeUpsellBanner, UserExperienceTypePostsBetaAnnouncement, UserExperienceTypeCreatorBetaFullscreenAnnouncementModal, UserExperienceTypeCreatorBetaMicroAnnouncementModal:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeMaintenanceAug2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5, UserExperienceTypeUpsellBanner, UserExperienceTypePostsBetaAnnouncement, UserExperienceTypeCreatorBetaFullscreenAnnouncementModal, UserExperienceTypeCreatorBetaMicroAnnouncementModal, UserExperienceTypeRadianceMintApr2024:
 		return true
 	}
 	return false

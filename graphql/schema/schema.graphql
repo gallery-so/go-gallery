@@ -916,6 +916,7 @@ enum UserExperienceType {
   PostsBetaAnnouncement
   CreatorBetaFullscreenAnnouncementModal
   CreatorBetaMicroAnnouncementModal
+  RadianceMintApr2024
 }
 
 type UserExperience {

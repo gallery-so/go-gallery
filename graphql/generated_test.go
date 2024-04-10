@@ -626,6 +626,7 @@ const (
 	UserExperienceTypePostsbetaannouncement                  UserExperienceType = "PostsBetaAnnouncement"
 	UserExperienceTypeCreatorbetafullscreenannouncementmodal UserExperienceType = "CreatorBetaFullscreenAnnouncementModal"
 	UserExperienceTypeCreatorbetamicroannouncementmodal      UserExperienceType = "CreatorBetaMicroAnnouncementModal"
+	UserExperienceTypeRadiancemintapr2024                    UserExperienceType = "RadianceMintApr2024"
 )
 
 // __addUserWalletMutationInput is used internally by genqlient
