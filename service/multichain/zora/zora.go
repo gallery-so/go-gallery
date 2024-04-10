@@ -262,8 +262,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
-// GetContractsByOwnerAddress retrieves all contracts owned by a given address
-func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetContractsByCreatorAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
 	req := graphql.NewRequest(`query createdTokens($creator: Bytes!) {
   zoraCreateContracts(where: {creator: $creator}) {
     address

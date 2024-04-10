@@ -157,8 +157,8 @@ type ContractFetcher interface {
 	GetContractByAddress(ctx context.Context, contract persist.Address) (ChainAgnosticContract, error)
 }
 
-type ContractsOwnerFetcher interface {
-	GetContractsByOwnerAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
+type ContractsCreatorFetcher interface {
+	GetContractsByCreatorAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
 }
 
 // ContractRefresher supports refreshes of a contract
@@ -270,7 +270,7 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 
 	wg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		contractFetcher, contractOK := p.Chains[c].(ContractsOwnerFetcher)
+		contractFetcher, contractOK := p.Chains[c].(ContractsCreatorFetcher)
 		tokenFetcher, tokenOK := p.Chains[c].(TokensIncrementalContractFetcher)
 
 		if !contractOK || !tokenOK {
@@ -284,7 +284,7 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 			wg.Go(func() {
 				innerWg := &conc.WaitGroup{}
 
-				contracts, err := contractFetcher.GetContractsByOwnerAddress(ctx, addr)
+				contracts, err := contractFetcher.GetContractsByCreatorAddress(ctx, addr)
 				if err != nil {
 					errCh <- ErrProviderFailed{Err: err}
 					return
@@ -1108,7 +1108,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 
 	for chain, addresses := range searchAddresses {
 
-		fetcher, ok := p.Chains[chain].(ContractsOwnerFetcher)
+		fetcher, ok := p.Chains[chain].(ContractsCreatorFetcher)
 		if !ok {
 			continue
 		}
@@ -1117,7 +1117,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 			c := chain
 			a := address
 			providerPool.Go(func(ctx context.Context) (ContractOwnerResult, error) {
-				contracts, err := fetcher.GetContractsByOwnerAddress(ctx, a)
+				contracts, err := fetcher.GetContractsByCreatorAddress(ctx, a)
 				if err != nil {
 					logger.For(ctx).Errorf("error fetching contracts for address %s: %s", a, err)
 					return ContractOwnerResult{Chain: c}, nil

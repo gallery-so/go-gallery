@@ -20,22 +20,35 @@ import (
 )
 
 var (
-	getNftsByWalletEndpoint      = checkURL(fmt.Sprintf(getNftsByWalletEndpointTemplate, baseURL))
-	getNftsByTokenListEndpoint   = checkURL(fmt.Sprintf(getNftsByTokenListEndpointTemplate, baseURL))
-	getContractsByWalletEndpoint = checkURL(fmt.Sprintf(getContractsByWalletEndpointTemplate, baseURL))
+	getNftsByWalletEndpoint        = checkURL(fmt.Sprintf(getNftsByWalletEndpointTemplate, baseURL))
+	getNftsByTokenListEndpoint     = checkURL(fmt.Sprintf(getNftsByTokenListEndpointTemplate, baseURL))
+	getContractsByWalletEndpoint   = checkURL(fmt.Sprintf(getContractsByWalletEndpointTemplate, baseURL))
+	getContractsByOwnerEndpoint    = checkURL(fmt.Sprintf(getContractsByOwnerEndpointTemplate, baseURL))
+	getContractsByDeployerEndpoint = checkURL(fmt.Sprintf(getContractsByDeployerEndpointTemplate, baseURL))
 )
 
+var chainToSimpleHashChain = map[persist.Chain]string{
+	persist.ChainETH:      "ethereum",
+	persist.ChainBase:     "base",
+	persist.ChainZora:     "zora",
+	persist.ChainArbitrum: "arbitrum",
+	persist.ChainOptimism: "optimism",
+	persist.ChainPolygon:  "polygon",
+}
+
 const (
-	baseURL                              = "https://api.simplehash.com"
-	getNftsByWalletEndpointTemplate      = "%s/api/v0/nfts/owners_v2"
-	getNftsByTokenListEndpointTemplate   = "%s/api/v0/nfts/assets"
-	getContractsByWalletEndpointTemplate = "%s/api/v0/nfts/contracts_by_wallets"
-	getNftByTokenIDEndpointTemplate      = "%s/api/v0/nfts/%s/%s/%s"
-	getNftsByContractEndpointTemplate    = "%s/api/v0/nfts/%s/%s"
-	spamScoreThreshold                   = 90
-	tokenBatchLimit                      = 50
-	contractBatchLimit                   = 40
-	incrementalSyncPoolSize              = 24
+	baseURL                                = "https://api.simplehash.com"
+	getNftsByWalletEndpointTemplate        = "%s/api/v0/nfts/owners_v2"
+	getNftsByTokenListEndpointTemplate     = "%s/api/v0/nfts/assets"
+	getContractsByWalletEndpointTemplate   = "%s/api/v0/nfts/contracts_by_wallets"
+	getNftByTokenIDEndpointTemplate        = "%s/api/v0/nfts/%s/%s/%s"
+	getNftsByContractEndpointTemplate      = "%s/api/v0/nfts/%s/%s"
+	getContractsByOwnerEndpointTemplate    = "%s/api/v0/contracts_by_owner"
+	getContractsByDeployerEndpointTemplate = "%s/api/v0/contracts_by_deployer"
+	spamScoreThreshold                     = 90
+	tokenBatchLimit                        = 50
+	contractBatchLimit                     = 40
+	incrementalSyncPoolSize                = 24
 )
 
 type Provider struct {
@@ -72,12 +85,6 @@ func checkURL(s string) url.URL {
 		panic(err)
 	}
 	return *u
-}
-
-var chainToSimpleHashChain = map[persist.Chain]string{
-	persist.ChainETH:  "ethereum",
-	persist.ChainBase: "base",
-	persist.ChainZora: "zora",
 }
 
 func setChain(u url.URL, chain persist.Chain) url.URL {
@@ -193,6 +200,12 @@ type simplehashContract struct {
 	HasMultipleCollections bool   `json:"has_multiple_collections"`
 }
 
+type simplehashContractDetailed struct {
+	simplehashContract
+	ContractAddress string                 `json:"contract_address"`
+	TopCollections  []simplehashCollection `json:"top_collections"`
+}
+
 type simplehashMetadata struct {
 	ImageOriginalURL     string `json:"image_original_url"`
 	AnimationOriginalURL string `json:"animation_original_url"`
@@ -268,6 +281,18 @@ type getCollectionByContractResponse struct {
 	NextCursor  string                 `json:"next_cursor"`
 	Next        string                 `json:"next"`
 	Collections []simplehashCollection `json:"collections"`
+}
+
+type getContractsByOwnerResponse struct {
+	NextCursor string                       `json:"next_cursor"`
+	Next       string                       `json:"next"`
+	Contracts  []simplehashContractDetailed `json:"contracts"`
+}
+
+type getContractsByDeployerResponse struct {
+	NextCursor string                       `json:"next_cursor"`
+	Next       string                       `json:"next"`
+	Contracts  []simplehashContractDetailed `json:"contracts"`
 }
 
 func isSpamCollection(c simplehashCollection) bool {
@@ -376,10 +401,10 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tIDs 
 	next := u.String()
 
 	var token simplehashNFT
+	var body getNftsByWalletResponse
 
 outer:
-	for next != "" && token.TokenID == "" {
-		var body getNftsByWalletResponse
+	for ; next != "" && token.TokenID == ""; next = body.Next {
 
 		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 		if err != nil {
@@ -392,8 +417,6 @@ outer:
 				break outer
 			}
 		}
-
-		next = body.Next
 	}
 
 	if token.TokenID == "" {
@@ -429,9 +452,9 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 		u = setSpamThreshold(u, spamScoreThreshold)
 		next := u.String()
 
-		for next != "" {
-			var body getContractsByWalletResponse
+		var body getContractsByWalletResponse
 
+		for ; next != ""; next = body.Next {
 			err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 			if err != nil {
 				errCh <- err
@@ -467,8 +490,6 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 					requestBinTotals = append(requestBinTotals[:addedToBinIdx], requestBinTotals[addedToBinIdx+1:]...)
 				}
 			}
-
-			next = body.Next
 		}
 
 		// Send the remaining bins
@@ -517,8 +538,9 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 
 					next := u.String()
 
-					for next != "" {
-						var body getNftsByWalletResponse
+					var body getNftsByWalletResponse
+
+					for ; next != ""; next = body.Next {
 
 						err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 						if err != nil {
@@ -536,8 +558,6 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 						}
 
 						outCh <- page
-
-						next = body.Next
 					}
 				})
 			}
@@ -686,4 +706,95 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, tID m
 		return persist.TokenMetadata{}, err
 	}
 	return tokens[0].TokenMetadata, nil
+}
+
+func (p *Provider) GetContractsByCreatorAddress(ctx context.Context, address persist.Address) ([]mc.ChainAgnosticContract, error) {
+	contracts := make([]mc.ChainAgnosticContract, 0)
+	seen := make(map[persist.Address]bool)
+
+	owned, err := p.GetContractsByOwnerAddress(ctx, address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get owned contracts: %s", err)
+	}
+
+	for _, c := range owned {
+		seen[c.Address] = true
+		contracts = append(contracts, c)
+	}
+
+	deployed, hasOwner, err := p.GetContractsByDeployerAddress(ctx, address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deployed contracts: %s", err)
+	}
+
+	for i := range deployed {
+		if !hasOwner[i] {
+			// You are the creator on Gallery when you are the deployer and there is no owner()
+			contracts = append(contracts, deployed[i])
+		}
+	}
+
+	return contracts, nil
+}
+
+func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, address persist.Address) ([]mc.ChainAgnosticContract, error) {
+	contracts := make([]mc.ChainAgnosticContract, 0)
+
+	u := setChain(getContractsByOwnerEndpoint, p.chain)
+	u = setWallet(u, address)
+	next := u.String()
+
+	var body getContractsByOwnerResponse
+
+	for ; next != ""; next = body.Next {
+		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, c := range body.Contracts {
+			var collection simplehashCollection
+
+			if len(c.TopCollections) > 0 {
+				collection = c.TopCollections[0]
+			}
+
+			contract := translateToChainAgnosticContract(c.ContractAddress, c.simplehashContract, collection)
+			contracts = append(contracts, contract)
+		}
+	}
+
+	return contracts, nil
+}
+
+func (p *Provider) GetContractsByDeployerAddress(ctx context.Context, address persist.Address) ([]mc.ChainAgnosticContract, []bool, error) {
+	contracts := make([]mc.ChainAgnosticContract, 0)
+	hasOwner := make([]bool, 0)
+
+	u := setChain(getContractsByDeployerEndpoint, p.chain)
+	u = setWallet(u, address)
+	next := u.String()
+
+	var body getContractsByDeployerResponse
+
+	for ; next != ""; next = body.Next {
+		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for _, c := range body.Contracts {
+			var collection simplehashCollection
+
+			if len(c.TopCollections) > 0 {
+				collection = c.TopCollections[0]
+			}
+
+			contract := translateToChainAgnosticContract(c.ContractAddress, c.simplehashContract, collection)
+			contracts = append(contracts, contract)
+			hasOwner = append(hasOwner, c.OwnedBy != "")
+		}
+	}
+
+	return contracts, hasOwner, nil
 }

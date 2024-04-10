@@ -70,8 +70,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
-// GetContractsByOwnerAddress retrieves ethereum contracts by their owner address
-func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetContractsByCreatorAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/contracts/get?owner=%s", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return nil, err
