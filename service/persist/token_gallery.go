@@ -91,7 +91,7 @@ type ContractIdentifiers struct {
 	Chain           Chain   `json:"chain"`
 }
 
-func (c *ContractIdentifiers) String() string {
+func (c ContractIdentifiers) String() string {
 	return fmt.Sprintf("contract(chain=%d, address=%s)", c.Chain, c.ContractAddress)
 }
 

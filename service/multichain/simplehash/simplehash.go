@@ -77,6 +77,7 @@ func checkURL(s string) url.URL {
 var chainToSimpleHashChain = map[persist.Chain]string{
 	persist.ChainETH:  "ethereum",
 	persist.ChainBase: "base",
+	persist.ChainZora: "zora",
 }
 
 func setChain(u url.URL, chain persist.Chain) url.URL {
@@ -263,6 +264,12 @@ type getContractsByWalletResponse struct {
 	Contracts  []simplehashContractOwnership `json:"contracts"`
 }
 
+type getCollectionByContractResponse struct {
+	NextCursor  string                 `json:"next_cursor"`
+	Next        string                 `json:"next"`
+	Collections []simplehashCollection `json:"collections"`
+}
+
 func isSpamCollection(c simplehashCollection) bool {
 	return c.SpamScore > spamScoreThreshold
 }
@@ -317,9 +324,10 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 func translateToChainAgnosticContract(address string, contract simplehashContract, collection simplehashCollection) mc.ChainAgnosticContract {
 	c := mc.ChainAgnosticContract{
 		Descriptors: mc.ChainAgnosticContractDescriptors{
-			Symbol:       contract.Symbol,
-			Name:         contract.Name,
-			OwnerAddress: persist.Address(util.FirstNonEmptyString(contract.OwnedBy, contract.DeployedBy)),
+			Symbol:         contract.Symbol,
+			Name:           contract.Name,
+			OwnerAddress:   persist.Address(contract.OwnedBy),
+			CreatorAddress: persist.Address(contract.DeployedBy),
 		},
 		Address: persist.Address(address),
 		IsSpam:  util.ToPointer(isSpamCollection(collection)),
@@ -647,8 +655,21 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID mc.Chain
 }
 
 func (p *Provider) GetContractByAddress(ctx context.Context, address persist.Address) (mc.ChainAgnosticContract, error) {
-	_, contract, err := p.GetTokensByTokenIdentifiers(ctx, mc.ChainAgnosticIdentifiers{ContractAddress: address, TokenID: "1"})
-	return contract, err
+	// Needs at least one mint in order to fetch the contract, because the contract object is only available in the token response
+	outCh, errCh := p.GetTokensIncrementallyByContractAddress(ctx, address, 1)
+	for {
+		select {
+		case page := <-outCh:
+			if len(page.Contracts) == 0 {
+				return mc.ChainAgnosticContract{}, fmt.Errorf("%s not found", persist.NewContractIdentifiers(address, p.chain))
+			}
+			return page.Contracts[0], nil
+		case err := <-errCh:
+			if err != nil {
+				return mc.ChainAgnosticContract{}, err
+			}
+		}
+	}
 }
 
 func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tID mc.ChainAgnosticIdentifiers) (mc.ChainAgnosticTokenDescriptors, mc.ChainAgnosticContractDescriptors, error) {
