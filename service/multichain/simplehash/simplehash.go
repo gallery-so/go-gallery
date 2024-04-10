@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	// "sort"
 	"strconv"
 	"strings"
-	// "time"
 
 	"github.com/sourcegraph/conc/pool"
 
@@ -349,10 +347,9 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 func translateToChainAgnosticContract(address string, contract simplehashContract, collection simplehashCollection) mc.ChainAgnosticContract {
 	c := mc.ChainAgnosticContract{
 		Descriptors: mc.ChainAgnosticContractDescriptors{
-			Symbol:         contract.Symbol,
-			Name:           contract.Name,
-			OwnerAddress:   persist.Address(contract.OwnedBy),
-			CreatorAddress: persist.Address(contract.DeployedBy),
+			Symbol:       contract.Symbol,
+			Name:         contract.Name,
+			OwnerAddress: persist.Address(util.FirstNonEmptyString(contract.OwnedBy, contract.DeployedBy)),
 		},
 		Address: persist.Address(address),
 		IsSpam:  util.ToPointer(isSpamCollection(collection)),
@@ -401,10 +398,10 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tIDs 
 	next := u.String()
 
 	var token simplehashNFT
-	var body getNftsByWalletResponse
 
 outer:
-	for ; next != "" && token.TokenID == ""; next = body.Next {
+	for next != "" && token.TokenID == "" {
+		var body getNftsByWalletResponse
 
 		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 		if err != nil {
@@ -417,6 +414,8 @@ outer:
 				break outer
 			}
 		}
+
+		next = body.Next
 	}
 
 	if token.TokenID == "" {
@@ -452,9 +451,9 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 		u = setSpamThreshold(u, spamScoreThreshold)
 		next := u.String()
 
-		var body getContractsByWalletResponse
+		for next != "" {
+			var body getContractsByWalletResponse
 
-		for ; next != ""; next = body.Next {
 			err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 			if err != nil {
 				errCh <- err
@@ -490,13 +489,13 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 					requestBinTotals = append(requestBinTotals[:addedToBinIdx], requestBinTotals[addedToBinIdx+1:]...)
 				}
 			}
+			next = body.Next
 		}
 
 		// Send the remaining bins
 		for _, bin := range requestBins {
 			outCh <- bin
 		}
-
 	}()
 
 	return outCh, errCh
@@ -538,9 +537,8 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 
 					next := u.String()
 
-					var body getNftsByWalletResponse
-
-					for ; next != ""; next = body.Next {
+					for next != "" {
+						var body getNftsByWalletResponse
 
 						err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 						if err != nil {
@@ -558,6 +556,8 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 						}
 
 						outCh <- page
+
+						next = body.Next
 					}
 				})
 			}
@@ -728,8 +728,8 @@ func (p *Provider) GetContractsByCreatorAddress(ctx context.Context, address per
 	}
 
 	for i := range deployed {
-		if !hasOwner[i] {
-			// You are the creator on Gallery when you are the deployer and there is no owner()
+		// You are the creator on Gallery when you are the deployer and there is no owner()
+		if !hasOwner[i] && !seen[deployed[i].Address] {
 			contracts = append(contracts, deployed[i])
 		}
 	}
@@ -744,9 +744,9 @@ func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, address persi
 	u = setWallet(u, address)
 	next := u.String()
 
-	var body getContractsByOwnerResponse
+	for next != "" {
+		var body getContractsByOwnerResponse
 
-	for ; next != ""; next = body.Next {
 		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 		if err != nil {
 			return nil, err
@@ -762,6 +762,8 @@ func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, address persi
 			contract := translateToChainAgnosticContract(c.ContractAddress, c.simplehashContract, collection)
 			contracts = append(contracts, contract)
 		}
+
+		next = body.Next
 	}
 
 	return contracts, nil
@@ -775,9 +777,9 @@ func (p *Provider) GetContractsByDeployerAddress(ctx context.Context, address pe
 	u = setWallet(u, address)
 	next := u.String()
 
-	var body getContractsByDeployerResponse
+	for next != "" {
+		var body getContractsByDeployerResponse
 
-	for ; next != ""; next = body.Next {
 		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 		if err != nil {
 			return nil, nil, err
@@ -794,6 +796,8 @@ func (p *Provider) GetContractsByDeployerAddress(ctx context.Context, address pe
 			contracts = append(contracts, contract)
 			hasOwner = append(hasOwner, c.OwnedBy != "")
 		}
+
+		next = body.Next
 	}
 
 	return contracts, hasOwner, nil

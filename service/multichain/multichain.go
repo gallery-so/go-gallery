@@ -93,7 +93,6 @@ type ChainAgnosticContractDescriptors struct {
 	Description     string          `json:"description"`
 	ProfileImageURL string          `json:"profile_image_url"`
 	OwnerAddress    persist.Address `json:"owner_address"`
-	CreatorAddress  persist.Address `json:"creator_address"`
 }
 
 // ChainAgnosticIdentifiers identify tokens despite their chain

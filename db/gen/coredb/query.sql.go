@@ -6030,50 +6030,6 @@ func (q *Queries) HasMintedClaimsByWalletAddress(ctx context.Context, arg HasMin
 	return i, err
 }
 
-const highlightCreatorQC = `-- name: HighlightCreatorQC :many
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain from contracts where not deleted and chain = $1 limit 1000
-`
-
-func (q *Queries) HighlightCreatorQC(ctx context.Context, chain persist.Chain) ([]Contract, error) {
-	rows, err := q.db.Query(ctx, highlightCreatorQC, chain)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Contract
-	for rows.Next() {
-		var i Contract
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
-			&i.L1Chain,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const insertComment = `-- name: InsertComment :one
 INSERT INTO comments 
 (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, TOP_LEVEL_COMMENT_ID, COMMENT) 

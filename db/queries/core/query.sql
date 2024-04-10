@@ -2057,6 +2057,3 @@ update highlight_mint_claims set last_updated = now(), status = $1, internal_tok
 -- name: AddAppMintAnnouncementNotificationToUser :exec
 insert into notifications (id, deleted, owner_id, last_updated, created_at, action, data, event_ids, seen, amount)
     values (@notification_id, false, @user_id, now(), now(), 'Announcement', '{"announcement_details": {"title": "Thank you for downloading the Gallery mobile app", "platform": "Web", "image_url": "https://highlight-creator-assets.highlight.xyz/main/base-dir/5b5d06ee-679c-4ead-90bf-aa784e9aabcc/previews/3.png?d=152x152&attempt=2", "description": "Tap to claim your unique mint of Radiance by MCHX", "internal_id": "apr-2024-mchx-collab"}}', '{2egglIVtSLLWmsPv3szwgkQmCd7}', false, 1);
-
--- name: HighlightCreatorQC :many
-select * from contracts where not deleted and chain = $1 limit 1000;
