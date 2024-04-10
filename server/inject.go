@@ -7,13 +7,11 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"time"
 
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
@@ -30,7 +28,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 // envInit is a type returned after setting up the environment
@@ -46,7 +43,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		newTokenManageCache,
 		postgres.NewRepositories,
 		dbConnSet,
-		newReservoirLimiter, // needs to be a singleton
 		wire.Struct(new(multichain.ChainProvider), "*"),
 		multichainProviderInjector,
 		ethInjector,
@@ -71,18 +67,6 @@ var dbConnSet = wire.NewSet(
 func setEnv(f func()) envInit {
 	f()
 	return envInit{}
-}
-
-type reservoirLimiter limiters.KeyRateLimiter
-
-// Dumb forward method to satisfy the retry.Limiter interface
-func (r *reservoirLimiter) ForKey(ctx context.Context, key string) (bool, time.Duration, error) {
-	return (*limiters.KeyRateLimiter)(r).ForKey(ctx, key)
-}
-
-func newReservoirLimiter(ctx context.Context, c *redis.Cache) *reservoirLimiter {
-	l := limiters.NewKeyRateLimiter(ctx, c, "retryer:reservoir", 120, time.Minute)
-	return util.ToPointer(reservoirLimiter(*l))
 }
 
 func newPqClient(e envInit) (*sql.DB, func()) {
@@ -131,7 +115,7 @@ func customMetadataHandlersInjector(simplehashProvider *simplehash.Provider) *mu
 	))
 }
 
-func ethInjector(envInit, context.Context, *http.Client, *reservoirLimiter) (*multichain.EthereumProvider, func()) {
+func ethInjector(envInit, context.Context, *http.Client) (*multichain.EthereumProvider, func()) {
 	panic(wire.Build(
 		rpc.NewEthClient,
 		wire.Value(persist.ChainETH),
@@ -169,7 +153,6 @@ func ethSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-	l *reservoirLimiter,
 ) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -178,8 +161,6 @@ func ethSyncPipelineInjector(
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(retry.Limiter), util.ToPointer(l)),
-		wrapper.NewFillInWrapper,
 		customMetadataHandlersInjector,
 	))
 }
@@ -206,7 +187,7 @@ func tezosProviderInjector(tezosProvider *tezos.Provider, tzktProvider *tzkt.Pro
 	))
 }
 
-func optimismInjector(context.Context, *http.Client, *reservoirLimiter) (*multichain.OptimismProvider, func()) {
+func optimismInjector(context.Context, *http.Client) (*multichain.OptimismProvider, func()) {
 	panic(wire.Build(
 		wire.Value(persist.ChainOptimism),
 		simplehash.NewProvider,
@@ -237,7 +218,6 @@ func optimismSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-	l *reservoirLimiter,
 ) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -246,13 +226,11 @@ func optimismSyncPipelineInjector(
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(retry.Limiter), util.ToPointer(l)),
-		wrapper.NewFillInWrapper,
 		customMetadataHandlersInjector,
 	))
 }
 
-func arbitrumInjector(context.Context, *http.Client, *reservoirLimiter) (*multichain.ArbitrumProvider, func()) {
+func arbitrumInjector(context.Context, *http.Client) (*multichain.ArbitrumProvider, func()) {
 	panic(wire.Build(
 		wire.Value(persist.ChainArbitrum),
 		simplehash.NewProvider,
@@ -283,7 +261,6 @@ func arbitrumSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-	l *reservoirLimiter,
 ) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -292,8 +269,6 @@ func arbitrumSyncPipelineInjector(
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(retry.Limiter), util.ToPointer(l)),
-		wrapper.NewFillInWrapper,
 		customMetadataHandlersInjector,
 	))
 }
@@ -315,7 +290,7 @@ func poapProviderInjector(poapProvider *poap.Provider) *multichain.PoapProvider 
 	))
 }
 
-func zoraInjector(envInit, context.Context, *http.Client, *reservoirLimiter) (*multichain.ZoraProvider, func()) {
+func zoraInjector(envInit, context.Context, *http.Client) (*multichain.ZoraProvider, func()) {
 	panic(wire.Build(
 		wire.Value(persist.ChainZora),
 		simplehash.NewProvider,
@@ -347,7 +322,6 @@ func zoraSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-	l *reservoirLimiter,
 ) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -356,13 +330,11 @@ func zoraSyncPipelineInjector(
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(retry.Limiter), util.ToPointer(l)),
-		wrapper.NewFillInWrapper,
 		customMetadataHandlersInjector,
 	))
 }
 
-func baseInjector(context.Context, *http.Client, *reservoirLimiter) (*multichain.BaseProvider, func()) {
+func baseInjector(context.Context, *http.Client) (*multichain.BaseProvider, func()) {
 	panic(wire.Build(
 		wire.Value(persist.ChainBase),
 		simplehash.NewProvider,
@@ -393,7 +365,6 @@ func baseSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-	l *reservoirLimiter,
 ) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -402,13 +373,11 @@ func baseSyncPipelineInjector(
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(retry.Limiter), util.ToPointer(l)),
-		wrapper.NewFillInWrapper,
 		customMetadataHandlersInjector,
 	))
 }
 
-func polygonInjector(context.Context, *http.Client, *reservoirLimiter) (*multichain.PolygonProvider, func()) {
+func polygonInjector(context.Context, *http.Client) (*multichain.PolygonProvider, func()) {
 	panic(wire.Build(
 		wire.Value(persist.ChainPolygon),
 		simplehash.NewProvider,
@@ -439,7 +408,6 @@ func polygonSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-	l *reservoirLimiter,
 ) (*wrapper.SyncPipelineWrapper, func()) {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -448,8 +416,6 @@ func polygonSyncPipelineInjector(
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(retry.Limiter), util.ToPointer(l)),
-		wrapper.NewFillInWrapper,
 		customMetadataHandlersInjector,
 	))
 }
