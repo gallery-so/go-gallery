@@ -434,6 +434,7 @@ type Notification struct {
 	TokenID     persist.DBID             `db:"token_id" json:"token_id"`
 	MentionID   persist.DBID             `db:"mention_id" json:"mention_id"`
 	CommunityID persist.DBID             `db:"community_id" json:"community_id"`
+	Pinned      bool                     `db:"pinned" json:"pinned"`
 }
 
 type OwnedCommunity struct {
