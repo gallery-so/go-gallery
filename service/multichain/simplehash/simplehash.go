@@ -35,18 +35,23 @@ var chainToSimpleHashChain = map[persist.Chain]string{
 }
 
 const (
-	baseURL                                = "https://api.simplehash.com"
-	getNftsByWalletEndpointTemplate        = "%s/api/v0/nfts/owners_v2"
-	getNftsByTokenListEndpointTemplate     = "%s/api/v0/nfts/assets"
-	getContractsByWalletEndpointTemplate   = "%s/api/v0/nfts/contracts_by_wallets"
-	getNftByTokenIDEndpointTemplate        = "%s/api/v0/nfts/%s/%s/%s"
-	getNftsByContractEndpointTemplate      = "%s/api/v0/nfts/%s/%s"
-	getContractsByOwnerEndpointTemplate    = "%s/api/v0/contracts_by_owner"
-	getContractsByDeployerEndpointTemplate = "%s/api/v0/contracts_by_deployer"
-	spamScoreThreshold                     = 90
-	tokenBatchLimit                        = 50
-	contractBatchLimit                     = 40
-	incrementalSyncPoolSize                = 24
+	baseURL                                 = "https://api.simplehash.com"
+	getNftsByWalletEndpointTemplate         = "%s/api/v0/nfts/owners_v2"
+	getNftsByTokenListEndpointTemplate      = "%s/api/v0/nfts/assets"
+	getContractsByWalletEndpointTemplate    = "%s/api/v0/nfts/contracts_by_wallets"
+	getNftByTokenIDEndpointTemplate         = "%s/api/v0/nfts/%s/%s/%s"
+	getNftsByContractEndpointTemplate       = "%s/api/v0/nfts/%s/%s"
+	getContractsByOwnerEndpointTemplate     = "%s/api/v0/contracts_by_owner"
+	getContractsByDeployerEndpointTemplate  = "%s/api/v0/contracts_by_deployer"
+	getCollectorsByContractEndpointTemplate = "%s/api/v0/nfts/top_collectors/%s/%s"
+	getOwnersByContractEndpointTemplate     = "%s/api/v0/nfts/owners/%s/%s"
+	spamScoreThreshold                      = 90
+	tokenBatchLimit                         = 50
+	collectorBatchLimit                     = 50
+	ownerBatchLimit                         = 1000
+	contractBatchLimit                      = 40
+	addressBatchLimit                       = 20
+	incrementalSyncPoolSize                 = 24
 )
 
 type Provider struct {
@@ -93,8 +98,12 @@ func setChain(u url.URL, chain persist.Chain) url.URL {
 }
 
 func setWallet(u url.URL, wallet persist.Address) url.URL {
+	return setWallets(u, []string{wallet.String()})
+}
+
+func setWallets(u url.URL, wallets []string) url.URL {
 	query := u.Query()
-	query.Set("wallet_addresses", wallet.String())
+	query.Set("wallet_addresses", strings.Join(wallets, ","))
 	u.RawQuery = query.Encode()
 	return u
 }
@@ -293,6 +302,29 @@ type getContractsByDeployerResponse struct {
 	Contracts  []simplehashContractDetailed `json:"contracts"`
 }
 
+type simpleHashCollector struct {
+	OwnerAddress      string `json:"owner_address"`
+	DistinctNftsOwned int    `json:"distinct_nfts_owned"`
+	TotalCopiesOwned  int    `json:"total_copies_owned"`
+}
+
+type getCollectorsByContractResponse struct {
+	NextCursor    string                `json:"next_cursor"`
+	Next          string                `json:"next"`
+	TopCollectors []simpleHashCollector `json:"top_collectors"`
+}
+
+type simplehashTokenOwner struct {
+	OwnerAddress string `json:"owner_address"`
+	Quantity     int    `json:"quantity"`
+}
+
+type getOwnersByContractResponse struct {
+	NextCursor string                 `json:"next_cursor"`
+	Next       string                 `json:"next"`
+	Owners     []simplehashTokenOwner `json:"owners"`
+}
+
 func isSpamCollection(c simplehashCollection) bool {
 	return c.SpamScore > spamScoreThreshold
 }
@@ -442,7 +474,7 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 		defer close(outCh)
 		defer close(errCh)
 
-		requestBins := [][]string{}
+		requestBins := [][]string{{}}
 		requestBinTotals := []int{0}
 
 		u := setChain(getContractsByWalletEndpoint, p.chain)
@@ -491,10 +523,11 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 			}
 			next = body.Next
 		}
-
 		// Send the remaining bins
 		for _, bin := range requestBins {
-			outCh <- bin
+			if len(bin) > 0 {
+				outCh <- bin
+			}
 		}
 	}()
 
@@ -516,8 +549,8 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 	outer:
 		for {
 			select {
-			case err, ok := <-batchRequestErrCh:
-				if ok {
+			case err := <-batchRequestErrCh:
+				if err != nil {
 					errCh <- err
 					return
 				}
@@ -562,29 +595,29 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 				})
 			}
 		}
-
 		workers.Wait()
 	}()
 
 	return outCh, errCh
 }
 
-func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan mc.ChainAgnosticTokensAndContracts, <-chan error) {
-	outCh := make(chan mc.ChainAgnosticTokensAndContracts)
+func (p *Provider) binRequestsByOwner(ctx context.Context, address persist.Address) (<-chan []string, <-chan error) {
+	outCh := make(chan []string, incrementalSyncPoolSize)
 	errCh := make(chan error)
 
 	go func() {
 		defer close(outCh)
 		defer close(errCh)
 
-		u := checkURL(fmt.Sprintf(getNftsByContractEndpointTemplate, baseURL, chainToSimpleHashChain[p.chain], address))
-		u = setLimit(u, tokenBatchLimit)
+		u := checkURL(fmt.Sprintf(getOwnersByContractEndpointTemplate, baseURL, chainToSimpleHashChain[p.chain], address))
+		u = setLimit(u, ownerBatchLimit)
 
 		next := u.String()
-		var tokensReceived int
+		ownerQuantity := make(map[string]int)
+		sent := make(map[string]bool)
 
-		for next != "" && tokensReceived < maxLimit {
-			var body getNftsByContractResponse
+		for next != "" {
+			var body getOwnersByContractResponse
 
 			err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 			if err != nil {
@@ -592,21 +625,128 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 				return
 			}
 
-			var page mc.ChainAgnosticTokensAndContracts
+			for _, o := range body.Owners {
+				if sent[o.OwnerAddress] {
+					continue
+				}
 
-			for i := 0; i < len(body.NFTs) && tokensReceived < maxLimit; i++ {
-				nft := body.NFTs[i]
-				contract := translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
-				token := translateToChainAgnosticToken(nft, persist.Address(address), contract.IsSpam)
-				page.Tokens = append(page.Tokens, token)
-				page.Contracts = append(page.Contracts, contract)
-				tokensReceived++
+				ownerQuantity[o.OwnerAddress] += o.Quantity
+
+				// Submit the owner address immediately if they own more than page limit
+				if ownerQuantity[o.OwnerAddress] >= tokenBatchLimit {
+					outCh <- []string{o.OwnerAddress}
+					sent[o.OwnerAddress] = true
+					delete(ownerQuantity, o.OwnerAddress)
+				}
 			}
-
-			outCh <- page
 
 			next = body.Next
 		}
+
+		requestBins := [][]string{{}}
+		requestBinTotals := []int{0}
+
+		// Use first-fit binning to find the first request that can fit the owner
+		for o, qty := range ownerQuantity {
+			var placed bool
+			var addedToBinIdx int
+
+			for binIdx, bin := range requestBins {
+				if requestBinTotals[binIdx]+qty <= tokenBatchLimit && len(bin)+1 <= addressBatchLimit {
+					requestBins[binIdx] = append(requestBins[binIdx], o)
+					requestBinTotals[binIdx] += qty
+					placed = true
+					addedToBinIdx = binIdx
+					break
+				}
+			}
+
+			if !placed {
+				newBin := []string{o}
+				addedToBinIdx = len(requestBins)
+				requestBins = append(requestBins, newBin)
+				requestBinTotals = append(requestBinTotals, qty)
+			}
+
+			// Send a bin once its full
+			if requestBinTotals[addedToBinIdx] >= tokenBatchLimit || len(requestBins[addedToBinIdx]) >= addressBatchLimit {
+				outCh <- requestBins[addedToBinIdx]
+				requestBins = append(requestBins[:addedToBinIdx], requestBins[addedToBinIdx+1:]...)
+				requestBinTotals = append(requestBinTotals[:addedToBinIdx], requestBinTotals[addedToBinIdx+1:]...)
+			}
+		}
+
+		// Send the remaining bins
+		for _, bin := range requestBins {
+			if len(bin) > 0 {
+				outCh <- bin
+			}
+		}
+	}()
+
+	return outCh, errCh
+}
+
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan mc.ChainAgnosticTokensAndContracts, <-chan error) {
+	batchRequestCh, batchRequestErrCh := p.binRequestsByOwner(ctx, address)
+
+	outCh := make(chan mc.ChainAgnosticTokensAndContracts)
+	errCh := make(chan error)
+
+	go func() {
+		defer close(outCh)
+		defer close(errCh)
+
+		workers := pool.New().WithMaxGoroutines(incrementalSyncPoolSize)
+	outer:
+		for {
+			select {
+			case err := <-batchRequestErrCh:
+				if err != nil {
+					errCh <- err
+					return
+				}
+			case ownerBin, ok := <-batchRequestCh:
+				if !ok {
+					break outer
+				}
+
+				workers.Go(func() {
+					logger.For(ctx).Infof("simplehash batch fetching tokens for %d owners for contract=%s\n", len(ownerBin), address)
+					u := setChain(getNftsByWalletEndpoint, p.chain)
+					u = setWallets(u, ownerBin)
+					u = setContractAddress(u, p.chain, address)
+					u = setQueriedWalletBalances(u)
+					u = setLimit(u, tokenBatchLimit)
+
+					next := u.String()
+
+					for next != "" {
+						var body getNftsByWalletResponse
+
+						err := readResponseBodyInto(ctx, p.httpClient, next, &body)
+						if err != nil {
+							errCh <- err
+							return
+						}
+
+						var page mc.ChainAgnosticTokensAndContracts
+
+						for _, nft := range body.NFTs {
+							contract := translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
+							token := translateToChainAgnosticToken(nft, persist.Address(address), contract.IsSpam)
+							page.Contracts = append(page.Contracts, contract)
+							page.Tokens = append(page.Tokens, token)
+						}
+
+						outCh <- page
+
+						next = body.Next
+					}
+				})
+			}
+		}
+		workers.Wait()
 	}()
 
 	return outCh, errCh
