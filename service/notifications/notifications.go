@@ -682,6 +682,9 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
+		if time.Since(follower.CreatedAt) < 24*time.Hour {
+			return task.PushNotificationMessage{}, errAccountTooNew
+		}
 		if err = limiter.tryFollow(ctx, follower.ID, notif.OwnerID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
@@ -1146,9 +1149,13 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 
 	message, err := createPushMessage(ctx, notif, queries, limiter)
 	if err != nil {
-		if _, ok := err.(errRateLimited); ok {
+		if util.ErrorIs[errRateLimited](err) {
 			// Rate limiting is expected and shouldn't be propagated upward as an error
 			logger.For(ctx).Infof("couldn't create push message: %s", err)
+			return nil
+		} else if errors.Is(err, errAccountTooNew) {
+			// Some message types (e.g. follow notifications) shouldn't be triggered by new accounts
+			logger.For(ctx).Infof("not sending push notification to %s because sending user is too new", notif.OwnerID)
 			return nil
 		}
 
@@ -1486,6 +1493,8 @@ func createSubscription(ctx context.Context, client *pubsub.Client, topic, name 
 		ExpirationPolicy: time.Hour * 24 * 3,
 	})
 }
+
+var errAccountTooNew = errors.New("not sending a push notification: user was created less than 24 hours ago")
 
 type errRateLimited struct {
 	limiterName string
