@@ -810,17 +810,32 @@ WHERE
     END
     AND c.deleted = false;
 
--- name: GetUserNotificationsBatch :batchmany
-SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
-    AND (last_updated, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (last_updated, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-    ORDER BY pinned DESC,
-        CASE WHEN sqlc.arg('paging_forward')::bool THEN (last_updated, id) END ASC,
-        CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (last_updated, id) END DESC
-    LIMIT sqlc.arg('limit');
+-- name: GetUserNotifications :many
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- name: GetUserUnseenNotifications :many
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
 
 -- name: GetRecentUnseenNotifications :many
 SELECT * FROM notifications WHERE owner_id = @owner_id AND deleted = false AND seen = false and created_at > @created_after order by created_at desc limit @lim;
+
+-- name: GetUserNotificationsBatch :batchmany
+SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
 
 -- name: CountUserNotifications :one
 SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false;
@@ -2040,6 +2055,6 @@ update highlight_mint_claims set last_updated = now(), status = $1, minted_token
 update highlight_mint_claims set last_updated = now(), status = $1, internal_token_id = $2 where id = @id returning *;
 
 -- name: AddAppMintAnnouncementNotificationToUser :exec
-insert into notifications (id, deleted, owner_id, last_updated, created_at, action, data, event_ids, seen, amount, pinned)
-    values (@notification_id, false, @user_id, now(), now(), 'Announcement', '{"announcement_details": {"title": "Thank you for downloading the Gallery mobile app", "platform": "Web", "image_url": "https://highlight-creator-assets.highlight.xyz/main/base-dir/5b5d06ee-679c-4ead-90bf-aa784e9aabcc/previews/3.png?d=152x152&attempt=2", "description": "Tap to claim your unique mint of Radiance by MCHX", "internal_id": "apr-2024-mchx-collab"}}', '{2egglIVtSLLWmsPv3szwgkQmCd7}', false, 1, true);
+insert into notifications (id, deleted, owner_id, last_updated, created_at, action, data, event_ids, seen, amount)
+    values (@notification_id, false, @user_id, now(), now(), 'Announcement', '{"announcement_details": {"title": "Thank you for downloading the Gallery mobile app", "platform": "Web", "image_url": "https://highlight-creator-assets.highlight.xyz/main/base-dir/5b5d06ee-679c-4ead-90bf-aa784e9aabcc/previews/3.png?d=152x152&attempt=2", "description": "Tap to claim your unique mint of Radiance by MCHX", "internal_id": "apr-2024-mchx-collab"}}', '{2egglIVtSLLWmsPv3szwgkQmCd7}', false, 1);
 
