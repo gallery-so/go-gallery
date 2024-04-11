@@ -52,7 +52,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 	}
 
 	cursorFunc := func(n db.Notification) (time.Time, persist.DBID, error) {
-		return n.CreatedAt, n.ID, nil
+		return n.LastUpdated, n.ID, nil
 	}
 
 	paginator := timeIDPaginator[db.Notification]{
