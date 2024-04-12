@@ -170,7 +170,7 @@ func fmtContractID(chain persist.Chain, contract persist.Address) string {
 }
 
 func fmtNftID(chain persist.Chain, contract persist.Address, tokenID persist.DecimalTokenID) string {
-	return fmt.Sprintf("%s.%s.%s", chainToSimpleHashChain[chain], contract, tokenID)
+	return fmt.Sprintf("%s.%s", fmtContractID(chain, contract), tokenID)
 }
 
 type simplehashPreviews struct {
@@ -693,6 +693,8 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	outCh := make(chan mc.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 
+	var total int
+
 	go func() {
 		defer close(outCh)
 		defer close(errCh)
@@ -732,7 +734,8 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 
 						var page mc.ChainAgnosticTokensAndContracts
 
-						for _, nft := range body.NFTs {
+						for i := 0; i < len(body.NFTs) && total < maxLimit; i, total = i+1, total+1 {
+							nft := body.NFTs[i]
 							contract := translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
 							token := translateToChainAgnosticToken(nft, persist.Address(address), contract.IsSpam)
 							page.Contracts = append(page.Contracts, contract)

@@ -1090,58 +1090,6 @@ type ContractOwnerResult struct {
 	Chain     persist.Chain
 }
 
-func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
-	user, err := p.Queries.GetUserById(ctx, userID)
-	if err != nil {
-		return err
-	}
-
-	if len(chains) == 0 {
-		for chain := range p.Chains {
-			chains = append(chains, chain)
-		}
-	}
-
-	searchAddresses := p.matchingWallets(user.Wallets, chains)
-	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx)
-
-	for chain, addresses := range searchAddresses {
-
-		fetcher, ok := p.Chains[chain].(ContractsCreatorFetcher)
-		if !ok {
-			continue
-		}
-
-		for _, address := range addresses {
-			c := chain
-			a := address
-			providerPool.Go(func(ctx context.Context) (ContractOwnerResult, error) {
-				contracts, err := fetcher.GetContractsByCreatorAddress(ctx, a)
-				if err != nil {
-					logger.For(ctx).Errorf("error fetching contracts for address %s: %s", a, err)
-					return ContractOwnerResult{Chain: c}, nil
-				}
-				logger.For(ctx).Debugf("found %d contracts for address %s", len(contracts), a)
-				return ContractOwnerResult{Contracts: contracts, Chain: c}, nil
-			})
-		}
-	}
-
-	pResult, err := providerPool.Wait()
-	if err != nil {
-		return err
-	}
-
-	for _, result := range pResult {
-		_, _, err = p.processContracts(ctx, result.Chain, result.Contracts, nil, true)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // matchingWallets returns wallet addresses that belong to any of the passed chains
 func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
 	matches := make(map[persist.Chain][]persist.Address)
