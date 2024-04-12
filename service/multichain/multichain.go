@@ -14,7 +14,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
-	"github.com/sourcegraph/conc/pool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
@@ -1407,7 +1406,7 @@ func chainContractsToUpsertableContracts(chain persist.Chain, contracts []ChainA
 		result[normalizedAddress] = mergeContracts(result[normalizedAddress], db.Contract{
 			Symbol:               util.ToNullStringEmptyNull(c.Descriptors.Symbol),
 			Name:                 util.ToNullStringEmptyNull(c.Descriptors.Name),
-			OwnerAddress:         c.Descriptors.OwnerAddress,
+			OwnerAddress:         persist.Address(chain.NormalizeAddress(c.Descriptors.OwnerAddress)),
 			ProfileImageUrl:      util.ToNullStringEmptyNull(c.Descriptors.ProfileImageURL),
 			Description:          util.ToNullStringEmptyNull(c.Descriptors.Description),
 			IsProviderMarkedSpam: util.FromPointer(c.IsSpam),
