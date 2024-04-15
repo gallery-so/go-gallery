@@ -675,7 +675,6 @@ func (p *Provider) binRequestsByOwner(ctx context.Context, address persist.Addre
 				requestBinTotals = append(requestBinTotals[:addedToBinIdx], requestBinTotals[addedToBinIdx+1:]...)
 			}
 		}
-
 		// Send the remaining bins
 		for _, bin := range requestBins {
 			if len(bin) > 0 {

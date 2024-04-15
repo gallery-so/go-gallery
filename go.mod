@@ -70,7 +70,6 @@ require (
 	github.com/james-bowman/sparse v0.0.0-20210729090128-1e6c7dd483e9
 	github.com/miguelmota/go-ethereum-hdwallet v0.1.1
 	github.com/pkg/errors v0.9.1
-	github.com/pkg/profile v1.5.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/wealdtech/go-ens/v3 v3.5.5
 	go.mozilla.org/sops/v3 v3.7.3

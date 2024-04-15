@@ -50,14 +50,14 @@ type CustomMetadataHandlers struct {
 	OpenseaSharedStorefrontHandler metadataHandler
 }
 
-func NewCustomMetadataHandlers(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, f TokenMetadataFetcher) *CustomMetadataHandlers {
+func NewCustomMetadataHandlers(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) *CustomMetadataHandlers {
 	return &CustomMetadataHandlers{
 		AutoglyphHandler:               newAutoglyphHandler(ethClient),
 		ColorglyphHandler:              newColorglyphHandler(ethClient),
 		EnsHandler:                     newEnsHandler(),
 		CryptopunkHandler:              newCryptopunkHandler(ethClient),
 		ZoraHandler:                    newZoraHandler(ethClient, ipfsClient, arweaveClient),
-		OpenseaSharedStorefrontHandler: newOpenseaSharedStorefrontHandler(f),
+		OpenseaSharedStorefrontHandler: newOpenseaSharedStorefrontHandler(),
 	}
 }
 
@@ -593,7 +593,7 @@ func newZoraHandler(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweav
 		return resultMetadata, nil
 	}
 }
-func newOpenseaSharedStorefrontHandler(f TokenMetadataFetcher) metadataHandler {
+func newOpenseaSharedStorefrontHandler() metadataHandler {
 	return func(ctx context.Context, t persist.TokenIdentifiers, oldMetadata ...persist.TokenMetadata) (persist.TokenMetadata, error) {
 		var m persist.TokenMetadata
 		var err error
@@ -601,11 +601,6 @@ func newOpenseaSharedStorefrontHandler(f TokenMetadataFetcher) metadataHandler {
 		// Determine whether to use existing metadata or fetch new metadata
 		if len(oldMetadata) > 0 {
 			m = oldMetadata[0]
-		} else {
-			m, err = f.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID})
-			if err != nil {
-				return persist.TokenMetadata{}, err
-			}
 		}
 
 		imgKey, imgURL, _, _, err := media.FindMediaURLsKeysChain(m, t.Chain)

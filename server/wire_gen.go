@@ -88,11 +88,11 @@ func multichainProviderInjector(contextContext context.Context, repositories *po
 	return provider
 }
 
-func customMetadataHandlersInjector(simplehashProvider *simplehash.Provider) *multichain.CustomMetadataHandlers {
+func customMetadataHandlersInjector() *multichain.CustomMetadataHandlers {
 	client := rpc.NewEthClient()
 	shell := ipfs.NewShell()
 	goarClient := arweave.NewClient()
-	customMetadataHandlers := multichain.NewCustomMetadataHandlers(client, shell, goarClient, simplehashProvider)
+	customMetadataHandlers := multichain.NewCustomMetadataHandlers(client, shell, goarClient)
 	return customMetadataHandlers
 }
 
@@ -130,7 +130,7 @@ func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipeline
 }
 
 func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
-	customMetadataHandlers := customMetadataHandlersInjector(simplehashProvider)
+	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      simplehashProvider,
@@ -193,7 +193,7 @@ func optimismProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simpleh
 }
 
 func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
-	customMetadataHandlers := customMetadataHandlersInjector(simplehashProvider)
+	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      simplehashProvider,
@@ -236,7 +236,7 @@ func arbitrumProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simpleh
 }
 
 func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
-	customMetadataHandlers := customMetadataHandlersInjector(simplehashProvider)
+	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      simplehashProvider,
@@ -296,7 +296,7 @@ func zoraProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashP
 }
 
 func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
-	customMetadataHandlers := customMetadataHandlersInjector(simplehashProvider)
+	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      simplehashProvider,
@@ -339,7 +339,7 @@ func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehash
 }
 
 func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
-	customMetadataHandlers := customMetadataHandlersInjector(simplehashProvider)
+	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      simplehashProvider,
@@ -382,7 +382,7 @@ func polygonProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simpleh
 }
 
 func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
-	customMetadataHandlers := customMetadataHandlersInjector(simplehashProvider)
+	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
 		TokenIdentifierOwnerFetcher:      simplehashProvider,

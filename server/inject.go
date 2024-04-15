@@ -105,10 +105,9 @@ func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
 	}
 }
 
-func customMetadataHandlersInjector(simplehashProvider *simplehash.Provider) *multichain.CustomMetadataHandlers {
+func customMetadataHandlersInjector() *multichain.CustomMetadataHandlers {
 	panic(wire.Build(
 		multichain.NewCustomMetadataHandlers,
-		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(simplehashProvider)),
 		rpc.NewEthClient,
 		ipfs.NewShell,
 		arweave.NewClient,
