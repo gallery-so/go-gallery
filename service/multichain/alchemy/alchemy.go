@@ -930,7 +930,6 @@ func setExcludeSpam(url *url.URL, chain persist.Chain) {
 	query := url.Query()
 	query.Set("excludeFilters[]", "SPAM")
 	url.RawQuery = query.Encode()
-
 }
 
 func setContractAddress(url *url.URL, address persist.Address) {

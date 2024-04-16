@@ -249,6 +249,7 @@ func SetDefaults() {
 	viper.SetDefault("HIGHLIGHT_APP_ID", "")
 	viper.SetDefault("HIGHLIGHT_APP_SECRET", "")
 	viper.SetDefault("MINT_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/mint-processing")
+	viper.SetDefault("SIMPLEHASH_API_KEY", "")
 
 	viper.AutomaticEnv()
 

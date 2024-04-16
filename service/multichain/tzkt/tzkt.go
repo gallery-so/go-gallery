@@ -481,8 +481,7 @@ type tzktOrigination struct {
 	} `json:"originatedContract"`
 }
 
-// GetContractsByOwnerAddress retrieves tezos contracts by their owner address
-func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetContractsByCreatorAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/operations/originations?sender=%s", p.apiURL, addr.String()), nil)
 	if err != nil {
 		return nil, err

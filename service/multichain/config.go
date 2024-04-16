@@ -20,7 +20,7 @@ type ChainProvider struct {
 type EthereumProvider struct {
 	ContractRefresher
 	ContractFetcher
-	ContractsOwnerFetcher
+	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher
@@ -32,7 +32,7 @@ type EthereumProvider struct {
 }
 
 type TezosProvider struct {
-	ContractsOwnerFetcher
+	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher
@@ -42,6 +42,7 @@ type TezosProvider struct {
 }
 
 type OptimismProvider struct {
+	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher
@@ -52,6 +53,7 @@ type OptimismProvider struct {
 }
 
 type ArbitrumProvider struct {
+	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher
@@ -70,7 +72,7 @@ type PoapProvider struct {
 
 type ZoraProvider struct {
 	ContractFetcher
-	ContractsOwnerFetcher
+	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher
@@ -81,6 +83,7 @@ type ZoraProvider struct {
 }
 
 type BaseProvider struct {
+	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher
@@ -91,6 +94,7 @@ type BaseProvider struct {
 }
 
 type PolygonProvider struct {
+	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
 	TokensIncrementalContractFetcher

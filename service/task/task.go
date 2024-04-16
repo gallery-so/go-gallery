@@ -87,9 +87,9 @@ type AutosocialPollFarcasterMessage struct {
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
 
 func (t TokenIdentifiersQuantities) MarshalJSON() ([]byte, error) {
-	m := make(map[string]string)
+	m := make(map[string]string, len(t))
 	for k, v := range t {
-		m[k.String()] = v.String()
+		m[k.AsJSONKey()] = string(v)
 	}
 	return json.Marshal(m)
 }
@@ -101,11 +101,11 @@ func (t *TokenIdentifiersQuantities) UnmarshalJSON(b []byte) error {
 	}
 	result := make(TokenIdentifiersQuantities)
 	for k, v := range m {
-		identifiers, err := persist.TokenUniqueIdentifiersFromString(k)
-		if err != nil {
+		var tID persist.TokenUniqueIdentifiers
+		if err := tID.FromJSONKey(k); err != nil {
 			return err
 		}
-		result[identifiers] = persist.HexString(v)
+		result[tID] = persist.HexString(v)
 	}
 	*t = result
 	return nil
