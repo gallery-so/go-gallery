@@ -20,26 +20,8 @@ type SyncPipelineWrapper struct {
 	TokensIncrementalContractFetcher multichain.TokensIncrementalContractFetcher
 	TokenMetadataBatcher             multichain.TokenMetadataBatcher
 	TokensByTokenIdentifiersFetcher  multichain.TokensByTokenIdentifiersFetcher
+	TokensByContractWalletFetcher    multichain.TokensByContractWalletFetcher
 	CustomMetadataWrapper            *multichain.CustomMetadataHandlers
-}
-
-func NewSyncPipelineWrapper(
-	ctx context.Context,
-	chain persist.Chain,
-	tokenIdentifierOwnerFetcher multichain.TokenIdentifierOwnerFetcher,
-	tokensIncrementalOwnerFetcher multichain.TokensIncrementalOwnerFetcher,
-	tokensIncrementalContractFetcher multichain.TokensIncrementalContractFetcher,
-	tokenMetadataBatcher multichain.TokenMetadataBatcher,
-	customMetadataHandlers *multichain.CustomMetadataHandlers,
-) *SyncPipelineWrapper {
-	return &SyncPipelineWrapper{
-		Chain:                            chain,
-		TokensIncrementalOwnerFetcher:    tokensIncrementalOwnerFetcher,
-		TokenIdentifierOwnerFetcher:      tokenIdentifierOwnerFetcher,
-		TokensIncrementalContractFetcher: tokensIncrementalContractFetcher,
-		TokenMetadataBatcher:             tokenMetadataBatcher,
-		CustomMetadataWrapper:            customMetadataHandlers,
-	}
 }
 
 func (w SyncPipelineWrapper) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, address persist.Address) (t multichain.ChainAgnosticToken, c multichain.ChainAgnosticContract, err error) {
@@ -64,6 +46,15 @@ func (w SyncPipelineWrapper) GetTokensByTokenIdentifiers(ctx context.Context, ti
 	t, c, err := w.TokensByTokenIdentifiersFetcher.GetTokensByTokenIdentifiers(ctx, ti)
 	t = w.CustomMetadataWrapper.LoadAll(ctx, w.Chain, t)
 	return t, c, err
+}
+
+func (w SyncPipelineWrapper) GetTokensByContractWallet(ctx context.Context, c persist.ChainAddress, wallet persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	panic("not implemented")
+}
+
+func (w SyncPipelineWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	metadata, err := w.GetTokenMetadataByTokenIdentifiersBatch(ctx, []multichain.ChainAgnosticIdentifiers{ti})
+	return metadata[0], err
 }
 
 func (w SyncPipelineWrapper) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []multichain.ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {

@@ -3,6 +3,7 @@ package operation
 import (
 	"context"
 	"database/sql"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgtype"
@@ -38,36 +39,6 @@ func TokenFullDetailsByUserTokenIdentifiers(ctx context.Context, q *db.Queries, 
 		Contract:   r.Contract,
 		Definition: r.TokenDefinition,
 	}, nil
-}
-
-func TokensFullDetailsByUserID(ctx context.Context, q *db.Queries, userID persist.DBID) ([]TokenFullDetails, error) {
-	r, err := q.GetTokenFullDetailsByUserId(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	tokens := util.MapWithoutError(r, func(r db.GetTokenFullDetailsByUserIdRow) TokenFullDetails {
-		return TokenFullDetails{
-			Instance:   r.Token,
-			Contract:   r.Contract,
-			Definition: r.TokenDefinition,
-		}
-	})
-	return tokens, nil
-}
-
-func TokensFullDetailsByContractID(ctx context.Context, q *db.Queries, contractID persist.DBID) ([]TokenFullDetails, error) {
-	r, err := q.GetTokenFullDetailsByContractId(ctx, contractID)
-	if err != nil {
-		return nil, err
-	}
-	tokens := util.MapWithoutError(r, func(r db.GetTokenFullDetailsByContractIdRow) TokenFullDetails {
-		return TokenFullDetails{
-			Instance:   r.Token,
-			Contract:   r.Contract,
-			Definition: r.TokenDefinition,
-		}
-	})
-	return tokens, nil
 }
 
 type TokenUpsertParams struct {
@@ -109,7 +80,63 @@ type UpsertToken struct {
 	Identifiers persist.TokenIdentifiers
 }
 
-func BulkUpsert(ctx context.Context, q *db.Queries, tokens []UpsertToken, definitions []db.TokenDefinition, setCreatorFields bool, setHolderFields bool) (time.Time, []TokenFullDetails, error) {
+func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.TokenDefinition) ([]db.TokenDefinition, error) {
+	// Sort to ensure consistent insertion order
+	sort.SliceStable(tokens, func(i, j int) bool {
+		if tokens[i].Chain != tokens[j].Chain {
+			return tokens[i].Chain < tokens[j].Chain
+		}
+		if tokens[i].ContractAddress != tokens[j].ContractAddress {
+			return tokens[i].ContractAddress < tokens[j].ContractAddress
+		}
+		return tokens[i].TokenID < tokens[j].TokenID
+	})
+
+	var p db.UpsertTokenDefinitionsParams
+	var errors []error
+
+	for i := range tokens {
+		t := &tokens[i]
+		p.DefinitionDbid = append(p.DefinitionDbid, persist.GenerateID().String())
+		p.DefinitionName = append(p.DefinitionName, t.Name.String)
+		p.DefinitionDescription = append(p.DefinitionDescription, t.Description.String)
+		p.DefinitionTokenType = append(p.DefinitionTokenType, t.TokenType.String())
+		p.DefinitionTokenID = append(p.DefinitionTokenID, t.TokenID.String())
+		p.DefinitionExternalUrl = append(p.DefinitionExternalUrl, t.ExternalUrl.String)
+		p.DefinitionChain = append(p.DefinitionChain, int32(t.Chain))
+		appendJSONB(&p.DefinitionFallbackMedia, t.FallbackMedia, &errors)
+		appendJSONB(&p.DefinitionMetadata, t.Metadata, &errors)
+		p.DefinitionContractAddress = append(p.DefinitionContractAddress, t.ContractAddress.String())
+		p.DefinitionContractID = append(p.DefinitionContractID, t.ContractID.String())
+		p.DefinitionIsFxhash = append(p.DefinitionIsFxhash, t.IsFxhash)
+		// Community memberships
+		p.CommunityMembershipDbid = append(p.CommunityMembershipDbid, persist.GenerateID().String())
+		p.CommunityMembershipTokenID = append(p.CommunityMembershipTokenID, t.TokenID.ToDecimalTokenID().Numeric())
+		// Defer error checking until now to keep the code above from being littered with multiline "if" statements
+		if len(errors) > 0 {
+			return nil, errors[0]
+		}
+	}
+
+	added, err := q.UpsertTokenDefinitions(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(added) == 0 {
+		logger.For(ctx).Infof("no new definitions added")
+		return []db.TokenDefinition{}, nil
+	}
+
+	addedTokens := make([]db.TokenDefinition, len(added))
+	for i, t := range added {
+		addedTokens[i] = t.TokenDefinition
+	}
+
+	return addedTokens, nil
+}
+
+func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken) (time.Time, []TokenFullDetails, error) {
 	tokens = excludeZeroQuantityTokens(ctx, tokens)
 
 	// If we're not upserting anything, we still need to return the current database time
@@ -122,75 +149,60 @@ func BulkUpsert(ctx context.Context, q *db.Queries, tokens []UpsertToken, defini
 		return currentTime, []TokenFullDetails{}, nil
 	}
 
-	params := db.UpsertTokensParams{
-		SetCreatorFields:    setCreatorFields,
-		SetHolderFields:     setHolderFields,
-		TokenOwnedByWallets: []string{},
-	}
-
-	var errors []error
-
-	for i := range definitions {
-		d := &definitions[i]
-		params.DefinitionDbid = append(params.DefinitionDbid, persist.GenerateID().String())
-		params.DefinitionName = append(params.DefinitionName, d.Name.String)
-		params.DefinitionDescription = append(params.DefinitionDescription, d.Description.String)
-		params.DefinitionTokenType = append(params.DefinitionTokenType, d.TokenType.String())
-		params.DefinitionTokenID = append(params.DefinitionTokenID, d.TokenID.String())
-		params.DefinitionExternalUrl = append(params.DefinitionExternalUrl, d.ExternalUrl.String)
-		params.DefinitionChain = append(params.DefinitionChain, int32(d.Chain))
-		appendJSONB(&params.DefinitionFallbackMedia, d.FallbackMedia, &errors)
-		appendJSONB(&params.DefinitionMetadata, d.Metadata, &errors)
-		params.DefinitionContractAddress = append(params.DefinitionContractAddress, d.ContractAddress.String())
-		params.DefinitionContractID = append(params.DefinitionContractID, d.ContractID.String())
-		params.DefinitionIsFxhash = append(params.DefinitionIsFxhash, d.IsFxhash)
-
-		// Community memberships
-		params.CommunityMembershipDbid = append(params.CommunityMembershipDbid, persist.GenerateID().String())
-		params.CommunityMembershipTokenID = append(params.CommunityMembershipTokenID, d.TokenID.ToDecimalTokenID().Numeric())
-		// Defer error checking until now to keep the code above from being
-		// littered with multiline "if" statements
-		if len(errors) > 0 {
-			return time.Time{}, nil, errors[0]
+	// Sort to ensure consistent insertion order
+	sort.SliceStable(tokens, func(i, j int) bool {
+		if tokens[i].Token.OwnerUserID != tokens[j].Token.OwnerUserID {
+			return tokens[i].Token.OwnerUserID < tokens[j].Token.OwnerUserID
 		}
-	}
+		if tokens[i].Identifiers.Chain != tokens[j].Identifiers.Chain {
+			return tokens[i].Identifiers.Chain < tokens[j].Identifiers.Chain
+		}
+		if tokens[i].Identifiers.ContractAddress != tokens[j].Identifiers.ContractAddress {
+			return tokens[i].Identifiers.ContractAddress < tokens[j].Identifiers.ContractAddress
+		}
+		return tokens[i].Identifiers.TokenID < tokens[j].Identifiers.TokenID
+	})
+
+	var p db.UpsertTokensParams
 
 	for i := range tokens {
 		t := &tokens[i].Token
 		tID := &tokens[i].Identifiers
-		params.TokenDbid = append(params.TokenDbid, persist.GenerateID().String())
-		params.TokenVersion = append(params.TokenVersion, t.Version.Int32)
-		params.TokenCollectorsNote = append(params.TokenCollectorsNote, t.CollectorsNote.String)
-		params.TokenTokenID = append(params.TokenTokenID, tID.TokenID.String())
-		params.TokenQuantity = append(params.TokenQuantity, t.Quantity.String())
-		params.TokenBlockNumber = append(params.TokenBlockNumber, t.BlockNumber.Int64)
-		params.TokenOwnerUserID = append(params.TokenOwnerUserID, t.OwnerUserID.String())
-		appendDBIDList(&params.TokenOwnedByWallets, t.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx)
-		params.TokenChain = append(params.TokenChain, int32(tID.Chain))
-		params.TokenContractAddress = append(params.TokenContractAddress, tID.ContractAddress.String())
-		params.TokenIsCreatorToken = append(params.TokenIsCreatorToken, t.IsCreatorToken)
-		params.TokenContractID = append(params.TokenContractID, t.ContractID.String())
-		// Defer error checking until now to keep the code above from being
-		// littered with multiline "if" statements
-		if len(errors) > 0 {
-			return time.Time{}, nil, errors[0]
-		}
+		p.TokenDbid = append(p.TokenDbid, persist.GenerateID().String())
+		p.TokenVersion = append(p.TokenVersion, t.Version.Int32)
+		p.TokenCollectorsNote = append(p.TokenCollectorsNote, t.CollectorsNote.String)
+		p.TokenTokenID = append(p.TokenTokenID, tID.TokenID.String())
+		p.TokenQuantity = append(p.TokenQuantity, t.Quantity.String())
+		p.TokenBlockNumber = append(p.TokenBlockNumber, t.BlockNumber.Int64)
+		p.TokenOwnerUserID = append(p.TokenOwnerUserID, t.OwnerUserID.String())
+		appendDBIDList(&p.TokenOwnedByWallets, t.OwnedByWallets, &p.TokenOwnedByWalletsStartIdx, &p.TokenOwnedByWalletsEndIdx)
+		p.TokenChain = append(p.TokenChain, int32(tID.Chain))
+		p.TokenContractAddress = append(p.TokenContractAddress, tID.ContractAddress.String())
+		p.TokenIsCreatorToken = append(p.TokenIsCreatorToken, t.IsCreatorToken)
+		p.TokenContractID = append(p.TokenContractID, t.ContractID.String())
 	}
 
-	upserted, err := q.UpsertTokens(ctx, params)
+	added, err := q.UpsertTokens(ctx, p)
 	if err != nil {
 		return time.Time{}, nil, err
 	}
 
-	upsertedTokens := util.MapWithoutError(upserted, func(r db.UpsertTokensRow) TokenFullDetails {
-		return TokenFullDetails{
-			Instance:   r.Token,
-			Contract:   r.Contract,
-			Definition: r.TokenDefinition,
-		}
-	})
+	// No new tokens were added
+	if len(added) == 0 {
+		logger.For(ctx).Infof("no new tokens added")
+		return time.Time{}, []TokenFullDetails{}, nil
+	}
 
-	return upserted[0].Token.LastSynced, upsertedTokens, nil
+	addedTokens := make([]TokenFullDetails, len(added))
+	for i, t := range added {
+		addedTokens[i] = TokenFullDetails{
+			Instance:   t.Token,
+			Contract:   t.Contract,
+			Definition: t.TokenDefinition,
+		}
+	}
+
+	return addedTokens[0].Instance.LastSynced, addedTokens, nil
 }
 
 func excludeZeroQuantityTokens(ctx context.Context, tokens []UpsertToken) []UpsertToken {

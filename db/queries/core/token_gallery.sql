@@ -1,4 +1,4 @@
--- name: UpsertTokens :many
+-- name: UpsertTokenDefinitions :many
 with token_definitions_insert as (
   insert into token_definitions
   ( 
@@ -47,69 +47,6 @@ with token_definitions_insert as (
     , is_fxhash = excluded.is_fxhash
   returning *
 )
-, tokens_insert as (
-  insert into tokens
-  (
-    id
-    , deleted
-    , version
-    , created_at
-    , last_updated
-    , collectors_note
-    , quantity
-    , block_number
-    , owner_user_id
-    , owned_by_wallets
-    , is_creator_token
-    , last_synced
-    , token_definition_id
-    , contract_id
-  ) (
-    select
-      bulk_upsert.id
-      , false
-      , bulk_upsert.version
-      , now()
-      , now()
-      , bulk_upsert.collectors_note
-      , bulk_upsert.quantity
-      , bulk_upsert.block_number
-      , bulk_upsert.owner_user_id
-      , case when @set_holder_fields::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
-      , case when @set_creator_fields::bool then bulk_upsert.is_creator_token else false end
-      , now()
-      , token_definitions_insert.id
-      , bulk_upsert.contract_id
-    from (
-      select unnest(@token_dbid::varchar[]) as id
-        , unnest(@token_version::int[]) as version
-        , unnest(@token_collectors_note::varchar[]) as collectors_note
-        , unnest(@token_quantity::varchar[]) as quantity
-        , unnest(@token_block_number::bigint[]) as block_number
-        , unnest(@token_owner_user_id::varchar[]) as owner_user_id
-        , @token_owned_by_wallets::varchar[] as owned_by_wallets
-        , unnest(@token_owned_by_wallets_start_idx::int[]) as owned_by_wallets_start_idx
-        , unnest(@token_owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
-        , unnest(@token_is_creator_token::bool[]) as is_creator_token
-        , unnest(@token_token_id::varchar[]) as token_id
-        , unnest(@token_contract_address::varchar[]) as contract_address
-        , unnest(@token_chain::int[]) as chain
-        , unnest(@token_contract_id::varchar[]) as contract_id
-    ) bulk_upsert
-    join token_definitions_insert on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions_insert.chain, token_definitions_insert.contract_address, token_definitions_insert.token_id)
-  )
-  on conflict (owner_user_id, token_definition_id) where deleted = false
-  do update set
-    quantity = excluded.quantity
-    , owned_by_wallets = case when @set_holder_fields then excluded.owned_by_wallets else tokens.owned_by_wallets end
-    , is_creator_token = case when @set_creator_fields then excluded.is_creator_token else tokens.is_creator_token end
-    , block_number = excluded.block_number
-    , version = excluded.version
-    , last_updated = excluded.last_updated
-    , last_synced = greatest(excluded.last_synced,tokens.last_synced)
-    , contract_id = excluded.contract_id
-  returning *
-)
 , community_memberships_insert as (
   insert into token_community_memberships
   (
@@ -146,10 +83,81 @@ with token_definitions_insert as (
     last_updated = excluded.last_updated
   returning *
 )
+select sqlc.embed(token_definitions)
+from token_definitions_insert token_definitions
+left join token_definitions prior_state on token_definitions.chain = prior_state.chain and token_definitions.contract_id = prior_state.contract_id and token_definitions.token_id = prior_state.token_id and not prior_state.deleted
+where prior_state.id is null;
+
+-- name: UpsertTokens :many
+with tokens_insert as (
+  insert into tokens
+  (
+    id
+    , deleted
+    , version
+    , created_at
+    , last_updated
+    , collectors_note
+    , quantity
+    , block_number
+    , owner_user_id
+    , owned_by_wallets
+    , is_creator_token
+    , last_synced
+    , token_definition_id
+    , contract_id
+  ) (
+    select
+      bulk_upsert.id
+      , false
+      , bulk_upsert.version
+      , now()
+      , now()
+      , bulk_upsert.collectors_note
+      , bulk_upsert.quantity
+      , bulk_upsert.block_number
+      , bulk_upsert.owner_user_id
+      , case when @set_holder_fields::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
+      , case when @set_creator_fields::bool then bulk_upsert.is_creator_token else false end
+      , now()
+      , token_definitions.id
+      , bulk_upsert.contract_id
+    from (
+      select unnest(@token_dbid::varchar[]) as id
+        , unnest(@token_version::int[]) as version
+        , unnest(@token_collectors_note::varchar[]) as collectors_note
+        , unnest(@token_quantity::varchar[]) as quantity
+        , unnest(@token_block_number::bigint[]) as block_number
+        , unnest(@token_owner_user_id::varchar[]) as owner_user_id
+        , @token_owned_by_wallets::varchar[] as owned_by_wallets
+        , unnest(@token_owned_by_wallets_start_idx::int[]) as owned_by_wallets_start_idx
+        , unnest(@token_owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
+        , unnest(@token_is_creator_token::bool[]) as is_creator_token
+        , unnest(@token_token_id::varchar[]) as token_id
+        , unnest(@token_contract_address::varchar[]) as contract_address
+        , unnest(@token_chain::int[]) as chain
+        , unnest(@token_contract_id::varchar[]) as contract_id
+    ) bulk_upsert
+    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id)
+  )
+  on conflict (owner_user_id, token_definition_id) where deleted = false
+  do update set
+    quantity = excluded.quantity
+    , owned_by_wallets = case when @set_holder_fields then excluded.owned_by_wallets else tokens.owned_by_wallets end
+    , is_creator_token = case when @set_creator_fields then excluded.is_creator_token else tokens.is_creator_token end
+    , block_number = excluded.block_number
+    , version = excluded.version
+    , last_updated = excluded.last_updated
+    , last_synced = greatest(excluded.last_synced,tokens.last_synced)
+    , contract_id = excluded.contract_id
+  returning *
+)
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
 from tokens_insert tokens
-join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id;
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+left join tokens prior_state on tokens.owner_user_id = prior_state.owner_user_id and tokens.token_definition_id = prior_state.token_definition_id and not prior_state.deleted
+where prior_state.id is null;
 
 -- name: DeleteTokensBeforeTimestamp :execrows
 update tokens t
