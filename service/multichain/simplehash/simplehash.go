@@ -15,6 +15,7 @@ import (
 	mc "github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 var (
@@ -24,6 +25,8 @@ var (
 	getContractsByOwnerEndpoint    = checkURL(fmt.Sprintf(getContractsByOwnerEndpointTemplate, baseURL))
 	getContractsByDeployerEndpoint = checkURL(fmt.Sprintf(getContractsByDeployerEndpointTemplate, baseURL))
 )
+
+var retryPolicy = retry.Retry{MaxWait: 24, MaxRetries: 8}
 
 var chainToSimpleHashChain = map[persist.Chain]string{
 	persist.ChainETH:      "ethereum",
@@ -51,7 +54,7 @@ const (
 	ownerBatchLimit                         = 1000
 	contractBatchLimit                      = 40
 	addressBatchLimit                       = 20
-	incrementalSyncPoolSize                 = 24
+	incrementalSyncPoolSize                 = 12
 )
 
 type Provider struct {
@@ -399,7 +402,7 @@ func readResponseBodyInto(ctx context.Context, httpClient *http.Client, url stri
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := retry.RetryRequestWithRetry(httpClient, req, retryPolicy)
 	if err != nil {
 		return err
 	}
