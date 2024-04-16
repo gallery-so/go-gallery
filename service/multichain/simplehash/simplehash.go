@@ -54,7 +54,7 @@ const (
 	ownerBatchLimit                         = 1000
 	contractBatchLimit                      = 40
 	addressBatchLimit                       = 20
-	incrementalSyncPoolSize                 = 12
+	requestPoolSize                         = 24
 )
 
 type Provider struct {
@@ -470,7 +470,7 @@ outer:
 }
 
 func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Address) (<-chan []string, <-chan error) {
-	outCh := make(chan []string, incrementalSyncPoolSize)
+	outCh := make(chan []string, requestPoolSize)
 	errCh := make(chan error)
 
 	go func() {
@@ -547,7 +547,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 		defer close(outCh)
 		defer close(errCh)
 
-		workers := pool.New().WithMaxGoroutines(incrementalSyncPoolSize)
+		workers := pool.New().WithMaxGoroutines(requestPoolSize)
 
 	outer:
 		for {
@@ -605,7 +605,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 func (p *Provider) binRequestsByOwner(ctx context.Context, address persist.Address) (<-chan []string, <-chan error) {
-	outCh := make(chan []string, incrementalSyncPoolSize)
+	outCh := make(chan []string, requestPoolSize)
 	errCh := make(chan error)
 
 	go func() {
@@ -701,7 +701,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 		defer close(outCh)
 		defer close(errCh)
 
-		workers := pool.New().WithMaxGoroutines(incrementalSyncPoolSize)
+		workers := pool.New().WithMaxGoroutines(requestPoolSize)
 	outer:
 		for {
 			select {
