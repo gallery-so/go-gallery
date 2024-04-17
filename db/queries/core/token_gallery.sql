@@ -47,46 +47,47 @@ with token_definitions_insert as (
     , is_fxhash = excluded.is_fxhash
   returning *
 )
-, community_memberships_insert as (
-  insert into token_community_memberships
-  (
-    id
-    , token_definition_id
-    , community_id
-    , created_at
-    , last_updated
-    , deleted
-    , token_id
-  ) (
-    select community_memberships.id
-      , token_definitions_insert.id
-      , communities.id
-      , now()
-      , now()
-      , false
-      , community_memberships.token_id
-    from (
-      select unnest(@community_membership_dbid::varchar[]) as id
-        , unnest(@community_membership_token_id::numeric[]) as token_id
-        , unnest(@definition_contract_id::varchar[]) as definition_contract_id
-        , unnest(@definition_token_id::varchar[]) as definition_token_id
-    ) community_memberships
-    join token_definitions_insert on
-        community_memberships.definition_contract_id = token_definitions_insert.contract_id
-        and community_memberships.definition_token_id = token_definitions_insert.token_id
-    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
-    -- contract community for this token. Every contract should have a community created for it by the time we get here!
-    left join communities on communities.contract_id = community_memberships.definition_contract_id and communities.community_type = 0
-  )
-  on conflict (token_definition_id, community_id) where not deleted
-  do update set
-    last_updated = excluded.last_updated
-  returning *
-)
-select sqlc.embed(token_definitions)
+select sqlc.embed(token_definitions), (prior_state.id is null)::bool is_new_definition
 from token_definitions_insert token_definitions
-left join token_definitions prior_state on token_definitions.chain = prior_state.chain and token_definitions.contract_id = prior_state.contract_id and token_definitions.token_id = prior_state.token_id and not prior_state.deleted
-where prior_state.id is null;
+left join token_definitions prior_state on token_definitions.chain = prior_state.chain and token_definitions.contract_id = prior_state.contract_id and token_definitions.token_id = prior_state.token_id and not prior_state.deleted;
+
+-- name: UpsertTokenDefinitionCommunityMemberships :many
+insert into token_community_memberships
+(
+  id
+  , token_definition_id
+  , community_id
+  , created_at
+  , last_updated
+  , deleted
+  , token_id
+) (
+  select
+    community_memberships.id
+    , community_memberships.token_definition_id
+    , communities.id
+    , now()
+    , now()
+    , false
+    , community_memberships.token_id
+  from (
+    select unnest(@community_membership_dbid::varchar[]) as id
+      , unnest(@community_token_definition_id::varchar[]) as token_definition_id
+      , unnest(@community_membership_token_id::numeric[]) as token_id
+      , unnest(@community_contract_id::varchar[]) as contract_id
+      -- , unnest(@definition_token_id::varchar[]) as definition_token_id
+  ) community_memberships
+  -- join token_definitions_insert on
+  --     community_memberships.definition_contract_id = token_definitions_insert.contract_id
+  --     and community_memberships.definition_token_id = token_definitions_insert.token_id
+  -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
+  -- contract community for this token. Every contract should have a community created for it by the time we get here!
+  left join communities on communities.contract_id = community_memberships.contract_id and communities.community_type = 0
+)
+on conflict (token_definition_id, community_id) where not deleted
+do update set
+  last_updated = excluded.last_updated
+returning *;
 
 -- name: UpsertTokens :many
 with tokens_insert as (
@@ -120,7 +121,8 @@ with tokens_insert as (
       , case when @set_holder_fields::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
       , case when @set_creator_fields::bool then bulk_upsert.is_creator_token else false end
       , now()
-      , token_definitions.id
+      -- , token_definitions.id
+      , bulk_upsert.token_definition_id
       , bulk_upsert.contract_id
     from (
       select unnest(@token_dbid::varchar[]) as id
@@ -136,10 +138,9 @@ with tokens_insert as (
         , unnest(@token_token_id::varchar[]) as token_id
         , unnest(@token_contract_address::varchar[]) as contract_address
         , unnest(@token_chain::int[]) as chain
+        , unnest(@token_definition_id::varchar[]) as token_definition_id
         , unnest(@token_contract_id::varchar[]) as contract_id
     ) bulk_upsert
-    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a pre-existing definition for a token
-    left join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) and not token_definitions.deleted
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set

@@ -651,17 +651,44 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 	// Insert token definitions
 	definitionsToAdd = dedupeTokenDefinitions(definitionsToAdd)
-	addedDefinitions, err := op.InsertTokenDefinitions(ctx, p.Queries, definitionsToAdd)
+	addedDefinitions, isNewDefinition, err := op.InsertTokenDefinitions(ctx, p.Queries, definitionsToAdd)
 	if err != nil {
 		logger.For(ctx).Errorf("error in bulk upsert of token definitions: %s", err)
+		return nil, err
+	}
+
+	tokenToDefinitionID := map[persist.TokenIdentifiers]persist.DBID{}
+	membershipsToAdd := make([]db.TokenCommunityMembership, len(addedDefinitions))
+	membershipContractIDs := make([]persist.DBID, len(addedDefinitions))
+
+	for i, t := range addedDefinitions {
+		membershipsToAdd[i] = db.TokenCommunityMembership{
+			TokenDefinitionID: t.ID,
+			TokenID:           t.TokenID.ToDecimalTokenID(),
+		}
+		membershipContractIDs[i] = t.ContractID
+		tID := persist.TokenIdentifiers{
+			TokenID:         t.TokenID,
+			ContractAddress: t.ContractAddress,
+			Chain:           t.Chain,
+		}
+		tokenToDefinitionID[tID] = t.ID
+	}
+
+	// Insert token memberships
+	_, err = op.InsertTokenCommunityMemberships(ctx, p.Queries, membershipsToAdd, membershipContractIDs)
+	if err != nil {
+		logger.For(ctx).Errorf("error in bulk upsert of token communities: %s", err)
 		return nil, err
 	}
 
 	// Send definitions to tokenprocessing
 	w := pool.New().WithMaxGoroutines(10)
 	definitionsToProcess := make([]persist.DBID, len(addedDefinitions))
-	for i, d := range addedDefinitions {
-		definitionsToProcess[i] = d.ID
+	for i := range addedDefinitions {
+		if isNewDefinition[i] {
+			definitionsToProcess[i] = addedDefinitions[i].ID
+		}
 	}
 	for _, b := range util.ChunkBy(definitionsToProcess, 50) {
 		b := b
@@ -675,6 +702,10 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 	// Insert tokens
 	tokensToAdd = dedupeTokenInstances(tokensToAdd)
+	for i := range tokensToAdd {
+		tokensToAdd[i].Token.TokenDefinitionID = tokenToDefinitionID[tokensToAdd[i].Identifiers]
+	}
+
 	upsertTime, addedTokens, err := op.InsertTokens(ctx, p.Queries, tokensToAdd, upsertParams)
 	if err != nil {
 		logger.For(ctx).Errorf("error in bulk upsert of tokens: %s", err)

@@ -3,6 +3,7 @@ package operation
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sort"
 	"time"
 
@@ -80,7 +81,7 @@ type UpsertToken struct {
 	Identifiers persist.TokenIdentifiers
 }
 
-func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.TokenDefinition) ([]db.TokenDefinition, error) {
+func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.TokenDefinition) ([]db.TokenDefinition, []bool, error) {
 	// Sort to ensure consistent insertion order
 	sort.SliceStable(tokens, func(i, j int) bool {
 		if tokens[i].Chain != tokens[j].Chain {
@@ -110,30 +111,55 @@ func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.Toke
 		p.DefinitionContractID = append(p.DefinitionContractID, t.ContractID.String())
 		p.DefinitionIsFxhash = append(p.DefinitionIsFxhash, t.IsFxhash)
 		// Community memberships
-		p.CommunityMembershipDbid = append(p.CommunityMembershipDbid, persist.GenerateID().String())
-		p.CommunityMembershipTokenID = append(p.CommunityMembershipTokenID, t.TokenID.ToDecimalTokenID().Numeric())
+		// p.CommunityMembershipDbid = append(p.CommunityMembershipDbid, persist.GenerateID().String())
+		// p.CommunityMembershipTokenID = append(p.CommunityMembershipTokenID, t.TokenID.ToDecimalTokenID().Numeric())
 		// Defer error checking until now to keep the code above from being littered with multiline "if" statements
 		if len(errors) > 0 {
-			return nil, errors[0]
+			return nil, nil, errors[0]
 		}
 	}
 
 	added, err := q.UpsertTokenDefinitions(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(added) == 0 {
 		logger.For(ctx).Infof("no new definitions added, definitions already existed in the db")
-		return []db.TokenDefinition{}, nil
+		return []db.TokenDefinition{}, []bool{}, nil
 	}
 
 	addedTokens := make([]db.TokenDefinition, len(added))
+	isNewDefinition := make([]bool, len(added))
 	for i, t := range added {
 		addedTokens[i] = t.TokenDefinition
+		isNewDefinition[i] = t.IsNewDefinition
 	}
 
-	return addedTokens, nil
+	return addedTokens, isNewDefinition, nil
+}
+
+func InsertTokenCommunityMemberships(ctx context.Context, q *db.Queries, memberships []db.TokenCommunityMembership, contractIDs []persist.DBID) ([]db.TokenCommunityMembership, error) {
+	if len(memberships) != len(contractIDs) {
+		panic(fmt.Sprintf("len of memberships and contractIDs must be equal; expected %d; got %d;", len(memberships), len(contractIDs)))
+	}
+
+	// Sort to ensure consistent insertion order
+	sort.SliceStable(memberships, func(i, j int) bool {
+		return memberships[i].TokenDefinitionID < memberships[j].TokenDefinitionID
+	})
+
+	var p db.UpsertTokenDefinitionCommunityMembershipsParams
+
+	for i := range memberships {
+		m := &memberships[i]
+		p.CommunityMembershipDbid = append(p.CommunityMembershipDbid, persist.GenerateID().String())
+		p.CommunityTokenDefinitionID = append(p.CommunityTokenDefinitionID, m.TokenDefinitionID.String())
+		p.CommunityMembershipTokenID = append(p.CommunityMembershipTokenID, m.TokenID.Numeric())
+		p.CommunityContractID = append(p.CommunityContractID, contractIDs[i].String())
+	}
+
+	return q.UpsertTokenDefinitionCommunityMemberships(ctx, p)
 }
 
 func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken, opt TokenUpsertParams) (time.Time, []TokenFullDetails, error) {
@@ -183,6 +209,7 @@ func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken, opt 
 		p.TokenChain = append(p.TokenChain, int32(tID.Chain))
 		p.TokenContractAddress = append(p.TokenContractAddress, tID.ContractAddress.String())
 		p.TokenIsCreatorToken = append(p.TokenIsCreatorToken, t.IsCreatorToken)
+		p.TokenDefinitionID = append(p.TokenDefinitionID, t.TokenDefinitionID.String())
 		p.TokenContractID = append(p.TokenContractID, t.ContractID.String())
 	}
 

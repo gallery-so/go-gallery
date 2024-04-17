@@ -57,6 +57,86 @@ func (q *Queries) DeleteTokensBeforeTimestamp(ctx context.Context, arg DeleteTok
 	return result.RowsAffected(), nil
 }
 
+const upsertTokenDefinitionCommunityMemberships = `-- name: UpsertTokenDefinitionCommunityMemberships :many
+insert into token_community_memberships
+(
+  id
+  , token_definition_id
+  , community_id
+  , created_at
+  , last_updated
+  , deleted
+  , token_id
+) (
+  select
+    community_memberships.id
+    , community_memberships.token_definition_id
+    , communities.id
+    , now()
+    , now()
+    , false
+    , community_memberships.token_id
+  from (
+    select unnest($1::varchar[]) as id
+      , unnest($2::varchar[]) as token_definition_id
+      , unnest($3::numeric[]) as token_id
+      , unnest($4::varchar[]) as contract_id
+      -- , unnest(@definition_token_id::varchar[]) as definition_token_id
+  ) community_memberships
+  -- join token_definitions_insert on
+  --     community_memberships.definition_contract_id = token_definitions_insert.contract_id
+  --     and community_memberships.definition_token_id = token_definitions_insert.token_id
+  -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
+  -- contract community for this token. Every contract should have a community created for it by the time we get here!
+  left join communities on communities.contract_id = community_memberships.contract_id and communities.community_type = 0
+)
+on conflict (token_definition_id, community_id) where not deleted
+do update set
+  last_updated = excluded.last_updated
+returning id, version, token_definition_id, community_id, created_at, last_updated, deleted, token_id
+`
+
+type UpsertTokenDefinitionCommunityMembershipsParams struct {
+	CommunityMembershipDbid    []string         `db:"community_membership_dbid" json:"community_membership_dbid"`
+	CommunityTokenDefinitionID []string         `db:"community_token_definition_id" json:"community_token_definition_id"`
+	CommunityMembershipTokenID []pgtype.Numeric `db:"community_membership_token_id" json:"community_membership_token_id"`
+	CommunityContractID        []string         `db:"community_contract_id" json:"community_contract_id"`
+}
+
+func (q *Queries) UpsertTokenDefinitionCommunityMemberships(ctx context.Context, arg UpsertTokenDefinitionCommunityMembershipsParams) ([]TokenCommunityMembership, error) {
+	rows, err := q.db.Query(ctx, upsertTokenDefinitionCommunityMemberships,
+		arg.CommunityMembershipDbid,
+		arg.CommunityTokenDefinitionID,
+		arg.CommunityMembershipTokenID,
+		arg.CommunityContractID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TokenCommunityMembership
+	for rows.Next() {
+		var i TokenCommunityMembership
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.TokenDefinitionID,
+			&i.CommunityID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.TokenID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertTokenDefinitions = `-- name: UpsertTokenDefinitions :many
 with token_definitions_insert as (
   insert into token_definitions
@@ -106,67 +186,29 @@ with token_definitions_insert as (
     , is_fxhash = excluded.is_fxhash
   returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id, is_fxhash
 )
-, community_memberships_insert as (
-  insert into token_community_memberships
-  (
-    id
-    , token_definition_id
-    , community_id
-    , created_at
-    , last_updated
-    , deleted
-    , token_id
-  ) (
-    select community_memberships.id
-      , token_definitions_insert.id
-      , communities.id
-      , now()
-      , now()
-      , false
-      , community_memberships.token_id
-    from (
-      select unnest($13::varchar[]) as id
-        , unnest($14::numeric[]) as token_id
-        , unnest($10::varchar[]) as definition_contract_id
-        , unnest($5::varchar[]) as definition_token_id
-    ) community_memberships
-    join token_definitions_insert on
-        community_memberships.definition_contract_id = token_definitions_insert.contract_id
-        and community_memberships.definition_token_id = token_definitions_insert.token_id
-    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
-    -- contract community for this token. Every contract should have a community created for it by the time we get here!
-    left join communities on communities.contract_id = community_memberships.definition_contract_id and communities.community_type = 0
-  )
-  on conflict (token_definition_id, community_id) where not deleted
-  do update set
-    last_updated = excluded.last_updated
-  returning id, version, token_definition_id, community_id, created_at, last_updated, deleted, token_id
-)
-select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash
+select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, (prior_state.id is null)::bool is_new_definition
 from token_definitions_insert token_definitions
 left join token_definitions prior_state on token_definitions.chain = prior_state.chain and token_definitions.contract_id = prior_state.contract_id and token_definitions.token_id = prior_state.token_id and not prior_state.deleted
-where prior_state.id is null
 `
 
 type UpsertTokenDefinitionsParams struct {
-	DefinitionDbid             []string         `db:"definition_dbid" json:"definition_dbid"`
-	DefinitionName             []string         `db:"definition_name" json:"definition_name"`
-	DefinitionDescription      []string         `db:"definition_description" json:"definition_description"`
-	DefinitionTokenType        []string         `db:"definition_token_type" json:"definition_token_type"`
-	DefinitionTokenID          []string         `db:"definition_token_id" json:"definition_token_id"`
-	DefinitionExternalUrl      []string         `db:"definition_external_url" json:"definition_external_url"`
-	DefinitionChain            []int32          `db:"definition_chain" json:"definition_chain"`
-	DefinitionFallbackMedia    []pgtype.JSONB   `db:"definition_fallback_media" json:"definition_fallback_media"`
-	DefinitionContractAddress  []string         `db:"definition_contract_address" json:"definition_contract_address"`
-	DefinitionContractID       []string         `db:"definition_contract_id" json:"definition_contract_id"`
-	DefinitionMetadata         []pgtype.JSONB   `db:"definition_metadata" json:"definition_metadata"`
-	DefinitionIsFxhash         []bool           `db:"definition_is_fxhash" json:"definition_is_fxhash"`
-	CommunityMembershipDbid    []string         `db:"community_membership_dbid" json:"community_membership_dbid"`
-	CommunityMembershipTokenID []pgtype.Numeric `db:"community_membership_token_id" json:"community_membership_token_id"`
+	DefinitionDbid            []string       `db:"definition_dbid" json:"definition_dbid"`
+	DefinitionName            []string       `db:"definition_name" json:"definition_name"`
+	DefinitionDescription     []string       `db:"definition_description" json:"definition_description"`
+	DefinitionTokenType       []string       `db:"definition_token_type" json:"definition_token_type"`
+	DefinitionTokenID         []string       `db:"definition_token_id" json:"definition_token_id"`
+	DefinitionExternalUrl     []string       `db:"definition_external_url" json:"definition_external_url"`
+	DefinitionChain           []int32        `db:"definition_chain" json:"definition_chain"`
+	DefinitionFallbackMedia   []pgtype.JSONB `db:"definition_fallback_media" json:"definition_fallback_media"`
+	DefinitionContractAddress []string       `db:"definition_contract_address" json:"definition_contract_address"`
+	DefinitionContractID      []string       `db:"definition_contract_id" json:"definition_contract_id"`
+	DefinitionMetadata        []pgtype.JSONB `db:"definition_metadata" json:"definition_metadata"`
+	DefinitionIsFxhash        []bool         `db:"definition_is_fxhash" json:"definition_is_fxhash"`
 }
 
 type UpsertTokenDefinitionsRow struct {
 	TokenDefinition TokenDefinition `db:"tokendefinition" json:"tokendefinition"`
+	IsNewDefinition bool            `db:"is_new_definition" json:"is_new_definition"`
 }
 
 func (q *Queries) UpsertTokenDefinitions(ctx context.Context, arg UpsertTokenDefinitionsParams) ([]UpsertTokenDefinitionsRow, error) {
@@ -183,8 +225,6 @@ func (q *Queries) UpsertTokenDefinitions(ctx context.Context, arg UpsertTokenDef
 		arg.DefinitionContractID,
 		arg.DefinitionMetadata,
 		arg.DefinitionIsFxhash,
-		arg.CommunityMembershipDbid,
-		arg.CommunityMembershipTokenID,
 	)
 	if err != nil {
 		return nil, err
@@ -210,6 +250,7 @@ func (q *Queries) UpsertTokenDefinitions(ctx context.Context, arg UpsertTokenDef
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
+			&i.IsNewDefinition,
 		); err != nil {
 			return nil, err
 		}
@@ -253,7 +294,8 @@ with tokens_insert as (
       , case when $1::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
       , case when $2::bool then bulk_upsert.is_creator_token else false end
       , now()
-      , token_definitions.id
+      -- , token_definitions.id
+      , bulk_upsert.token_definition_id
       , bulk_upsert.contract_id
     from (
       select unnest($3::varchar[]) as id
@@ -269,10 +311,9 @@ with tokens_insert as (
         , unnest($13::varchar[]) as token_id
         , unnest($14::varchar[]) as contract_address
         , unnest($15::int[]) as chain
-        , unnest($16::varchar[]) as contract_id
+        , unnest($16::varchar[]) as token_definition_id
+        , unnest($17::varchar[]) as contract_id
     ) bulk_upsert
-    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a pre-existing definition for a token
-    left join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) and not token_definitions.deleted
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
@@ -310,6 +351,7 @@ type UpsertTokensParams struct {
 	TokenTokenID                []string `db:"token_token_id" json:"token_token_id"`
 	TokenContractAddress        []string `db:"token_contract_address" json:"token_contract_address"`
 	TokenChain                  []int32  `db:"token_chain" json:"token_chain"`
+	TokenDefinitionID           []string `db:"token_definition_id" json:"token_definition_id"`
 	TokenContractID             []string `db:"token_contract_id" json:"token_contract_id"`
 }
 
@@ -336,6 +378,7 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 		arg.TokenTokenID,
 		arg.TokenContractAddress,
 		arg.TokenChain,
+		arg.TokenDefinitionID,
 		arg.TokenContractID,
 	)
 	if err != nil {
