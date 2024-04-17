@@ -102,11 +102,12 @@ func withReturnError(err error) providerOpt {
 
 // withDummyTokenN will generate n dummy tokens from the provided contract
 func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress persist.Address, n int) providerOpt {
+	start := 1337
 	return func(p *stubProvider) {
 		tokens := []multichain.ChainAgnosticToken{}
-		for i := 0; i < n; i++ {
-			tokenID := persist.HexTokenID(fmt.Sprintf("%X", i))
-			token := dummyTokenIDContract(ownerAddress, contract.Address, tokenID)
+		for i := start; i < start+n; i++ {
+			tokenID := persist.DecimalTokenID(fmt.Sprint(i))
+			token := dummyTokenIDContract(ownerAddress, contract.Address, tokenID.ToHexTokenID())
 			tokens = append(tokens, token)
 		}
 		withContracts([]multichain.ChainAgnosticContract{contract})(p)

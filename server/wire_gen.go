@@ -114,16 +114,16 @@ var (
 
 func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipelineWrapper, indexerProvider *indexer.Provider, simplehashProvider *simplehash.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
-		ContractRefresher:                indexerProvider,
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
-		TokenMetadataFetcher:             simplehashProvider,
-		TokensIncrementalContractFetcher: syncPipeline,
-		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
+		TokenMetadataFetcher:             syncPipeline,
+		TokensByContractWalletFetcher:    syncPipeline,
 		TokensByTokenIdentifiersFetcher:  syncPipeline,
+		TokensIncrementalContractFetcher: syncPipeline,
+		TokensIncrementalOwnerFetcher:    syncPipeline,
 		Verifier:                         indexerProvider,
 	}
 	return ethereumProvider
@@ -138,6 +138,7 @@ func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain
 		TokensIncrementalContractFetcher: simplehashProvider,
 		TokenMetadataBatcher:             simplehashProvider,
 		TokensByTokenIdentifiersFetcher:  simplehashProvider,
+		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
 	return syncPipelineWrapper, func() {
@@ -180,14 +181,16 @@ var (
 
 func optimismProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.OptimismProvider {
 	optimismProvider := &multichain.OptimismProvider{
+		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
-		TokenMetadataFetcher:             simplehashProvider,
-		TokensIncrementalContractFetcher: syncPipeline,
-		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
+		TokenMetadataFetcher:             syncPipeline,
+		TokensByContractWalletFetcher:    syncPipeline,
 		TokensByTokenIdentifiersFetcher:  syncPipeline,
+		TokensIncrementalContractFetcher: syncPipeline,
+		TokensIncrementalOwnerFetcher:    syncPipeline,
 	}
 	return optimismProvider
 }
@@ -201,6 +204,7 @@ func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 		TokensIncrementalContractFetcher: simplehashProvider,
 		TokenMetadataBatcher:             simplehashProvider,
 		TokensByTokenIdentifiersFetcher:  simplehashProvider,
+		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
 	return syncPipelineWrapper, func() {
@@ -223,14 +227,16 @@ var (
 
 func arbitrumProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.ArbitrumProvider {
 	arbitrumProvider := &multichain.ArbitrumProvider{
+		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
-		TokenMetadataFetcher:             simplehashProvider,
-		TokensIncrementalContractFetcher: syncPipeline,
-		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
+		TokenMetadataFetcher:             syncPipeline,
+		TokensByContractWalletFetcher:    syncPipeline,
 		TokensByTokenIdentifiersFetcher:  syncPipeline,
+		TokensIncrementalContractFetcher: syncPipeline,
+		TokensIncrementalOwnerFetcher:    syncPipeline,
 	}
 	return arbitrumProvider
 }
@@ -244,6 +250,7 @@ func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 		TokensIncrementalContractFetcher: simplehashProvider,
 		TokenMetadataBatcher:             simplehashProvider,
 		TokensByTokenIdentifiersFetcher:  simplehashProvider,
+		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
 	return syncPipelineWrapper, func() {
@@ -285,12 +292,13 @@ func zoraProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashP
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
-		TokenMetadataFetcher:             simplehashProvider,
-		TokensIncrementalContractFetcher: syncPipeline,
-		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
+		TokenMetadataFetcher:             syncPipeline,
+		TokensByContractWalletFetcher:    syncPipeline,
 		TokensByTokenIdentifiersFetcher:  syncPipeline,
+		TokensIncrementalContractFetcher: syncPipeline,
+		TokensIncrementalOwnerFetcher:    syncPipeline,
 	}
 	return zoraProvider
 }
@@ -304,6 +312,7 @@ func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 		TokensIncrementalContractFetcher: simplehashProvider,
 		TokenMetadataBatcher:             simplehashProvider,
 		TokensByTokenIdentifiersFetcher:  simplehashProvider,
+		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
 	return syncPipelineWrapper, func() {
@@ -326,14 +335,16 @@ var (
 
 func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.BaseProvider {
 	baseProvider := &multichain.BaseProvider{
+		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
-		TokenMetadataFetcher:             simplehashProvider,
-		TokensIncrementalContractFetcher: syncPipeline,
-		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
+		TokenMetadataFetcher:             syncPipeline,
+		TokensByContractWalletFetcher:    syncPipeline,
 		TokensByTokenIdentifiersFetcher:  syncPipeline,
+		TokensIncrementalContractFetcher: syncPipeline,
+		TokensIncrementalOwnerFetcher:    syncPipeline,
 	}
 	return baseProvider
 }
@@ -347,6 +358,7 @@ func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 		TokensIncrementalContractFetcher: simplehashProvider,
 		TokenMetadataBatcher:             simplehashProvider,
 		TokensByTokenIdentifiersFetcher:  simplehashProvider,
+		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
 	return syncPipelineWrapper, func() {
@@ -369,14 +381,16 @@ var (
 
 func polygonProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.PolygonProvider {
 	polygonProvider := &multichain.PolygonProvider{
+		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
-		TokenMetadataFetcher:             simplehashProvider,
-		TokensIncrementalContractFetcher: syncPipeline,
-		TokensIncrementalOwnerFetcher:    syncPipeline,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
+		TokenMetadataFetcher:             simplehashProvider,
+		TokensByContractWalletFetcher:    syncPipeline,
 		TokensByTokenIdentifiersFetcher:  syncPipeline,
+		TokensIncrementalContractFetcher: syncPipeline,
+		TokensIncrementalOwnerFetcher:    syncPipeline,
 	}
 	return polygonProvider
 }
@@ -390,6 +404,7 @@ func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, c
 		TokensIncrementalContractFetcher: simplehashProvider,
 		TokenMetadataBatcher:             simplehashProvider,
 		TokensByTokenIdentifiersFetcher:  simplehashProvider,
+		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
 	return syncPipelineWrapper, func() {

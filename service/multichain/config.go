@@ -18,16 +18,16 @@ type ChainProvider struct {
 }
 
 type EthereumProvider struct {
-	ContractRefresher
 	ContractFetcher
 	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
-	TokenMetadataFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
+	TokenMetadataFetcher
+	TokensByContractWalletFetcher
 	TokensByTokenIdentifiersFetcher
+	TokensIncrementalContractFetcher
+	TokensIncrementalOwnerFetcher
 	Verifier
 }
 
@@ -42,25 +42,29 @@ type TezosProvider struct {
 }
 
 type OptimismProvider struct {
+	ContractFetcher
 	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
-	TokenMetadataFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
+	TokenMetadataFetcher
+	TokensByContractWalletFetcher
 	TokensByTokenIdentifiersFetcher
+	TokensIncrementalContractFetcher
+	TokensIncrementalOwnerFetcher
 }
 
 type ArbitrumProvider struct {
+	ContractFetcher
 	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
-	TokenMetadataFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
+	TokenMetadataFetcher
+	TokensByContractWalletFetcher
 	TokensByTokenIdentifiersFetcher
+	TokensIncrementalContractFetcher
+	TokensIncrementalOwnerFetcher
 }
 
 type PoapProvider struct {
@@ -74,32 +78,37 @@ type ZoraProvider struct {
 	ContractFetcher
 	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
-	TokenMetadataFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
+	TokenMetadataFetcher
+	TokensByContractWalletFetcher
 	TokensByTokenIdentifiersFetcher
+	TokensIncrementalContractFetcher
+	TokensIncrementalOwnerFetcher
 }
 
 type BaseProvider struct {
+	ContractFetcher
 	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
-	TokenMetadataFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
+	TokenMetadataFetcher
+	TokensByContractWalletFetcher
 	TokensByTokenIdentifiersFetcher
+	TokensIncrementalContractFetcher
+	TokensIncrementalOwnerFetcher
 }
 
 type PolygonProvider struct {
+	ContractFetcher
 	ContractsCreatorFetcher
 	TokenDescriptorsFetcher
-	TokenMetadataFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
+	TokenMetadataFetcher
+	TokensByContractWalletFetcher
 	TokensByTokenIdentifiersFetcher
+	TokensIncrementalContractFetcher
+	TokensIncrementalOwnerFetcher
 }

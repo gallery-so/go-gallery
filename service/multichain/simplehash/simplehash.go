@@ -26,7 +26,7 @@ var (
 	getContractsByDeployerEndpoint = checkURL(fmt.Sprintf(getContractsByDeployerEndpointTemplate, baseURL))
 )
 
-var retryPolicy = retry.Retry{MaxWait: 24, MaxRetries: 8}
+var retryPolicy = retry.Retry{MinWait: 1, MaxWait: 24, MaxRetries: 8}
 
 var chainToSimpleHashChain = map[persist.Chain]string{
 	persist.ChainETH:      "ethereum",
@@ -77,7 +77,7 @@ type authMiddleware struct {
 }
 
 func (a *authMiddleware) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.Header.Add("X-API-KEY", a.apiKey)
+	r.Header.Set("X-API-KEY", a.apiKey)
 	t := a.t
 	if t == nil {
 		t = http.DefaultTransport
@@ -817,6 +817,36 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID mc.Chain
 	contract := translateToChainAgnosticContract(body.ContractAddress, body.Contract, body.Collection)
 	token := translateToChainAgnosticToken(body, "", contract.IsSpam)
 	return []mc.ChainAgnosticToken{token}, contract, nil
+}
+
+func (p *Provider) GetTokensByContractWallet(ctx context.Context, contract persist.ChainAddress, wallet persist.Address) ([]mc.ChainAgnosticToken, mc.ChainAgnosticContract, error) {
+	u := setChain(getNftsByWalletEndpoint, contract.Chain())
+	u = setContractAddress(u, contract.Chain(), contract.Address())
+	u = setWallet(u, wallet)
+	u = setLimit(u, tokenBatchLimit)
+
+	next := u.String()
+
+	var t []mc.ChainAgnosticToken
+	var c mc.ChainAgnosticContract
+
+	for next != "" {
+		var body getNftsByWalletResponse
+
+		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
+		if err != nil {
+			return nil, mc.ChainAgnosticContract{}, err
+		}
+
+		for _, nft := range body.NFTs {
+			c = translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
+			t = append(t, translateToChainAgnosticToken(nft, contract.Address(), c.IsSpam))
+		}
+
+		next = body.Next
+	}
+
+	return t, c, nil
 }
 
 func (p *Provider) GetContractByAddress(ctx context.Context, address persist.Address) (mc.ChainAgnosticContract, error) {

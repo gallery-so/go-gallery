@@ -714,7 +714,8 @@ func listenerLoop(ctx context.Context, connectionID int, conn *websocket.Conn, t
 		logger.For(reportCtx).Infof("received user item transfer event for token (contract=%s, tokenID=%s) transferred to wallet %s on chain %d",
 			win.Payload.Item.NFTID.ContractAddress.String(), win.Payload.Item.NFTID.TokenID.String(), win.Payload.ToAccount.Address.String(), win.Payload.Item.NFTID.Chain)
 
-		if !addSeenEvent(message) {
+		key := append(oe.Payload.Payload.ToAccount.Address.Address().Bytes(), []byte(oe.Payload.Payload.Item.NFTID.String())...)
+		if !addSeenEvent(key) {
 			continue
 		}
 
