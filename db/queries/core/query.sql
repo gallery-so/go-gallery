@@ -8,7 +8,7 @@ select * from pii.user_view where id = @user_id and deleted = false;
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
 -- name: GetUsersByIDs :many
-SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false
+SELECT * FROM users WHERE id = ANY(@user_ids::dbid[]) AND deleted = false
     AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
     AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,

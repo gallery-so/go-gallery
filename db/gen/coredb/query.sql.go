@@ -5405,7 +5405,7 @@ func (q *Queries) GetUsersByFarcasterIDs(ctx context.Context, fids []string) ([]
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona FROM users WHERE id = ANY($2) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id, persona FROM users WHERE id = ANY($2::dbid[]) AND deleted = false
     AND (created_at, id) < ($3, $4::dbid)
     AND (created_at, id) > ($5, $6::dbid)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -5414,13 +5414,13 @@ SELECT id, deleted, version, last_updated, created_at, username, username_idempo
 `
 
 type GetUsersByIDsParams struct {
-	Limit         int32        `db:"limit" json:"limit"`
-	UserIds       persist.DBID `db:"user_ids" json:"user_ids"`
-	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
-	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
-	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
-	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
-	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32          `db:"limit" json:"limit"`
+	UserIds       []persist.DBID `db:"user_ids" json:"user_ids"`
+	CurBeforeTime time.Time      `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID   `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time      `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID   `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool           `db:"paging_forward" json:"paging_forward"`
 }
 
 func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([]User, error) {
