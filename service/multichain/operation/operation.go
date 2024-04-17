@@ -124,7 +124,7 @@ func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.Toke
 	}
 
 	if len(added) == 0 {
-		logger.For(ctx).Infof("no new definitions added")
+		logger.For(ctx).Infof("no new definitions added, definitions already existed in the db")
 		return []db.TokenDefinition{}, nil
 	}
 
@@ -187,9 +187,8 @@ func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken) (tim
 		return time.Time{}, nil, err
 	}
 
-	// No new tokens were added
 	if len(added) == 0 {
-		logger.For(ctx).Infof("no new tokens added")
+		logger.For(ctx).Infof("no new tokens added, tokens already existed in the db")
 		return time.Time{}, []TokenFullDetails{}, nil
 	}
 

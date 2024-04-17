@@ -48,8 +48,10 @@ func (w SyncPipelineWrapper) GetTokensByTokenIdentifiers(ctx context.Context, ti
 	return t, c, err
 }
 
-func (w SyncPipelineWrapper) GetTokensByContractWallet(ctx context.Context, c persist.ChainAddress, wallet persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	panic("not implemented")
+func (w SyncPipelineWrapper) GetTokensByContractWallet(ctx context.Context, address persist.ChainAddress, wallet persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	t, c, err := w.TokensByContractWalletFetcher.GetTokensByContractWallet(ctx, address, wallet)
+	t = w.CustomMetadataWrapper.LoadAll(ctx, w.Chain, t)
+	return t, c, err
 }
 
 func (w SyncPipelineWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
