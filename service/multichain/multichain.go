@@ -684,20 +684,22 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 	// Send definitions to tokenprocessing
 	w := pool.New().WithMaxGoroutines(10)
-	definitionsToProcess := make([]persist.DBID, len(addedDefinitions))
+	definitionsToProcess := make([]persist.DBID, 0, len(addedDefinitions))
 	for i := range addedDefinitions {
 		if isNewDefinition[i] {
-			definitionsToProcess[i] = addedDefinitions[i].ID
+			definitionsToProcess = append(definitionsToProcess, addedDefinitions[i].ID)
 		}
 	}
 	for _, b := range util.ChunkBy(definitionsToProcess, 50) {
 		b := b
-		w.Go(func() {
-			if err := p.SubmitTokens(ctx, b); err != nil {
-				logger.For(ctx).Errorf("failed to submit batch: %s", err)
-				sentryutil.ReportError(ctx, err)
-			}
-		})
+		if len(b) > 0 {
+			w.Go(func() {
+				if err := p.SubmitTokens(ctx, b); err != nil {
+					logger.For(ctx).Errorf("failed to submit batch: %s", err)
+					sentryutil.ReportError(ctx, err)
+				}
+			})
+		}
 	}
 
 	// Insert tokens

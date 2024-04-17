@@ -110,10 +110,6 @@ func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.Toke
 		p.DefinitionContractAddress = append(p.DefinitionContractAddress, t.ContractAddress.String())
 		p.DefinitionContractID = append(p.DefinitionContractID, t.ContractID.String())
 		p.DefinitionIsFxhash = append(p.DefinitionIsFxhash, t.IsFxhash)
-		// Community memberships
-		// p.CommunityMembershipDbid = append(p.CommunityMembershipDbid, persist.GenerateID().String())
-		// p.CommunityMembershipTokenID = append(p.CommunityMembershipTokenID, t.TokenID.ToDecimalTokenID().Numeric())
-		// Defer error checking until now to keep the code above from being littered with multiline "if" statements
 		if len(errors) > 0 {
 			return nil, nil, errors[0]
 		}

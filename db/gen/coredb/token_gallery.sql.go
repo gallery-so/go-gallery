@@ -81,11 +81,7 @@ insert into token_community_memberships
       , unnest($2::varchar[]) as token_definition_id
       , unnest($3::numeric[]) as token_id
       , unnest($4::varchar[]) as contract_id
-      -- , unnest(@definition_token_id::varchar[]) as definition_token_id
   ) community_memberships
-  -- join token_definitions_insert on
-  --     community_memberships.definition_contract_id = token_definitions_insert.contract_id
-  --     and community_memberships.definition_token_id = token_definitions_insert.token_id
   -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
   -- contract community for this token. Every contract should have a community created for it by the time we get here!
   left join communities on communities.contract_id = community_memberships.contract_id and communities.community_type = 0
@@ -211,6 +207,7 @@ type UpsertTokenDefinitionsRow struct {
 	IsNewDefinition bool            `db:"is_new_definition" json:"is_new_definition"`
 }
 
+// token_definitions is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this table.
 func (q *Queries) UpsertTokenDefinitions(ctx context.Context, arg UpsertTokenDefinitionsParams) ([]UpsertTokenDefinitionsRow, error) {
 	rows, err := q.db.Query(ctx, upsertTokenDefinitions,
 		arg.DefinitionDbid,
@@ -294,7 +291,6 @@ with tokens_insert as (
       , case when $1::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
       , case when $2::bool then bulk_upsert.is_creator_token else false end
       , now()
-      -- , token_definitions.id
       , bulk_upsert.token_definition_id
       , bulk_upsert.contract_id
     from (
@@ -361,6 +357,7 @@ type UpsertTokensRow struct {
 	Contract        Contract        `db:"contract" json:"contract"`
 }
 
+// tokens is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this table.
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]UpsertTokensRow, error) {
 	rows, err := q.db.Query(ctx, upsertTokens,
 		arg.SetHolderFields,

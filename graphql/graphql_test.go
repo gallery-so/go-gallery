@@ -944,7 +944,7 @@ func testSyncNewTokensMultichain(t *testing.T) {
 
 func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
-	provider := defaultStubProvider(userF.Wallet.Address)
+	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0xdead"}, userF.Wallet.Address, 10))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	tokenRecorder := sendTokensRecorder{}
 	h := handlerWithProviders(t, tokenRecorder.Send, providers)
@@ -1039,6 +1039,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
+		<-time.After(time.Second)
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)

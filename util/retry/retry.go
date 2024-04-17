@@ -169,7 +169,7 @@ func RetryRequestWithRetry(c *http.Client, req *http.Request, r Retry) (*http.Re
 			return resp, err
 		}
 		wait := WaitTime(r.MinWait, r.MaxWait, i)
-		logger.For(req.Context()).Infof("rate limited by %s (attempt=%d/%d); waiting for %s", req.Host, i, r.MaxRetries, wait)
+		logger.For(req.Context()).Infof("rate limited by %s (attempt=%d/%d); waiting for %s", req.Host, i+1, r.MaxRetries, wait)
 		<-time.After(wait)
 	}
 	return nil, ErrOutOfRetries

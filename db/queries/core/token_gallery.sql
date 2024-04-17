@@ -49,6 +49,7 @@ with token_definitions_insert as (
 )
 select sqlc.embed(token_definitions), (prior_state.id is null)::bool is_new_definition
 from token_definitions_insert token_definitions
+-- token_definitions is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this table.
 left join token_definitions prior_state on token_definitions.chain = prior_state.chain and token_definitions.contract_id = prior_state.contract_id and token_definitions.token_id = prior_state.token_id and not prior_state.deleted;
 
 -- name: UpsertTokenDefinitionCommunityMemberships :many
@@ -75,11 +76,7 @@ insert into token_community_memberships
       , unnest(@community_token_definition_id::varchar[]) as token_definition_id
       , unnest(@community_membership_token_id::numeric[]) as token_id
       , unnest(@community_contract_id::varchar[]) as contract_id
-      -- , unnest(@definition_token_id::varchar[]) as definition_token_id
   ) community_memberships
-  -- join token_definitions_insert on
-  --     community_memberships.definition_contract_id = token_definitions_insert.contract_id
-  --     and community_memberships.definition_token_id = token_definitions_insert.token_id
   -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a
   -- contract community for this token. Every contract should have a community created for it by the time we get here!
   left join communities on communities.contract_id = community_memberships.contract_id and communities.community_type = 0
@@ -121,7 +118,6 @@ with tokens_insert as (
       , case when @set_holder_fields::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
       , case when @set_creator_fields::bool then bulk_upsert.is_creator_token else false end
       , now()
-      -- , token_definitions.id
       , bulk_upsert.token_definition_id
       , bulk_upsert.contract_id
     from (
@@ -158,6 +154,7 @@ select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
 from tokens_insert tokens
 join token_definitions on tokens.token_definition_id = token_definitions.id and not token_definitions.deleted
 join contracts on token_definitions.contract_id = contracts.id
+-- tokens is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this table.
 left join tokens prior_state on tokens.owner_user_id = prior_state.owner_user_id and tokens.token_definition_id = prior_state.token_definition_id and not prior_state.deleted
 where prior_state.id is null;
 

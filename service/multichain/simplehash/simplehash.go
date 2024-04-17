@@ -26,7 +26,7 @@ var (
 	getContractsByDeployerEndpoint = checkURL(fmt.Sprintf(getContractsByDeployerEndpointTemplate, baseURL))
 )
 
-var retryPolicy = retry.Retry{MaxWait: 24, MaxRetries: 8}
+var retryPolicy = retry.Retry{MinWait: 1, MaxWait: 24, MaxRetries: 8}
 
 var chainToSimpleHashChain = map[persist.Chain]string{
 	persist.ChainETH:      "ethereum",
@@ -77,7 +77,7 @@ type authMiddleware struct {
 }
 
 func (a *authMiddleware) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.Header.Add("X-API-KEY", a.apiKey)
+	r.Header.Set("X-API-KEY", a.apiKey)
 	t := a.t
 	if t == nil {
 		t = http.DefaultTransport
