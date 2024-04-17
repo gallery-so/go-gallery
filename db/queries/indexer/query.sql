@@ -29,7 +29,7 @@ SELECT
 FROM contracts
 WHERE contracts.deleted = false
 AND (contracts.owner_address IS NULL OR contracts.owner_address = '' OR contracts.creator_address IS NULL OR contracts.creator_address = '') 
-AND contracts.id >= @start_id AND contracts.id < @end_id
+AND contracts.id >= @start_id::text AND contracts.id < @end_id::text
 ORDER BY contracts.id;
 
 -- name: UpdateContractOwnerByID :exec

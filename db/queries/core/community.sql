@@ -115,7 +115,7 @@ select k.batch_key_index, sqlc.embed(c) from keys k
 
 -- name: GetCommunityContractProviders :many
 select * from community_contract_providers
-    where contract_id = any(@contract_ids)
+    where contract_id = any(@contract_ids::dbid[])
     and not deleted;
 
 -- name: UpsertCommunityContractProviders :exec
@@ -149,8 +149,8 @@ select posts.*
     where community_data.community_type = 0
         and community_data.contract_id = any(posts.contract_ids)
         and posts.deleted = false
-        and (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        and (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and (posts.created_at, posts.id) < (@cur_before_time, @cur_before_id::dbid)
+        and (posts.created_at, posts.id) > (@cur_after_time, @cur_after_id::dbid)
     order by
         case when sqlc.arg('paging_forward')::bool then (posts.created_at, posts.id) end asc,
         case when not sqlc.arg('paging_forward')::bool then (posts.created_at, posts.id) end desc
@@ -168,8 +168,8 @@ select posts.*
             and not token_community_memberships.deleted
     where community_data.community_type = 1
       and posts.deleted = false
-      and (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-      and (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+      and (posts.created_at, posts.id) < (@cur_before_time, @cur_before_id::dbid)
+      and (posts.created_at, posts.id) > (@cur_after_time, @cur_after_id::dbid)
     order by
         case when sqlc.arg('paging_forward')::bool then (posts.created_at, posts.id) end asc,
         case when not sqlc.arg('paging_forward')::bool then (posts.created_at, posts.id) end desc
@@ -268,8 +268,8 @@ select users.* from (
         and u.universal = false
         and t.deleted = false and u.deleted = false
     ) as users
-    where (users.created_at,users.id) < (@cur_before_time::timestamptz, @cur_before_id)
-    and (users.created_at,users.id) > (@cur_after_time::timestamptz, @cur_after_id)
+    where (users.created_at,users.id) < (@cur_before_time::timestamptz, @cur_before_id::dbid)
+    and (users.created_at,users.id) > (@cur_after_time::timestamptz, @cur_after_id::dbid)
     order by case when @paging_forward::bool then (users.created_at,users.id) end asc,
          case when not @paging_forward::bool then (users.created_at,users.id) end desc limit sqlc.narg('limit');
 
@@ -332,8 +332,8 @@ where cd.community_type = 0
     and td.deleted = false
     and u.deleted = false
     and u.universal = false
-    and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id)
-    and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id)
+    and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id::dbid)
+    and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id::dbid)
 order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
          case when not @paging_forward::bool then (t.created_at,t.id) end desc
 limit sqlc.arg('limit'))
@@ -354,8 +354,8 @@ where cd.community_type != 0
     and td.deleted = false
     and u.deleted = false
     and u.universal = false
-    and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id)
-    and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id)
+    and (t.created_at,t.id) < (@cur_before_time::timestamptz, @cur_before_id::dbid)
+    and (t.created_at,t.id) > (@cur_after_time::timestamptz, @cur_after_id::dbid)
 order by case when @paging_forward::bool then (t.created_at,t.id) end asc,
          case when not @paging_forward::bool then (t.created_at,t.id) end desc
 limit sqlc.arg('limit'));

@@ -8,7 +8,7 @@ update galleries set last_updated = now(), collections = @collection_ids where g
 update galleries set last_updated = now(), collections = @collection_ids::text[] || collections where galleries.id = @gallery_id and (select count(*) from collections c where c.id = any(@collection_ids) and c.gallery_id = @gallery_id and c.deleted = false) = coalesce(array_length(@collection_ids, 1), 0);
 
 -- name: GalleryRepoCheckOwnCollections :one
-select count(*) from collections where id = any(@collection_ids) and owner_user_id = $1;
+select count(*) from collections where id = any(@collection_ids::dbid[]) and owner_user_id = $1;
 
 -- name: GalleryRepoCountAllCollections :one
 select count(*) from collections where owner_user_id = $1 and deleted = false;

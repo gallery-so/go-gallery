@@ -48,6 +48,7 @@ sql:
           filename: 'manifest.json'
     queries: 'db/queries/core'
     engine: 'postgresql'
+    strict_order_by: false
     gen:
       go:
         package: 'coredb'
@@ -58,7 +59,20 @@ sql:
         emit_json_tags: true
         emit_db_tags: true
         overrides:
-          # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
+          # DB type overrides. These are typically mappings from our own custom Postgres types to our own Go types,
+          # which allows us to use standard ::casts to specify query parameter types.
+          - db_type: 'dbid'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.DBID'
+          - db_type: 'address'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Address'
+          - db_type: 'role'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Role'
+          - db_type: 'action'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Action'
+          - db_type: 'hextokenid'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenID'
+
+          # Column overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
           # the override should come _before_ the * entry
           # Users (and pii.user_view)
           # "*.user*" wildcards are so these mappings will also apply to the "pii.user_view" view

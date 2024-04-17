@@ -9,8 +9,8 @@ SELECT * FROM users WHERE id = $1 AND deleted = false;
 
 -- name: GetUsersByIDs :many
 SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
     LIMIT $1;
@@ -46,10 +46,10 @@ where wallets.address = sqlc.arg('address')
 	and users.deleted = false;
 
 -- name: GetUsersWithTrait :many
-SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;
+SELECT * FROM users WHERE (traits->$1::text) IS NOT NULL AND deleted = false;
 
 -- name: GetUsersWithTraitBatch :batchmany
-SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;
+SELECT * FROM users WHERE (traits->$1::text) IS NOT NULL AND deleted = false;
 
 -- name: GetGalleryById :one
 SELECT * FROM galleries WHERE id = $1 AND deleted = false;
@@ -118,7 +118,7 @@ where token_definitions.id = tokens.token_definition_id
 -- name: GetTokenDefinitionByTokenIdentifiers :one
 select *
 from token_definitions
-where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id) and not deleted;
+where (chain, contract_address, token_id) = (@chain, @contract_address::address, @token_id::hextokenid) and not deleted;
 
 -- name: GetTokenFullDetailsByUserTokenIdentifiers :one
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
@@ -126,7 +126,7 @@ from tokens
 join token_definitions on tokens.token_definition_id = token_definitions.id
 join contracts on token_definitions.contract_id = contracts.id
 where tokens.owner_user_id = $1 
-    and (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = (@chain, @contract_address, @token_id)
+    and (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = (@chain, @contract_address::address, @token_id::hextokenid)
     and tokens.displayable
     and not tokens.deleted
     and not token_definitions.deleted
@@ -153,10 +153,10 @@ order by tokens.block_number desc;
 update tokens set collectors_note = $1, last_updated = now() where id = $2 and owner_user_id = $3;
 
 -- name: UpdateTokensAsUserMarkedSpam :exec
-update tokens set is_user_marked_spam = $1, last_updated = now() where owner_user_id = $2 and id = any(@token_ids) and deleted = false;
+update tokens set is_user_marked_spam = $1, last_updated = now() where owner_user_id = $2 and id = any(@token_ids::dbid[]) and deleted = false;
 
 -- name: CheckUserOwnsAllTokenDbids :one
-with user_tokens as (select count(*) total from tokens where id = any(@token_ids) and owner_user_id = $1 and not tokens.deleted), total_tokens as (select cardinality(@token_ids) total)
+with user_tokens as (select count(*) total from tokens where id = any(@token_ids::dbid[]) and owner_user_id = $1 and not tokens.deleted), total_tokens as (select cardinality(@token_ids) total)
 select (select total from total_tokens) = (select total from user_tokens) owns_all;
 
 -- name: GetTokenByIdBatch :batchone
@@ -232,8 +232,8 @@ select sqlc.embed(tokens), sqlc.embed(admires)
 from admires
 join tokens on admires.token_id = tokens.id
 where actor_id = @user_id and not admires.deleted and not tokens.deleted
-and (admires.created_at, admires.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-and (admires.created_at, admires.id) < (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+and (admires.created_at, admires.id) > (@cur_before_time, @cur_before_id::dbid)
+and (admires.created_at, admires.id) < (@cur_after_time, @cur_after_id::dbid)
 order by case when sqlc.arg('paging_forward')::bool then (admires.created_at, admires.id) end desc,
     case when not sqlc.arg('paging_forward')::bool then (admires.created_at, admires.id) end asc
 limit sqlc.arg('limit');
@@ -297,7 +297,7 @@ select k.batch_key_index, sqlc.embed(c) from keys k
     where not c.deleted;
 
 -- name: GetContractsByTokenIDs :many
-select contracts.* from contracts join tokens on contracts.id = tokens.contract_id where tokens.id = any(@token_ids) and contracts.deleted = false;
+select contracts.* from contracts join tokens on contracts.id = tokens.contract_id where tokens.id = any(@token_ids::dbid[]) and contracts.deleted = false;
 
 -- name: GetContractByChainAddress :one
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
@@ -346,7 +346,7 @@ SELECT u.* FROM follows f
 -- name: GetTokensByWalletIdsBatch :batchmany
 select sqlc.embed(t), sqlc.embed(td)
 from tokens t
-join tokens td on t.token_definition_id = td.id
+join token_definitions td on t.token_definition_id = td.id
 where t.owned_by_wallets && $1 and t.displayable and t.deleted = false and td.deleted = false
 order by t.created_at desc, td.name desc, t.id desc;
 
@@ -361,8 +361,8 @@ select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c), sqlc.embed(u) from tokens t
     and c.deleted = false
     and td.deleted = false
     and (not @gallery_users_only::bool or u.universal = false)
-    and (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    and (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    and (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id::dbid)
+    and (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id::dbid)
     order by case when @paging_forward::bool then (u.universal,t.created_at,t.id) end asc,
              case when not @paging_forward::bool then (u.universal,t.created_at,t.id) end desc
     limit $2;
@@ -390,8 +390,8 @@ select users.* from (
         and (not @gallery_users_only::bool or u.universal = false)
         and t.deleted = false and u.deleted = false and c.deleted = false
     ) as users
-    where (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    and (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    where (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id::dbid)
+    and (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id::dbid)
     order by case when @paging_forward::bool then (users.universal,users.created_at,users.id) end asc,
          case when not @paging_forward::bool then (users.universal,users.created_at,users.id) end desc limit sqlc.narg('limit');
 
@@ -434,10 +434,10 @@ where t.owner_user_id = @owner_user_id
 order by t.created_at desc, td.name desc, t.id desc;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post')::text, sqlc.narg('comment')::text, sqlc.narg('feed_event')::text, sqlc.narg('mention')::text, $6, $7, $8) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, sqlc.narg('gallery'), sqlc.narg('collection')) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, sqlc.narg('gallery')::text, sqlc.narg('collection')::text) RETURNING *;
 
 -- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption, group_id, gallery_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
@@ -446,7 +446,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommunityEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, community_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, community_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post')::text, sqlc.narg('comment')::text, sqlc.narg('feed_event')::text, sqlc.narg('mention')::text, $6, $7, $8) RETURNING *;
 
 -- name: CreatePostEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
@@ -455,10 +455,10 @@ INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id,
 INSERT INTO events (id, actor_id, action, resource_type_id, data, group_id, caption, subject_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, comment_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token'), sqlc.narg('comment'), $6, $7, $8, $9) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, token_id, comment_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event')::text, sqlc.narg('post')::text, sqlc.narg('token')::text, sqlc.narg('comment')::text, $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event')::text, sqlc.narg('post')::text, sqlc.narg('mention')::text, $6, $7, $8, $9) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
@@ -469,7 +469,7 @@ with recursive activity as (
     union
     select e.* from events e, activity a
     where e.actor_id = a.actor_id
-        and e.action = any(@actions)
+        and e.action = any(@actions::action[])
         and e.created_at < a.created_at
         and e.created_at >= a.created_at - make_interval(secs => $2)
         and e.deleted = false
@@ -484,7 +484,7 @@ with recursive activity as (
     union
     select e.* from events e, activity a
     where e.actor_id = a.actor_id
-        and e.action = any(@actions)
+        and e.action = any(@actions::action[])
         and e.gallery_id = @gallery_id
         and e.created_at < a.created_at
         and e.created_at >= a.created_at - make_interval(secs => $2)
@@ -511,7 +511,7 @@ select exists(
 select exists(
   select 1 from events where deleted = false
   and actor_id = $1
-  and action = any(@actions)
+  and action = any(@actions::action[])
   and created_at > @window_start and created_at <= @window_end
 );
 
@@ -537,7 +537,7 @@ select exists(
   select 1 from events where deleted = false
   and actor_id = $1
   and subject_id = $2
-  and action = any(@actions)
+  and action = any(@actions::action[])
   and created_at > @window_start and created_at <= @window_end
 );
 
@@ -545,8 +545,8 @@ select exists(
 select fe.*
 from feed_entities fe
 left join feed_blocklist fb on fe.actor_id = fb.user_id and not fb.deleted and fb.active
-where (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+where (fe.created_at, fe.id) < (@cur_before_time, @cur_before_id::dbid)
+        and (fe.created_at, fe.id) > (@cur_after_time, @cur_after_id::dbid)
         and (fb.user_id is null or @viewer_id = fb.user_id)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
@@ -558,8 +558,8 @@ select fe.* from feed_entities fe, follows fl
     where fl.deleted = false
       and fe.actor_id = fl.followee
       and fl.follower = sqlc.arg('follower')
-      and (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-      and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+      and (fe.created_at, fe.id) < (@cur_before_time, @cur_before_id::dbid)
+      and (fe.created_at, fe.id) > (@cur_after_time, @cur_after_id::dbid)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
@@ -569,8 +569,8 @@ limit sqlc.arg('limit');
 select *
 from posts
 where actor_id = sqlc.arg('user_id')
-        and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
+        and (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
         and not posts.deleted
 order by
     case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
@@ -583,10 +583,10 @@ select count(*) from posts where actor_id = $1 and not posts.deleted;
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
 FROM posts
-WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
+WHERE @contract_id::dbid = ANY(posts.contract_ids)
 AND posts.deleted = false
-AND (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+AND (posts.created_at, posts.id) < (@cur_before_time, @cur_before_id::dbid)
+AND (posts.created_at, posts.id) > (@cur_after_time, @cur_after_id::dbid)
 ORDER BY
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
@@ -608,8 +608,8 @@ with valid_post_ids as (
 )
 SELECT posts.* from posts
     join valid_post_ids on posts.id = valid_post_ids.id
-WHERE (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+WHERE (posts.created_at, posts.id) < (@cur_before_time, @cur_before_id::dbid)
+  AND (posts.created_at, posts.id) > (@cur_after_time, @cur_after_id::dbid)
 ORDER BY
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
@@ -618,7 +618,7 @@ LIMIT sqlc.arg('limit');
 -- name: CountPostsByContractID :one
 select count(*)
 from posts
-where sqlc.arg('contract_id') = any(posts.contract_ids)
+where @contract_id::dbid = any(posts.contract_ids)
 and posts.deleted = false;
 
 -- name: GetFeedEventsByIds :many
@@ -655,7 +655,7 @@ UPDATE feed_events SET caption = (select caption from events where events.group_
 -- name: GetLastFeedEventForUser :one
 select * from feed_events where deleted = false
     and owner_id = $1
-    and action = any(@actions)
+    and action = any(@actions::action[])
     and event_time < $2
     order by event_time desc
     limit 1;
@@ -663,7 +663,7 @@ select * from feed_events where deleted = false
 -- name: GetLastFeedEventForToken :one
 select * from feed_events where deleted = false
     and owner_id = $1
-    and action = any(@actions)
+    and action = any(@actions::action[])
     and data ->> 'token_id' = @token_id::varchar
     and event_time < $2
     order by event_time desc
@@ -672,8 +672,8 @@ select * from feed_events where deleted = false
 -- name: GetLastFeedEventForCollection :one
 select * from feed_events where deleted = false
     and owner_id = $1
-    and action = any(@actions)
-    and data ->> 'collection_id' = @collection_id
+    and action = any(@actions::action[])
+    and data ->> 'collection_id' = @collection_id::dbid
     and event_time < $2
     order by event_time desc
     limit 1;
@@ -692,7 +692,7 @@ update feed_blocklist set active = false where user_id = $1 and not deleted;
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
 -- name: GetAdmiresByAdmireIDs :many
-SELECT * from admires WHERE id = ANY(@admire_ids) AND deleted = false;
+SELECT * from admires WHERE id = ANY(@admire_ids::dbid[]) AND deleted = false;
 
 -- name: GetAdmireByAdmireIDBatch :batchone
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
@@ -705,7 +705,7 @@ SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_a
 
 -- name: PaginateAdmiresByFeedEventIDBatch :batchmany
 SELECT * FROM admires WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid) AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -715,7 +715,7 @@ SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false;
 
 -- name: PaginateAdmiresByPostIDBatch :batchmany
 SELECT * FROM admires WHERE post_id = sqlc.arg('post_id') AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid) AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -725,7 +725,7 @@ SELECT count(*) FROM admires WHERE post_id = $1 AND deleted = false;
 
 -- name: PaginateAdmiresByTokenIDBatch :batchmany
 SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_actor::bool or actor_id = @actor_id) AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid) AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -735,7 +735,7 @@ SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
 -- name: PaginateAdmiresByCommentIDBatch :batchmany
 select * from admires where comment_id = sqlc.arg('comment_id') and deleted = false
-    and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    and (created_at, id) < (@cur_before_time, @cur_before_id::dbid) and (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     order by case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
              case when not sqlc.arg('paging_forward')::bool then (created_at, id) end desc
     limit sqlc.arg('limit');
@@ -747,15 +747,15 @@ select count(*) from admires where comment_id = $1 and deleted = false;
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
 -- name: GetCommentsByCommentIDs :many
-SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
+SELECT * from comments WHERE id = ANY(@comment_ids::dbid[]) AND deleted = false;
 
 -- name: GetCommentByCommentIDBatch :batchone
 SELECT * FROM comments WHERE id = $1 AND deleted = false; 
 
 -- name: PaginateCommentsByFeedEventIDBatch :batchmany
 SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -768,8 +768,8 @@ SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AN
 
 -- name: PaginateCommentsByPostIDBatch :batchmany
 SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -789,8 +789,8 @@ WHERE
         ELSE c.reply_to = sqlc.arg('comment_id') 
     END
     AND c.deleted = false
-    AND (c.created_at, c.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (c.created_at, c.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    AND (c.created_at, c.id) < (@cur_before_time, @cur_before_id::dbid)
+    AND (c.created_at, c.id) > (@cur_after_time, @cur_after_id::dbid)
 ORDER BY 
     CASE 
         WHEN sqlc.arg('paging_forward')::bool THEN (c.created_at, c.id) 
@@ -812,16 +812,16 @@ WHERE
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
     LIMIT $2;
 
 -- name: GetUserUnseenNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
     LIMIT $2;
@@ -831,8 +831,8 @@ SELECT * FROM notifications WHERE owner_id = @owner_id AND deleted = false AND s
 
 -- name: GetUserNotificationsBatch :batchmany
 SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
-    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    AND (created_at, id) < (@cur_before_time, @cur_before_id::dbid)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id::dbid)
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
     LIMIT sqlc.arg('limit');
@@ -877,16 +877,16 @@ SELECT * FROM notifications
     ORDER BY created_at DESC;
 
 -- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token')) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event')::text, sqlc.narg('post')::text, sqlc.narg('token')::text) RETURNING *;
 
 -- name: CreateCommentNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event')::text, sqlc.narg('post')::text, $6) RETURNING *;
 
 -- name: CreateCommunityNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, community_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, community_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event')::text, sqlc.narg('post')::text, sqlc.narg('comment')::text, $6, $7) RETURNING *;
 
 -- name: CreateUserPostedYourWorkNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, community_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, community_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post')::text, $6) RETURNING *;
 
 -- name: CountFollowersByUserID :one
 SELECT count(*) FROM follows WHERE followee = $1 AND deleted = false;
@@ -934,7 +934,7 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2
 INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amount) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateMentionUserNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event')::text, sqlc.narg('post')::text, sqlc.narg('comment')::text, $6) RETURNING *;
 
 -- name: CreateViewGalleryNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
@@ -954,10 +954,10 @@ UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURN
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
-        AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, @cur_before_time, @cur_before_id::dbid) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, @cur_after_time, @cur_after_id::dbid)
                                                                     UNION
     SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.reply_to is null AND t.deleted = false
-        AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, @cur_before_time, @cur_before_id::dbid) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, @cur_after_time, @cur_after_id::dbid)
 ) as interactions
 
 ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END ASC,
@@ -972,10 +972,10 @@ SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.
 -- name: PaginateInteractionsByPostIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
-        AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, @cur_before_time, @cur_before_id::dbid) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, @cur_after_time, @cur_after_id::dbid)
                                                                     UNION
     SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.reply_to is null AND t.deleted = false
-        AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, @cur_before_time, @cur_before_id::dbid) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, @cur_after_time, @cur_after_id::dbid)
 ) as interactions
 
 ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END ASC,
@@ -1015,8 +1015,8 @@ select u.* from pii.user_view u
     where (u.email_unsubscriptions->>'all' = 'false' or u.email_unsubscriptions->>'all' is null)
     and (u.email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar = 'false' or u.email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar is null)
     and u.deleted = false and u.pii_verified_email_address is not null
-    and (u.created_at, u.id) < (@cur_before_time, @cur_before_id)
-    and (u.created_at, u.id) > (@cur_after_time, @cur_after_id)
+    and (u.created_at, u.id) < (@cur_before_time, @cur_before_id::dbid)
+    and (u.created_at, u.id) > (@cur_after_time, @cur_after_id::dbid)
     and (@email_testers_only::bool = false or r.user_id is not null)
     order by case when @paging_forward::bool then (u.created_at, u.id) end asc,
              case when not @paging_forward::bool then (u.created_at, u.id) end desc
@@ -1025,8 +1025,8 @@ select u.* from pii.user_view u
 -- name: GetUsersWithRolePaginate :many
 select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = false
     and u.id = ur.user_id and ur.role = @role
-    and (u.username_idempotent, u.id) < (@cur_before_key::varchar, @cur_before_id)
-    and (u.username_idempotent, u.id) > (@cur_after_key::varchar, @cur_after_id)
+    and (u.username_idempotent, u.id) < (@cur_before_key::varchar, @cur_before_id::dbid)
+    and (u.username_idempotent, u.id) > (@cur_after_key::varchar, @cur_after_id::dbid)
     order by case when @paging_forward::bool then (u.username_idempotent, u.id) end asc,
              case when not @paging_forward::bool then (u.username_idempotent, u.id) end desc
     limit $1;
@@ -1084,7 +1084,7 @@ select unnest(@ids::varchar[]), $1, unnest(@roles::varchar[]), now(), now()
 on conflict (user_id, role) do update set deleted = false, last_updated = now();
 
 -- name: DeleteUserRoles :exec
-update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any(@roles);
+update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any(@roles::role[]);
 
 -- name: GetUserRolesByUserId :many
 with membership_roles(role) as (
@@ -1130,7 +1130,7 @@ update galleries set name = case when @name_set::bool then @name else name end, 
 update galleries set collections = @collections, last_updated = now() where galleries.id = @gallery_id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = cardinality(@collections);
 
 -- name: UpdateUserFeaturedGallery :exec
-update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
+update users set featured_gallery = @gallery_id::dbid, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
 -- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
 select tm.*
@@ -1290,8 +1290,8 @@ from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernam
     inner join pii.user_view on user_view.pii_socials->sqlc.arg('social')::text->>'id'::varchar = s.social_id and user_view.deleted = false
     left outer join follows f on f.follower = @user_id and f.followee = user_view.id and f.deleted = false
 where case when @only_unfollowing::bool then f.id is null else true end
-    and (f.id is not null,user_view.created_at,user_view.id) < (@cur_before_following::bool, @cur_before_time::timestamptz, @cur_before_id)
-    and (f.id is not null,user_view.created_at,user_view.id) > (@cur_after_following::bool, @cur_after_time::timestamptz, @cur_after_id)
+    and (f.id is not null,user_view.created_at,user_view.id) < (@cur_before_following::bool, @cur_before_time::timestamptz, @cur_before_id::dbid)
+    and (f.id is not null,user_view.created_at,user_view.id) > (@cur_after_following::bool, @cur_after_time::timestamptz, @cur_after_id::dbid)
 order by case when @paging_forward::bool then (f.id is not null,user_view.created_at,user_view.id) end asc,
     case when not @paging_forward::bool then (f.id is not null,user_view.created_at,user_view.id) end desc
 limit $1;
@@ -1333,8 +1333,8 @@ where a.follower = @follower
 	and a.deleted = false
 	and b.deleted = false
 	and users.deleted = false
-  and (a.created_at, users.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (a.created_at, users.id) < (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+  and (a.created_at, users.id) > (@cur_before_time, @cur_before_id::dbid)
+  and (a.created_at, users.id) < (@cur_after_time, @cur_after_id::dbid)
 order by case when sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end desc,
         case when not sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end asc
 limit sqlc.arg('limit');
@@ -1369,10 +1369,10 @@ where a.user_id = @user_a_id
     a.owned_count,
     communities.id
   ) > (
-    sqlc.arg('cur_before_displayed_by_user_a'),
-    sqlc.arg('cur_before_displayed_by_user_b'),
-    sqlc.arg('cur_before_owned_count')::int,
-    sqlc.arg('cur_before_contract_id')
+    @cur_before_displayed_by_user_a,
+    @cur_before_displayed_by_user_b,
+    @cur_before_owned_count::int,
+    @cur_before_contract_id::dbid
   )
   and (
     a.displayed,
@@ -1380,10 +1380,10 @@ where a.user_id = @user_a_id
     a.owned_count,
     communities.id
   ) < (
-    sqlc.arg('cur_after_displayed_by_user_a'),
-    sqlc.arg('cur_after_displayed_by_user_b'),
-    sqlc.arg('cur_after_owned_count')::int,
-    sqlc.arg('cur_after_contract_id')
+    @cur_after_displayed_by_user_a,
+    @cur_after_displayed_by_user_b,
+    @cur_after_owned_count::int,
+    @cur_after_contract_id::dbid
   )
 order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end desc,
         case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, communities.id) end asc
@@ -1394,8 +1394,8 @@ select contracts.*
 from contracts
     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = @user_id
 where (@include_all_chains::bool or contracts.chain = any(string_to_array(@chains, ',')::int[]))
-  and (contracts.created_at, contracts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (contracts.created_at, contracts.id) > ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+  and (contracts.created_at, contracts.id) < (@cur_before_time, @cur_before_id::dbid)
+  and (contracts.created_at, contracts.id) > ( @cur_after_time, @cur_after_id::dbid)
 order by case when sqlc.arg('paging_forward')::bool then (contracts.created_at, contracts.id) end asc,
         case when not sqlc.arg('paging_forward')::bool then (contracts.created_at, contracts.id) end desc
 limit sqlc.arg('limit');
@@ -1423,8 +1423,8 @@ select c.*
 from contracts c
 where c.parent_id = @parent_id
   and c.deleted = false
-  and (c.created_at, c.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (c.created_at, c.id) > ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+  and (c.created_at, c.id) < (@cur_before_time, @cur_before_id::dbid)
+  and (c.created_at, c.id) > (@cur_after_time, @cur_after_id::dbid)
 order by case when sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end asc,
         case when not sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end desc
 limit sqlc.arg('limit');
@@ -1460,7 +1460,7 @@ with insert_job(id) as (
     (
         select @retiring_media_id, media, processing_job_id, false, created_at, now()
         from token_medias
-        where id = (select token_media_id from token_definitions td where (td.chain, td.contract_address, td.token_id) = (@chain, @contract_address, @token_id) and not deleted)
+        where id = (select token_media_id from token_definitions td where (td.chain, td.contract_address, td.token_id) = (@chain, @contract_address::address, @token_id::hextokenid) and not deleted)
         and not deleted
         and @new_media_is_active::bool
     )
@@ -1468,7 +1468,7 @@ with insert_job(id) as (
 )
 , insert_new_media as (
     insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
-    values (@new_media_id, @new_media, (select id from insert_job), @new_media_is_active,
+    values (@new_media_id, @new_media::jsonb, (select id from insert_job), @new_media_is_active,
         -- Using timestamps generated from set_conditionally_current_media_to_inactive ensures that the new record is only inserted after the current media is moved
         (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now())),
         (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now()))
@@ -1477,7 +1477,7 @@ with insert_job(id) as (
 )
 , update_token_definition as (
     update token_definitions
-    set metadata = @new_metadata,
+    set metadata = @new_metadata::jsonb,
         name = @new_name,
         description = @new_description,
         last_updated = (select last_updated from insert_new_media),
@@ -1514,7 +1514,7 @@ select * from push_notification_tokens where push_token = @push_token and delete
 insert into push_notification_tokens (id, user_id, push_token, created_at, deleted) values (@id, @user_id, @push_token, now(), false) returning *;
 
 -- name: DeletePushTokensByIDs :exec
-update push_notification_tokens set deleted = true where id = any(@ids) and deleted = false;
+update push_notification_tokens set deleted = true where id = any(@ids::dbid[]) and deleted = false;
 
 -- name: GetPushTokensByUserID :many
 select * from push_notification_tokens where user_id = @user_id and deleted = false;
@@ -1578,7 +1578,7 @@ select m.* from token_medias m where m.id = $1 and not deleted;
 select token_medias.*
 from token_definitions
 join token_medias on token_definitions.token_media_id = token_medias.id
-where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id)
+where (chain, contract_address, token_id) = (@chain, @contract_address::address, @token_id::hextokenid)
     and not token_definitions.deleted
     and not token_medias.deleted;
 
@@ -1798,10 +1798,10 @@ update tokens
 select * from pii.user_view u where u.pii_socials->sqlc.arg('social_account_type')::varchar->>'id' = any(@social_ids::varchar[]) and not u.deleted and not u.universal;
 
 -- name: InsertCommentMention :one
-insert into mentions (id, user_id, community_id, comment_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('community'), @comment_id, @start, @length) returning *;
+insert into mentions (id, user_id, community_id, comment_id, start, length) values (@id, sqlc.narg('user')::text, sqlc.narg('community')::text, @comment_id, @start, @length) returning *;
 
 -- name: InsertPostMention :one
-insert into mentions (id, user_id, community_id, post_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('community'), @post_id, @start, @length) returning *;
+insert into mentions (id, user_id, community_id, post_id, start, length) values (@id, sqlc.narg('user')::text, sqlc.narg('community')::text, @post_id, @start, @length) returning *;
 
 -- name: GetMentionsByCommentID :batchmany
 select * from mentions where comment_id = @comment_id and not deleted;
@@ -1869,7 +1869,7 @@ LIMIT $1;
 -- name: UpdateTopActiveUsers :exec
 UPDATE users
 SET traits = CASE 
-                WHEN id = ANY(@top_user_ids) THEN 
+                WHEN id = ANY(@top_user_ids::dbid[]) THEN
                     COALESCE(traits, '{}'::jsonb) || '{"top_activity": true}'::jsonb
                 ELSE 
                     traits - 'top_activity'
@@ -1885,7 +1885,7 @@ with sources as (
 select users.* from users join top_recs using(id) where not users.deleted and not users.universal limit $1;
 
 -- name: InsertMention :one
-insert into mentions (id, comment_id, user_id, community_id, start, length) values ($1, $2, sqlc.narg('user'), sqlc.narg('community'), $3, $4) returning id;
+insert into mentions (id, comment_id, user_id, community_id, start, length) values ($1, $2, sqlc.narg('user')::text, sqlc.narg('community')::text, $3, $4) returning id;
 
 -- name: InsertComment :one
 INSERT INTO comments 
@@ -1907,7 +1907,7 @@ UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;
 
 -- name: ReportPost :one
 with offending_post as (select id from posts where posts.id = @post_id and not deleted)
-insert into reported_posts (id, post_id, reporter_id, reason) (select @id, offending_post.id, sqlc.narg(reporter), sqlc.narg(reason) from offending_post)
+insert into reported_posts (id, post_id, reporter_id, reason) (select @id, offending_post.id, sqlc.narg(reporter)::text, sqlc.narg(reason) from offending_post)
 on conflict(post_id, reporter_id, reason) where not deleted do update set last_updated = now() returning id;
 
 -- name: BlockUser :one
@@ -1989,8 +1989,8 @@ select sqlc.embed(g),
     join galleries g on cg.gallery_id = g.id and not g.deleted and not g.hidden
     join community_galleries cg2 on cg2.gallery_id = cg.gallery_id and cg2.community_id is null
 where cg.community_id = @community_id
-    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) < (@cur_before_is_not_relative_user::bool, @community_id, @cur_before_relevance::float8, @cur_before_id)
-    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) > (@cur_after_is_not_relative_user::bool, @community_id, @cur_after_relevance::float8, @cur_after_id)
+    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) < (@cur_before_is_not_relative_user::bool, @community_id, @cur_before_relevance::float8, @cur_before_id::dbid)
+    and (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) > (@cur_after_is_not_relative_user::bool, @community_id, @cur_after_relevance::float8, @cur_after_id::dbid)
 order by case when @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end asc,
          case when not @paging_forward::bool then (cg.user_id != @relative_to_user_id, cg.community_id, -cg.gallery_relevance, cg.gallery_id) end desc
 limit sqlc.arg('limit');
