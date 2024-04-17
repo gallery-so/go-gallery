@@ -271,7 +271,8 @@ with tokens_insert as (
         , unnest($15::int[]) as chain
         , unnest($16::varchar[]) as contract_id
     ) bulk_upsert
-    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id)
+    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a pre-existing definition for a token
+    left join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) and not token_definitions.deleted
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
@@ -287,7 +288,7 @@ with tokens_insert as (
 )
 select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
 from tokens_insert tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
+join token_definitions on tokens.token_definition_id = token_definitions.id and not token_definitions.deleted
 join contracts on token_definitions.contract_id = contracts.id
 left join tokens prior_state on tokens.owner_user_id = prior_state.owner_user_id and tokens.token_definition_id = prior_state.token_definition_id and not prior_state.deleted
 where prior_state.id is null

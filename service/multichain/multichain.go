@@ -675,7 +675,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 	// Insert tokens
 	tokensToAdd = dedupeTokenInstances(tokensToAdd)
-	upsertTime, addedTokens, err := op.InsertTokens(ctx, p.Queries, tokensToAdd)
+	upsertTime, addedTokens, err := op.InsertTokens(ctx, p.Queries, tokensToAdd, upsertParams)
 	if err != nil {
 		logger.For(ctx).Errorf("error in bulk upsert of tokens: %s", err)
 		return nil, err
@@ -750,12 +750,12 @@ func (p *Provider) receiveProviderData(ctx context.Context, user persist.User, r
 				return newTokens, currentContracts, nil
 			}
 
-			currentContracts, _, err = p.processContracts(ctx, page.Chain, page.Contracts, false)
+			contracts, err := p.processContracts(ctx, page.Chain, page.Contracts, false)
 			if err != nil {
 				return nil, nil, err
 			}
 
-			addedTokens, err := addTokensF(ctx, user, page.Chain, page.Tokens, currentContracts)
+			addedTokens, err := addTokensF(ctx, user, page.Chain, page.Tokens, contracts)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1034,7 +1034,7 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 		contracts = append(contracts, c)
 	}
 
-	_, _, err := p.processContracts(ctx, ci.Chain, contracts, false)
+	_, err := p.processContracts(ctx, ci.Chain, contracts, false)
 	return err
 }
 
@@ -1166,19 +1166,20 @@ func (d *Provider) processContractCommunities(ctx context.Context, contracts []d
 // processContracts deduplicates contracts and upserts them into the database. If canOverwriteOwnerAddress is true, then
 // the owner address of an existing contract will be overwritten if the new contract provides a non-empty owner address.
 // An empty owner address will never overwrite an existing address, even if canOverwriteOwnerAddress is true.
-func (d *Provider) processContracts(ctx context.Context, chain persist.Chain, contracts []ChainAgnosticContract, canOverwriteOwnerAddress bool) (dbContracts []db.Contract, newContracts []db.Contract, err error) {
+func (d *Provider) processContracts(ctx context.Context, chain persist.Chain, contracts []ChainAgnosticContract, canOverwriteOwnerAddress bool) (newContracts []db.Contract, err error) {
 	contractsToAdd := chainContractsToUpsertableContracts(chain, contracts)
-	newUpsertedContracts, err := d.Repos.ContractRepository.BulkUpsert(ctx, contractsToAdd, canOverwriteOwnerAddress)
+
+	addedContracts, err := d.Repos.ContractRepository.BulkUpsert(ctx, contractsToAdd, canOverwriteOwnerAddress)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	_, err = d.processContractCommunities(ctx, contractsToAdd)
+	_, err = d.processContractCommunities(ctx, addedContracts)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return dbContracts, newUpsertedContracts, nil
+	return addedContracts, nil
 }
 
 // chainTokensToUpsertableTokenDefinitions returns a slice of token definitions that are ready to be upserted into the database from a slice of chainTokens.

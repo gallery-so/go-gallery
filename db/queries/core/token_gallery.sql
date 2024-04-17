@@ -138,7 +138,8 @@ with tokens_insert as (
         , unnest(@token_chain::int[]) as chain
         , unnest(@token_contract_id::varchar[]) as contract_id
     ) bulk_upsert
-    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id)
+    -- Left join ensures that the insert will fail with a constraint violation (trying to insert null) if there isn't a pre-existing definition for a token
+    left join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) and not token_definitions.deleted
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
@@ -154,7 +155,7 @@ with tokens_insert as (
 )
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
 from tokens_insert tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
+join token_definitions on tokens.token_definition_id = token_definitions.id and not token_definitions.deleted
 join contracts on token_definitions.contract_id = contracts.id
 left join tokens prior_state on tokens.owner_user_id = prior_state.owner_user_id and tokens.token_definition_id = prior_state.token_definition_id and not prior_state.deleted
 where prior_state.id is null;

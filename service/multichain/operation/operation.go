@@ -136,7 +136,7 @@ func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.Toke
 	return addedTokens, nil
 }
 
-func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken) (time.Time, []TokenFullDetails, error) {
+func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken, opt TokenUpsertParams) (time.Time, []TokenFullDetails, error) {
 	tokens = excludeZeroQuantityTokens(ctx, tokens)
 
 	// If we're not upserting anything, we still need to return the current database time
@@ -163,7 +163,11 @@ func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken) (tim
 		return tokens[i].Identifiers.TokenID < tokens[j].Identifiers.TokenID
 	})
 
-	var p db.UpsertTokensParams
+	p := db.UpsertTokensParams{
+		SetCreatorFields:    opt.SetCreatorFields,
+		SetHolderFields:     opt.SetHolderFields,
+		TokenOwnedByWallets: []string{},
+	}
 
 	for i := range tokens {
 		t := &tokens[i].Token
@@ -207,7 +211,7 @@ func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken) (tim
 func excludeZeroQuantityTokens(ctx context.Context, tokens []UpsertToken) []UpsertToken {
 	return util.Filter(tokens, func(t UpsertToken) bool {
 		if t.Token.Quantity == "" || t.Token.Quantity == "0" {
-			logger.For(ctx).Warnf("Token(chain=%d, address=%s, tokenID=%s) has 0 quantity", t.Identifiers.Chain, t.Identifiers.ContractAddress, t.Identifiers.TokenID)
+			logger.For(ctx).Warnf("%s has 0 quantity", t.Identifiers)
 			return false
 		}
 		return true

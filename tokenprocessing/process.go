@@ -270,7 +270,7 @@ func processOwnersForOpenseaTokens(mc *multichain.Provider, queries *db.Queries)
 
 			dbToken, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.Instance.ID)
 			if err != nil {
-				logger.For(ctx).Errorf("error getting unique token identifiers: %s", err)
+				logger.For(ctx).Errorf("error getting unique token identifiers from tokenID=%s: %s", token.Instance.ID, err)
 				continue
 			}
 
