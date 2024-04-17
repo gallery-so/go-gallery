@@ -820,7 +820,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID mc.Chain
 }
 
 func (p *Provider) GetTokensByContractWallet(ctx context.Context, contract persist.ChainAddress, wallet persist.Address) ([]mc.ChainAgnosticToken, mc.ChainAgnosticContract, error) {
-	u := setChain(getContractsByWalletEndpoint, contract.Chain())
+	u := setChain(getNftsByWalletEndpoint, contract.Chain())
 	u = setContractAddress(u, contract.Chain(), contract.Address())
 	u = setWallet(u, wallet)
 	u = setLimit(u, tokenBatchLimit)

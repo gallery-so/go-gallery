@@ -90,15 +90,15 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 			t.DiscountCode = &discountCode.String
 		}
 
-		switch token.Definition.Metadata["name"] {
-		case "T-Shirt":
+		switch strings.ToLower(token.Definition.Name.String) {
+		case "t-shirt":
 			t.ObjectType = model.MerchTypeTShirt
-		case "Hat":
+		case "hat":
 			t.ObjectType = model.MerchTypeHat
-		case "Card":
+		case "card":
 			t.ObjectType = model.MerchTypeCard
 		default:
-			return nil, fmt.Errorf("unknown merch type for token %v", token.Definition.TokenID)
+			return nil, fmt.Errorf("unknown merch type for token %v: %s", token.Definition.TokenID, token.Definition.Name.String)
 		}
 
 		merchTokens[i] = t
