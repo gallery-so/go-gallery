@@ -1039,9 +1039,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
-		<-time.After(time.Second)
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1049,14 +1048,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process video", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x1"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x1423897231"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/video", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeVideo), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1064,14 +1063,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process iframe", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x2"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x232474823"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/iframe", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeHTML), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1079,14 +1078,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process gif", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x3"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x342789"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/gif", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeGIF), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1094,70 +1093,70 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process bad metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x4"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x4234789123"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/bad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process missing metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x5"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x523489"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/notfound", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process bad media", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x6"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x612387192"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/bad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process missing media", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x7"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x72342897"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/notfound", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process svg", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x8"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x821347892"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/svg", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeSVG), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1165,14 +1164,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process base64 encoded svg", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x9"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x9123487912"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/base64svg", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeSVG), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1180,14 +1179,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process base64 encoded metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xa"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xa123781"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/base64", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia](*tokens[0].Media)
 		assert.Equal(t, *media.MediaType, string(persist.MediaTypeImage))
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1195,14 +1194,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process ipfs", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xb"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xb1234891"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/ipfs", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia](*tokens[0].Media)
 		assert.Equal(t, *media.MediaType, string(persist.MediaTypeImage))
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1210,28 +1209,28 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process bad dns", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xc"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xc42358972"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/media/dnsbad", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process different keyword", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xd"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xd1238901"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/differentkeyword", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1239,14 +1238,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process wrong keyword", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xe"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xe234902"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/wrongkeyword", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeVideo), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1254,14 +1253,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process animation", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xf"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0xf2348912"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/animation", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeAnimation), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1269,14 +1268,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process pdf", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x10"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x101231789"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/pdf", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypePDF), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1284,14 +1283,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process text", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x11"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x11123891"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/text", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeText), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
@@ -1299,17 +1298,31 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	t.Run("should process bad image", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
-		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x12"))
+		dummyTokenOpt := withDummyTokenID(userF.Wallet.Address, persist.HexTokenID("0x2348971232"))
 		h := newDummyMetadataProviderFixture(t, ctx, persist.ChainETH, userF.Wallet.Address, "/metadata/badimage", dummyTokenOpt)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
+}
+
+// Ideally testing syncs are synchronous, but for now we have to wait for the media to be processed
+func waitForSynced[T any](media any) T {
+	_, ok := (media).(T)
+	for i := 0; i < 10 && !ok; i++ {
+		<-time.After(time.Second)
+		t, ok := (media).(T)
+		if ok {
+			return t
+		}
+	}
+	// let it fail
+	return media.(T)
 }
 
 func assertSyncedTokens(t *testing.T, response *syncTokensMutationResponse, err error, expectedLen int) []*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken {
