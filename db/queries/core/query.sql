@@ -133,22 +133,6 @@ where tokens.owner_user_id = $1
     and not contracts.deleted
 order by tokens.block_number desc;
 
--- name: GetTokenFullDetailsByUserId :many
-select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
-from tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id
-where tokens.owner_user_id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
-order by tokens.block_number desc;
-
--- name: GetTokenFullDetailsByContractId :many
-select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
-from tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id
-where contracts.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
-order by tokens.block_number desc;
-
 -- name: UpdateTokenCollectorsNoteByTokenDbidUserId :exec
 update tokens set collectors_note = $1, last_updated = now() where id = $2 and owner_user_id = $3;
 
@@ -349,6 +333,18 @@ from tokens t
 join token_definitions td on t.token_definition_id = td.id
 where t.owned_by_wallets && $1 and t.displayable and t.deleted = false and td.deleted = false
 order by t.created_at desc, td.name desc, t.id desc;
+
+-- name: GetTokensByContractAddressUserId :many
+select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c)
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+join contracts c on td.contract_id = c.id
+where t.owner_user_id = $1 
+    and td.contract_address = $2
+    and td.chain = $3
+    and @wallet_id::varchar = any(t.owned_by_wallets)
+    and not t.deleted
+    and not td.deleted;
 
 -- name: GetTokensByContractIdPaginate :many
 select sqlc.embed(t), sqlc.embed(td), sqlc.embed(c), sqlc.embed(u) from tokens t

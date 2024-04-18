@@ -4241,182 +4241,6 @@ func (q *Queries) GetTokenDefinitionByTokenIdentifiers(ctx context.Context, arg 
 	return i, err
 }
 
-const getTokenFullDetailsByContractId = `-- name: GetTokenFullDetailsByContractId :many
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
-from tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id
-where contracts.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
-order by tokens.block_number desc
-`
-
-type GetTokenFullDetailsByContractIdRow struct {
-	Token           Token           `db:"token" json:"token"`
-	TokenDefinition TokenDefinition `db:"token_definition" json:"token_definition"`
-	Contract        Contract        `db:"contract" json:"contract"`
-}
-
-func (q *Queries) GetTokenFullDetailsByContractId(ctx context.Context, id persist.DBID) ([]GetTokenFullDetailsByContractIdRow, error) {
-	rows, err := q.db.Query(ctx, getTokenFullDetailsByContractId, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetTokenFullDetailsByContractIdRow
-	for rows.Next() {
-		var i GetTokenFullDetailsByContractIdRow
-		if err := rows.Scan(
-			&i.Token.ID,
-			&i.Token.Deleted,
-			&i.Token.Version,
-			&i.Token.CreatedAt,
-			&i.Token.LastUpdated,
-			&i.Token.CollectorsNote,
-			&i.Token.Quantity,
-			&i.Token.BlockNumber,
-			&i.Token.OwnerUserID,
-			&i.Token.OwnedByWallets,
-			&i.Token.ContractID,
-			&i.Token.IsUserMarkedSpam,
-			&i.Token.LastSynced,
-			&i.Token.IsCreatorToken,
-			&i.Token.TokenDefinitionID,
-			&i.Token.IsHolderToken,
-			&i.Token.Displayable,
-			&i.TokenDefinition.ID,
-			&i.TokenDefinition.CreatedAt,
-			&i.TokenDefinition.LastUpdated,
-			&i.TokenDefinition.Deleted,
-			&i.TokenDefinition.Name,
-			&i.TokenDefinition.Description,
-			&i.TokenDefinition.TokenType,
-			&i.TokenDefinition.TokenID,
-			&i.TokenDefinition.ExternalUrl,
-			&i.TokenDefinition.Chain,
-			&i.TokenDefinition.Metadata,
-			&i.TokenDefinition.FallbackMedia,
-			&i.TokenDefinition.ContractAddress,
-			&i.TokenDefinition.ContractID,
-			&i.TokenDefinition.TokenMediaID,
-			&i.TokenDefinition.IsFxhash,
-			&i.Contract.ID,
-			&i.Contract.Deleted,
-			&i.Contract.Version,
-			&i.Contract.CreatedAt,
-			&i.Contract.LastUpdated,
-			&i.Contract.Name,
-			&i.Contract.Symbol,
-			&i.Contract.Address,
-			&i.Contract.CreatorAddress,
-			&i.Contract.Chain,
-			&i.Contract.ProfileBannerUrl,
-			&i.Contract.ProfileImageUrl,
-			&i.Contract.BadgeUrl,
-			&i.Contract.Description,
-			&i.Contract.OwnerAddress,
-			&i.Contract.IsProviderMarkedSpam,
-			&i.Contract.ParentID,
-			&i.Contract.OverrideCreatorUserID,
-			&i.Contract.L1Chain,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTokenFullDetailsByUserId = `-- name: GetTokenFullDetailsByUserId :many
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
-from tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id
-where tokens.owner_user_id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
-order by tokens.block_number desc
-`
-
-type GetTokenFullDetailsByUserIdRow struct {
-	Token           Token           `db:"token" json:"token"`
-	TokenDefinition TokenDefinition `db:"token_definition" json:"token_definition"`
-	Contract        Contract        `db:"contract" json:"contract"`
-}
-
-func (q *Queries) GetTokenFullDetailsByUserId(ctx context.Context, ownerUserID persist.DBID) ([]GetTokenFullDetailsByUserIdRow, error) {
-	rows, err := q.db.Query(ctx, getTokenFullDetailsByUserId, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetTokenFullDetailsByUserIdRow
-	for rows.Next() {
-		var i GetTokenFullDetailsByUserIdRow
-		if err := rows.Scan(
-			&i.Token.ID,
-			&i.Token.Deleted,
-			&i.Token.Version,
-			&i.Token.CreatedAt,
-			&i.Token.LastUpdated,
-			&i.Token.CollectorsNote,
-			&i.Token.Quantity,
-			&i.Token.BlockNumber,
-			&i.Token.OwnerUserID,
-			&i.Token.OwnedByWallets,
-			&i.Token.ContractID,
-			&i.Token.IsUserMarkedSpam,
-			&i.Token.LastSynced,
-			&i.Token.IsCreatorToken,
-			&i.Token.TokenDefinitionID,
-			&i.Token.IsHolderToken,
-			&i.Token.Displayable,
-			&i.TokenDefinition.ID,
-			&i.TokenDefinition.CreatedAt,
-			&i.TokenDefinition.LastUpdated,
-			&i.TokenDefinition.Deleted,
-			&i.TokenDefinition.Name,
-			&i.TokenDefinition.Description,
-			&i.TokenDefinition.TokenType,
-			&i.TokenDefinition.TokenID,
-			&i.TokenDefinition.ExternalUrl,
-			&i.TokenDefinition.Chain,
-			&i.TokenDefinition.Metadata,
-			&i.TokenDefinition.FallbackMedia,
-			&i.TokenDefinition.ContractAddress,
-			&i.TokenDefinition.ContractID,
-			&i.TokenDefinition.TokenMediaID,
-			&i.TokenDefinition.IsFxhash,
-			&i.Contract.ID,
-			&i.Contract.Deleted,
-			&i.Contract.Version,
-			&i.Contract.CreatedAt,
-			&i.Contract.LastUpdated,
-			&i.Contract.Name,
-			&i.Contract.Symbol,
-			&i.Contract.Address,
-			&i.Contract.CreatorAddress,
-			&i.Contract.Chain,
-			&i.Contract.ProfileBannerUrl,
-			&i.Contract.ProfileImageUrl,
-			&i.Contract.BadgeUrl,
-			&i.Contract.Description,
-			&i.Contract.OwnerAddress,
-			&i.Contract.IsProviderMarkedSpam,
-			&i.Contract.ParentID,
-			&i.Contract.OverrideCreatorUserID,
-			&i.Contract.L1Chain,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTokenFullDetailsByUserTokenIdentifiers = `-- name: GetTokenFullDetailsByUserTokenIdentifiers :one
 select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.collectors_note, tokens.quantity, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.contract_id, tokens.is_user_marked_spam, tokens.last_synced, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
 from tokens
@@ -4507,6 +4331,110 @@ func (q *Queries) GetTokenFullDetailsByUserTokenIdentifiers(ctx context.Context,
 		&i.Contract.L1Chain,
 	)
 	return i, err
+}
+
+const getTokensByContractAddressUserId = `-- name: GetTokensByContractAddressUserId :many
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+join contracts c on td.contract_id = c.id
+where t.owner_user_id = $1 
+    and td.contract_address = $2
+    and td.chain = $3
+    and $4::varchar = any(t.owned_by_wallets)
+    and not t.deleted
+    and not td.deleted
+`
+
+type GetTokensByContractAddressUserIdParams struct {
+	OwnerUserID     persist.DBID    `db:"owner_user_id" json:"owner_user_id"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
+	WalletID        string          `db:"wallet_id" json:"wallet_id"`
+}
+
+type GetTokensByContractAddressUserIdRow struct {
+	Token           Token           `db:"token" json:"token"`
+	TokenDefinition TokenDefinition `db:"token_definition" json:"token_definition"`
+	Contract        Contract        `db:"contract" json:"contract"`
+}
+
+func (q *Queries) GetTokensByContractAddressUserId(ctx context.Context, arg GetTokensByContractAddressUserIdParams) ([]GetTokensByContractAddressUserIdRow, error) {
+	rows, err := q.db.Query(ctx, getTokensByContractAddressUserId,
+		arg.OwnerUserID,
+		arg.ContractAddress,
+		arg.Chain,
+		arg.WalletID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTokensByContractAddressUserIdRow
+	for rows.Next() {
+		var i GetTokensByContractAddressUserIdRow
+		if err := rows.Scan(
+			&i.Token.ID,
+			&i.Token.Deleted,
+			&i.Token.Version,
+			&i.Token.CreatedAt,
+			&i.Token.LastUpdated,
+			&i.Token.CollectorsNote,
+			&i.Token.Quantity,
+			&i.Token.BlockNumber,
+			&i.Token.OwnerUserID,
+			&i.Token.OwnedByWallets,
+			&i.Token.ContractID,
+			&i.Token.IsUserMarkedSpam,
+			&i.Token.LastSynced,
+			&i.Token.IsCreatorToken,
+			&i.Token.TokenDefinitionID,
+			&i.Token.IsHolderToken,
+			&i.Token.Displayable,
+			&i.TokenDefinition.ID,
+			&i.TokenDefinition.CreatedAt,
+			&i.TokenDefinition.LastUpdated,
+			&i.TokenDefinition.Deleted,
+			&i.TokenDefinition.Name,
+			&i.TokenDefinition.Description,
+			&i.TokenDefinition.TokenType,
+			&i.TokenDefinition.TokenID,
+			&i.TokenDefinition.ExternalUrl,
+			&i.TokenDefinition.Chain,
+			&i.TokenDefinition.Metadata,
+			&i.TokenDefinition.FallbackMedia,
+			&i.TokenDefinition.ContractAddress,
+			&i.TokenDefinition.ContractID,
+			&i.TokenDefinition.TokenMediaID,
+			&i.TokenDefinition.IsFxhash,
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.Contract.L1Chain,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
