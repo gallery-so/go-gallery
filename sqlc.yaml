@@ -65,12 +65,17 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.DBID'
           - db_type: 'address'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Address'
+          - db_type: 'email'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Email'
           - db_type: 'role'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Role'
           - db_type: 'action'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Action'
           - db_type: 'hextokenid'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.HexTokenID'
+          - db_type: 'chain'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
+
 
           # Column overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
           # the override should come _before_ the * entry
