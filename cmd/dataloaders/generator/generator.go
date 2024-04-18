@@ -454,7 +454,7 @@ func Generate(sqlcManifestPath string, outputDir string) {
 	}
 
 	// Load the Queries type from the sqlc generated output directory
-	sourceType := filepath.Join(wd, sqlcManifest.GetSettings().GetGo().GetOut()+".Queries")
+	sourceType := filepath.Join(wd, sqlcManifest.GetSettings().GetCodegen().GetOut()+".Queries")
 	queriesType := loadQueriesType(sourceType)
 
 	// Get the package of the Queries type so we can compare it to other structs and see if they are

@@ -403,6 +403,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
 		}
 	})
+	loaders.GetTokensByWalletIdsBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByWalletIdsBatchRow) {
+		for _, entry := range result {
+			loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
+		}
+	})
 	loaders.PaginateTokensByCommunityID.RegisterResultSubscriber(func(result []coredb.PaginateTokensByCommunityIDRow) {
 		for _, entry := range result {
 			loaders.GetTokenDefinitionByIdBatch.Prime(loaders.GetTokenDefinitionByIdBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
@@ -429,6 +434,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 		loaders.GetTokenDefinitionByTokenDbidBatch.Prime(loaders.GetTokenDefinitionByTokenDbidBatch.getKeyForResult(result), result)
 	})
 	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetTokenDefinitionByTokenDbidBatch.Prime(loaders.GetTokenDefinitionByTokenDbidBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
+		}
+	})
+	loaders.GetTokensByWalletIdsBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByWalletIdsBatchRow) {
 		for _, entry := range result {
 			loaders.GetTokenDefinitionByTokenDbidBatch.Prime(loaders.GetTokenDefinitionByTokenDbidBatch.getKeyForResult(entry.TokenDefinition), entry.TokenDefinition)
 		}

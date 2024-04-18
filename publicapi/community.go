@@ -47,7 +47,7 @@ func (api CommunityAPI) GetCommunityByID(ctx context.Context, communityID persis
 func (api CommunityAPI) GetCommunityByKey(ctx context.Context, communityKey persist.CommunityKey) (*db.Community, error) {
 	// Not much to validate here; different community types have different key requirements.
 	params := db.GetCommunityByKeyParams{
-		Type: int32(communityKey.Type),
+		Type: communityKey.Type,
 		Key1: communityKey.Key1,
 		Key2: communityKey.Key2,
 		Key3: communityKey.Key3,
