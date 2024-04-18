@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/sourcegraph/conc/pool"
 
@@ -50,6 +51,7 @@ const (
 	getOwnersByContractEndpointTemplate     = "%s/api/v0/nfts/owners/%s/%s"
 	spamScoreThreshold                      = 90
 	tokenBatchLimit                         = 50
+	fetchByTokenCountLimit                  = 1000
 	collectorBatchLimit                     = 50
 	ownerBatchLimit                         = 1000
 	contractBatchLimit                      = 40
@@ -139,6 +141,13 @@ func setQueriedWalletBalances(u url.URL) url.URL {
 func setLimit(u url.URL, limit int) url.URL {
 	query := u.Query()
 	query.Set("limit", strconv.Itoa(limit))
+	u.RawQuery = query.Encode()
+	return u
+}
+
+func setCount(u url.URL) url.URL {
+	query := u.Query()
+	query.Set("count", "1")
 	u.RawQuery = query.Encode()
 	return u
 }
@@ -270,6 +279,7 @@ type getNftsByContractResponse struct {
 	NextCursor string          `json:"next_cursor"`
 	Next       string          `json:"next"`
 	NFTs       []simplehashNFT `json:"nfts"`
+	Count      int             `json:"count"`
 }
 
 type getNftsByTokenListResponse struct {
@@ -345,8 +355,16 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 	}
 
 	var quantity persist.HexString
+
+	// We've queried for a token from a specific wallet
 	if len(t.QueriedWalletBalances) > 0 {
 		quantity = persist.MustHexString(t.QueriedWalletBalances[0].QuantityString)
+	}
+
+	// We got a token for a non-specific wallet, just use the first owner
+	if ownerAddress == "" && len(t.Owners) > 0 {
+		ownerAddress = persist.Address(t.Owners[0].OwnerAddress)
+		quantity = persist.MustHexString(strconv.Itoa(t.Owners[0].Quantity))
 	}
 
 	return mc.ChainAgnosticToken{
@@ -690,12 +708,67 @@ func (p *Provider) binRequestsByOwner(ctx context.Context, address persist.Addre
 }
 
 func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan mc.ChainAgnosticTokensAndContracts, <-chan error) {
-	batchRequestCh, batchRequestErrCh := p.binRequestsByOwner(ctx, address)
-
 	outCh := make(chan mc.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 
-	var total int
+	// Sample a token to get the token type
+	u := checkURL(fmt.Sprintf(getNftsByContractEndpointTemplate, baseURL, chainToSimpleHashChain[p.chain], address))
+	u = setLimit(u, 1)
+	u = setCount(u)
+
+	var sample getNftsByContractResponse
+
+	err := readResponseBodyInto(ctx, p.httpClient, u.String(), &sample)
+	if err != nil {
+		close(outCh)
+		close(errCh)
+		return outCh, errCh
+	}
+
+	sampleToken := translateToChainAgnosticToken(sample.NFTs[0], "", nil)
+
+	if sampleToken.TokenType == persist.TokenTypeERC1155 || sample.Count <= fetchByTokenCountLimit || maxLimit <= fetchByTokenCountLimit {
+		logger.For(ctx).Infof("fetching tokens of contract=%s via tokens", address)
+
+		go func() {
+			defer close(outCh)
+			defer close(errCh)
+
+			var total int
+
+			u = setLimit(u, tokenBatchLimit)
+
+			next := u.String()
+
+			for next != "" {
+				var body getNftsByContractResponse
+
+				err := readResponseBodyInto(ctx, p.httpClient, next, &body)
+				if err != nil {
+					errCh <- err
+				}
+
+				var page mc.ChainAgnosticTokensAndContracts
+
+				for i := 0; i < len(body.NFTs) && total < maxLimit; i, total = i+1, total+1 {
+					nft := body.NFTs[i]
+					contract := translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
+					token := translateToChainAgnosticToken(nft, "", contract.IsSpam)
+					page.Contracts = append(page.Contracts, contract)
+					page.Tokens = append(page.Tokens, token)
+				}
+
+				outCh <- page
+
+				next = body.Next
+			}
+		}()
+
+		return outCh, errCh
+	}
+
+	logger.For(ctx).Infof("fetching tokens of contract=%s via owners", address)
+	batchRequestCh, batchRequestErrCh := p.binRequestsByOwner(ctx, address)
 
 	go func() {
 		defer close(outCh)
@@ -714,6 +787,8 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 				if !ok {
 					break outer
 				}
+
+				var total atomic.Uint64
 
 				workers.Go(func() {
 					logger.For(ctx).Infof("simplehash batch fetching tokens for %d owners for contract=%s\n", len(ownerBin), address)
@@ -736,7 +811,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 
 						var page mc.ChainAgnosticTokensAndContracts
 
-						for i := 0; i < len(body.NFTs) && total < maxLimit; i, total = i+1, total+1 {
+						for i := 0; i < len(body.NFTs) && total.Load() < uint64(maxLimit); i, _ = i+1, total.Add(uint64(1)) {
 							nft := body.NFTs[i]
 							contract := translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
 							token := translateToChainAgnosticToken(nft, persist.Address(address), contract.IsSpam)
