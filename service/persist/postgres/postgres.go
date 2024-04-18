@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"strings"
 	"time"
@@ -209,6 +210,15 @@ func NewPgxClient(opts ...ConnectionOption) *pgxpool.Pool {
 
 	config.ConnConfig.Logger = &pgxTracer{continueOnly: true}
 
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		err := registerDomainArrays(ctx, conn)
+		if err != nil {
+			panic(fmt.Errorf("could not register domain arrays: %w", err))
+		}
+
+		return nil
+	}
+
 	var db *pgxpool.Pool
 
 	connectF := func(ctx context.Context) error {
@@ -379,4 +389,99 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 
 func (r *Repositories) BeginTx(ctx context.Context) (pgx.Tx, error) {
 	return r.pool.BeginTx(ctx, pgx.TxOptions{})
+}
+
+// registerDomainArrays looks for custom domain types in the public schema and registers their array types
+// with pgx. This fixes an issue where pgx doesn't know how to handle arrays of custom domain types (for example,
+// if dbid is an alias for text, pgx knows how to treat dbid by default, but not how to treat dbid[]).
+func registerDomainArrays(ctx context.Context, conn *pgx.Conn) error {
+	// Query to find custom domain types and their base types in the public schema
+	const query = `
+SELECT t.typname, b.typname AS base_type_name, t.typarray
+FROM pg_type t
+JOIN pg_namespace n ON t.typnamespace = n.oid
+JOIN pg_type b ON t.typbasetype = b.oid
+WHERE n.nspname = 'public' AND t.typtype = 'd';
+`
+
+	rows, err := conn.Query(ctx, query)
+	if err != nil {
+		logger.For(ctx).Errorf("Error querying custom domain types: %v", err)
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var typname, baseTypeName string
+		var typArray pgtype.OID
+		err := rows.Scan(&typname, &baseTypeName, &typArray)
+		if err != nil {
+			logger.For(ctx).Errorf("error scanning domain types: %v", err)
+			return err
+		}
+
+		// Determine the appropriate array type for the base type
+		arrayType, err := getPgArrayType(baseTypeName)
+		if err != nil {
+			logger.For(ctx).Errorf("Error determining array type for %s: %v", baseTypeName, err)
+			return err
+		}
+
+		// Register the array type under the name "_{domain type name}"
+		conn.ConnInfo().RegisterDataType(pgtype.DataType{
+			Value: arrayType,
+			Name:  fmt.Sprintf("_%s", typname),
+			OID:   uint32(typArray),
+		})
+		logger.For(ctx).Infof("Registered array type for domain %s", typname)
+	}
+
+	if err = rows.Err(); err != nil {
+		logger.For(ctx).Errorf("Row iteration error: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// getPgArrayType returns the appropriate pgtype array instance for a given base type name
+func getPgArrayType(baseTypeName string) (pgtype.ValueTranscoder, error) {
+	switch baseTypeName {
+	case "text":
+		return &pgtype.TextArray{}, nil
+	case "varchar":
+		return &pgtype.TextArray{}, nil
+	case "char":
+		return &pgtype.TextArray{}, nil
+	case "int2":
+		return &pgtype.Int2Array{}, nil
+	case "int4":
+		return &pgtype.Int4Array{}, nil
+	case "int8":
+		return &pgtype.Int8Array{}, nil
+	case "bool":
+		return &pgtype.BoolArray{}, nil
+	case "bytea":
+		return &pgtype.ByteaArray{}, nil
+	case "float4":
+		return &pgtype.Float4Array{}, nil
+	case "float8":
+		return &pgtype.Float8Array{}, nil
+	case "numeric":
+		return &pgtype.NumericArray{}, nil
+	case "date":
+		return &pgtype.DateArray{}, nil
+	case "timestamp":
+		return &pgtype.TimestampArray{}, nil
+	case "timestamptz":
+		return &pgtype.TimestamptzArray{}, nil
+	case "json":
+		return &pgtype.JSONBArray{}, nil // JSON and JSONB typically use JSONBArray in pgx
+	case "jsonb":
+		return &pgtype.JSONBArray{}, nil
+	case "uuid":
+		return &pgtype.UUIDArray{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported base type: %s", baseTypeName)
+	}
 }
