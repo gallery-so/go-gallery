@@ -81,28 +81,6 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 	return r, nil
 }
 
-func StartPostgresIndexer() (resource *dockertest.Resource, err error) {
-	pool, err := newPool(time.Minute * 3)
-	if err != nil {
-		return nil, err
-	}
-
-	r, err := startService(pool, "postgres_indexer")
-	if err != nil {
-		return nil, err
-	}
-
-	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
-	host := hostAndPort[0]
-	port := hostAndPort[1]
-
-	if err = pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
-		return nil, err
-	}
-
-	return r, nil
-}
-
 func StartRedis() (*dockertest.Resource, error) {
 	pool, err := newPool(time.Minute * 3)
 	if err != nil {

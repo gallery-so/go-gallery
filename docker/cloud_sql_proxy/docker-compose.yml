@@ -3,7 +3,6 @@
 
 # Prod DB:         127.0.0.1:6543
 # Prod DB Replica: 127.0.0.1:6544
-# Prod Indexer DB: 127.0.0.1:6545
 # Dev DB:          127.0.0.1:6643
 
 version: "3.9"
@@ -19,7 +18,6 @@ services:
     command: >
       --address=0.0.0.0 --credentials-file=/config
       '${SQL_CONNECTION_NAME_PROD_DB}?port=6543'
-      '${SQL_CONNECTION_NAME_PROD_ETH_INDEXER}?port=6545'
 
   cloud-sql-proxy-dev:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy

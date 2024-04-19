@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS contracts;
-DROP TABLE IF EXISTS tokens;

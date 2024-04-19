@@ -52,7 +52,6 @@ start-dev-sql-proxy  : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
 start-prod-sql-proxy : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 migrate-dev-coredb   : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
 migrate-prod-coredb  : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
-migrate-prod-indexerdb : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 
 # Environment-specific settings
 $(DEPLOY)-$(DEV)-%                : ENV                    := $(DEV)
@@ -71,7 +70,6 @@ $(PROMOTE)-$(PROD)-%              : REQUIRED_SOPS_SECRETS  := $(SOPS_PROD_SECRET
 
 # Service files, add a line for each service and environment you want to deploy.
 $(DEPLOY)-$(DEV)-backend            : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(DEV)-indexer-server     : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(DEV)-admin              : SERVICE_FILE := app-dev-admin.yaml
 $(DEPLOY)-$(DEV)-feed               : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(DEV)-tokenprocessing    : SERVICE_FILE := tokenprocessing-env.yaml
@@ -87,8 +85,6 @@ $(DEPLOY)-$(DEV)-graphql-gateway    : SERVICE_FILE := graphql-gateway.yml
 $(DEPLOY)-$(DEV)-userpref-upload    : SERVICE_FILE := userpref-upload.yaml
 $(DEPLOY)-$(SANDBOX)-backend        : SERVICE_FILE := backend-sandbox-env.yaml
 $(DEPLOY)-$(PROD)-backend           : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(PROD)-indexer           : SERVICE_FILE := indexer-env.yaml
-$(DEPLOY)-$(PROD)-indexer-server    : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(PROD)-admin             : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed              : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(PROD)-feedbot           : SERVICE_FILE := feedbot-env.yaml
@@ -107,8 +103,6 @@ $(DEPLOY)-$(PROD)-rasterizer        : SERVICE_FILE := rasterizer.yaml
 
 # Service to Sentry project mapping
 $(DEPLOY)-%-backend               : SENTRY_PROJECT := gallery-backend
-$(DEPLOY)-%-indexer               : SENTRY_PROJECT := indexer
-$(DEPLOY)-%-indexer-server        : SENTRY_PROJECT := indexer-api
 $(DEPLOY)-%-tokenprocessing       : SENTRY_PROJECT := tokenprocessing
 $(DEPLOY)-%-pushnotifications     : SENTRY_PROJECT := pushnotifications
 $(DEPLOY)-%-dummymetadata         : SENTRY_PROJECT := dummymetadata
@@ -176,24 +170,6 @@ $(DEPLOY)-%-dummymetadata              : CPU            := $(DUMMYMETADATA_CPU)
 $(DEPLOY)-%-dummymetadata              : MEMORY         := $(DUMMYMETADATA_MEMORY)
 $(DEPLOY)-%-dummymetadata              : CONCURRENCY    := $(DUMMYMETADATA_CONCURRENCY)
 $(DEPLOY)-%-dummymetadata              : SERVICE        := dummymetadata
-$(DEPLOY)-%-indexer-server             : REPO           := indexer-api
-$(DEPLOY)-%-indexer-server             : DOCKER_FILE    := $(DOCKER_DIR)/indexer_api/Dockerfile
-$(DEPLOY)-%-indexer-server             : PORT           := 6000
-$(DEPLOY)-%-indexer-server             : TIMEOUT        := $(INDEXER_SERVER_TIMEOUT)
-$(DEPLOY)-%-indexer-server             : CPU            := $(INDEXER_SERVER_CPU)
-$(DEPLOY)-%-indexer-server             : MEMORY         := $(INDEXER_SERVER_MEMORY)
-$(DEPLOY)-%-indexer-server             : CONCURRENCY    := $(INDEXER_SERVER_CONCURRENCY)
-$(DEPLOY)-$(DEV)-indexer-server        : SERVICE        := indexer-api-dev
-$(DEPLOY)-$(PROD)-indexer-server       : SERVICE        := indexer-api
-$(DEPLOY)-%-indexer                    : REPO           := indexer
-$(DEPLOY)-%-indexer                    : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
-$(DEPLOY)-%-indexer                    : PORT           := 4000
-$(DEPLOY)-%-indexer                    : TIMEOUT        := $(INDEXER_TIMEOUT)
-$(DEPLOY)-%-indexer                    : CPU            := $(INDEXER_CPU)
-$(DEPLOY)-%-indexer                    : MEMORY         := $(INDEXER_MEMORY)
-$(DEPLOY)-%-indexer                    : CONCURRENCY    := $(INDEXER_CONCURRENCY)
-$(DEPLOY)-%-indexer                    : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
-$(DEPLOY)-$(PROD)-indexer              : SERVICE        := indexer
 $(DEPLOY)-%-emails                     : REPO           := emails
 $(DEPLOY)-%-emails                     : DOCKER_FILE    := $(DOCKER_DIR)/emails/Dockerfile
 $(DEPLOY)-%-emails                     : PORT           := 5500
@@ -328,8 +304,6 @@ $(DEPLOY)-%-userpref-upload            : DOCKER_FILE    := $(DOCKER_DIR)/userpre
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
-$(PROMOTE)-%-indexer                   : SERVICE := indexer
-$(PROMOTE)-%-indexer-server            : SERVICE := indexer-api
 $(PROMOTE)-%-emails                    : SERVICE := emails-v2
 $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing
 $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing-v3
@@ -459,7 +433,6 @@ _$(RELEASE)-%:
 
 # DEV deployments
 $(DEPLOY)-$(DEV)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(DEV)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(DEV)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(DEV)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
 $(DEPLOY)-$(DEV)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orc
@@ -485,8 +458,6 @@ $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-bac
 
 # PROD deployments
 $(DEPLOY)-$(PROD)-backend                  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer                  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
-$(DEPLOY)-$(PROD)-indexer-server           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(PROD)-tokenprocessing          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(PROD)-autosocial               : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
 $(DEPLOY)-$(PROD)-autosocial-orch          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orch
@@ -516,8 +487,6 @@ $(DEPLOY)-$(PROD)-rasterizer               : _set-project-$(ENV) _$(DOCKER)-$(DE
 # $ make promote-prod-backend version=myVersion
 #
 $(PROMOTE)-$(PROD)-backend            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-backend
-$(PROMOTE)-$(PROD)-indexer            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer
-$(PROMOTE)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
 $(PROMOTE)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
 $(PROMOTE)-$(PROD)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-autosocial
 $(PROMOTE)-$(PROD)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-autosocial-orch
@@ -618,10 +587,6 @@ start-prod-sql-proxy:
 stop-sql-proxy:
 	docker-compose -f docker/cloud_sql_proxy/docker-compose.yml down
 
-# Migrations
-migrate-local-indexerdb:
-	migrate -path ./db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
-
 migrate-local-coredb:
 	go run cmd/migrate/main.go
 
@@ -644,9 +609,6 @@ migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
 	POSTGRES_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6543 \
 	go run cmd/migrate/main.go
-
-migrate-prod-indexerdb: start-prod-sql-proxy confirm-prod-migrate
-	migrate -path ./db/migrations/indexer -database "postgresql://postgres:$(POSTGRES_INDEXER_PASSWORD)@localhost:6545/postgres?sslmode=disable" up
 
 fix-sops-macs:
 	@cd secrets; ../scripts/fix-sops-macs.sh
