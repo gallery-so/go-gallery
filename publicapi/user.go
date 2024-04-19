@@ -11,12 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/everFinance/goar"
 	"github.com/gallery-so/fracdex"
 	"github.com/go-playground/validator/v10"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 
@@ -56,12 +53,8 @@ type UserAPI struct {
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
-	ipfsClient         *shell.Shell
-	arweaveClient      *goar.Client
-	storageClient      *storage.Client
 	multichainProvider *multichain.Provider
 	taskClient         *task.Client
-	cache              *redis.Cache
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -867,7 +860,7 @@ func (api UserAPI) UpdateUserNotificationSettings(ctx context.Context, notificat
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
 	// Nothing to validate
-	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.repos.WalletRepository, api.ethClient, api.ipfsClient, api.arweaveClient, api.storageClient)
+	return membership.GetMembershipTiers(ctx, api.repos.MembershipRepository)
 }
 
 func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID persist.DBID) (*db.Membership, error) {
