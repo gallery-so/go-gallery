@@ -76,9 +76,6 @@ Create a new migration:
 ```bash
 # New migration for the backend db
 migrate create -ext sql -dir db/migrations/core -seq <name of migration>
-
-# New migration for the indexer db
-migrate create -ext sql -dir db/migrations/indexer -seq <name of migration>
 ```
 
 Run a migration locally:
@@ -86,9 +83,6 @@ Run a migration locally:
 ```bash
 # Run all migrations for the local backend db
 make migrate-coredb
-
-# Run all migrations for the local indexer db
-make migrate-indexerdb
 ```
 
 Run a migration on dev backend db:
@@ -99,16 +93,6 @@ migrate -path db/migrations/core -database "postgresql://postgres:<dev db passwo
 
 # Undo the last migration to the backend db
 migrate -path db/migrations/core -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down 1
-```
-
-Run a migration on the indexer db:
-
-```bash
-# Apply an up migration to the indexer db
-migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db password here>@<indexer db ip>:5432/postgres" up
-
-# Undo the last migration to the indexer db
-migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db password here>@<indexer db ip>:5432/postgres" down 1
 ```
 
 ### Healthcheck
@@ -164,14 +148,6 @@ For example, to run the server locally with live data from the `dev` environment
 ```bash
 go run cmd/server/main.go dev
 ```
-
-To run the indexer server connected to production, run the following command:
-
-```bash
-go run cmd/indexer/server/main.go prod
-```
-
-When testing the indexer locally, you may want to sync log data from the prod to dev bucket. You can do this by running the sync command below. This command can take a few minutes depending on when the buckets were last synced.
 
 ```bash
 # Do not switch the order of the buckets! Doing so may overwrite prod data.

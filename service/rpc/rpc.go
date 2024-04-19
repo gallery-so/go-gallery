@@ -24,12 +24,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
 	"github.com/getsentry/sentry-go"
@@ -46,7 +43,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/rpc/onchfs"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -61,13 +57,9 @@ const (
 	defaultHTTPKeepAlive           = 600
 	defaultHTTPMaxIdleConns        = 250
 	defaultHTTPMaxIdleConnsPerHost = 250
-	GethSocketOpName               = "geth.wss"
 )
 
-var (
-	defaultHTTPClient     = newHTTPClientForRPC(true)
-	defaultMetricsHandler = metricsHandler{}
-)
+var defaultHTTPClient = newHTTPClientForRPC(true)
 
 // rateLimited is the content returned from an RPC call when rate limited.
 var rateLimited = "429 Too Many Requests"
@@ -86,27 +78,6 @@ func (e ErrEthClient) Error() string {
 
 func (e ErrTokenURINotFound) Error() string {
 	return e.Err.Error()
-}
-
-// Transfer represents a Transfer from the RPC response
-type Transfer struct {
-	BlockNumber     persist.BlockNumber
-	From            persist.EthereumAddress
-	To              persist.EthereumAddress
-	TokenID         persist.HexTokenID
-	TokenType       persist.TokenType
-	Amount          uint64
-	ContractAddress persist.EthereumAddress
-	// These are geth types which are useful for getting more details about a transaction.
-	TxHash    common.Hash
-	BlockHash common.Hash
-	TxIndex   uint
-}
-
-// TokenContractMetadata represents a token contract's metadata
-type TokenContractMetadata struct {
-	Name   string
-	Symbol string
 }
 
 // NewEthClient returns an ethclient.Client
@@ -130,19 +101,6 @@ func NewEthClient() *ethclient.Client {
 	}
 
 	return ethclient.NewClient(client)
-}
-
-// NewEthSocketClient returns a websocket client with request tracing enabled
-func NewEthSocketClient() *ethclient.Client {
-	if strings.HasPrefix(env.GetString("RPC_URL"), "wss") {
-		log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
-			if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil || r.Msg != "Handled RPC response" {
-				return false
-			}
-			return true
-		}, defaultMetricsHandler))
-	}
-	return NewEthClient()
 }
 
 func NewStorageClient(ctx context.Context) *storage.Client {
@@ -176,28 +134,6 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 	storageClient.SetRetry(storage.WithPolicy(storage.RetryAlways), storage.WithBackoff(gax.Backoff{Initial: 100 * time.Millisecond, Max: 2 * time.Minute, Multiplier: 1.3}), storage.WithErrorFunc(storage.ShouldRetry))
 
 	return storageClient
-}
-
-// metricsHandler traces RPC records that get logged by the RPC client
-type metricsHandler struct{}
-
-// Log sends trace information to Sentry.
-// Geth logs each response it receives in the handleImmediate method of handler: https://github.com/ethereum/go-ethereum/blob/master/rpc/handler.go
-// We take advantage of this by configuring the client's root logger with a custom handler that sends a span to Sentry each time we get the log message.
-func (h metricsHandler) Log(r *log.Record) error {
-	reqID := valFromSlice(r.Ctx, "reqid")
-
-	// A useful context isn't passed to the log record, so we use the background context here.
-	ctx := context.Background()
-	span, _ := tracing.StartSpan(ctx, GethSocketOpName, "rpcCall", sentryutil.TransactionNameSafe("gethRPC"))
-	tracing.AddEventDataToSpan(span, map[string]interface{}{"reqID": reqID})
-	defer tracing.FinishSpan(span)
-
-	// Fix the duration to 100ms because there isn't a useful duration to use
-	span.EndTime = r.Time
-	span.StartTime = r.Time.Add(time.Millisecond * -100)
-
-	return nil
 }
 
 // newHTTPClientForRPC returns an http.Client configured with default settings intended for RPC calls.
@@ -242,102 +178,6 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 	}
 }
 
-// GetBlockNumber returns the current block height.
-func GetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, error) {
-	return ethClient.BlockNumber(ctx)
-}
-
-// RetryGetBlockNumber calls GetBlockNumber with backoff.
-func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, error) {
-	var height uint64
-	var err error
-	for i := 0; i < retry.DefaultRetry.MaxRetries; i++ {
-		height, err = GetBlockNumber(ctx, ethClient)
-		if !isRateLimitedError(err) {
-			break
-		}
-		<-time.After(retry.WaitTime(retry.DefaultRetry.MinWait, retry.DefaultRetry.MaxRetries, i))
-	}
-	return height, err
-}
-
-// GetLogs returns log events for the given block range and query.
-func GetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery) ([]types.Log, error) {
-	return ethClient.FilterLogs(ctx, query)
-}
-
-// RetryGetLogs calls GetLogs with backoff.
-func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery) ([]types.Log, error) {
-	logs := make([]types.Log, 0)
-	var err error
-	for i := 0; i < retry.DefaultRetry.MaxRetries; i++ {
-		logs, err = GetLogs(ctx, ethClient, query)
-		if !isRateLimitedError(err) {
-			break
-		}
-		<-time.After(retry.WaitTime(retry.DefaultRetry.MinWait, retry.DefaultRetry.MaxWait, i))
-	}
-	return logs, err
-}
-
-// GetTransaction returns the transaction of the given hash.
-func GetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash) (*types.Transaction, bool, error) {
-	return ethClient.TransactionByHash(ctx, txHash)
-}
-
-// RetryGetTransaction calls GetTransaction with backoff.
-func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, r retry.Retry) (*types.Transaction, bool, error) {
-	var tx *types.Transaction
-	var pending bool
-	var err error
-	for i := 0; i < r.MaxRetries; i++ {
-		tx, pending, err = GetTransaction(ctx, ethClient, txHash)
-		if !isRateLimitedError(err) {
-			break
-		}
-		<-time.After(retry.WaitTime(r.MinWait, r.MaxWait, i))
-	}
-	return tx, pending, err
-}
-
-// GetTokenContractMetadata returns the metadata for a given contract (without URI)
-func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
-	contract := address.Address()
-	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
-	if err != nil {
-		return nil, err
-	}
-
-	name, err := instance.Name(&bind.CallOpts{
-		Context: ctx,
-	})
-	if err != nil {
-		return nil, err
-	}
-	symbol, err := instance.Symbol(&bind.CallOpts{
-		Context: ctx,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &TokenContractMetadata{Name: name, Symbol: symbol}, nil
-}
-
-// RetryGetTokenContractMetaData calls GetTokenContractMetadata with backoff.
-func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
-	var metadata *TokenContractMetadata
-	var err error
-	for i := 0; i < retry.DefaultRetry.MaxRetries; i++ {
-		metadata, err = GetTokenContractMetadata(ctx, contractAddress, ethClient)
-		if !isRateLimitedError(err) {
-			break
-		}
-		<-time.After(retry.WaitTime(retry.DefaultRetry.MinWait, retry.DefaultRetry.MaxWait, i))
-	}
-	return metadata, err
-}
-
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
 func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 
@@ -355,7 +195,6 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 	}
 
 	return meta, nil
-
 }
 
 // GetDataFromURIAsReader calls URI and returns the data as an unread reader with the headers pre-read.
@@ -728,72 +567,6 @@ func GetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.Ethereu
 	return persist.EthereumAddress(strings.ToLower(owner.String())), nil
 }
 
-// GetContractCreator returns the address of the contract creator
-func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
-	highestBlock, err := ethClient.BlockNumber(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error getting highest block: %s", err.Error())
-	}
-	_, err = ethClient.CodeAt(ctx, contractAddress.Address(), big.NewInt(int64(highestBlock)))
-	if err != nil {
-		return "", fmt.Errorf("error getting code at: %s", err.Error())
-	}
-	lowestBlock := uint64(0)
-
-	for lowestBlock <= highestBlock {
-		midBlock := uint64((highestBlock + lowestBlock) / 2)
-		codeAt, err := ethClient.CodeAt(ctx, contractAddress.Address(), big.NewInt(int64(midBlock)))
-		if err != nil {
-			return "", fmt.Errorf("error getting code at: %s", err.Error())
-		}
-		if len(codeAt) > 0 {
-			highestBlock = midBlock
-		} else {
-			lowestBlock = midBlock
-		}
-
-		if lowestBlock+1 == highestBlock {
-			break
-		}
-	}
-	block, err := ethClient.BlockByNumber(ctx, big.NewInt(int64(highestBlock)))
-	if err != nil {
-		return "", fmt.Errorf("error getting block: %s", err.Error())
-	}
-	txs := block.Transactions()
-	for _, tx := range txs {
-		receipt, err := ethClient.TransactionReceipt(ctx, tx.Hash())
-		if err != nil {
-			return "", fmt.Errorf("error getting transaction receipt: %s", err.Error())
-		}
-		if receipt.ContractAddress == contractAddress.Address() {
-			msg, err := tx.AsMessage(types.HomesteadSigner{}, nil)
-			if err != nil {
-				return "", fmt.Errorf("error getting message: %s", err.Error())
-			}
-			return persist.EthereumAddress(fmt.Sprintf("0x%s", strings.ToLower(msg.From().String()))), nil
-		}
-	}
-	return "", fmt.Errorf("could not find contract creator")
-}
-
-// GetContractOwner returns the address of the contract owner
-func GetContractOwner(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
-	instance, err := contracts.NewOwnableCaller(contractAddress.Address(), ethClient)
-	if err != nil {
-		return "", err
-	}
-
-	owner, err := instance.Owner(&bind.CallOpts{
-		Context: ctx,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return persist.EthereumAddress(strings.ToLower(owner.String())), nil
-}
-
 func GetArweaveDataHTTPReader(ctx context.Context, id string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://arweave.net/%s", id), nil)
 	if err != nil {
@@ -825,16 +598,6 @@ func GetArweaveDataHTTP(ctx context.Context, id string) ([]byte, error) {
 		return nil, fmt.Errorf("error reading data: %s", err.Error())
 	}
 	return data, nil
-}
-
-// valFromSlice returns the value from a slice formatted as [key val key val ...]
-func valFromSlice(s []interface{}, keyName string) interface{} {
-	for i, key := range s {
-		if key == keyName {
-			return s[i+1]
-		}
-	}
-	return nil
 }
 
 func isRateLimitedError(err error) bool {

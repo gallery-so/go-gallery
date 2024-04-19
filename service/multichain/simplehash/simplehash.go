@@ -120,10 +120,6 @@ func setContractAddress(u url.URL, chain persist.Chain, contract persist.Address
 	return u
 }
 
-func setContractID(u url.URL, contractID string) url.URL {
-	return setContractIDs(u, []string{contractID})
-}
-
 func setContractIDs(u url.URL, contractIDs []string) url.URL {
 	query := u.Query()
 	query.Set("contract_ids", strings.Join(contractIDs, ","))
@@ -297,12 +293,6 @@ type getContractsByWalletResponse struct {
 	Contracts  []simplehashContractOwnership `json:"contracts"`
 }
 
-type getCollectionByContractResponse struct {
-	NextCursor  string                 `json:"next_cursor"`
-	Next        string                 `json:"next"`
-	Collections []simplehashCollection `json:"collections"`
-}
-
 type getContractsByOwnerResponse struct {
 	NextCursor string                       `json:"next_cursor"`
 	Next       string                       `json:"next"`
@@ -313,18 +303,6 @@ type getContractsByDeployerResponse struct {
 	NextCursor string                       `json:"next_cursor"`
 	Next       string                       `json:"next"`
 	Contracts  []simplehashContractDetailed `json:"contracts"`
-}
-
-type simpleHashCollector struct {
-	OwnerAddress      string `json:"owner_address"`
-	DistinctNftsOwned int    `json:"distinct_nfts_owned"`
-	TotalCopiesOwned  int    `json:"total_copies_owned"`
-}
-
-type getCollectorsByContractResponse struct {
-	NextCursor    string                `json:"next_cursor"`
-	Next          string                `json:"next"`
-	TopCollectors []simpleHashCollector `json:"top_collectors"`
 }
 
 type simplehashTokenOwner struct {

@@ -8,12 +8,13 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/simplehash"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
@@ -120,15 +121,19 @@ func ethInjector(envInit, context.Context, *http.Client) (*multichain.EthereumPr
 		wire.Value(persist.ChainETH),
 		ethProviderInjector,
 		ethSyncPipelineInjector,
-		indexer.NewProvider,
+		ethVerifierInjector,
 		simplehash.NewProvider,
 	))
+}
+
+func ethVerifierInjector(ethClient *ethclient.Client) *eth.Verifier {
+	panic(wire.Build(wire.Struct(new(eth.Verifier), "*")))
 }
 
 func ethProviderInjector(
 	ctx context.Context,
 	syncPipeline *wrapper.SyncPipelineWrapper,
-	indexerProvider *indexer.Provider,
+	verifier *eth.Verifier,
 	simplehashProvider *simplehash.Provider,
 ) *multichain.EthereumProvider {
 	panic(wire.Build(
@@ -143,7 +148,7 @@ func ethProviderInjector(
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(multichain.Verifier), util.ToPointer(indexerProvider)),
+		wire.Bind(new(multichain.Verifier), util.ToPointer(verifier)),
 	))
 }
 
@@ -427,7 +432,7 @@ func polygonSyncPipelineInjector(
 		wire.Bind(new(multichain.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider))
+		wire.Bind(new(multichain.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
 		wire.Bind(new(multichain.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
 		customMetadataHandlersInjector,
