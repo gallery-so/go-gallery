@@ -1,1 +1,0 @@
-alter table contracts add column owner_address character varying(255);

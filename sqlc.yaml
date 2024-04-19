@@ -4,38 +4,6 @@ plugins:
     process:
       cmd: db/bin/sqlc-gen-json
 sql:
-  # Indexer model gen
-  - schema: 'db/migrations/indexer'
-    queries: 'db/queries/indexer'
-    engine: 'postgresql'
-    gen:
-      go:
-        package: 'indexerdb'
-        out: 'db/gen/indexerdb'
-        sql_package: 'pgx/v4'
-        output_db_file_name: 'db_gen.go'
-        output_models_file_name: 'models_gen.go'
-        overrides:
-          # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
-          # the override should come _before_ the * entry
-
-          - column: 'reprocess_jobs.id'
-            go_type: 'int'
-          - column: 'contracts.owner_method'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.ContractOwnerMethod'
-          - column: 'contracts.*address'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.EthereumAddress'
-          # Wildcards
-          # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
-          - column: '*.id'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.DBID'
-          - column: '*.block_start'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.BlockNumber'
-          - column: '*.block_end'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.BlockNumber'
-          - column: '*.chain'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
-
   # Backend model gen
   - schema:
       - 'db/migrations/core'

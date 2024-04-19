@@ -9,11 +9,12 @@ package server
 import (
 	"context"
 	"database/sql"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/indexer"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/simplehash"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
@@ -101,8 +102,8 @@ func ethInjector(serverEnvInit envInit, contextContext context.Context, client *
 	provider := simplehash.NewProvider(chain, client)
 	syncPipelineWrapper, cleanup := ethSyncPipelineInjector(contextContext, client, chain, provider)
 	ethclientClient := rpc.NewEthClient()
-	indexerProvider := indexer.NewProvider(client, ethclientClient)
-	ethereumProvider := ethProviderInjector(contextContext, syncPipelineWrapper, indexerProvider, provider)
+	verifier := ethVerifierInjector(ethclientClient)
+	ethereumProvider := ethProviderInjector(contextContext, syncPipelineWrapper, verifier, provider)
 	return ethereumProvider, func() {
 		cleanup()
 	}
@@ -112,7 +113,14 @@ var (
 	_wireChainValue = persist.ChainETH
 )
 
-func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipelineWrapper, indexerProvider *indexer.Provider, simplehashProvider *simplehash.Provider) *multichain.EthereumProvider {
+func ethVerifierInjector(ethClient *ethclient.Client) *eth.Verifier {
+	verifier := &eth.Verifier{
+		Client: ethClient,
+	}
+	return verifier
+}
+
+func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipelineWrapper, verifier *eth.Verifier, simplehashProvider *simplehash.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
@@ -124,7 +132,7 @@ func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipeline
 		TokensByTokenIdentifiersFetcher:  syncPipeline,
 		TokensIncrementalContractFetcher: syncPipeline,
 		TokensIncrementalOwnerFetcher:    syncPipeline,
-		Verifier:                         indexerProvider,
+		Verifier:                         verifier,
 	}
 	return ethereumProvider
 }

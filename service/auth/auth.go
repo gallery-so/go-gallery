@@ -60,9 +60,6 @@ const AuthCookieKey = "GLRY_JWT"
 // RefreshCookieKey is the key used to store the refresh token in the cookie
 const RefreshCookieKey = "GLRY_REFRESH_JWT"
 
-// ErrAddressSignatureMismatch is returned when the address signature does not match the address cryptographically
-var ErrAddressSignatureMismatch = errors.New("address does not match signature")
-
 // ErrNonceMismatch is returned when the nonce does not match the expected nonce
 var ErrNonceMismatch = errors.New("incorrect nonce input")
 

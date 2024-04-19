@@ -48,7 +48,6 @@ import (
 
 func init() {
 	env.RegisterValidation("TOKEN_PROCESSING_URL", "required")
-	env.RegisterValidation("INDEXER_HOST", "required")
 }
 
 // Init initializes the server
@@ -194,7 +193,6 @@ func SetDefaults() {
 	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
-	viper.SetDefault("INDEXER_HOST", "http://localhost:6000")
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "")
 	viper.SetDefault("SENTRY_DSN", "")

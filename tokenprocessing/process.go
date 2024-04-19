@@ -732,10 +732,6 @@ func (m *highlightTracker) setStatusMediaProcessing(ctx context.Context, claimID
 	})
 }
 
-func (m *highlightTracker) setStatusTxPending(ctx context.Context, claimID persist.DBID) (db.HighlightMintClaim, error) {
-	return m.setStatus(ctx, claimID, highlight.ClaimStatusTxPending, "")
-}
-
 func (m *highlightTracker) setStatusFailed(ctx context.Context, claimID persist.DBID, err error) (db.HighlightMintClaim, error) {
 	return m.setStatus(ctx, claimID, highlight.ClaimStatusFailedInternal, err.Error())
 }
