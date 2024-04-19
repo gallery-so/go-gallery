@@ -48,10 +48,11 @@ SOPS_DEV_SECRETS      := $(SOPS_SECRETS_DIR)/$(DEV)/$(SOPS_SECRETS_FILENAME)
 SOPS_PROD_SECRETS     := $(SOPS_SECRETS_DIR)/$(PROD)/$(SOPS_SECRETS_FILENAME)
 
 # Per-target secrets
-start-dev-sql-proxy  : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
-start-prod-sql-proxy : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
-migrate-dev-coredb   : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
-migrate-prod-coredb  : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
+start-dev-sql-proxy    : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
+start-prod-sql-proxy   : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
+migrate-dev-coredb     : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
+migrate-prod-coredb    : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
+migrate-prod-mirrordb  : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 migrate-prod-indexerdb : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 
 # Environment-specific settings
@@ -644,6 +645,12 @@ migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
 	POSTGRES_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6543 \
 	go run cmd/migrate/main.go
+
+migrate-prod-mirrordb: start-prod-sql-proxy confirm-prod-migrate
+	@POSTGRES_USER=$(POSTGRES_MIGRATION_USER) \
+	POSTGRES_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
+	POSTGRES_PORT=6544 \
+	go run cmd/migrate/main.go mirror
 
 migrate-prod-indexerdb: start-prod-sql-proxy confirm-prod-migrate
 	migrate -path ./db/migrations/indexer -database "postgresql://postgres:$(POSTGRES_INDEXER_PASSWORD)@localhost:6545/postgres?sslmode=disable" up
