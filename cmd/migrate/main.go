@@ -21,9 +21,13 @@ func init() {
 }
 
 func main() {
-	coreMigrations := "./db/migrations/core"
+	migrations := "./db/migrations/core"
 
-	superRequired, err := migrate.SuperUserRequired(coreMigrations)
+	if len(os.Args) > 1 && os.Args[1] == "mirror" {
+		migrations = "./db/migrations/mirror"
+	}
+
+	superRequired, err := migrate.SuperUserRequired(migrations)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +53,7 @@ func main() {
 		)
 	}
 
-	if err := migrate.RunMigrations(superClient, coreMigrations); err != nil {
+	if err := migrate.RunMigrations(superClient, migrations); err != nil {
 		fmt.Fprint(os.Stderr, err)
 	}
 }
