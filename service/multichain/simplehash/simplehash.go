@@ -695,6 +695,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	u = setCount(u)
 
 	var sample getNftsByContractResponse
+	var sampleToken mc.ChainAgnosticToken
 
 	err := readResponseBodyInto(ctx, p.httpClient, u.String(), &sample)
 	if err != nil {
@@ -703,7 +704,9 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 		return outCh, errCh
 	}
 
-	sampleToken := translateToChainAgnosticToken(sample.NFTs[0], "", nil)
+	if len(sample.NFTs) > 0 {
+		sampleToken = translateToChainAgnosticToken(sample.NFTs[0], "", nil)
+	}
 
 	if sampleToken.TokenType == persist.TokenTypeERC1155 || sample.Count <= fetchByTokenCountLimit || maxLimit <= fetchByTokenCountLimit {
 		logger.For(ctx).Infof("fetching tokens of contract=%s via tokens", address)
