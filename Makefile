@@ -95,6 +95,7 @@ $(DEPLOY)-$(PROD)-autosocial-orch   : SERVICE_FILE := autosocial-env.yaml
 $(DEPLOY)-$(PROD)-tokenprocessing   : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(PROD)-pushnotifications : SERVICE_FILE := pushnotifications-env.yaml
 $(DEPLOY)-$(PROD)-opensea-streamer  : SERVICE_FILE := opensea-streamer-env.yaml
+$(DEPLOY)-$(PROD)-kafka-streamer    : SERVICE_FILE := kafka-streamer-env.yaml
 $(DEPLOY)-$(PROD)-dummymetadata     : SERVICE_FILE := dummymetadata-env.yaml
 $(DEPLOY)-$(PROD)-emails            : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(PROD)-routing-rules     : SERVICE_FILE := dispatch.yaml
@@ -113,6 +114,7 @@ $(DEPLOY)-%-emails                : SENTRY_PROJECT := emails
 $(DEPLOY)-%-userpref-upload       : SENTRY_PROJECT := userpref
 $(DEPLOY)-%-activitystats         : SENTRY_PROJECT := activitystats
 $(DEPLOY)-%-opensea-streamer      : SENTRY_PROJECT := opensea-streamer
+$(DEPLOY)-%-kafka-streamer        : SENTRY_PROJECT := kafka-streamer
 $(DEPLOY)-%-autosocial            : SENTRY_PROJECT := autosocial
 $(DEPLOY)-%-autosocial-orch       : SENTRY_PROJECT := autosocial
 
@@ -230,6 +232,15 @@ $(DEPLOY)-%-opensea-streamer           : CONCURRENCY    := $(OPENSEA_STREAMER_CO
 $(DEPLOY)-%-opensea-streamer           : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
 $(DEPLOY)-$(DEV)-opensea-streamer      : SERVICE        := opensea-streamer
 $(DEPLOY)-$(PROD)-opensea-streamer     : SERVICE        := opensea-streamer
+$(DEPLOY)-%-kafka-streamer             : REPO           := kafka-streamer
+$(DEPLOY)-%-kafka-streamer             : DOCKER_FILE    := $(DOCKER_DIR)/kafka-streamer/Dockerfile
+$(DEPLOY)-%-kafka-streamer             : PORT           := 3000
+$(DEPLOY)-%-kafka-streamer             : TIMEOUT        := $(KAFKA_STREAMER_TIMEOUT)
+$(DEPLOY)-%-kafka-streamer             : CPU            := $(KAFKA_STREAMER_CPU)
+$(DEPLOY)-%-kafka-streamer             : MEMORY         := $(KAFKA_STREAMER_MEMORY)
+$(DEPLOY)-%-kafka-streamer             : CONCURRENCY    := $(KAFKA_STREAMER_CONCURRENCY)
+$(DEPLOY)-%-kafka-streamer             : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
+$(DEPLOY)-$(PROD)-kafka-streamer       : SERVICE        := kafka-streamer
 $(DEPLOY)-%-rasterizer                 : SERVICE        := rasterizer
 $(DEPLOY)-%-rasterizer                 : REPO           := rasterizer
 $(DEPLOY)-%-rasterizer                 : DOCKER_FILE    := $(DOCKER_DIR)/rasterizer/Dockerfile
@@ -469,6 +480,7 @@ $(DEPLOY)-$(PROD)-emails                   : _set-project-$(ENV) _$(DOCKER)-$(DE
 $(DEPLOY)-$(PROD)-feed                     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
 $(DEPLOY)-$(PROD)-feedbot                  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
 $(DEPLOY)-$(PROD)-opensea-streamer         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-opensea-streamer _$(RELEASE)-opensea-streamer
+$(DEPLOY)-$(PROD)-kafka-streamer           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-kafka-streamer _$(RELEASE)-kafka-streamer
 $(DEPLOY)-$(PROD)-admin                    : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(PROD)-routing-rules            : _set-project-$(ENV) _$(DEPLOY)-routing-rules
 $(DEPLOY)-$(PROD)-graphql-gateway          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
@@ -497,6 +509,7 @@ $(PROMOTE)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE
 $(PROMOTE)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
 $(PROMOTE)-$(PROD)-feed               : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-feed
 $(PROMOTE)-$(PROD)-opensea-streamer   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-opensea-streamer
+$(PROMOTE)-$(PROD)-kafka-streamer     : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-kafka-streamer
 $(PROMOTE)-$(PROD)-feedbot            : _set-project-$(ENV) _$(PROMOTE)-feedbot
 $(PROMOTE)-$(PROD)-admin              : _set-project-$(ENV) _$(PROMOTE)-admin
 

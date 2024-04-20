@@ -7,6 +7,7 @@ import (
 	registry "github.com/confluentinc/confluent-kafka-go/schemaregistry"
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde"
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde/avro"
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/mirrordb"
@@ -33,6 +34,11 @@ func main() {
 	logger.InitWithGCPDefaults()
 
 	ctx := context.Background()
+
+	// Health endpoint
+	router := gin.Default()
+	router.GET("/health", util.HealthCheckHandler())
+
 	streamTopics(ctx)
 }
 
