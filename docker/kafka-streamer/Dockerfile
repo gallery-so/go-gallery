@@ -14,6 +14,6 @@ RUN go build -o ./bin/kafka-streamer ./kafka-streamer/main.go
 
 ENV GAE_VERSION=$VERSION
 
-EXPOSE 4000
+EXPOSE 3000
 USER nobody
 ENTRYPOINT ["./bin/kafka-streamer"]
