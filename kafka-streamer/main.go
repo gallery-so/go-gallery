@@ -39,7 +39,13 @@ func main() {
 	router := gin.Default()
 	router.GET("/health", util.HealthCheckHandler())
 
-	streamTopics(ctx)
+	go streamTopics(ctx)
+
+	err := router.Run(":3000")
+	if err != nil {
+		err = fmt.Errorf("error running router: %w", err)
+		panic(err)
+	}
 }
 
 func streamTopics(ctx context.Context) {
