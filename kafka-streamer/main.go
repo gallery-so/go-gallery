@@ -121,6 +121,9 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, config *streamerConfig)
 		return fmt.Errorf("failed to subscribe to topic %s: %w", config.Topic, err)
 	}
 
+	var messagesPerHour int64 = 0
+	var nextHourReportTime = time.Now().Add(time.Hour)
+
 	for {
 		msg, err := c.ReadMessage(100)
 		if err != nil {
@@ -137,6 +140,13 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, config *streamerConfig)
 		err = config.ProcessMessageF(ctx, msg)
 		if err != nil {
 			return fmt.Errorf("failed to process message: %w", err)
+		}
+
+		messagesPerHour++
+		if time.Now().After(nextHourReportTime) {
+			logger.For(ctx).Infof("Processed %d messages in the last hour", messagesPerHour)
+			messagesPerHour = 0
+			nextHourReportTime = time.Now().Add(time.Hour)
 		}
 	}
 }
