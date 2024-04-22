@@ -52,7 +52,6 @@ func streamTopics(ctx context.Context) {
 	pgx := postgres.NewPgxClient()
 	defer pgx.Close()
 
-	queries := mirrordb.New(pgx)
 	deserializer, err := newDeserializerFromRegistry()
 	if err != nil {
 		panic(fmt.Errorf("failed to create Avro deserializer: %w", err))
@@ -60,14 +59,11 @@ func streamTopics(ctx context.Context) {
 
 	config := &streamerConfig{
 		Topic: "ethereum.owner.v4",
-		ProcessMessageF: func(ctx context.Context, msg *kafka.Message) error {
-			return processOwnerMessage(ctx, queries, deserializer, msg)
-		},
 	}
 
 	errChannel := make(chan error)
 	go func() {
-		err := runStreamer(ctx, pgx, config)
+		err := runStreamer(ctx, pgx, deserializer, config)
 		if err != nil {
 			errChannel <- err
 		}
@@ -96,7 +92,64 @@ func newDeserializerFromRegistry() (*avro.GenericDeserializer, error) {
 	return deserializer, nil
 }
 
-func runStreamer(ctx context.Context, pgx *pgxpool.Pool, config *streamerConfig) error {
+type batcher[T any] struct {
+	maxSize         int
+	timeoutDuration time.Duration
+	parseF          func(message *kafka.Message) (T, error)
+	submitF         func(entries []T) error
+
+	entries     []T
+	nextTimeout time.Time
+}
+
+func newBatcher[T any](maxSize int, timeout time.Duration, parseF func(message *kafka.Message) (T, error), submitF func(entries []T) error) *batcher[T] {
+	return &batcher[T]{
+		maxSize:         maxSize,
+		timeoutDuration: timeout,
+		parseF:          parseF,
+		submitF:         submitF,
+	}
+}
+
+func (b *batcher[T]) Add(msg *kafka.Message) error {
+	t, err := b.parseF(msg)
+	if err != nil {
+		return fmt.Errorf("failed to parse message: %w", err)
+	}
+
+	b.entries = append(b.entries, t)
+	b.nextTimeout = time.Now().Add(b.timeoutDuration)
+	return nil
+}
+
+func (b *batcher[T]) IsReady() bool {
+	if len(b.entries) == 0 {
+		return false
+	}
+
+	return len(b.entries) >= b.maxSize || time.Now().After(b.nextTimeout)
+}
+
+func (b *batcher[T]) Submit(c *kafka.Consumer) error {
+	if len(b.entries) == 0 {
+		return nil
+	}
+
+	err := b.submitF(b.entries)
+	if err != nil {
+		return fmt.Errorf("failed to submit batch: %w", err)
+	}
+
+	_, err = c.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit offsets: %w", err)
+	}
+
+	b.entries = []T{}
+	return nil
+}
+
+func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.GenericDeserializer, config *streamerConfig) error {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"topic": config.Topic})
 
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
@@ -105,7 +158,7 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, config *streamerConfig)
 		"sasl.username":      env.GetString("SIMPLEHASH_API_KEY"),
 		"sasl.password":      env.GetString("SIMPLEHASH_API_SECRET"),
 		"auto.offset.reset":  "earliest",
-		"enable.auto.commit": true,
+		"enable.auto.commit": false,
 		"security.protocol":  "SASL_SSL",
 		"sasl.mechanisms":    "PLAIN",
 	})
@@ -116,7 +169,39 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, config *streamerConfig)
 
 	defer c.Close()
 
-	err = c.SubscribeTopics([]string{config.Topic}, nil)
+	queries := mirrordb.New(pgx)
+
+	parseF := func(message *kafka.Message) (mirrordb.ProcessEthereumOwnerEntryParams, error) {
+		return parseOwnerMessage(ctx, deserializer, message)
+	}
+
+	submitF := func(entries []mirrordb.ProcessEthereumOwnerEntryParams) error {
+		return submitOwnerBatch(ctx, queries, entries)
+	}
+
+	batch := newBatcher(100, time.Second, parseF, submitF)
+
+	rebalanceCb := func(c *kafka.Consumer, event kafka.Event) error {
+		switch e := event.(type) {
+		case kafka.AssignedPartitions:
+			err := c.Assign(e.Partitions)
+			if err != nil {
+				return fmt.Errorf("failed to assign partitions: %w", err)
+			}
+		case kafka.RevokedPartitions:
+			err := batch.Submit(c)
+			if err != nil {
+				return fmt.Errorf("failed to submit batch: %w", err)
+			}
+			err = c.Unassign()
+			if err != nil {
+				return fmt.Errorf("failed to unassign partitions: %w", err)
+			}
+		}
+		return nil
+	}
+
+	err = c.SubscribeTopics([]string{config.Topic}, rebalanceCb)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to topic %s: %w", config.Topic, err)
 	}
@@ -129,7 +214,12 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, config *streamerConfig)
 		if err != nil {
 			if kafkaErr, ok := util.ErrorAs[kafka.Error](err); ok {
 				if kafkaErr.Code() == kafka.ErrTimedOut {
-					// No need to log polling timeouts
+					if batch.IsReady() {
+						err := batch.Submit(c)
+						if err != nil {
+							return fmt.Errorf("failed to submit batch: %w", err)
+						}
+					}
 					continue
 				}
 			}
@@ -137,9 +227,16 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, config *streamerConfig)
 			return fmt.Errorf("error reading message: %w", err)
 		}
 
-		err = config.ProcessMessageF(ctx, msg)
+		err = batch.Add(msg)
 		if err != nil {
-			return fmt.Errorf("failed to process message: %w", err)
+			return fmt.Errorf("failed to add message to batch: %w", err)
+		}
+
+		if batch.IsReady() {
+			err := batch.Submit(c)
+			if err != nil {
+				return fmt.Errorf("failed to submit batch: %w", err)
+			}
 		}
 
 		messagesPerHour++
@@ -225,24 +322,24 @@ func parseTimestamp(s *string) (*time.Time, error) {
 	return &ts, nil
 }
 
-func processOwnerMessage(ctx context.Context, queries *mirrordb.Queries, deserializer *avro.GenericDeserializer, msg *kafka.Message) error {
+func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializer, msg *kafka.Message) (mirrordb.ProcessEthereumOwnerEntryParams, error) {
 	key := string(msg.Key)
 
 	owner := ethereum.Owner{}
 	err := deserializer.DeserializeInto(*msg.TopicPartition.Topic, msg.Value, &owner)
 	if err != nil {
-		return fmt.Errorf("failed to deserialize owner message with key %s: %w", key, err)
+		return mirrordb.ProcessEthereumOwnerEntryParams{}, fmt.Errorf("failed to deserialize owner message with key %s: %w", key, err)
 	}
 
 	actionType, err := getActionType(msg)
 	if err != nil {
 		err = fmt.Errorf("failed to get action type for msg: %v", msg)
-		return err
+		return mirrordb.ProcessEthereumOwnerEntryParams{}, err
 	}
 
 	contractAddress, tokenID, err := parseNftID(owner.Nft_id)
 	if err != nil {
-		return fmt.Errorf("error parsing NftID: %w", err)
+		return mirrordb.ProcessEthereumOwnerEntryParams{}, fmt.Errorf("error parsing NftID: %w", err)
 	}
 
 	// TODO: Same as above, we'll want to normalize the address based on the chain at some point
@@ -250,29 +347,32 @@ func processOwnerMessage(ctx context.Context, queries *mirrordb.Queries, deseria
 
 	quantity, err := parseNumeric(owner.Quantity)
 	if err != nil {
-		return err
+		return mirrordb.ProcessEthereumOwnerEntryParams{}, err
 	}
 
 	firstAcquiredDate, err := parseTimestamp(owner.First_acquired_date)
 	if err != nil {
 		err = fmt.Errorf("failed to parse First_acquired_date: %w", err)
-		return err
+		return mirrordb.ProcessEthereumOwnerEntryParams{}, err
 	}
 
 	lastAcquiredDate, err := parseTimestamp(owner.Last_acquired_date)
 	if err != nil {
 		err = fmt.Errorf("failed to parse Last_acquired_date: %w", err)
-		return err
+		return mirrordb.ProcessEthereumOwnerEntryParams{}, err
 	}
 
+	var params mirrordb.ProcessEthereumOwnerEntryParams
+
 	if actionType == "delete" {
-		err := queries.DeleteEthereumOwnerEntry(ctx, key)
-		if err != nil {
-			return fmt.Errorf("failed to delete ethereum owner entry with key %s: %w", key, err)
+		params = mirrordb.ProcessEthereumOwnerEntryParams{
+			ShouldDelete:       true,
+			SimplehashKafkaKey: key,
 		}
 	} else {
 		if actionType == "insert" || actionType == "update" {
-			err := queries.UpsertEthereumOwnerEntry(ctx, mirrordb.UpsertEthereumOwnerEntryParams{
+			params = mirrordb.ProcessEthereumOwnerEntryParams{
+				ShouldUpsert:             true,
 				SimplehashKafkaKey:       key,
 				SimplehashNftID:          &owner.Nft_id,
 				KafkaOffset:              util.ToPointer(int64(msg.TopicPartition.Offset)),
@@ -290,16 +390,27 @@ func processOwnerMessage(ctx context.Context, queries *mirrordb.Queries, deseria
 				MintedToThisWallet:       owner.Minted_to_this_wallet,
 				AirdroppedToThisWallet:   owner.Airdropped_to_this_wallet,
 				SoldToThisWallet:         owner.Sold_to_this_wallet,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to upsert ethereum owner entry with key %s: %w", key, err)
 			}
 		} else {
-			return fmt.Errorf("invalid action type: %s", actionType)
+			return params, fmt.Errorf("invalid action type: %s", actionType)
 		}
 	}
 
-	return nil
+	return params, nil
+}
+
+func submitOwnerBatch(ctx context.Context, queries *mirrordb.Queries, entries []mirrordb.ProcessEthereumOwnerEntryParams) error {
+	b := queries.ProcessEthereumOwnerEntry(ctx, entries)
+	defer b.Close()
+
+	var err error
+	b.Exec(func(i int, e error) {
+		if err != nil {
+			err = fmt.Errorf("failed to process ethereum owner entry: %w", e)
+		}
+	})
+
+	return err
 }
 
 func getActionType(msg *kafka.Message) (string, error) {
