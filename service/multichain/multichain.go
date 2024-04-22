@@ -690,16 +690,9 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 			definitionsToProcess = append(definitionsToProcess, addedDefinitions[i].ID)
 		}
 	}
-	for _, b := range util.ChunkBy(definitionsToProcess, 50) {
-		b := b
-		if len(b) > 0 {
-			w.Go(func() {
-				if err := p.SubmitTokens(ctx, b); err != nil {
-					logger.For(ctx).Errorf("failed to submit batch: %s", err)
-					sentryutil.ReportError(ctx, err)
-				}
-			})
-		}
+	if err := p.SubmitTokens(ctx, definitionsToProcess); err != nil {
+		logger.For(ctx).Errorf("failed to submit batch: %s", err)
+		sentryutil.ReportError(ctx, err)
 	}
 
 	// Insert tokens

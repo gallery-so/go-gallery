@@ -80,7 +80,7 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 	getWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID FROM wallets WHERE ADDRESS = $1 AND L1_CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ADDRESS,CHAIN,WALLET_TYPE,VERSION,CREATED_AT,LAST_UPDATED FROM wallets WHERE ID = $1 AND DELETED = false;`)
+	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ADDRESS,CHAIN,WALLET_TYPE,VERSION,CREATED_AT,LAST_UPDATED,L1_CHAIN FROM wallets WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	removeWalletFromUserStmt, err := db.PrepareContext(ctx, `UPDATE users SET WALLETS = array_remove(WALLETS, $1) WHERE ID = $2 AND NOT $1 = PRIMARY_WALLET_ID AND $1 = ANY(WALLETS);`)
@@ -323,7 +323,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 
 	for i, walletID := range walletIDs {
 		wallet := persist.Wallet{ID: walletID}
-		err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated)
+		err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.L1Chain)
 		if err == nil {
 			wallets[i] = wallet
 		}
@@ -353,7 +353,7 @@ func (u *UserRepository) GetByIDs(pCtx context.Context, pIDs []persist.DBID) ([]
 
 		for i, walletID := range walletIDs {
 			wallet := persist.Wallet{ID: walletID}
-			err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated)
+			err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.L1Chain)
 			if err != nil && err != sql.ErrNoRows {
 				return nil, fmt.Errorf("failed to get wallet: %w", err)
 			}
@@ -396,7 +396,7 @@ func (u *UserRepository) GetByWalletID(pCtx context.Context, pWalletID persist.D
 	wallets := make([]persist.Wallet, len(user.Wallets))
 
 	for i, wallet := range user.Wallets {
-		err = u.getWalletStmt.QueryRowContext(pCtx, wallet.ID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated)
+		err = u.getWalletStmt.QueryRowContext(pCtx, wallet.ID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.L1Chain)
 		if err != nil && err != sql.ErrNoRows {
 			return persist.User{}, fmt.Errorf("failed to get wallet: %w", err)
 		}
@@ -589,7 +589,7 @@ func (u *UserRepository) FillWalletDataForUser(pCtx context.Context, user *persi
 	wallets := make([]persist.Wallet, 0, len(user.Wallets))
 	for _, wallet := range user.Wallets {
 		wallet := persist.Wallet{ID: wallet.ID}
-		if err := u.getWalletStmt.QueryRowContext(pCtx, wallet.ID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated); err != nil {
+		if err := u.getWalletStmt.QueryRowContext(pCtx, wallet.ID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.L1Chain); err != nil {
 			return err
 		}
 

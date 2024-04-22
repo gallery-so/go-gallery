@@ -8,7 +8,7 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-type tracingTransport struct {
+type TracingTransport struct {
 	http.RoundTripper
 
 	continueOnly bool
@@ -18,24 +18,24 @@ type tracingTransport struct {
 // NewTracingTransport creates an http transport that will trace requests via Sentry. If continueOnly is true,
 // traces will only be generated if they'd contribute to an existing parent trace (e.g. if a trace is not in progress,
 // no new trace would be started). It errorsOnly is true, only requests that returned an error status code (400 and above) are reported.
-func NewTracingTransport(roundTripper http.RoundTripper, continueOnly bool, spanOptions ...sentry.SpanOption) *tracingTransport {
+func NewTracingTransport(roundTripper http.RoundTripper, continueOnly bool, spanOptions ...sentry.SpanOption) *TracingTransport {
 	// If roundTripper is already a tracer, grab its underlying RoundTripper instead
-	if existingTracer, ok := roundTripper.(*tracingTransport); ok {
-		return &tracingTransport{
+	if existingTracer, ok := roundTripper.(*TracingTransport); ok {
+		return &TracingTransport{
 			RoundTripper: existingTracer.RoundTripper,
 			continueOnly: continueOnly,
 			opts:         spanOptions,
 		}
 	}
 
-	return &tracingTransport{
+	return &TracingTransport{
 		RoundTripper: roundTripper,
 		continueOnly: continueOnly,
 		opts:         spanOptions,
 	}
 }
 
-func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *TracingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.continueOnly {
 		transaction := sentry.TransactionFromContext(req.Context())
 		if transaction == nil {
