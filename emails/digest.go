@@ -623,32 +623,40 @@ func addProfileImage(p userFragProfileImage) string {
 	return ""
 }
 
+func findDisplayURL(mediaURLs ...*string) (empty string) {
+	m, found := util.FindFirst(mediaURLs, func(s *string) bool { return s != nil && *s != "" })
+	if found {
+		return *m
+	}
+	return empty
+}
+
 func addImagePreview(m definitionFragMediaMediaSubtype) string {
 	switch media := (m).(type) {
 	case *definitionFragMediaAudioMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaGIFMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaGltfMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaHtmlMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaImageMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaInvalidMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaJsonMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaPdfMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaSyncingMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaTextMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaUnknownMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	case *definitionFragMediaVideoMedia:
-		return util.GetOptionalValue(media.PreviewURLs.Small, util.GetOptionalValue(media.FallbackMedia.MediaURL, ""))
+		return findDisplayURL(media.PreviewURLs.Small, media.FallbackMedia.MediaURL)
 	}
 	return ""
 }
