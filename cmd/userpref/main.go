@@ -38,7 +38,6 @@ var rootCmd = &cobra.Command{
 		logger.For(ctx).Infof("uploading matrices to %s/%s", args[0], args[1])
 
 		n, err := upload(ctx, args[0], args[1])
-
 		if err != nil {
 			logger.For(ctx).Errorf("failed to write to %s: %s", args[1], err)
 			sentryutil.ReportError(ctx, err)
