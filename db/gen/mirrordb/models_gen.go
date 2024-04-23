@@ -11,7 +11,51 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+type BaseOwner struct {
+	SimplehashKafkaKey       string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	SimplehashNftID          *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	ContractAddress          *persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID                  pgtype.Numeric   `db:"token_id" json:"token_id"`
+	OwnerAddress             *persist.Address `db:"owner_address" json:"owner_address"`
+	Quantity                 pgtype.Numeric   `db:"quantity" json:"quantity"`
+	CollectionID             *string          `db:"collection_id" json:"collection_id"`
+	FirstAcquiredDate        *time.Time       `db:"first_acquired_date" json:"first_acquired_date"`
+	LastAcquiredDate         *time.Time       `db:"last_acquired_date" json:"last_acquired_date"`
+	FirstAcquiredTransaction *string          `db:"first_acquired_transaction" json:"first_acquired_transaction"`
+	LastAcquiredTransaction  *string          `db:"last_acquired_transaction" json:"last_acquired_transaction"`
+	MintedToThisWallet       *bool            `db:"minted_to_this_wallet" json:"minted_to_this_wallet"`
+	AirdroppedToThisWallet   *bool            `db:"airdropped_to_this_wallet" json:"airdropped_to_this_wallet"`
+	SoldToThisWallet         *bool            `db:"sold_to_this_wallet" json:"sold_to_this_wallet"`
+	CreatedAt                time.Time        `db:"created_at" json:"created_at"`
+	LastUpdated              time.Time        `db:"last_updated" json:"last_updated"`
+	KafkaOffset              *int64           `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition           *int32           `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp           *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
+}
+
 type EthereumOwner struct {
+	SimplehashKafkaKey       string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	SimplehashNftID          *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	ContractAddress          *persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID                  pgtype.Numeric   `db:"token_id" json:"token_id"`
+	OwnerAddress             *persist.Address `db:"owner_address" json:"owner_address"`
+	Quantity                 pgtype.Numeric   `db:"quantity" json:"quantity"`
+	CollectionID             *string          `db:"collection_id" json:"collection_id"`
+	FirstAcquiredDate        *time.Time       `db:"first_acquired_date" json:"first_acquired_date"`
+	LastAcquiredDate         *time.Time       `db:"last_acquired_date" json:"last_acquired_date"`
+	FirstAcquiredTransaction *string          `db:"first_acquired_transaction" json:"first_acquired_transaction"`
+	LastAcquiredTransaction  *string          `db:"last_acquired_transaction" json:"last_acquired_transaction"`
+	MintedToThisWallet       *bool            `db:"minted_to_this_wallet" json:"minted_to_this_wallet"`
+	AirdroppedToThisWallet   *bool            `db:"airdropped_to_this_wallet" json:"airdropped_to_this_wallet"`
+	SoldToThisWallet         *bool            `db:"sold_to_this_wallet" json:"sold_to_this_wallet"`
+	CreatedAt                time.Time        `db:"created_at" json:"created_at"`
+	LastUpdated              time.Time        `db:"last_updated" json:"last_updated"`
+	KafkaOffset              *int64           `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition           *int32           `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp           *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
+}
+
+type ZoraOwner struct {
 	SimplehashKafkaKey       string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
 	SimplehashNftID          *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
 	ContractAddress          *persist.Address `db:"contract_address" json:"contract_address"`
