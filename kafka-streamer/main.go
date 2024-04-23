@@ -408,16 +408,16 @@ func setDefaults() {
 	}
 }
 
-func parseNumeric(s *string) (*pgtype.Numeric, error) {
+func parseNumeric(s *string) (pgtype.Numeric, error) {
 	if s == nil {
-		return nil, nil
+		return pgtype.Numeric{Status: pgtype.Null}, nil
 	}
 
-	n := &pgtype.Numeric{}
+	n := pgtype.Numeric{}
 	err := n.Set(*s)
 	if err != nil {
 		err = fmt.Errorf("failed to parse numeric '%s': %w", *s, err)
-		return nil, err
+		return n, err
 	}
 
 	return n, nil
@@ -437,7 +437,7 @@ func parseNftID(nftID string) (contractAddress persist.Address, tokenID pgtype.N
 
 	// TODO: Use the chain to map to one of our chains and normalize the address accordingly.
 	// For now, just assume Ethereum and convert to lowercase.
-	return persist.Address(strings.ToLower(parts[1])), *id, nil
+	return persist.Address(strings.ToLower(parts[1])), id, nil
 }
 
 func parseTimestamp(s *string) (*time.Time, error) {
@@ -499,6 +499,11 @@ func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 		params = mirrordb.ProcessEthereumOwnerEntryParams{
 			ShouldDelete:       true,
 			SimplehashKafkaKey: key,
+
+			// pgtype.Numeric defaults to 'undefined' instead of 'null', so we actually need to set these explicitly
+			// or else we'll get an error when pgx tries to encode them
+			TokenID:  pgtype.Numeric{Status: pgtype.Null},
+			Quantity: pgtype.Numeric{Status: pgtype.Null},
 		}
 	} else {
 		if actionType == "insert" || actionType == "update" {
@@ -512,7 +517,7 @@ func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 				ContractAddress:          &contractAddress,
 				TokenID:                  tokenID,
 				OwnerAddress:             util.ToPointer(persist.Address(walletAddress)),
-				Quantity:                 *quantity,
+				Quantity:                 quantity,
 				CollectionID:             owner.Collection_id,
 				FirstAcquiredDate:        firstAcquiredDate,
 				LastAcquiredDate:         lastAcquiredDate,
