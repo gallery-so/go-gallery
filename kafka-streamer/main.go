@@ -9,6 +9,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde/avro"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/mirrordb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/kafka-streamer/schema/ethereum"
@@ -38,7 +39,10 @@ func main() {
 	router := gin.Default()
 	router.GET("/health", util.HealthCheckHandler())
 
-	go runStreamer(ctx)
+	pgx := postgres.NewPgxClient()
+	defer pgx.Close()
+
+	go runStreamer(ctx, pgx)
 
 	err := router.Run(":3000")
 	if err != nil {
@@ -104,10 +108,7 @@ func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
-func runStreamer(ctx context.Context) {
-	pgx := postgres.NewPgxClient()
-	defer pgx.Close()
-
+func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 	deserializer, err := newDeserializerFromRegistry()
 	if err != nil {
 		panic(fmt.Errorf("failed to create Avro deserializer: %w", err))
