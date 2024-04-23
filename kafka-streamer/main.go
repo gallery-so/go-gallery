@@ -92,6 +92,48 @@ func newDeserializerFromRegistry() (*avro.GenericDeserializer, error) {
 	return deserializer, nil
 }
 
+type messageStats struct {
+	interval       time.Duration
+	nextReportTime time.Time
+	inserts        int64
+	updates        int64
+	deletes        int64
+}
+
+func newMessageStats(reportingInterval time.Duration) *messageStats {
+	return &messageStats{
+		interval:       reportingInterval,
+		nextReportTime: time.Now().Add(reportingInterval),
+	}
+}
+
+func (m *messageStats) Update(ctx context.Context, msg *kafka.Message) {
+	actionType, err := getActionType(msg)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to get action type for message: %v", msg)
+		return
+	}
+
+	switch actionType {
+	case "insert":
+		m.inserts++
+	case "update":
+		m.updates++
+	case "delete":
+		m.deletes++
+	default:
+		logger.For(ctx).Errorf("invalid action type %s for message %v", actionType, msg)
+	}
+
+	if time.Now().After(m.nextReportTime) {
+		logger.For(ctx).Infof("processed %d messages in the last %s (%d inserts, %d updates, and %d deletes)", m.inserts+m.updates+m.deletes, m.interval, m.inserts, m.updates, m.deletes)
+		m.inserts = 0
+		m.updates = 0
+		m.deletes = 0
+		m.nextReportTime = time.Now().Add(m.interval)
+	}
+}
+
 type batcher[T any] struct {
 	maxSize         int
 	timeoutDuration time.Duration
@@ -212,8 +254,7 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 		return fmt.Errorf("failed to subscribe to topic %s: %w", config.Topic, err)
 	}
 
-	var messagesPerHour int64 = 0
-	var nextHourReportTime = time.Now().Add(time.Hour)
+	stats := newMessageStats(time.Hour)
 
 	for {
 		msg, err := c.ReadMessage(100)
@@ -245,12 +286,7 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 			}
 		}
 
-		messagesPerHour++
-		if time.Now().After(nextHourReportTime) {
-			logger.For(ctx).Infof("Processed %d messages in the last hour", messagesPerHour)
-			messagesPerHour = 0
-			nextHourReportTime = time.Now().Add(time.Hour)
-		}
+		stats.Update(ctx, msg)
 	}
 }
 
