@@ -36,6 +36,7 @@ var chainToSimpleHashChain = map[persist.Chain]string{
 	persist.ChainArbitrum: "arbitrum",
 	persist.ChainOptimism: "optimism",
 	persist.ChainPolygon:  "polygon",
+	persist.ChainTezos:    "tezos",
 }
 
 const (
@@ -199,7 +200,6 @@ type simplehashImageProps struct {
 
 type simplehashOwners struct {
 	OwnerAddress      string `json:"owner_address"`
-	Quantity          int    `json:"quantity"`
 	QuantityString    string `json:"quantity_string"`
 	FirstAcquiredDate string `json:"first_acquired_date"`
 	LastAcquiredDate  string `json:"last_acquired_date"`
@@ -241,7 +241,6 @@ type simplehashCollection struct {
 
 type queriedWalletBalance struct {
 	Address           string `json:"address"`
-	Quantity          int    `json:"quantity"`
 	QuantityString    string `json:"quantity_string"`
 	FirstAcquiredDate string `json:"first_acquired_date"`
 	LastAcquiredDate  string `json:"last_acquired_date"`
@@ -323,11 +322,12 @@ func isSpamCollection(c simplehashCollection) bool {
 func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address, isSpam *bool) mc.ChainAgnosticToken {
 	var tokenType persist.TokenType
 
-	if t.Contract.Type == "ERC721" {
+	switch t.Contract.Type {
+	case "ERC721":
 		tokenType = persist.TokenTypeERC721
-	} else if t.Contract.Type == "ERC1155" {
+	case "ERC1155", "FA2":
 		tokenType = persist.TokenTypeERC1155
-	} else {
+	default:
 		tID := mc.ChainAgnosticIdentifiers{ContractAddress: persist.Address(t.ContractAddress), TokenID: persist.HexTokenID(t.TokenID)}
 		logger.For(context.Background()).Warnf("%s has unknown token type: %s", tID, t.Contract.Type)
 	}
@@ -342,7 +342,7 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 	// We got a token for a non-specific wallet, just use the first owner
 	if ownerAddress == "" && len(t.Owners) > 0 {
 		ownerAddress = persist.Address(t.Owners[0].OwnerAddress)
-		quantity = persist.MustHexString(strconv.Itoa(t.Owners[0].Quantity))
+		quantity = persist.MustHexString(t.Owners[0].QuantityString)
 	}
 
 	return mc.ChainAgnosticToken{

@@ -47,8 +47,6 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	InitSentry()
 	logger.InitWithGCPDefaults()
 
-	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
-
 	router := gin.Default()
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
@@ -69,7 +67,20 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 
 	t := newThrottler()
 	metadataFetcher := MetadataFinder{mc: mc, ctx: ctx, wait: 5 * time.Second, maxBatch: 100}
-	tp := NewTokenProcessor(clients.Queries, clients.HTTPClient, &metadataFetcher, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
+
+	// tokenprocessing tends to create many connections to many different hosts.
+	// Since a connection is unlikely to get re-used, we don't leave any idle connections around
+	// to avoid having too many open connections.
+	if tr, ok := http.DefaultTransport.(*http.Transport); ok {
+		(*tr).MaxIdleConns = -1
+		(*tr).DisableKeepAlives = true
+	} else if tr, ok := http.DefaultTransport.(*tracing.TracingTransport); ok {
+		t := tr.RoundTripper.(*http.Transport)
+		(*t).MaxIdleConns = -1
+		(*t).DisableKeepAlives = true
+	}
+
+	tp := NewTokenProcessor(clients.Queries, http.DefaultClient, &metadataFetcher, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
 
 	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient, redis.NewCache(redis.TokenManageCache))
 }

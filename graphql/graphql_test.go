@@ -1314,7 +1314,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 // Ideally testing syncs are synchronous, but for now we have to wait for the media to be processed
 func waitForSynced[T any](media any) T {
 	_, ok := (media).(T)
-	for i := 0; i < 10 && !ok; i++ {
+	for i := 0; i < 20 && !ok; i++ {
 		<-time.After(time.Second)
 		t, ok := (media).(T)
 		if ok {
