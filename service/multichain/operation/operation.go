@@ -81,7 +81,7 @@ type UpsertToken struct {
 	Identifiers persist.TokenIdentifiers
 }
 
-func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.TokenDefinition) ([]db.TokenDefinition, []bool, error) {
+func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.TokenDefinition) ([]db.TokenDefinition, error) {
 	// Sort to ensure consistent insertion order
 	sort.SliceStable(tokens, func(i, j int) bool {
 		if tokens[i].Chain != tokens[j].Chain {
@@ -111,28 +111,23 @@ func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.Toke
 		p.DefinitionContractID = append(p.DefinitionContractID, t.ContractID.String())
 		p.DefinitionIsFxhash = append(p.DefinitionIsFxhash, t.IsFxhash)
 		if len(errors) > 0 {
-			return nil, nil, errors[0]
+			return nil, errors[0]
 		}
 	}
 
 	added, err := q.UpsertTokenDefinitions(ctx, p)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	if len(added) == 0 {
-		logger.For(ctx).Infof("no new definitions added, definitions already existed in the db")
-		return []db.TokenDefinition{}, []bool{}, nil
-	}
+	logger.For(ctx).Infof("added %d new definition(s) to the db", len(added))
 
-	addedTokens := make([]db.TokenDefinition, len(added))
-	isNewDefinition := make([]bool, len(added))
+	definitions := make([]db.TokenDefinition, len(added))
 	for i, t := range added {
-		addedTokens[i] = t.TokenDefinition
-		isNewDefinition[i] = t.IsNewDefinition
+		definitions[i] = t.TokenDefinition
 	}
 
-	return addedTokens, isNewDefinition, nil
+	return definitions, nil
 }
 
 func InsertTokenCommunityMemberships(ctx context.Context, q *db.Queries, memberships []db.TokenCommunityMembership, contractIDs []persist.DBID) ([]db.TokenCommunityMembership, error) {
@@ -214,9 +209,16 @@ func InsertTokens(ctx context.Context, q *db.Queries, tokens []UpsertToken, opt 
 		return time.Time{}, nil, err
 	}
 
+	logger.For(ctx).Infof("added %d new token instance(s) to the db", len(added))
+
+	// If we're not upserting anything, we still need to return the current database time
+	// since it may be used by the caller and is assumed valid if err == nil
 	if len(added) == 0 {
-		logger.For(ctx).Infof("no new tokens added, tokens already existed in the db")
-		return time.Time{}, []TokenFullDetails{}, nil
+		currentTime, err := q.GetCurrentTime(ctx)
+		if err != nil {
+			return time.Time{}, nil, err
+		}
+		return currentTime, []TokenFullDetails{}, nil
 	}
 
 	addedTokens := make([]TokenFullDetails, len(added))

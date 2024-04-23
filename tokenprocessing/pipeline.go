@@ -457,6 +457,7 @@ func (tpj *tokenProcessingJob) saveResult(ctx context.Context, media persist.Med
 		Chain:            tpj.token.Chain,
 		ContractAddress:  tpj.contract.ContractAddress,
 		TokenID:          tpj.token.TokenID,
+		DecimalTokenID:   tpj.token.TokenID.ToDecimalTokenID(),
 		NewMediaIsActive: tpj.activeStatus(ctx, media),
 		NewMediaID:       persist.GenerateID(),
 		NewMedia:         newMedia,
