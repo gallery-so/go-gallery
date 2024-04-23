@@ -536,7 +536,7 @@ func submitOwnerBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Conte
 
 	var err error
 	b.Exec(func(i int, e error) {
-		if err != nil {
+		if e != nil {
 			err = fmt.Errorf("failed to process owner entry: %w", e)
 		}
 	})
