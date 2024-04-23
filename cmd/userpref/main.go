@@ -66,12 +66,15 @@ func upload(ctx context.Context, bucketName, objectName string) (int, error) {
 	pgx := postgres.NewPgxClient()
 	q := db.New(pgx)
 
+	logger.For(ctx).Info("creating new matrices")
 	m := userpref.ReadMatrices(ctx, q)
+	logger.For(ctx).Info("serializing matrices")
 	byt, err := m.MarshalBinary()
 	if err != nil {
 		return 0, err
 	}
 
+	logger.For(ctx).Info("uploading matrices")
 	return b.WriteGzip(ctx, objectName, byt)
 }
 
