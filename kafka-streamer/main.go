@@ -116,9 +116,13 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 
 	queries := mirrordb.New(pgx)
 
+	// Creating multiple configs for each topic allows them to process separate partitions in parallel
 	configs := []*streamerConfig{
 		newEthereumOwnerConfig(deserializer, queries),
+		newEthereumOwnerConfig(deserializer, queries),
 		newBaseOwnerConfig(deserializer, queries),
+		newBaseOwnerConfig(deserializer, queries),
+		newZoraOwnerConfig(deserializer, queries),
 		newZoraOwnerConfig(deserializer, queries),
 	}
 
