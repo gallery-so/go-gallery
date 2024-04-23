@@ -301,7 +301,7 @@ $(DEPLOY)-$(PROD)-emails-digest              : URI_NAME       := emails-v2
 
 # Cloud Jobs
 $(DEPLOY)-%-userpref-upload            : JOB_NAME       := userpref-upload
-$(DEPLOY)-%-userpref-upload            : BASE_OPTIONS   := --tasks 1 --task-timeout 10m --parallelism 1 --cpu 1 --memory 2G
+$(DEPLOY)-%-userpref-upload            : BASE_OPTIONS   := --tasks 1 --task-timeout 10m --parallelism 1 --cpu 1 --memory 4G
 $(DEPLOY)-%-userpref-upload            : REGION         := $(DEPLOY_REGION)
 $(DEPLOY)-%-userpref-upload            : REPO           := userpref
 $(DEPLOY)-%-userpref-upload            : CRON_PREFIX    := userpref-schedule

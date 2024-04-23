@@ -38,7 +38,6 @@ var rootCmd = &cobra.Command{
 		logger.For(ctx).Infof("uploading matrices to %s/%s", args[0], args[1])
 
 		n, err := upload(ctx, args[0], args[1])
-
 		if err != nil {
 			logger.For(ctx).Errorf("failed to write to %s: %s", args[1], err)
 			sentryutil.ReportError(ctx, err)
@@ -66,12 +65,15 @@ func upload(ctx context.Context, bucketName, objectName string) (int, error) {
 	pgx := postgres.NewPgxClient()
 	q := db.New(pgx)
 
+	logger.For(ctx).Info("creating new matrices")
 	m := userpref.ReadMatrices(ctx, q)
+	logger.For(ctx).Info("serializing matrices")
 	byt, err := m.MarshalBinary()
 	if err != nil {
 		return 0, err
 	}
 
+	logger.For(ctx).Info("uploading matrices")
 	return b.WriteGzip(ctx, objectName, byt)
 }
 
