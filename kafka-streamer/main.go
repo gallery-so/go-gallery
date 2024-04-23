@@ -186,16 +186,22 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 		case kafka.AssignedPartitions:
 			err := c.Assign(e.Partitions)
 			if err != nil {
-				return fmt.Errorf("failed to assign partitions: %w", err)
+				err = fmt.Errorf("failed to assign partitions: %w", err)
+				logger.For(ctx).Error(err)
+				return err
 			}
 		case kafka.RevokedPartitions:
 			err := batch.Submit(c)
 			if err != nil {
-				return fmt.Errorf("failed to submit batch: %w", err)
+				err = fmt.Errorf("failed to submit batch: %w", err)
+				logger.For(ctx).Error(err)
+				return err
 			}
 			err = c.Unassign()
 			if err != nil {
-				return fmt.Errorf("failed to unassign partitions: %w", err)
+				err = fmt.Errorf("failed to unassign partitions: %w", err)
+				logger.For(ctx).Error(err)
+				return err
 			}
 		}
 		return nil
