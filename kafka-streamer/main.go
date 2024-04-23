@@ -179,7 +179,7 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 		return submitOwnerBatch(ctx, queries, entries)
 	}
 
-	batch := newBatcher(100, time.Second, parseF, submitF)
+	batch := newBatcher(250, time.Second, parseF, submitF)
 
 	rebalanceCb := func(c *kafka.Consumer, event kafka.Event) error {
 		switch e := event.(type) {
