@@ -9,7 +9,6 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde/avro"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/mirrordb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/kafka-streamer/schema/ethereum"
@@ -25,8 +24,8 @@ import (
 )
 
 type streamerConfig struct {
-	Topic           string
-	ProcessMessageF func(ctx context.Context, msg *kafka.Message) error
+	Topic   string
+	Batcher batcher
 }
 
 func main() {
@@ -39,7 +38,7 @@ func main() {
 	router := gin.Default()
 	router.GET("/health", util.HealthCheckHandler())
 
-	go streamTopics(ctx)
+	go runStreamer(ctx)
 
 	err := router.Run(":3000")
 	if err != nil {
@@ -48,7 +47,64 @@ func main() {
 	}
 }
 
-func streamTopics(ctx context.Context) {
+func newEthereumOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessEthereumOwnerEntryParams, error) {
+		return parseOwnerMessage(ctx, deserializer, message)
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessEthereumOwnerEntryParams) error {
+		return submitOwnerBatch(ctx, queries.ProcessEthereumOwnerEntry, entries)
+	}
+
+	return &streamerConfig{
+		Topic:   "ethereum.owner.v4",
+		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+	}
+}
+
+func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseOwnerEntryParams, error) {
+		ethereumEntry, err := parseOwnerMessage(ctx, deserializer, message)
+		if err != nil {
+			return mirrordb.ProcessBaseOwnerEntryParams{}, err
+		}
+
+		// All EVM chains (Ethereum, Base, Zora) have the same database and query structure, so we can cast between their parameters
+		return mirrordb.ProcessBaseOwnerEntryParams(ethereumEntry), nil
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseOwnerEntryParams) error {
+		return submitOwnerBatch(ctx, queries.ProcessBaseOwnerEntry, entries)
+	}
+
+	return &streamerConfig{
+		Topic:   "base.owner.v4",
+		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+	}
+}
+
+func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessZoraOwnerEntryParams, error) {
+		ethereumEntry, err := parseOwnerMessage(ctx, deserializer, message)
+		if err != nil {
+			return mirrordb.ProcessZoraOwnerEntryParams{}, err
+		}
+
+		// All EVM chains (Ethereum, Base, Zora) have the same database and query structure, so we can cast between their parameters
+		return mirrordb.ProcessZoraOwnerEntryParams(ethereumEntry), nil
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessZoraOwnerEntryParams) error {
+		return submitOwnerBatch(ctx, queries.ProcessZoraOwnerEntry, entries)
+	}
+
+	return &streamerConfig{
+		Topic:   "zora.owner.v4",
+		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+	}
+}
+
+func runStreamer(ctx context.Context) {
 	pgx := postgres.NewPgxClient()
 	defer pgx.Close()
 
@@ -57,23 +113,40 @@ func streamTopics(ctx context.Context) {
 		panic(fmt.Errorf("failed to create Avro deserializer: %w", err))
 	}
 
-	config := &streamerConfig{
-		Topic: "ethereum.owner.v4",
+	queries := mirrordb.New(pgx)
+
+	configs := []*streamerConfig{
+		newEthereumOwnerConfig(deserializer, queries),
+		newBaseOwnerConfig(deserializer, queries),
+		newZoraOwnerConfig(deserializer, queries),
 	}
 
-	errChannel := make(chan error)
-	go func() {
-		err := runStreamer(ctx, pgx, deserializer, config)
-		if err != nil {
-			errChannel <- err
-		}
-	}()
+	// If any topic errors more than 10 times in 10 minutes, panic and restart the whole service
+	maxRetries := 10
+	retryResetInterval := 10 * time.Minute
 
-	for {
-		select {
-		case err := <-errChannel:
-			panic(err)
-		}
+	for _, config := range configs {
+		go func(config *streamerConfig) {
+			retriesRemaining := maxRetries
+			retriesResetAt := time.Now().Add(retryResetInterval)
+			for {
+				err := streamTopic(ctx, config)
+				if err != nil {
+					if time.Now().After(retriesResetAt) {
+						retriesRemaining = maxRetries
+						retriesResetAt = time.Now().Add(retryResetInterval)
+					}
+
+					if retriesRemaining == 0 {
+						panic(fmt.Errorf("streaming topic '%s' failed with error: %w", config.Topic, err))
+					}
+
+					retriesRemaining--
+					config.Batcher.Reset()
+					logger.For(ctx).Warnf("streaming topic '%s' failed with error: %v, restarting...", config.Topic, err)
+				}
+			}
+		}(config)
 	}
 }
 
@@ -134,18 +207,25 @@ func (m *messageStats) Update(ctx context.Context, msg *kafka.Message) {
 	}
 }
 
-type batcher[T any] struct {
+type batcher interface {
+	Reset()
+	Add(context.Context, *kafka.Message) error
+	IsReady() bool
+	Submit(context.Context, *kafka.Consumer) error
+}
+
+type messageBatcher[T any] struct {
 	maxSize         int
 	timeoutDuration time.Duration
-	parseF          func(message *kafka.Message) (T, error)
-	submitF         func(entries []T) error
+	parseF          func(context.Context, *kafka.Message) (T, error)
+	submitF         func(context.Context, []T) error
 
 	entries     []T
 	nextTimeout time.Time
 }
 
-func newBatcher[T any](maxSize int, timeout time.Duration, parseF func(message *kafka.Message) (T, error), submitF func(entries []T) error) *batcher[T] {
-	return &batcher[T]{
+func newMessageBatcher[T any](maxSize int, timeout time.Duration, parseF func(context.Context, *kafka.Message) (T, error), submitF func(context.Context, []T) error) *messageBatcher[T] {
+	return &messageBatcher[T]{
 		maxSize:         maxSize,
 		timeoutDuration: timeout,
 		parseF:          parseF,
@@ -153,8 +233,13 @@ func newBatcher[T any](maxSize int, timeout time.Duration, parseF func(message *
 	}
 }
 
-func (b *batcher[T]) Add(msg *kafka.Message) error {
-	t, err := b.parseF(msg)
+func (b *messageBatcher[T]) Reset() {
+	b.entries = []T{}
+	b.nextTimeout = time.Time{}
+}
+
+func (b *messageBatcher[T]) Add(ctx context.Context, msg *kafka.Message) error {
+	t, err := b.parseF(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("failed to parse message: %w", err)
 	}
@@ -164,7 +249,7 @@ func (b *batcher[T]) Add(msg *kafka.Message) error {
 	return nil
 }
 
-func (b *batcher[T]) IsReady() bool {
+func (b *messageBatcher[T]) IsReady() bool {
 	if len(b.entries) == 0 {
 		return false
 	}
@@ -172,12 +257,12 @@ func (b *batcher[T]) IsReady() bool {
 	return len(b.entries) >= b.maxSize || time.Now().After(b.nextTimeout)
 }
 
-func (b *batcher[T]) Submit(c *kafka.Consumer) error {
+func (b *messageBatcher[T]) Submit(ctx context.Context, c *kafka.Consumer) error {
 	if len(b.entries) == 0 {
 		return nil
 	}
 
-	err := b.submitF(b.entries)
+	err := b.submitF(ctx, b.entries)
 	if err != nil {
 		return fmt.Errorf("failed to submit batch: %w", err)
 	}
@@ -191,7 +276,7 @@ func (b *batcher[T]) Submit(c *kafka.Consumer) error {
 	return nil
 }
 
-func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.GenericDeserializer, config *streamerConfig) error {
+func streamTopic(ctx context.Context, config *streamerConfig) error {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"topic": config.Topic})
 
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
@@ -211,17 +296,9 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 
 	defer c.Close()
 
-	queries := mirrordb.New(pgx)
-
-	parseF := func(message *kafka.Message) (mirrordb.ProcessEthereumOwnerEntryParams, error) {
-		return parseOwnerMessage(ctx, deserializer, message)
-	}
-
-	submitF := func(entries []mirrordb.ProcessEthereumOwnerEntryParams) error {
-		return submitOwnerBatch(ctx, queries, entries)
-	}
-
-	batch := newBatcher(250, time.Second, parseF, submitF)
+	batch := config.Batcher
+	var rebalanceErr error
+	rebalanceErrPtr := &rebalanceErr
 
 	rebalanceCb := func(c *kafka.Consumer, event kafka.Event) error {
 		switch e := event.(type) {
@@ -229,20 +306,19 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 			err := c.Assign(e.Partitions)
 			if err != nil {
 				err = fmt.Errorf("failed to assign partitions: %w", err)
-				logger.For(ctx).Error(err)
+				*rebalanceErrPtr = err
 				return err
 			}
 		case kafka.RevokedPartitions:
-			err := batch.Submit(c)
+			err := batch.Submit(ctx, c)
 			if err != nil {
-				err = fmt.Errorf("failed to submit batch: %w", err)
-				logger.For(ctx).Error(err)
+				*rebalanceErrPtr = err
 				return err
 			}
 			err = c.Unassign()
 			if err != nil {
 				err = fmt.Errorf("failed to unassign partitions: %w", err)
-				logger.For(ctx).Error(err)
+				*rebalanceErrPtr = err
 				return err
 			}
 		}
@@ -255,14 +331,22 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 	}
 
 	stats := newMessageStats(time.Hour)
+	readTimeout := 100 * time.Millisecond
 
 	for {
-		msg, err := c.ReadMessage(100)
+		msg, err := c.ReadMessage(readTimeout)
+
+		// rebalanceCb is triggered by ReadMessage, so we want to check immediately after ReadMessage to see if
+		// the rebalance failed and we need to restart
+		if rebalanceErr != nil {
+			return fmt.Errorf("rebalance failed: %w", rebalanceErr)
+		}
+
 		if err != nil {
 			if kafkaErr, ok := util.ErrorAs[kafka.Error](err); ok {
 				if kafkaErr.Code() == kafka.ErrTimedOut {
 					if batch.IsReady() {
-						err := batch.Submit(c)
+						err := batch.Submit(ctx, c)
 						if err != nil {
 							return fmt.Errorf("failed to submit batch: %w", err)
 						}
@@ -274,13 +358,13 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, deserializer *avro.Gene
 			return fmt.Errorf("error reading message: %w", err)
 		}
 
-		err = batch.Add(msg)
+		err = batch.Add(ctx, msg)
 		if err != nil {
 			return fmt.Errorf("failed to add message to batch: %w", err)
 		}
 
 		if batch.IsReady() {
-			err := batch.Submit(c)
+			err := batch.Submit(ctx, c)
 			if err != nil {
 				return fmt.Errorf("failed to submit batch: %w", err)
 			}
@@ -441,14 +525,19 @@ func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 	return params, nil
 }
 
-func submitOwnerBatch(ctx context.Context, queries *mirrordb.Queries, entries []mirrordb.ProcessEthereumOwnerEntryParams) error {
-	b := queries.ProcessEthereumOwnerEntry(ctx, entries)
+type queryBatchExecuter interface {
+	Exec(func(i int, e error))
+	Close() error
+}
+
+func submitOwnerBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+	b := queryF(ctx, entries)
 	defer b.Close()
 
 	var err error
 	b.Exec(func(i int, e error) {
 		if err != nil {
-			err = fmt.Errorf("failed to process ethereum owner entry: %w", e)
+			err = fmt.Errorf("failed to process owner entry: %w", e)
 		}
 	})
 

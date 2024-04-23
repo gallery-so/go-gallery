@@ -19,6 +19,145 @@ var (
 	ErrBatchAlreadyClosed = errors.New("batch already closed")
 )
 
+const processBaseOwnerEntry = `-- name: ProcessBaseOwnerEntry :batchexec
+with deletion as (
+    delete from base.owners where $19::bool and simplehash_kafka_key = $1
+)
+insert into base.owners (
+    simplehash_kafka_key,
+    simplehash_nft_id,
+    last_updated,
+    kafka_offset,
+    kafka_partition,
+    kafka_timestamp,
+    contract_address,
+    token_id,
+    owner_address,
+    quantity,
+    collection_id,
+    first_acquired_date,
+    last_acquired_date,
+    first_acquired_transaction,
+    last_acquired_transaction,
+    minted_to_this_wallet,
+    airdropped_to_this_wallet,
+    sold_to_this_wallet
+    )
+    select
+        $1,
+        $2,
+        now(),
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        $14,
+        $15,
+        $16,
+        $17
+    where $18::bool
+    on conflict (simplehash_kafka_key) do update
+        set simplehash_nft_id = excluded.simplehash_nft_id,
+            contract_address = excluded.contract_address,
+            token_id = excluded.token_id,
+            owner_address = excluded.owner_address,
+            quantity = excluded.quantity,
+            collection_id = excluded.collection_id,
+            first_acquired_date = excluded.first_acquired_date,
+            last_acquired_date = excluded.last_acquired_date,
+            first_acquired_transaction = excluded.first_acquired_transaction,
+            last_acquired_transaction = excluded.last_acquired_transaction,
+            minted_to_this_wallet = excluded.minted_to_this_wallet,
+            airdropped_to_this_wallet = excluded.airdropped_to_this_wallet,
+            sold_to_this_wallet = excluded.sold_to_this_wallet
+`
+
+type ProcessBaseOwnerEntryBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type ProcessBaseOwnerEntryParams struct {
+	SimplehashKafkaKey       string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	SimplehashNftID          *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	KafkaOffset              *int64           `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition           *int32           `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp           *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
+	ContractAddress          *persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID                  pgtype.Numeric   `db:"token_id" json:"token_id"`
+	OwnerAddress             *persist.Address `db:"owner_address" json:"owner_address"`
+	Quantity                 pgtype.Numeric   `db:"quantity" json:"quantity"`
+	CollectionID             *string          `db:"collection_id" json:"collection_id"`
+	FirstAcquiredDate        *time.Time       `db:"first_acquired_date" json:"first_acquired_date"`
+	LastAcquiredDate         *time.Time       `db:"last_acquired_date" json:"last_acquired_date"`
+	FirstAcquiredTransaction *string          `db:"first_acquired_transaction" json:"first_acquired_transaction"`
+	LastAcquiredTransaction  *string          `db:"last_acquired_transaction" json:"last_acquired_transaction"`
+	MintedToThisWallet       *bool            `db:"minted_to_this_wallet" json:"minted_to_this_wallet"`
+	AirdroppedToThisWallet   *bool            `db:"airdropped_to_this_wallet" json:"airdropped_to_this_wallet"`
+	SoldToThisWallet         *bool            `db:"sold_to_this_wallet" json:"sold_to_this_wallet"`
+	ShouldUpsert             bool             `db:"should_upsert" json:"should_upsert"`
+	ShouldDelete             bool             `db:"should_delete" json:"should_delete"`
+}
+
+func (q *Queries) ProcessBaseOwnerEntry(ctx context.Context, arg []ProcessBaseOwnerEntryParams) *ProcessBaseOwnerEntryBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.SimplehashKafkaKey,
+			a.SimplehashNftID,
+			a.KafkaOffset,
+			a.KafkaPartition,
+			a.KafkaTimestamp,
+			a.ContractAddress,
+			a.TokenID,
+			a.OwnerAddress,
+			a.Quantity,
+			a.CollectionID,
+			a.FirstAcquiredDate,
+			a.LastAcquiredDate,
+			a.FirstAcquiredTransaction,
+			a.LastAcquiredTransaction,
+			a.MintedToThisWallet,
+			a.AirdroppedToThisWallet,
+			a.SoldToThisWallet,
+			a.ShouldUpsert,
+			a.ShouldDelete,
+		}
+		batch.Queue(processBaseOwnerEntry, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &ProcessBaseOwnerEntryBatchResults{br, len(arg), false}
+}
+
+func (b *ProcessBaseOwnerEntryBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *ProcessBaseOwnerEntryBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const processEthereumOwnerEntry = `-- name: ProcessEthereumOwnerEntry :batchexec
 with deletion as (
     delete from ethereum.owners where $19::bool and simplehash_kafka_key = $1
@@ -154,6 +293,145 @@ func (b *ProcessEthereumOwnerEntryBatchResults) Exec(f func(int, error)) {
 }
 
 func (b *ProcessEthereumOwnerEntryBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const processZoraOwnerEntry = `-- name: ProcessZoraOwnerEntry :batchexec
+with deletion as (
+    delete from zora.owners where $19::bool and simplehash_kafka_key = $1
+)
+insert into zora.owners (
+    simplehash_kafka_key,
+    simplehash_nft_id,
+    last_updated,
+    kafka_offset,
+    kafka_partition,
+    kafka_timestamp,
+    contract_address,
+    token_id,
+    owner_address,
+    quantity,
+    collection_id,
+    first_acquired_date,
+    last_acquired_date,
+    first_acquired_transaction,
+    last_acquired_transaction,
+    minted_to_this_wallet,
+    airdropped_to_this_wallet,
+    sold_to_this_wallet
+    )
+    select
+        $1,
+        $2,
+        now(),
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        $14,
+        $15,
+        $16,
+        $17
+    where $18::bool
+    on conflict (simplehash_kafka_key) do update
+        set simplehash_nft_id = excluded.simplehash_nft_id,
+            contract_address = excluded.contract_address,
+            token_id = excluded.token_id,
+            owner_address = excluded.owner_address,
+            quantity = excluded.quantity,
+            collection_id = excluded.collection_id,
+            first_acquired_date = excluded.first_acquired_date,
+            last_acquired_date = excluded.last_acquired_date,
+            first_acquired_transaction = excluded.first_acquired_transaction,
+            last_acquired_transaction = excluded.last_acquired_transaction,
+            minted_to_this_wallet = excluded.minted_to_this_wallet,
+            airdropped_to_this_wallet = excluded.airdropped_to_this_wallet,
+            sold_to_this_wallet = excluded.sold_to_this_wallet
+`
+
+type ProcessZoraOwnerEntryBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type ProcessZoraOwnerEntryParams struct {
+	SimplehashKafkaKey       string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	SimplehashNftID          *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	KafkaOffset              *int64           `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition           *int32           `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp           *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
+	ContractAddress          *persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID                  pgtype.Numeric   `db:"token_id" json:"token_id"`
+	OwnerAddress             *persist.Address `db:"owner_address" json:"owner_address"`
+	Quantity                 pgtype.Numeric   `db:"quantity" json:"quantity"`
+	CollectionID             *string          `db:"collection_id" json:"collection_id"`
+	FirstAcquiredDate        *time.Time       `db:"first_acquired_date" json:"first_acquired_date"`
+	LastAcquiredDate         *time.Time       `db:"last_acquired_date" json:"last_acquired_date"`
+	FirstAcquiredTransaction *string          `db:"first_acquired_transaction" json:"first_acquired_transaction"`
+	LastAcquiredTransaction  *string          `db:"last_acquired_transaction" json:"last_acquired_transaction"`
+	MintedToThisWallet       *bool            `db:"minted_to_this_wallet" json:"minted_to_this_wallet"`
+	AirdroppedToThisWallet   *bool            `db:"airdropped_to_this_wallet" json:"airdropped_to_this_wallet"`
+	SoldToThisWallet         *bool            `db:"sold_to_this_wallet" json:"sold_to_this_wallet"`
+	ShouldUpsert             bool             `db:"should_upsert" json:"should_upsert"`
+	ShouldDelete             bool             `db:"should_delete" json:"should_delete"`
+}
+
+func (q *Queries) ProcessZoraOwnerEntry(ctx context.Context, arg []ProcessZoraOwnerEntryParams) *ProcessZoraOwnerEntryBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.SimplehashKafkaKey,
+			a.SimplehashNftID,
+			a.KafkaOffset,
+			a.KafkaPartition,
+			a.KafkaTimestamp,
+			a.ContractAddress,
+			a.TokenID,
+			a.OwnerAddress,
+			a.Quantity,
+			a.CollectionID,
+			a.FirstAcquiredDate,
+			a.LastAcquiredDate,
+			a.FirstAcquiredTransaction,
+			a.LastAcquiredTransaction,
+			a.MintedToThisWallet,
+			a.AirdroppedToThisWallet,
+			a.SoldToThisWallet,
+			a.ShouldUpsert,
+			a.ShouldDelete,
+		}
+		batch.Queue(processZoraOwnerEntry, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &ProcessZoraOwnerEntryBatchResults{br, len(arg), false}
+}
+
+func (b *ProcessZoraOwnerEntryBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *ProcessZoraOwnerEntryBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
