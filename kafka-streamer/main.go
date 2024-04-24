@@ -462,9 +462,15 @@ func parseTimestamp(s *string) (*time.Time, error) {
 		return nil, nil
 	}
 
+	// Try parsing with the RFC3339 format first
 	ts, err := time.Parse(time.RFC3339, *s)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse timestamp %s: %w", *s, err)
+		// If RFC3339 fails, try ISO8601 without timezone, since that's what some messages appear to use
+		const layout = "2006-01-02T15:04:05" //
+		ts, err = time.Parse(layout, *s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse timestamp %s: %w", *s, err)
+		}
 	}
 
 	return &ts, nil
