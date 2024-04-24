@@ -11,14 +11,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/mock"
 )
@@ -146,51 +145,53 @@ func newStubRecommender(t *testing.T, userIDs []persist.DBID) *recommend.Recomme
 }
 
 // newStubPersonalization returns a stub of the personalization service
-func newStubPersonaliztion(t *testing.T) *userpref.Personalization {
+func newStubPersonalization(t *testing.T) *userpref.Personalization {
 	return &userpref.Personalization{}
 }
 
-// sendTokensRecorder records tokenprocessing messages
-type sendTokensRecorder struct {
-	mock.Mock
-	SubmitTokens multichain.SubmitTokensF
-	Tasks        []task.TokenProcessingBatchMessage
-}
+// noopSubmitter is useful when the code under test doesn't require tokenprocessing
+type noopSubmitter struct{}
 
-func (r *sendTokensRecorder) Send(ctx context.Context, tDefIDs []persist.DBID) error {
-	r.Called(ctx, tDefIDs)
-	r.Tasks = append(r.Tasks, task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs})
+func (n *noopSubmitter) SubmitNewTokens(context.Context, []persist.DBID) error { return nil }
+func (n *noopSubmitter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
 	return nil
 }
 
-// submitUserTokensNoop is useful when the code under test doesn't require tokenprocessing
-func submitUserTokensNoop(ctx context.Context, tDefIDs []persist.DBID) error {
+// recorderSubmitter records tokens sent to tokenprocessing
+type recorderSubmitter struct{ mock.Mock }
+
+func (r *recorderSubmitter) SubmitNewTokens(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
+	r.Called(ctx, tokenDefinitionIDs)
 	return nil
 }
 
-// sendTokensToHTTPHandler makes an HTTP request to the passed handler
-func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitTokensF {
-	return func(ctx context.Context, tDefIDs []persist.DBID) error {
-		m := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
-		byt, _ := json.Marshal(m)
-		r := bytes.NewReader(byt)
-		req := httptest.NewRequest(method, endpoint, r)
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
-		res := w.Result()
-		if res.StatusCode != http.StatusOK {
-			return util.BodyAsError(res)
-		}
-		return nil
-	}
+func (r *recorderSubmitter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
+	panic("not implemented") // shouldn't be needed in syncing tests
 }
 
-// sendTokensToTokenProcessing processes a batch of tokens synchronously through tokenprocessing
-func sendTokensToTokenProcessing(ctx context.Context, c *server.Clients, provider *multichain.Provider) multichain.SubmitTokensF {
-	return func(ctx context.Context, tDefIDs []persist.DBID) error {
-		h := tokenprocessing.CoreInitServer(ctx, c, provider)
-		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, tDefIDs)
+// httpSubmitter processes tokens synchronously via HTTP
+type httpSubmitter struct {
+	Handler  http.Handler
+	Method   string
+	Endpoint string
+}
+
+func (h *httpSubmitter) SubmitNewTokens(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
+	m := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tokenDefinitionIDs}
+	byt, _ := json.Marshal(m)
+	r := bytes.NewReader(byt)
+	req := httptest.NewRequest(h.Method, h.Endpoint, r)
+	w := httptest.NewRecorder()
+	h.Handler.ServeHTTP(w, req)
+	res := w.Result()
+	if res.StatusCode != http.StatusOK {
+		return util.BodyAsError(res)
 	}
+	return nil
+}
+
+func (h *httpSubmitter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
+	panic("not implemented") // shouldn't be needed in syncing tests
 }
 
 // fetchFromDummyEndpoint fetches metadata from the given endpoint

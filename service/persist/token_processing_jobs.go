@@ -185,7 +185,7 @@ func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name strin
 
 	go func() {
 		for {
-			<-time.After(5 * time.Second)
+			<-time.After(20 * time.Second)
 			if status == nil || *status == PipelineStepStatusSuccess || *status == PipelineStepStatusError {
 				return
 			}

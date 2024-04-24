@@ -39,23 +39,23 @@ func (api *MintAPI) GetHighlightMintClaimByID(ctx context.Context, id persist.DB
 	return api.queries.GetHighlightMintClaimByID(ctx, id)
 }
 
-func (api *MintAPI) guardMinting(ctx context.Context, collectionID string, userID, walletID persist.DBID) (error, func()) {
+func (api *MintAPI) guardMinting(ctx context.Context, collectionID string, userID, walletID persist.DBID) (func(), error) {
 	userLock := fmt.Sprintf("mint:platform:highlight:collection:%s:user:%s", collectionID, userID)
 	err := api.throttler.Lock(ctx, userLock)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	walletLock := fmt.Sprintf("mint:platform:highlight:collection:%s:wallet:%s", collectionID, walletID)
 	err = api.throttler.Lock(ctx, walletLock)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
-	return nil, func() {
+	return func() {
 		api.throttler.Unlock(ctx, fmt.Sprintf("mint:platform:highlight:collection:%s:user:%s", collectionID, userID))
 		api.throttler.Unlock(ctx, fmt.Sprintf("mint:platform:highlight:collection:%s:wallet:%s", collectionID, walletID))
-	}
+	}, nil
 }
 
 func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string, walletID persist.DBID) (persist.DBID, error) {
@@ -71,7 +71,7 @@ func (api *MintAPI) ClaimHighlightMint(ctx context.Context, collectionID string,
 		return "", err
 	}
 
-	err, releaseLock := api.guardMinting(ctx, collectionID, userID, walletID)
+	releaseLock, err := api.guardMinting(ctx, collectionID, userID, walletID)
 	if util.ErrorIs[throttle.ErrThrottleLocked](err) {
 		return "", ErrMintTxPending
 	}

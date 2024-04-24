@@ -166,20 +166,20 @@ func (c *Client) CreateTaskForFeedbot(ctx context.Context, message FeedbotMessag
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func (c *Client) CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingBatchMessage) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
+func (c *Client) CreateTaskTokenProcessingSyncBatch(ctx context.Context, message TokenProcessingBatchMessage) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskTokenProcessingSyncBatch")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process", env.GetString("TOKEN_PROCESSING_URL"))
 	return c.submitTask(ctx, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))
 }
 
-func (c *Client) CreateTaskForTokenTokenProcessing(ctx context.Context, message TokenProcessingTokenMessage, delay time.Duration) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenTokenProcessing")
+func (c *Client) CreateTaskTokenProcessingRetryToken(ctx context.Context, message TokenProcessingTokenMessage, delayFor time.Duration) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskTokenProcessingRetryToken")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/tokenmanage/process/token", env.GetString("TOKEN_PROCESSING_URL"))
-	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), WithDelay(delay))
+	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), WithDelay(delayFor))
 }
 
 func (c *Client) CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage) error {
@@ -191,8 +191,8 @@ func (c *Client) CreateTaskForWalletRemoval(ctx context.Context, message TokenPr
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span))
 }
 
-func (c *Client) CreateTaskForOpenseaStreamerTokenProcessing(ctx context.Context, message persist.OpenSeaWebhookInput) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForOpenseaStreamerTokenProcessing")
+func (c *Client) CreateTaskTokenProcessingForOpenseaStreamer(ctx context.Context, message persist.OpenSeaWebhookInput) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskTokenProcessingForOpenseaStreamer")
 	defer tracing.FinishSpan(span)
 	tracing.AddEventDataToSpan(span, map[string]any{
 		"contract": message.Payload.Item.NFTID.ContractAddress.String(),

@@ -47,8 +47,10 @@ with token_definitions_insert as (
     , is_fxhash = excluded.is_fxhash
   returning *
 )
-select sqlc.embed(token_definitions)
-from token_definitions_insert token_definitions;
+select sqlc.embed(token_definitions), (prior_state.id is null)::bool is_new_definition
+from token_definitions_insert token_definitions
+-- token_definitions is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this snapshot.
+left join token_definitions prior_state on token_definitions.chain = prior_state.chain and token_definitions.contract_id = prior_state.contract_id and token_definitions.token_id = prior_state.token_id and not prior_state.deleted;
 
 -- name: UpsertTokenDefinitionCommunityMemberships :many
 insert into token_community_memberships
@@ -152,7 +154,9 @@ select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
 from tokens_insert tokens
 join token_definitions on tokens.token_definition_id = token_definitions.id and not token_definitions.deleted
 join contracts on token_definitions.contract_id = contracts.id
-where tokens.created_at = tokens.last_updated;
+-- tokens is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this snapshot.
+left join tokens prior_state on tokens.owner_user_id = prior_state.owner_user_id and tokens.token_definition_id = prior_state.token_definition_id and not prior_state.deleted
+where prior_state.id is null;
 
 -- name: DeleteTokensBeforeTimestamp :execrows
 update tokens t
