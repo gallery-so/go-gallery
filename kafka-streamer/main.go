@@ -135,6 +135,7 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 	// Creating multiple configs for each topic allows them to process separate partitions in parallel
 	configs := []*streamerConfig{
 		newEthereumOwnerConfig(deserializer, queries),
+		newEthereumOwnerConfig(deserializer, queries),
 		//newEthereumTokenConfig(deserializer, queries),
 		//newEthereumTokenConfig(deserializer, queries),
 		newBaseOwnerConfig(deserializer, queries),
