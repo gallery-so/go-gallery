@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	registry "github.com/confluentinc/confluent-kafka-go/schemaregistry"
@@ -57,11 +58,26 @@ func newEthereumOwnerConfig(deserializer *avro.GenericDeserializer, queries *mir
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessEthereumOwnerEntryParams) error {
-		return submitOwnerBatch(ctx, queries.ProcessEthereumOwnerEntry, entries)
+		return submitBatch(ctx, queries.ProcessEthereumOwnerEntry, entries)
 	}
 
 	return &streamerConfig{
 		Topic:   "ethereum.owner.v4",
+		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+	}
+}
+
+func newEthereumTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessEthereumTokenEntryParams, error) {
+		return parseTokenMessage(ctx, deserializer, message)
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessEthereumTokenEntryParams) error {
+		return submitBatch(ctx, queries.ProcessEthereumTokenEntry, entries)
+	}
+
+	return &streamerConfig{
+		Topic:   "ethereum.nft.v4",
 		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
 	}
 }
@@ -78,7 +94,7 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseOwnerEntryParams) error {
-		return submitOwnerBatch(ctx, queries.ProcessBaseOwnerEntry, entries)
+		return submitBatch(ctx, queries.ProcessBaseOwnerEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -99,7 +115,7 @@ func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessZoraOwnerEntryParams) error {
-		return submitOwnerBatch(ctx, queries.ProcessZoraOwnerEntry, entries)
+		return submitBatch(ctx, queries.ProcessZoraOwnerEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -535,19 +551,190 @@ func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 	return params, nil
 }
 
+func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializer, msg *kafka.Message) (mirrordb.ProcessEthereumTokenEntryParams, error) {
+	key := string(msg.Key)
+
+	nft := ethereum.Nft{}
+	err := deserializer.DeserializeInto(*msg.TopicPartition.Topic, msg.Value, &nft)
+	if err != nil {
+		return mirrordb.ProcessEthereumTokenEntryParams{}, fmt.Errorf("failed to deserialize token message with key %s: %w", key, err)
+	}
+
+	actionType, err := getActionType(msg)
+	if err != nil {
+		err = fmt.Errorf("failed to get action type for msg: %v", msg)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	contractAddress, tokenID, err := parseNftID(nft.Nft_id)
+	if err != nil {
+		return mirrordb.ProcessEthereumTokenEntryParams{}, fmt.Errorf("error parsing NftID: %w", err)
+	}
+
+	previews, err := toJSONB(nft.Previews)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Previews to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	contract, err := toJSONB(nft.Contract)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Contract to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	lastSale, err := toJSONB(nft.Last_sale)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Last_sale to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	firstCreated, err := toJSONB(nft.First_created)
+	if err != nil {
+		err = fmt.Errorf("failed to convert First_created to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	rarity, err := toJSONB(nft.Rarity)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Rarity to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	imageProperties, err := toJSONB(nft.Image_properties)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Image_properties to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	videoProperties, err := toJSONB(nft.Video_properties)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Video_properties to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	audioProperties, err := toJSONB(nft.Audio_properties)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Audio_properties to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	modelProperties, err := toJSONB(nft.Model_properties)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Model_properties to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	otherProperties, err := toJSONB(nft.Other_properties)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Other_properties to JSONB: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	tokenCount, err := parseNumeric(nft.Token_count)
+	if err != nil {
+		err = fmt.Errorf("failed to parse Token_count: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	ownerCount, err := parseNumeric(nft.Owner_count)
+	if err != nil {
+		err = fmt.Errorf("failed to parse Owner_count: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	var collectionID *string
+	if nft.Collection != nil {
+		collectionID = nft.Collection.Collection_id
+	}
+
+	onChainCreatedDate, err := parseTimestamp(nft.Created_date)
+	if err != nil {
+		err = fmt.Errorf("failed to parse Created_date: %w", err)
+		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	var params mirrordb.ProcessEthereumTokenEntryParams
+
+	if actionType == "delete" {
+		params = mirrordb.ProcessEthereumTokenEntryParams{
+			ShouldDelete:       true,
+			SimplehashKafkaKey: key,
+
+			// pgtype.Numeric and pgtype.JSONB default to 'undefined' instead of 'null', so we actually need to
+			// set these explicitly or else we'll get an error when pgx tries to encode them.
+			TokenID:         pgtype.Numeric{Status: pgtype.Null},
+			TokenCount:      pgtype.Numeric{Status: pgtype.Null},
+			OwnerCount:      pgtype.Numeric{Status: pgtype.Null},
+			Previews:        pgtype.JSONB{Status: pgtype.Null},
+			Contract:        pgtype.JSONB{Status: pgtype.Null},
+			LastSale:        pgtype.JSONB{Status: pgtype.Null},
+			FirstCreated:    pgtype.JSONB{Status: pgtype.Null},
+			Rarity:          pgtype.JSONB{Status: pgtype.Null},
+			ImageProperties: pgtype.JSONB{Status: pgtype.Null},
+			VideoProperties: pgtype.JSONB{Status: pgtype.Null},
+			AudioProperties: pgtype.JSONB{Status: pgtype.Null},
+			ModelProperties: pgtype.JSONB{Status: pgtype.Null},
+			OtherProperties: pgtype.JSONB{Status: pgtype.Null},
+		}
+	} else {
+		if actionType == "insert" || actionType == "update" {
+			params = mirrordb.ProcessEthereumTokenEntryParams{
+				ShouldUpsert:       true,
+				SimplehashKafkaKey: key,
+				SimplehashNftID:    &nft.Nft_id,
+				ContractAddress:    &contractAddress,
+				TokenID:            tokenID,
+				Name:               nft.Name,
+				Description:        nft.Description,
+				Previews:           previews,
+				ImageUrl:           nft.Image_url,
+				VideoUrl:           nft.Video_url,
+				AudioUrl:           nft.Audio_url,
+				ModelUrl:           nft.Model_url,
+				OtherUrl:           nft.Other_url,
+				BackgroundColor:    nft.Background_color,
+				ExternalUrl:        nft.External_url,
+				OnChainCreatedDate: onChainCreatedDate,
+				Status:             nft.Status,
+				TokenCount:         tokenCount,
+				OwnerCount:         ownerCount,
+				Contract:           contract,
+				CollectionID:       collectionID,
+				LastSale:           lastSale,
+				FirstCreated:       firstCreated,
+				Rarity:             rarity,
+				ExtraMetadata:      nft.Extra_metadata,
+				ImageProperties:    imageProperties,
+				VideoProperties:    videoProperties,
+				AudioProperties:    audioProperties,
+				ModelProperties:    modelProperties,
+				OtherProperties:    otherProperties,
+				KafkaOffset:        util.ToPointer(int64(msg.TopicPartition.Offset)),
+				KafkaPartition:     util.ToPointer(msg.TopicPartition.Partition),
+				KafkaTimestamp:     util.ToPointer(msg.Timestamp),
+			}
+		} else {
+			return params, fmt.Errorf("invalid action type: %s", actionType)
+		}
+	}
+
+	return params, nil
+}
+
 type queryBatchExecuter interface {
 	Exec(func(i int, e error))
 	Close() error
 }
 
-func submitOwnerBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+func submitBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
 	b := queryF(ctx, entries)
 	defer b.Close()
 
 	var err error
 	b.Exec(func(i int, e error) {
 		if e != nil {
-			err = fmt.Errorf("failed to process owner entry: %w", e)
+			err = fmt.Errorf("failed to process entry: %w", e)
 		}
 	})
 
@@ -562,4 +749,26 @@ func getActionType(msg *kafka.Message) (string, error) {
 	}
 
 	return "", fmt.Errorf("no action type found in message headers")
+}
+
+// toJSONB takes a pointer to any JSON-serializable type and converts it into a pgtype.JSONB.
+// If the input is nil, it returns a JSONB with a status of Null to represent a NULL value in the database.
+func toJSONB[T any](data *T) (pgtype.JSONB, error) {
+	if data == nil {
+		return pgtype.JSONB{Status: pgtype.Null}, nil
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return pgtype.JSONB{}, err
+	}
+
+	var jsonb pgtype.JSONB
+	err = jsonb.Set(jsonData)
+	if err != nil {
+		return pgtype.JSONB{}, err
+	}
+
+	jsonb.Status = pgtype.Present // Explicitly mark the JSONB data as present
+	return jsonb, nil
 }
