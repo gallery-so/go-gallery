@@ -136,6 +136,7 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 	configs := []*streamerConfig{
 		newEthereumOwnerConfig(deserializer, queries),
 		newEthereumOwnerConfig(deserializer, queries),
+		newEthereumTokenConfig(deserializer, queries),
 		newBaseOwnerConfig(deserializer, queries),
 		newBaseOwnerConfig(deserializer, queries),
 		newZoraOwnerConfig(deserializer, queries),
