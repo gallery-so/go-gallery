@@ -174,8 +174,8 @@ func (c *Client) CreateTaskTokenProcessingSyncBatch(ctx context.Context, message
 	return c.submitTask(ctx, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))
 }
 
-func (c *Client) CreateTaskTokenProcessingManagedToken(ctx context.Context, message TokenProcessingTokenMessage, delayFor time.Duration) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskTokenProcessingManagedToken")
+func (c *Client) CreateTaskTokenProcessingRetryToken(ctx context.Context, message TokenProcessingTokenMessage, delayFor time.Duration) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskTokenProcessingRetryToken")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/tokenmanage/process/token", env.GetString("TOKEN_PROCESSING_URL"))

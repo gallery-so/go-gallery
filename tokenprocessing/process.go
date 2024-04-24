@@ -583,16 +583,17 @@ var (
 // The default behavior of SubmitTokens is to send the new token to tokenprocessing by a queue.
 // Sometimes, we want to run the token as soon as we get it such as for minting in order to track the minting state.
 // noopSubmiiter is used so the token isn't processed twice.
-type noopSubmiiter struct{}
+type noopSubmitter struct{}
 
-func (n *noopSubmiiter) SubmitNewTokens(context.Context, []persist.DBID) error { return nil }
-func (n *noopSubmiiter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
+func (n *noopSubmitter) SubmitNewTokens(context.Context, []persist.DBID) error { return nil }
+func (n *noopSubmitter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
 	return nil
 }
 
 func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor, tm *tokenmanage.Manager, h *highlight.Provider, tracker *highlightTracker, claim db.HighlightMintClaim) error {
-	mc = &(*mc)
-	mc.Submitter = &noopSubmiiter{}
+	cpy := *mc
+	cpy.Submitter = &noopSubmitter{}
+	mc = &cpy // pointers are passed by value, so this has no impact on the caller
 
 	// Guard to protect against the pipeline never exiting if something is buggy with the state machine
 	maxDepth := 10

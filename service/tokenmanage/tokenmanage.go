@@ -79,7 +79,7 @@ func (t *TokenProcessingSubmitter) SubmitNewTokens(ctx context.Context, tokenDef
 
 func (t *TokenProcessingSubmitter) SubmitTokenForRetry(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error {
 	msg := task.TokenProcessingTokenMessage{TokenDefinitionID: tokenDefinitionID, Attempts: attempt}
-	return t.TaskClient.CreateTaskTokenProcessingManagedToken(ctx, msg, delayFor)
+	return t.TaskClient.CreateTaskTokenProcessingRetryToken(ctx, msg, delayFor)
 }
 
 // TickTokenF marks a token as ran and returns the wait time before it can be run again
