@@ -182,8 +182,9 @@ with token_definitions_insert as (
     , is_fxhash = excluded.is_fxhash
   returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id, is_fxhash
 )
-select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash
+select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, (prior_state.id is null)::bool is_new_definition
 from token_definitions_insert token_definitions
+left join token_definitions prior_state on token_definitions.chain = prior_state.chain and token_definitions.contract_id = prior_state.contract_id and token_definitions.token_id = prior_state.token_id and not prior_state.deleted
 `
 
 type UpsertTokenDefinitionsParams struct {
@@ -203,8 +204,10 @@ type UpsertTokenDefinitionsParams struct {
 
 type UpsertTokenDefinitionsRow struct {
 	TokenDefinition TokenDefinition `db:"token_definition" json:"token_definition"`
+	IsNewDefinition bool            `db:"is_new_definition" json:"is_new_definition"`
 }
 
+// token_definitions is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this snapshot.
 func (q *Queries) UpsertTokenDefinitions(ctx context.Context, arg UpsertTokenDefinitionsParams) ([]UpsertTokenDefinitionsRow, error) {
 	rows, err := q.db.Query(ctx, upsertTokenDefinitions,
 		arg.DefinitionDbid,
@@ -244,6 +247,7 @@ func (q *Queries) UpsertTokenDefinitions(ctx context.Context, arg UpsertTokenDef
 			&i.TokenDefinition.ContractID,
 			&i.TokenDefinition.TokenMediaID,
 			&i.TokenDefinition.IsFxhash,
+			&i.IsNewDefinition,
 		); err != nil {
 			return nil, err
 		}
@@ -323,7 +327,8 @@ select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last
 from tokens_insert tokens
 join token_definitions on tokens.token_definition_id = token_definitions.id and not token_definitions.deleted
 join contracts on token_definitions.contract_id = contracts.id
-where tokens.created_at = tokens.last_updated
+left join tokens prior_state on tokens.owner_user_id = prior_state.owner_user_id and tokens.token_definition_id = prior_state.token_definition_id and not prior_state.deleted
+where prior_state.id is null
 `
 
 type UpsertTokensParams struct {
@@ -352,6 +357,7 @@ type UpsertTokensRow struct {
 	Contract        Contract        `db:"contract" json:"contract"`
 }
 
+// tokens is the snapshot of the table prior to inserting. We can determine if a token is new by checking against this snapshot.
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]UpsertTokensRow, error) {
 	rows, err := q.db.Query(ctx, upsertTokens,
 		arg.SetHolderFields,

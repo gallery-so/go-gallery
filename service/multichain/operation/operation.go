@@ -81,7 +81,7 @@ type UpsertToken struct {
 	Identifiers persist.TokenIdentifiers
 }
 
-func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.TokenDefinition) ([]db.TokenDefinition, error) {
+func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.TokenDefinition) ([]db.TokenDefinition, []bool, error) {
 	// Sort to ensure consistent insertion order
 	sort.SliceStable(tokens, func(i, j int) bool {
 		if tokens[i].Chain != tokens[j].Chain {
@@ -111,23 +111,25 @@ func InsertTokenDefinitions(ctx context.Context, q *db.Queries, tokens []db.Toke
 		p.DefinitionContractID = append(p.DefinitionContractID, t.ContractID.String())
 		p.DefinitionIsFxhash = append(p.DefinitionIsFxhash, t.IsFxhash)
 		if len(errors) > 0 {
-			return nil, errors[0]
+			return nil, nil, errors[0]
 		}
 	}
 
 	added, err := q.UpsertTokenDefinitions(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	logger.For(ctx).Infof("added %d new definition(s) to the db", len(added))
 
 	definitions := make([]db.TokenDefinition, len(added))
+	isNewDefinition := make([]bool, len(added))
 	for i, t := range added {
 		definitions[i] = t.TokenDefinition
+		isNewDefinition[i] = t.IsNewDefinition
 	}
 
-	return definitions, nil
+	return definitions, isNewDefinition, nil
 }
 
 func InsertTokenCommunityMemberships(ctx context.Context, q *db.Queries, memberships []db.TokenCommunityMembership, contractIDs []persist.DBID) ([]db.TokenCommunityMembership, error) {
