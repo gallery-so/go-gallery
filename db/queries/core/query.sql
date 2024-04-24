@@ -1463,8 +1463,8 @@ with insert_job(id) as (
     returning last_updated
 )
 , insert_new_media as (
-    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
-    values (@new_media_id, @new_media::jsonb, (select id from insert_job), @new_media_is_active,
+    insert into token_medias (id, chain, contract_address, token_id, media, processing_job_id, active, created_at, last_updated)
+    values (@new_media_id, @chain, @contract_address, @decimal_token_id, @new_media::jsonb, (select id from insert_job), @new_media_is_active,
         -- Using timestamps generated from set_conditionally_current_media_to_inactive ensures that the new record is only inserted after the current media is moved
         (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now())),
         (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now()))
@@ -1571,12 +1571,12 @@ select * from reprocess_jobs where id = $1;
 select m.* from token_medias m where m.id = $1 and not deleted;
 
 -- name: GetMediaByTokenIdentifiersIgnoringStatus :one
-select token_medias.*
-from token_definitions
-join token_medias on token_definitions.token_media_id = token_medias.id
-where (chain, contract_address, token_id) = (@chain, @contract_address::address, @token_id::hextokenid)
-    and not token_definitions.deleted
-    and not token_medias.deleted;
+select tm.*
+from token_definitions td
+join token_medias tm on td.token_media_id = tm.id
+where (td.chain, td.contract_address, td.token_id) = (@chain, @contract_address::address, @token_id::hextokenid)
+    and not td.deleted
+    and not tm.deleted;
 
 -- name: UpsertSession :one
 insert into sessions (id, user_id,

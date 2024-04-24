@@ -14,7 +14,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
-	"github.com/sourcegraph/conc/pool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
@@ -422,7 +421,7 @@ outer:
 		defer close(recCh)
 		defer close(errCh)
 		for c, page := range chainPages {
-			logger.For(ctx).Infof("adding %d unchecked tokens to chain=%d for user=%s", len(page.Tokens), c, userID)
+			logger.For(ctx).Infof("adding %d unchecked token(s) to chain=%d for user=%s", len(page.Tokens), c, userID)
 			recCh <- page
 		}
 	}()
@@ -651,7 +650,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 	// Insert token definitions
 	definitionsToAdd = dedupeTokenDefinitions(definitionsToAdd)
-	addedDefinitions, isNewDefinition, err := op.InsertTokenDefinitions(ctx, p.Queries, definitionsToAdd)
+	addedDefinitions, err := op.InsertTokenDefinitions(ctx, p.Queries, definitionsToAdd)
 	if err != nil {
 		logger.For(ctx).Errorf("error in bulk upsert of token definitions: %s", err)
 		return nil, err
@@ -660,6 +659,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 	tokenToDefinitionID := map[persist.TokenIdentifiers]persist.DBID{}
 	membershipsToAdd := make([]db.TokenCommunityMembership, len(addedDefinitions))
 	membershipContractIDs := make([]persist.DBID, len(addedDefinitions))
+	definitionsToSendToTokenProcessing := make([]persist.DBID, 0, len(addedDefinitions))
 
 	for i, t := range addedDefinitions {
 		membershipsToAdd[i] = db.TokenCommunityMembership{
@@ -667,12 +667,30 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 			TokenID:           t.TokenID.ToDecimalTokenID(),
 		}
 		membershipContractIDs[i] = t.ContractID
+
 		tID := persist.TokenIdentifiers{
 			TokenID:         t.TokenID,
 			ContractAddress: t.ContractAddress,
 			Chain:           t.Chain,
 		}
 		tokenToDefinitionID[tID] = t.ID
+
+		// Compare when the token was last updated to when it was created to determine if a token is new
+		// Add a fudge factor of a second to account for difference in clock times
+		if t.LastUpdated.Sub(t.CreatedAt) < time.Second {
+			logger.For(ctx).Infof("%s is new (dbid=%s); sending to tokenprocessing", tID, t.ID)
+			definitionsToSendToTokenProcessing = append(definitionsToSendToTokenProcessing, addedDefinitions[i].ID)
+		} else {
+			logger.For(ctx).Infof("%s already in db (dbid=%s); added %s ago; not sending to tokenprocessing", tID, t.ID, time.Since(t.CreatedAt))
+		}
+	}
+
+	// Send definitions to tokenprocessing
+	if len(definitionsToSendToTokenProcessing) > 0 {
+		if err := p.SubmitTokens(ctx, definitionsToSendToTokenProcessing); err != nil {
+			logger.For(ctx).Errorf("failed to submit batch: %s", err)
+			sentryutil.ReportError(ctx, err)
+		}
 	}
 
 	// Insert token memberships
@@ -680,19 +698,6 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 	if err != nil {
 		logger.For(ctx).Errorf("error in bulk upsert of token communities: %s", err)
 		return nil, err
-	}
-
-	// Send definitions to tokenprocessing
-	w := pool.New().WithMaxGoroutines(10)
-	definitionsToProcess := make([]persist.DBID, 0, len(addedDefinitions))
-	for i := range addedDefinitions {
-		if isNewDefinition[i] {
-			definitionsToProcess = append(definitionsToProcess, addedDefinitions[i].ID)
-		}
-	}
-	if err := p.SubmitTokens(ctx, definitionsToProcess); err != nil {
-		logger.For(ctx).Errorf("failed to submit batch: %s", err)
-		sentryutil.ReportError(ctx, err)
 	}
 
 	// Insert tokens
@@ -731,8 +736,6 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 	for _, t := range addedTokens {
 		newUserTokens[t.Instance.OwnerUserID] = append(newUserTokens[t.Instance.OwnerUserID], t)
 	}
-
-	w.Wait()
 
 	return newUserTokens, err
 }

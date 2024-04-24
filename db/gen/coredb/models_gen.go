@@ -679,14 +679,17 @@ type TokenDefinition struct {
 }
 
 type TokenMedia struct {
-	ID              persist.DBID  `db:"id" json:"id"`
-	CreatedAt       time.Time     `db:"created_at" json:"created_at"`
-	LastUpdated     time.Time     `db:"last_updated" json:"last_updated"`
-	Version         int32         `db:"version" json:"version"`
-	Active          bool          `db:"active" json:"active"`
-	Media           persist.Media `db:"media" json:"media"`
-	ProcessingJobID persist.DBID  `db:"processing_job_id" json:"processing_job_id"`
-	Deleted         bool          `db:"deleted" json:"deleted"`
+	ID              persist.DBID           `db:"id" json:"id"`
+	CreatedAt       time.Time              `db:"created_at" json:"created_at"`
+	LastUpdated     time.Time              `db:"last_updated" json:"last_updated"`
+	Version         int32                  `db:"version" json:"version"`
+	Active          bool                   `db:"active" json:"active"`
+	Media           persist.Media          `db:"media" json:"media"`
+	ProcessingJobID persist.DBID           `db:"processing_job_id" json:"processing_job_id"`
+	Deleted         bool                   `db:"deleted" json:"deleted"`
+	Chain           persist.Chain          `db:"chain" json:"chain"`
+	ContractAddress persist.Address        `db:"contract_address" json:"contract_address"`
+	TokenID         persist.DecimalTokenID `db:"token_id" json:"token_id"`
 }
 
 type TokenMediasActive struct {

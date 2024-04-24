@@ -90,6 +90,8 @@ sql:
           # TokenMedias
           - column: 'token_medias.media'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Media'
+          - column: 'token_medias.token_id'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.DecimalTokenID'
 
           # TokenProcessingJobs
           - column: 'token_processing_jobs.pipeline_metadata'
