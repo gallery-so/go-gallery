@@ -702,6 +702,11 @@ func (id *DecimalTokenID) DecodeBinary(ci *pgtype.ConnInfo, src []byte) error {
 		return err
 	}
 
+	if numeric.Status == pgtype.Null {
+		*id = ""
+		return nil
+	}
+
 	// Assign pgtype.Numeric to big.Rat, because pgtype.Numeric has built-in support for this conversion
 	var rat big.Rat
 	if err := numeric.AssignTo(&rat); err != nil {
