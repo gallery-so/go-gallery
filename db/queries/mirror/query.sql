@@ -184,14 +184,14 @@ with deletion as (
 contract_insert as (
     insert into ethereum.contracts (address, simplehash_lookup_nft_id)
     select @contract_address, @simplehash_nft_id
-    where @should_upsert::bool
+    where @should_upsert::bool and @contract_address is not null
     on conflict (address) do nothing
 ),
     
 collection_insert as (
     insert into ethereum.collections (id, simplehash_lookup_nft_id)
     select @collection_id, @simplehash_nft_id
-    where @should_upsert::bool
+    where @should_upsert::bool and @collection_id is not null
     on conflict (id) do nothing
 )
 
