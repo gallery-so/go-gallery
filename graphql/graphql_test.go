@@ -23,6 +23,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
+	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -176,7 +178,7 @@ func testSuggestedUsersForViewer(t *testing.T) {
 		userB.ID,
 		userC.ID,
 	})
-	p := newStubPersonaliztion(t)
+	p := newStubPersonalization(t)
 	handler := server.CoreInit(ctx, clients, provider, recommender, p)
 	c := customHandlerClient(t, handler, withJWTOpt(t, userF.ID))
 
@@ -852,7 +854,7 @@ func testSyncNewTokens(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("should sync new tokens", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, providers)
+		h := handlerWithProviders(t, &noopSubmitter{}, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -863,7 +865,7 @@ func testSyncNewTokens(t *testing.T) {
 	})
 
 	t.Run("should not duplicate tokens from repeat syncs", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, providers)
+		h := handlerWithProviders(t, &noopSubmitter{}, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
@@ -877,7 +879,7 @@ func testSyncNewTokens(t *testing.T) {
 		userF := newUserWithTokensFixture(t)
 		require.Greater(t, len(userF.TokenIDs), 0)
 		providers := multichain.ProviderLookup{persist.ChainETH: newStubProvider(withReturnError(fmt.Errorf("can't get tokens")))}
-		h := handlerWithProviders(t, submitUserTokensNoop, providers)
+		h := handlerWithProviders(t, &noopSubmitter{}, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		// Sync tokens with a failing provider
@@ -901,7 +903,7 @@ func testSyncNewTokensIncrementally(t *testing.T) {
 
 	tr := util.ToPointer(true)
 	t.Run("should sync new tokens incrementally", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, providers)
+		h := handlerWithProviders(t, &noopSubmitter{}, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)
@@ -912,7 +914,7 @@ func testSyncNewTokensIncrementally(t *testing.T) {
 	})
 
 	t.Run("should not duplicate tokens from repeat incremental syncs", func(t *testing.T) {
-		h := handlerWithProviders(t, submitUserTokensNoop, providers)
+		h := handlerWithProviders(t, &noopSubmitter{}, providers)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)
@@ -930,7 +932,7 @@ func testSyncNewTokensMultichain(t *testing.T) {
 	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
 	secondProvider := newStubProvider(withDummyTokenN(contract, userF.Wallet.Address, 10))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider, persist.ChainOptimism: secondProvider}
-	h := handlerWithProviders(t, submitUserTokensNoop, providers)
+	h := handlerWithProviders(t, &noopSubmitter{}, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	ctx := context.Background()
 
@@ -946,17 +948,18 @@ func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0xdead"}, userF.Wallet.Address, 10))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
-	tokenRecorder := sendTokensRecorder{}
-	h := handlerWithProviders(t, tokenRecorder.Send, providers)
+	submitter := &recorderSubmitter{}
+	h := handlerWithProviders(t, submitter, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	// Ideally this compares against expected values, but mocks seems to behave weirdly with slices
-	tokenRecorder.On("Send", mock.Anything, mock.Anything).Times(1).Return(nil)
+	submitter.On("SubmitNewTokens", mock.Anything, mock.Anything).Times(1).Return(nil)
 
 	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	require.NoError(t, err)
-	tokenRecorder.AssertExpectations(t)
-	assert.Len(t, tokenRecorder.Tasks[0].TokenDefinitionIDs, len(provider.Tokens))
+	submitter.AssertExpectations(t)
+	tokens := submitter.Calls[0].Arguments.Get(1).([]persist.DBID)
+	assert.Len(t, tokens, len(provider.Tokens))
 }
 
 func testSyncSkipsSubmittingOldTokens(t *testing.T) {
@@ -972,13 +975,13 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 	require.NoError(t, err)
 
 	// Then sync again, with a provider that returns the same tokens
-	tokenRecorder := sendTokensRecorder{}
-	h = handlerWithProviders(t, tokenRecorder.Send, providers)
+	submitter := &recorderSubmitter{}
+	h = handlerWithProviders(t, submitter, providers)
 	c = customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	_, err = syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 	require.NoError(t, err)
-	tokenRecorder.AssertNotCalled(t, "Send")
+	submitter.AssertNotCalled(t, "SubmitNewTokens")
 }
 
 func testSyncKeepsOldTokens(t *testing.T) {
@@ -987,7 +990,7 @@ func testSyncKeepsOldTokens(t *testing.T) {
 	newTokensLen := 4
 	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, newTokensLen))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
-	h := handlerWithProviders(t, submitUserTokensNoop, providers)
+	h := handlerWithProviders(t, &noopSubmitter{}, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
@@ -1007,7 +1010,7 @@ func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 		withTokens([]multichain.ChainAgnosticToken{token, token}),
 	)
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
-	h := handlerWithProviders(t, submitUserTokensNoop, providers)
+	h := handlerWithProviders(t, &noopSubmitter{}, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
@@ -1023,9 +1026,14 @@ func newDummyMetadataProviderFixture(t *testing.T, ctx context.Context, chain pe
 	provider := newStubProvider(pOpts...)
 	providers := multichain.ProviderLookup{chain: provider}
 	c := server.ClientInit(ctx)
-	mc := newMultichainProvider(c, submitUserTokensNoop, providers)
+	mc := newMultichainProvider(c, &noopSubmitter{}, providers)
 	t.Cleanup(func() { c.Close() })
-	return handlerWithProviders(t, sendTokensToTokenProcessing(ctx, c, &mc), providers)
+	submitter := &httpSubmitter{
+		Handler:  tokenprocessing.CoreInitServer(ctx, c, &mc),
+		Method:   http.MethodPost,
+		Endpoint: "/media/process",
+	}
+	return handlerWithProviders(t, submitter, providers)
 }
 
 func testSyncShouldProcessMedia(t *testing.T) {
@@ -1628,7 +1636,7 @@ func defaultHandler(t *testing.T) http.Handler {
 	c := server.ClientInit(ctx)
 	p, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	r := newStubRecommender(t, []persist.DBID{})
-	pnl := newStubPersonaliztion(t)
+	pnl := newStubPersonalization(t)
 	handler := server.CoreInit(ctx, c, p, r, pnl)
 	t.Cleanup(func() {
 		c.Close()
@@ -1638,21 +1646,21 @@ func defaultHandler(t *testing.T) http.Handler {
 }
 
 // handlerWithProviders returns a GraphQL http.Handler
-func handlerWithProviders(t *testing.T, submitF multichain.SubmitTokensF, p multichain.ProviderLookup) http.Handler {
+func handlerWithProviders(t *testing.T, submitter tokenmanage.Submitter, p multichain.ProviderLookup) http.Handler {
 	ctx := context.Background()
 	c := server.ClientInit(context.Background())
-	provider := newMultichainProvider(c, submitF, p)
+	provider := newMultichainProvider(c, submitter, p)
 	t.Cleanup(c.Close)
-	return server.CoreInit(ctx, c, &provider, newStubRecommender(t, []persist.DBID{}), newStubPersonaliztion(t))
+	return server.CoreInit(ctx, c, &provider, newStubRecommender(t, []persist.DBID{}), newStubPersonalization(t))
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers
-func newMultichainProvider(c *server.Clients, submitF multichain.SubmitTokensF, p multichain.ProviderLookup) multichain.Provider {
+func newMultichainProvider(c *server.Clients, submitter tokenmanage.Submitter, p multichain.ProviderLookup) multichain.Provider {
 	return multichain.Provider{
-		Repos:        c.Repos,
-		Queries:      c.Queries,
-		Chains:       p,
-		SubmitTokens: submitF,
+		Repos:     c.Repos,
+		Queries:   c.Queries,
+		Chains:    p,
+		Submitter: submitter,
 	}
 }
 

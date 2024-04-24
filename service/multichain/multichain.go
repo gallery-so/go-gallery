@@ -24,6 +24,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/mikeydub/go-gallery/validate"
@@ -41,14 +42,11 @@ var unknownContractNames = map[string]bool{
 
 const maxCommunitySize = 1000
 
-// SubmitTokens is called to process a batch of tokens
-type SubmitTokensF func(ctx context.Context, tDefIDs []persist.DBID) error
-
 type Provider struct {
-	Repos        *postgres.Repositories
-	Queries      *db.Queries
-	SubmitTokens SubmitTokensF
-	Chains       ProviderLookup
+	Repos     *postgres.Repositories
+	Queries   *db.Queries
+	Chains    ProviderLookup
+	Submitter tokenmanage.Submitter
 }
 
 // ChainAgnosticToken is a token that is agnostic to the chain it is on
@@ -650,7 +648,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 	// Insert token definitions
 	definitionsToAdd = dedupeTokenDefinitions(definitionsToAdd)
-	addedDefinitions, err := op.InsertTokenDefinitions(ctx, p.Queries, definitionsToAdd)
+	addedDefinitions, isNewDefinitions, err := op.InsertTokenDefinitions(ctx, p.Queries, definitionsToAdd)
 	if err != nil {
 		logger.For(ctx).Errorf("error in bulk upsert of token definitions: %s", err)
 		return nil, err
@@ -677,20 +675,18 @@ func (p *Provider) processTokensForUsers(ctx context.Context, chain persist.Chai
 
 		// Compare when the token was last updated to when it was created to determine if a token is new
 		// Add a fudge factor of a second to account for difference in clock times
-		if t.LastUpdated.Sub(t.CreatedAt) < time.Second {
-			logger.For(ctx).Infof("%s is new (dbid=%s); sending to tokenprocessing", tID, t.ID)
+		if isNewDefinitions[i] {
+			logger.For(ctx).Infof("%s is new (dbid=%s); adding to tokenprocessing batch", tID, t.ID)
 			definitionsToSendToTokenProcessing = append(definitionsToSendToTokenProcessing, addedDefinitions[i].ID)
 		} else {
-			logger.For(ctx).Infof("%s already in db (dbid=%s); added %s ago; not sending to tokenprocessing", tID, t.ID, time.Since(t.CreatedAt))
+			logger.For(ctx).Infof("%s was already in db (dbid=%s); not adding to tokenprocessing batch", tID, t.ID)
 		}
 	}
 
 	// Send definitions to tokenprocessing
-	if len(definitionsToSendToTokenProcessing) > 0 {
-		if err := p.SubmitTokens(ctx, definitionsToSendToTokenProcessing); err != nil {
-			logger.For(ctx).Errorf("failed to submit batch: %s", err)
-			sentryutil.ReportError(ctx, err)
-		}
+	if err := p.Submitter.SubmitNewTokens(ctx, definitionsToSendToTokenProcessing); err != nil {
+		logger.For(ctx).Errorf("failed to submit batch: %s", err)
+		sentryutil.ReportError(ctx, err)
 	}
 
 	// Insert token memberships

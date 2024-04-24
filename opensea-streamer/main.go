@@ -161,7 +161,7 @@ func addSeenEvent(messageBytes []byte) bool {
 }
 
 func dispatchToTokenProcessing(ctx context.Context, taskClient *task.Client, payload persist.OpenSeaWebhookInput) {
-	err := taskClient.CreateTaskForOpenseaStreamerTokenProcessing(ctx, payload)
+	err := taskClient.CreateTaskTokenProcessingForOpenseaStreamer(ctx, payload)
 	if err != nil {
 		err = fmt.Errorf("error creating task for token processing: %w", err)
 		logger.For(ctx).Error(err)

@@ -28,10 +28,10 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	fastRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickFast", 1, 30*time.Second)
 	slowRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickSlow", 1, 5*time.Minute)
 	mintRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickMint", 1, 10*time.Second)
-	refreshManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenSync(ctx, fastRetry, slowRetry, mintRetry))
-	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesSync, tickTokenSync(ctx, fastRetry, slowRetry, mintRetry))
+	refreshManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenSyncF(ctx, fastRetry, slowRetry, mintRetry))
+	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesSync, tickTokenSyncF(ctx, fastRetry, slowRetry, mintRetry))
 	highlightProvider := highlight.NewProvider(http.DefaultClient)
-	mintManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickToken(ctx, mintRetry))
+	mintManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenF(ctx, mintRetry))
 
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/process", func(c *gin.Context) {
@@ -58,14 +58,14 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	return router
 }
 
-func tickToken(ctx context.Context, l *limiters.KeyRateLimiter) tokenmanage.TickToken {
+func tickTokenF(ctx context.Context, l *limiters.KeyRateLimiter) tokenmanage.TickTokenF {
 	return func(td db.TokenDefinition) (time.Duration, error) {
 		_, delay, err := l.ForKey(ctx, td.ID.String())
 		return delay, err
 	}
 }
 
-func tickTokenSync(ctx context.Context, fastRetry, slowRetry, mintRetry *limiters.KeyRateLimiter) tokenmanage.TickToken {
+func tickTokenSyncF(ctx context.Context, fastRetry, slowRetry, mintRetry *limiters.KeyRateLimiter) tokenmanage.TickTokenF {
 	return func(td db.TokenDefinition) (time.Duration, error) {
 		if shareToGalleryEnabled(td) {
 			_, delay, err := fastRetry.ForKey(ctx, td.ID.String())
