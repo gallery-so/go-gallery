@@ -39,11 +39,11 @@ type envInit struct{}
 func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Provider, func()) {
 	wire.Build(
 		setEnv,
-		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
-		newTokenManageCache,
+		wire.Value(http.DefaultClient), // HTTP client shared between providers
 		postgres.NewRepositories,
 		dbConnSet,
 		wire.Struct(new(multichain.ChainProvider), "*"),
+		tokenProcessingSubmitterInjector,
 		multichainProviderInjector,
 		ethInjector,
 		tezosInjector,
@@ -83,10 +83,14 @@ func newQueries(p *pgxpool.Pool) *db.Queries {
 	return db.New(p)
 }
 
-func multichainProviderInjector(context.Context, *postgres.Repositories, *db.Queries, *redis.Cache, *multichain.ChainProvider) *multichain.Provider {
+func newTokenManageCache() *redis.Cache {
+	return redis.NewCache(redis.TokenManageCache)
+}
+
+func multichainProviderInjector(ctx context.Context, repos *postgres.Repositories, q *db.Queries, chainProvider *multichain.ChainProvider, submitter *tokenmanage.TokenProcessingSubmitter) *multichain.Provider {
 	panic(wire.Build(
 		wire.Struct(new(multichain.Provider), "*"),
-		submitTokenBatchInjector,
+		wire.Bind(new(tokenmanage.Submitter), util.ToPointer(submitter)),
 		newProviderLookup,
 	))
 }
@@ -443,21 +447,11 @@ func polygonSyncPipelineInjector(
 	))
 }
 
-func newTokenManageCache() *redis.Cache {
-	return redis.NewCache(redis.TokenManageCache)
-}
-
-func submitTokenBatchInjector(context.Context, *redis.Cache) multichain.SubmitTokensF {
+func tokenProcessingSubmitterInjector(context.Context) *tokenmanage.TokenProcessingSubmitter {
 	panic(wire.Build(
-		submitBatch,
-		tokenmanage.New,
+		wire.Struct(new(tokenmanage.TokenProcessingSubmitter), "*"),
 		task.NewClient,
-		tickToken,
+		wire.Struct(new(tokenmanage.Registry), "*"),
+		newTokenManageCache,
 	))
-}
-
-func tickToken() tokenmanage.TickToken { return nil }
-
-func submitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
-	return tm.SubmitBatch
 }

@@ -572,7 +572,6 @@ func processHighlightMintClaim(mc *multichain.Provider, highlightProvider *highl
 
 		logger.For(ctx).Infof("succesfully handled highlight mint claimID=%s", msg.ClaimID)
 		ctx.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-		return
 	}
 }
 
@@ -581,12 +580,19 @@ var (
 	errHighlightTokenStillSyncing = fmt.Errorf("minted token is still syncing")
 )
 
+// The default behavior of SubmitTokens is to send the new token to tokenprocessing by a queue.
+// Sometimes, we want to run the token as soon as we get it - such as for minting, to accurately track the minting state.
+// noopSubmiiter is used so the token isn't processed twice.
+type noopSubmiiter struct{}
+
+func (n *noopSubmiiter) SubmitNewTokens(context.Context, []persist.DBID) error { return nil }
+func (n *noopSubmiiter) SubmitTokenManaged(context.Context, persist.DBID, int, time.Duration) error {
+	return nil
+}
+
 func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor, tm *tokenmanage.Manager, h *highlight.Provider, tracker *highlightTracker, claim db.HighlightMintClaim) error {
-	// The default behavior of SubmitTokens is to send the new token to tokenprocessing by a queue.
-	// We want to run the token as soon as we get it and also to accurately track the minting state,
-	// so SubmitTokens is updated to a noop so the token isn't processed twice.
 	mc = &(*mc)
-	mc.SubmitTokens = func(context.Context, []persist.DBID) error { return nil }
+	mc.Submitter = &noopSubmiiter{}
 
 	// Guard to protect against the pipeline never exiting if something is buggy with the state machine
 	maxDepth := 10
@@ -752,8 +758,7 @@ func runManagedPipeline(ctx context.Context, tp *tokenProcessor, tm *tokenmanage
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDefinitionDBID": td.ID,
 		"contractDBID":        td.ContractID,
-		"tokenID":             td.TokenID,
-		"tokenID_base10":      td.TokenID.Base10String(),
+		"tokenID":             td.TokenID.ToDecimalTokenID(),
 		"contractAddress":     td.ContractAddress,
 		"chain":               td.Chain,
 		"cause":               cause,

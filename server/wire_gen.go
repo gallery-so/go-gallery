@@ -39,7 +39,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	pool, cleanup2 := newPgxClient(serverEnvInit)
 	repositories := postgres.NewRepositories(db, pool)
 	queries := newQueries(pool)
-	cache := newTokenManageCache()
 	client := _wireClientValue
 	ethereumProvider, cleanup3 := ethInjector(serverEnvInit, ctx, client)
 	tezosProvider := tezosInjector(serverEnvInit, client)
@@ -59,7 +58,8 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		Base:     baseProvider,
 		Polygon:  polygonProvider,
 	}
-	provider := multichainProviderInjector(ctx, repositories, queries, cache, chainProvider)
+	tokenProcessingSubmitter := tokenProcessingSubmitterInjector(ctx)
+	provider := multichainProviderInjector(ctx, repositories, queries, chainProvider, tokenProcessingSubmitter)
 	return provider, func() {
 		cleanup8()
 		cleanup7()
@@ -73,17 +73,16 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 }
 
 var (
-	_wireClientValue = &http.Client{Timeout: 0}
+	_wireClientValue = http.DefaultClient
 )
 
-func multichainProviderInjector(contextContext context.Context, repositories *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, chainProvider *multichain.ChainProvider) *multichain.Provider {
-	submitTokensF := submitTokenBatchInjector(contextContext, cache)
+func multichainProviderInjector(ctx context.Context, repos *postgres.Repositories, q *coredb.Queries, chainProvider *multichain.ChainProvider, submitter *tokenmanage.TokenProcessingSubmitter) *multichain.Provider {
 	providerLookup := newProviderLookup(chainProvider)
 	provider := &multichain.Provider{
-		Repos:        repositories,
-		Queries:      queries,
-		SubmitTokens: submitTokensF,
-		Chains:       providerLookup,
+		Repos:     repos,
+		Queries:   q,
+		Chains:    providerLookup,
+		Submitter: submitter,
 	}
 	return provider
 }
@@ -427,12 +426,17 @@ func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, c
 	}
 }
 
-func submitTokenBatchInjector(contextContext context.Context, cache *redis.Cache) multichain.SubmitTokensF {
+func tokenProcessingSubmitterInjector(contextContext context.Context) *tokenmanage.TokenProcessingSubmitter {
 	client := task.NewClient(contextContext)
-	tokenmanageTickToken := tickToken()
-	manager := tokenmanage.New(contextContext, client, cache, tokenmanageTickToken)
-	submitTokensF := submitBatch(manager)
-	return submitTokensF
+	cache := newTokenManageCache()
+	registry := &tokenmanage.Registry{
+		Cache: cache,
+	}
+	tokenProcessingSubmitter := &tokenmanage.TokenProcessingSubmitter{
+		TaskClient: client,
+		Registry:   registry,
+	}
+	return tokenProcessingSubmitter
 }
 
 // inject.go:
@@ -468,17 +472,11 @@ func newQueries(p *pgxpool.Pool) *coredb.Queries {
 	return coredb.New(p)
 }
 
-// New chains must be added here
-func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
-	return multichain.ProviderLookup{persist.ChainETH: p.Ethereum, persist.ChainTezos: p.Tezos, persist.ChainOptimism: p.Optimism, persist.ChainArbitrum: p.Arbitrum, persist.ChainPOAP: p.Poap, persist.ChainZora: p.Zora, persist.ChainBase: p.Base, persist.ChainPolygon: p.Polygon}
-}
-
 func newTokenManageCache() *redis.Cache {
 	return redis.NewCache(redis.TokenManageCache)
 }
 
-func tickToken() tokenmanage.TickToken { return nil }
-
-func submitBatch(tm *tokenmanage.Manager) multichain.SubmitTokensF {
-	return tm.SubmitBatch
+// New chains must be added here
+func newProviderLookup(p *multichain.ChainProvider) multichain.ProviderLookup {
+	return multichain.ProviderLookup{persist.ChainETH: p.Ethereum, persist.ChainTezos: p.Tezos, persist.ChainOptimism: p.Optimism, persist.ChainArbitrum: p.Arbitrum, persist.ChainPOAP: p.Poap, persist.ChainZora: p.Zora, persist.ChainBase: p.Base, persist.ChainPolygon: p.Polygon}
 }

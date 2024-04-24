@@ -50,55 +50,79 @@ func (e ErrContractFlaking) Error() string {
 	return fmt.Sprintf("runs of chain=%d; contract=%s are paused for %s because of too many failed runs; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
 }
 
-type TickToken func(db.TokenDefinition) (time.Duration, error)
-
-type Manager struct {
-	ProcessRegistry *Registry
-	taskClient      *task.Client
-	throttle        *throttle.Locker
-	errorCounter    *limiters.KeyRateLimiter
-	tickToken       TickToken
-	metricReporter  metric.MetricReporter
-	maxRetries      func(db.TokenDefinition) int
+type Submitter interface {
+	// Handles how new tokens to Gallery should be processed
+	SubmitNewTokens(ctx context.Context, tokenDefinitionIDs []persist.DBID) error
+	// Handles how a token that is up for retry should be processed
+	SubmitTokenManaged(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error
 }
 
-func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache, tickToken TickToken) *Manager {
+type TokenProcessingSubmitter struct {
+	TaskClient *task.Client
+	Registry   *Registry
+}
+
+func (t *TokenProcessingSubmitter) SubmitNewTokens(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
+	if len(tokenDefinitionIDs) == 0 {
+		logger.For(ctx).Infof("received empty batch, skipping send to tokenprocessing")
+		return nil
+	}
+
+	batchID := persist.GenerateID()
+	msg := task.TokenProcessingBatchMessage{BatchID: batchID, TokenDefinitionIDs: tokenDefinitionIDs}
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"batchID": msg.BatchID})
+
+	logger.For(ctx).Infof("enqueueing batch: %s (size=%d)", batchID, len(tokenDefinitionIDs))
+	t.Registry.setManyEnqueue(ctx, tokenDefinitionIDs)
+	return t.TaskClient.CreateTaskTokenProcessingSyncBatch(ctx, msg)
+}
+
+func (t *TokenProcessingSubmitter) SubmitTokenManaged(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error {
+	msg := task.TokenProcessingTokenMessage{TokenDefinitionID: tokenDefinitionID, Attempts: attempt}
+	return t.TaskClient.CreateTaskTokenProcessingManagedToken(ctx, msg, delayFor)
+}
+
+// TickTokenF marks a token as ran and returns the wait time before it can be run again
+type TickTokenF func(db.TokenDefinition) (time.Duration, error)
+
+type Manager struct {
+	Registry       *Registry
+	Submitter      Submitter
+	throttle       *throttle.Locker
+	errorCounter   *limiters.KeyRateLimiter
+	tickTokenF     TickTokenF
+	metricReporter metric.MetricReporter
+	maxRetries     func(db.TokenDefinition) int
+}
+
+func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache, tickTokenF TickTokenF) *Manager {
+	registry := &Registry{cache}
+	submitter := &TokenProcessingSubmitter{taskClient, registry}
 	return &Manager{
-		ProcessRegistry: &Registry{cache},
-		taskClient:      taskClient,
-		throttle:        throttle.NewThrottleLocker(cache, 30*time.Minute),
-		metricReporter:  metric.NewLogMetricReporter(),
-		errorCounter:    limiters.NewKeyRateLimiter(ctx, cache, "errorCount", 100, 3*time.Hour),
-		tickToken:       tickToken,
+		Registry:       registry,
+		Submitter:      submitter,
+		throttle:       throttle.NewThrottleLocker(cache, 30*time.Minute),
+		metricReporter: metric.NewLogMetricReporter(),
+		errorCounter:   limiters.NewKeyRateLimiter(ctx, cache, "errorCount", 100, 3*time.Hour),
+		tickTokenF:     tickTokenF,
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, maxRetries func(db.TokenDefinition) int, tickToken TickToken) *Manager {
-	m := New(ctx, taskClient, cache, tickToken)
+func NewWithRetries(ctx context.Context, taskClient *task.Client, cache *redis.Cache, maxRetries func(db.TokenDefinition) int, tickTokenF TickTokenF) *Manager {
+	m := New(ctx, taskClient, cache, tickTokenF)
 	m.maxRetries = maxRetries
 	return m
 }
 
 // Processing returns true if the token is processing or enqueued.
 func (m Manager) Processing(ctx context.Context, tDefID persist.DBID) bool {
-	p, _ := m.ProcessRegistry.processing(ctx, tDefID)
+	p, _ := m.Registry.processing(ctx, tDefID)
 	return p
-}
-
-// SubmitBatch enqueues tokens for processing.
-func (m Manager) SubmitBatch(ctx context.Context, tDefIDs []persist.DBID) error {
-	if len(tDefIDs) == 0 {
-		return nil
-	}
-	m.ProcessRegistry.setManyEnqueue(ctx, tDefIDs)
-	message := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
-	logger.For(ctx).WithField("batchID", message.BatchID).Infof("enqueued batch: %s (size=%d)", message.BatchID, len(tDefIDs))
-	return m.taskClient.CreateTaskForTokenProcessing(ctx, message)
 }
 
 // IsPaused returns true if runs of this token are paused.
 func (m Manager) Paused(ctx context.Context, td db.TokenDefinition) bool {
-	p, _ := m.ProcessRegistry.pausedContract(ctx, td.Chain, td.ContractAddress)
+	p, _ := m.Registry.pausedContract(ctx, td.Chain, td.ContractAddress)
 	return p
 }
 
@@ -122,11 +146,11 @@ func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, att
 
 	go func() {
 		defer tick.Stop()
-		m.ProcessRegistry.keepAlive(ctx, td.ID)
+		m.Registry.keepAlive(ctx, td.ID)
 		for {
 			select {
 			case <-tick.C:
-				m.ProcessRegistry.keepAlive(ctx, td.ID)
+				m.Registry.keepAlive(ctx, td.ID)
 			case <-stop:
 				close(done)
 				return
@@ -139,7 +163,7 @@ func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, att
 	callback := func(tm db.TokenMedia, err error) error {
 		close(stop)
 		<-done
-		m.tickToken(td) // mark that the token ran so if an error occured tryRetry delays the next run appropriately
+		m.tickTokenF(td) // mark that the token ran so if an error occured tryRetry delays the next run appropriately
 		m.recordError(ctx, td, err)
 		m.tryRetry(ctx, td, err, attempts)
 		m.throttle.Unlock(ctx, "lock:"+td.ID.String())
@@ -156,7 +180,7 @@ func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, origina
 		return
 	}
 
-	if paused, _ := m.ProcessRegistry.pausedContract(ctx, td.Chain, td.ContractAddress); paused {
+	if paused, _ := m.Registry.pausedContract(ctx, td.Chain, td.ContractAddress); paused {
 		return
 	}
 
@@ -170,7 +194,7 @@ func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, origina
 		return
 	}
 
-	nowFlaky, err := m.ProcessRegistry.pauseContract(ctx, td.Chain, td.ContractAddress, time.Hour*3)
+	nowFlaky, err := m.Registry.pauseContract(ctx, td.Chain, td.ContractAddress, time.Hour*3)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to pause contract:%s", err)
 		sentryutil.ReportError(ctx, err)
@@ -187,30 +211,29 @@ func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, origina
 func (m Manager) tryRetry(ctx context.Context, td db.TokenDefinition, err error, attempts int) error {
 	// Only retry intermittent errors related to the token e.g. missing metadata
 	if !util.ErrorIs[ErrBadToken](err) {
-		m.ProcessRegistry.finish(ctx, td.ID)
+		m.Registry.finish(ctx, td.ID)
 		return nil
 	}
 
 	if m.Paused(ctx, td) {
-		m.ProcessRegistry.finish(ctx, td.ID)
+		m.Registry.finish(ctx, td.ID)
 		return nil
 	}
 
 	if err == nil || m.maxRetries == nil || attempts >= m.maxRetries(td) {
-		m.ProcessRegistry.finish(ctx, td.ID)
+		m.Registry.finish(ctx, td.ID)
 		return nil
 	}
 
-	delay, err := m.tickToken(td)
+	delay, err := m.tickTokenF(td)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to get retry delay, not retrying: %s", err)
-		m.ProcessRegistry.finish(ctx, td.ID)
+		m.Registry.finish(ctx, td.ID)
 		return err
 	}
 
-	m.ProcessRegistry.SetEnqueue(ctx, td.ID)
-	message := task.TokenProcessingTokenMessage{TokenDefinitionID: td.ID, Attempts: attempts + 1}
-	return m.taskClient.CreateTaskForTokenTokenProcessing(ctx, message, delay)
+	m.Registry.SetEnqueue(ctx, td.ID)
+	return m.Submitter.SubmitTokenManaged(ctx, td.ID, attempts+1, delay)
 }
 
 // Registry handles the storing of object state managed by Manager

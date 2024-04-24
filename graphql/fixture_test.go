@@ -228,7 +228,7 @@ func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 	user := newUserFixture(t)
 	ctx := context.Background()
 	providers := multichain.ProviderLookup{persist.ChainETH: defaultStubProvider(user.Wallet.Address)}
-	h := handlerWithProviders(t, submitUserTokensNoop, providers)
+	h := handlerWithProviders(t, &noopSubmitter{}, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, user.ID))
 	tokenIDs := syncTokens(t, ctx, c, user.ID)
 	return userWithTokensFixture{user, tokenIDs}
