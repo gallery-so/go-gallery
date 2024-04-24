@@ -2976,12 +2976,12 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 }
 
 const getMediaByTokenIdentifiersIgnoringStatus = `-- name: GetMediaByTokenIdentifiersIgnoringStatus :one
-select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.active, token_medias.media, token_medias.processing_job_id, token_medias.deleted
-from token_definitions
-join token_medias on token_definitions.token_media_id = token_medias.id
-where (chain, contract_address, token_id) = ($1, $2::address, $3::hextokenid)
-    and not token_definitions.deleted
-    and not token_medias.deleted
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted, tm.chain, tm.contract_address, tm.token_id
+from token_definitions td
+join token_medias tm on td.token_media_id = tm.id
+where (td.chain, td.contract_address, td.token_id) = ($1, $2::address, $3::hextokenid)
+    and not td.deleted
+    and not tm.deleted
 `
 
 type GetMediaByTokenIdentifiersIgnoringStatusParams struct {
@@ -3002,6 +3002,9 @@ func (q *Queries) GetMediaByTokenIdentifiersIgnoringStatus(ctx context.Context, 
 		&i.Media,
 		&i.ProcessingJobID,
 		&i.Deleted,
+		&i.Chain,
+		&i.ContractAddress,
+		&i.TokenID,
 	)
 	return i, err
 }
@@ -3430,7 +3433,7 @@ func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error
 }
 
 const getPotentialENSProfileImageByUserId = `-- name: GetPotentialENSProfileImageByUserId :one
-select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.active, token_medias.media, token_medias.processing_job_id, token_medias.deleted, wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain
+select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_definitions.is_fxhash, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.active, token_medias.media, token_medias.processing_job_id, token_medias.deleted, token_medias.chain, token_medias.contract_address, token_medias.token_id, wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain
 from token_definitions, tokens, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
 where token_definitions.contract_address = $1
     and token_definitions.chain = $2
@@ -3490,6 +3493,9 @@ func (q *Queries) GetPotentialENSProfileImageByUserId(ctx context.Context, arg G
 		&i.TokenMedia.Media,
 		&i.TokenMedia.ProcessingJobID,
 		&i.TokenMedia.Deleted,
+		&i.TokenMedia.Chain,
+		&i.TokenMedia.ContractAddress,
+		&i.TokenMedia.TokenID,
 		&i.Wallet.ID,
 		&i.Wallet.CreatedAt,
 		&i.Wallet.LastUpdated,
@@ -6179,19 +6185,19 @@ with insert_job(id) as (
     returning last_updated
 )
 , insert_new_media as (
-    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
-    values ($11, $12::jsonb, (select id from insert_job), $10,
+    insert into token_medias (id, chain, contract_address, token_id, media, processing_job_id, active, created_at, last_updated)
+    values ($11, $7, $8, $12, $13::jsonb, (select id from insert_job), $10,
         -- Using timestamps generated from set_conditionally_current_media_to_inactive ensures that the new record is only inserted after the current media is moved
         (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now())),
         (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now()))
     )
-    returning id, created_at, last_updated, version, active, media, processing_job_id, deleted
+    returning id, created_at, last_updated, version, active, media, processing_job_id, deleted, chain, contract_address, token_id
 )
 , update_token_definition as (
     update token_definitions
-    set metadata = $13::jsonb,
-        name = $14,
-        description = $15,
+    set metadata = $14::jsonb,
+        name = $15,
+        description = $16,
         last_updated = (select last_updated from insert_new_media),
         token_media_id = case
             -- If there isn't any media, use the new media regardless of its status
@@ -6203,7 +6209,7 @@ with insert_job(id) as (
         end
     where (chain, contract_address, token_id) = ($7, $8, $9) and not deleted
 )
-select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.active, token_medias.media, token_medias.processing_job_id, token_medias.deleted from insert_new_media token_medias
+select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.active, token_medias.media, token_medias.processing_job_id, token_medias.deleted, token_medias.chain, token_medias.contract_address, token_medias.token_id from insert_new_media token_medias
 `
 
 type InsertTokenPipelineResultsParams struct {
@@ -6218,6 +6224,7 @@ type InsertTokenPipelineResultsParams struct {
 	TokenID          persist.HexTokenID       `db:"token_id" json:"token_id"`
 	NewMediaIsActive bool                     `db:"new_media_is_active" json:"new_media_is_active"`
 	NewMediaID       persist.DBID             `db:"new_media_id" json:"new_media_id"`
+	DecimalTokenID   persist.DecimalTokenID   `db:"decimal_token_id" json:"decimal_token_id"`
 	NewMedia         pgtype.JSONB             `db:"new_media" json:"new_media"`
 	NewMetadata      pgtype.JSONB             `db:"new_metadata" json:"new_metadata"`
 	NewName          sql.NullString           `db:"new_name" json:"new_name"`
@@ -6242,6 +6249,7 @@ func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertToke
 		arg.TokenID,
 		arg.NewMediaIsActive,
 		arg.NewMediaID,
+		arg.DecimalTokenID,
 		arg.NewMedia,
 		arg.NewMetadata,
 		arg.NewName,
@@ -6257,6 +6265,9 @@ func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertToke
 		&i.TokenMedia.Media,
 		&i.TokenMedia.ProcessingJobID,
 		&i.TokenMedia.Deleted,
+		&i.TokenMedia.Chain,
+		&i.TokenMedia.ContractAddress,
+		&i.TokenMedia.TokenID,
 	)
 	return i, err
 }

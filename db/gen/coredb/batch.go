@@ -2520,7 +2520,7 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 }
 
 const getGalleryTokenMediasByGalleryIDBatch = `-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
-select tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted, tm.chain, tm.contract_address, tm.token_id
 from galleries g, collections c, tokens t, token_medias tm, token_definitions td
 where
 	g.id = $1
@@ -2588,6 +2588,9 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Query(f func(int, []
 					&i.Media,
 					&i.ProcessingJobID,
 					&i.Deleted,
+					&i.Chain,
+					&i.ContractAddress,
+					&i.TokenID,
 				); err != nil {
 					return err
 				}
@@ -2607,7 +2610,7 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Close() error {
 }
 
 const getMediaByMediaIdIgnoringStatusBatch = `-- name: GetMediaByMediaIdIgnoringStatusBatch :batchone
-select m.id, m.created_at, m.last_updated, m.version, m.active, m.media, m.processing_job_id, m.deleted from token_medias m where m.id = $1 and not deleted
+select m.id, m.created_at, m.last_updated, m.version, m.active, m.media, m.processing_job_id, m.deleted, m.chain, m.contract_address, m.token_id from token_medias m where m.id = $1 and not deleted
 `
 
 type GetMediaByMediaIdIgnoringStatusBatchBatchResults struct {
@@ -2648,6 +2651,9 @@ func (b *GetMediaByMediaIdIgnoringStatusBatchBatchResults) QueryRow(f func(int, 
 			&i.Media,
 			&i.ProcessingJobID,
 			&i.Deleted,
+			&i.Chain,
+			&i.ContractAddress,
+			&i.TokenID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -3893,7 +3899,7 @@ func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) Close() error {
 }
 
 const getTokenByUserTokenIdentifiersIgnoreDisplayableBatch = `-- name: GetTokenByUserTokenIdentifiersIgnoreDisplayableBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain, tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.collectors_note, t.quantity, t.block_number, t.owner_user_id, t.owned_by_wallets, t.contract_id, t.is_user_marked_spam, t.last_synced, t.is_creator_token, t.token_definition_id, t.is_holder_token, t.displayable, td.id, td.created_at, td.last_updated, td.deleted, td.name, td.description, td.token_type, td.token_id, td.external_url, td.chain, td.metadata, td.fallback_media, td.contract_address, td.contract_id, td.token_media_id, td.is_fxhash, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain, tm.id, tm.created_at, tm.last_updated, tm.version, tm.active, tm.media, tm.processing_job_id, tm.deleted, tm.chain, tm.contract_address, tm.token_id
 from tokens t, token_definitions td, contracts c, token_medias tm
 where t.token_definition_id = td.id
     and td.contract_id = c.id
@@ -4015,6 +4021,9 @@ func (b *GetTokenByUserTokenIdentifiersIgnoreDisplayableBatchBatchResults) Query
 			&i.TokenMedia.Media,
 			&i.TokenMedia.ProcessingJobID,
 			&i.TokenMedia.Deleted,
+			&i.TokenMedia.Chain,
+			&i.TokenMedia.ContractAddress,
+			&i.TokenMedia.TokenID,
 		)
 		if f != nil {
 			f(t, i, err)
