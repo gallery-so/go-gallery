@@ -739,7 +739,7 @@ func submitBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Context, q
 	var err error
 	b.Exec(func(i int, e error) {
 		if e != nil {
-			err = fmt.Errorf("failed to process entry: %w", e)
+			err = fmt.Errorf("failed to process entry: %w. entry data: %v", e, entries[i])
 		}
 	})
 
