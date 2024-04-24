@@ -145,7 +145,7 @@ func newStubRecommender(t *testing.T, userIDs []persist.DBID) *recommend.Recomme
 }
 
 // newStubPersonalization returns a stub of the personalization service
-func newStubPersonaliztion(t *testing.T) *userpref.Personalization {
+func newStubPersonalization(t *testing.T) *userpref.Personalization {
 	return &userpref.Personalization{}
 }
 
@@ -153,7 +153,7 @@ func newStubPersonaliztion(t *testing.T) *userpref.Personalization {
 type noopSubmitter struct{}
 
 func (n *noopSubmitter) SubmitNewTokens(context.Context, []persist.DBID) error { return nil }
-func (n *noopSubmitter) SubmitTokenManaged(context.Context, persist.DBID, int, time.Duration) error {
+func (n *noopSubmitter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
 	return nil
 }
 
@@ -165,20 +165,22 @@ func (r *recorderSubmitter) SubmitNewTokens(ctx context.Context, tokenDefinition
 	return nil
 }
 
-func (r *recorderSubmitter) SubmitTokenManaged(context.Context, persist.DBID, int, time.Duration) error {
+func (r *recorderSubmitter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
 	panic("not implemented") // shouldn't be needed in syncing tests
 }
 
 // httpSubmitter processes tokens synchronously via HTTP
 type httpSubmitter struct {
-	Handler http.Handler
+	Handler  http.Handler
+	Method   string
+	Endpoint string
 }
 
 func (h *httpSubmitter) SubmitNewTokens(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
 	m := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tokenDefinitionIDs}
 	byt, _ := json.Marshal(m)
 	r := bytes.NewReader(byt)
-	req := httptest.NewRequest(http.MethodPost, "/media/process", r)
+	req := httptest.NewRequest(h.Method, h.Endpoint, r)
 	w := httptest.NewRecorder()
 	h.Handler.ServeHTTP(w, req)
 	res := w.Result()
@@ -188,7 +190,7 @@ func (h *httpSubmitter) SubmitNewTokens(ctx context.Context, tokenDefinitionIDs 
 	return nil
 }
 
-func (h *httpSubmitter) SubmitTokenManaged(context.Context, persist.DBID, int, time.Duration) error {
+func (h *httpSubmitter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
 	panic("not implemented") // shouldn't be needed in syncing tests
 }
 

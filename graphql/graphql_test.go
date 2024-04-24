@@ -178,7 +178,7 @@ func testSuggestedUsersForViewer(t *testing.T) {
 		userB.ID,
 		userC.ID,
 	})
-	p := newStubPersonaliztion(t)
+	p := newStubPersonalization(t)
 	handler := server.CoreInit(ctx, clients, provider, recommender, p)
 	c := customHandlerClient(t, handler, withJWTOpt(t, userF.ID))
 
@@ -981,7 +981,7 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 
 	_, err = syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 	require.NoError(t, err)
-	submitter.AssertNotCalled(t, "Send")
+	submitter.AssertNotCalled(t, "SubmitNewTokens")
 }
 
 func testSyncKeepsOldTokens(t *testing.T) {
@@ -1028,7 +1028,11 @@ func newDummyMetadataProviderFixture(t *testing.T, ctx context.Context, chain pe
 	c := server.ClientInit(ctx)
 	mc := newMultichainProvider(c, &noopSubmitter{}, providers)
 	t.Cleanup(func() { c.Close() })
-	submitter := &httpSubmitter{Handler: tokenprocessing.CoreInitServer(ctx, c, &mc)}
+	submitter := &httpSubmitter{
+		Handler:  tokenprocessing.CoreInitServer(ctx, c, &mc),
+		Method:   http.MethodPost,
+		Endpoint: "/media/process",
+	}
 	return handlerWithProviders(t, submitter, providers)
 }
 
@@ -1632,7 +1636,7 @@ func defaultHandler(t *testing.T) http.Handler {
 	c := server.ClientInit(ctx)
 	p, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	r := newStubRecommender(t, []persist.DBID{})
-	pnl := newStubPersonaliztion(t)
+	pnl := newStubPersonalization(t)
 	handler := server.CoreInit(ctx, c, p, r, pnl)
 	t.Cleanup(func() {
 		c.Close()
@@ -1647,7 +1651,7 @@ func handlerWithProviders(t *testing.T, submitter tokenmanage.Submitter, p multi
 	c := server.ClientInit(context.Background())
 	provider := newMultichainProvider(c, submitter, p)
 	t.Cleanup(c.Close)
-	return server.CoreInit(ctx, c, &provider, newStubRecommender(t, []persist.DBID{}), newStubPersonaliztion(t))
+	return server.CoreInit(ctx, c, &provider, newStubRecommender(t, []persist.DBID{}), newStubPersonalization(t))
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers

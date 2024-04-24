@@ -581,12 +581,12 @@ var (
 )
 
 // The default behavior of SubmitTokens is to send the new token to tokenprocessing by a queue.
-// Sometimes, we want to run the token as soon as we get it - such as for minting, to accurately track the minting state.
+// Sometimes, we want to run the token as soon as we get it such as for minting in order to track the minting state.
 // noopSubmiiter is used so the token isn't processed twice.
 type noopSubmiiter struct{}
 
 func (n *noopSubmiiter) SubmitNewTokens(context.Context, []persist.DBID) error { return nil }
-func (n *noopSubmiiter) SubmitTokenManaged(context.Context, persist.DBID, int, time.Duration) error {
+func (n *noopSubmiiter) SubmitTokenForRetry(context.Context, persist.DBID, int, time.Duration) error {
 	return nil
 }
 

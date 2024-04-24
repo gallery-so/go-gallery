@@ -54,7 +54,7 @@ type Submitter interface {
 	// Handles how new tokens to Gallery should be processed
 	SubmitNewTokens(ctx context.Context, tokenDefinitionIDs []persist.DBID) error
 	// Handles how a token that is up for retry should be processed
-	SubmitTokenManaged(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error
+	SubmitTokenForRetry(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error
 }
 
 type TokenProcessingSubmitter struct {
@@ -77,7 +77,7 @@ func (t *TokenProcessingSubmitter) SubmitNewTokens(ctx context.Context, tokenDef
 	return t.TaskClient.CreateTaskTokenProcessingSyncBatch(ctx, msg)
 }
 
-func (t *TokenProcessingSubmitter) SubmitTokenManaged(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error {
+func (t *TokenProcessingSubmitter) SubmitTokenForRetry(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error {
 	msg := task.TokenProcessingTokenMessage{TokenDefinitionID: tokenDefinitionID, Attempts: attempt}
 	return t.TaskClient.CreateTaskTokenProcessingManagedToken(ctx, msg, delayFor)
 }
@@ -233,7 +233,7 @@ func (m Manager) tryRetry(ctx context.Context, td db.TokenDefinition, err error,
 	}
 
 	m.Registry.SetEnqueue(ctx, td.ID)
-	return m.Submitter.SubmitTokenManaged(ctx, td.ID, attempts+1, delay)
+	return m.Submitter.SubmitTokenForRetry(ctx, td.ID, attempts+1, delay)
 }
 
 // Registry handles the storing of object state managed by Manager
