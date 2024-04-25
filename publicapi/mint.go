@@ -11,6 +11,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -21,12 +22,24 @@ import (
 )
 
 type MintAPI struct {
-	validator         *validator.Validate
-	highlightProvider *highlight.Provider
-	queries           *db.Queries
-	taskClient        *task.Client
-	throttler         *throttle.Locker
-	ipRateLimiter     *limiters.KeyRateLimiter
+	validator          *validator.Validate
+	highlightProvider  *highlight.Provider
+	queries            *db.Queries
+	taskClient         *task.Client
+	throttler          *throttle.Locker
+	ipRateLimiter      *limiters.KeyRateLimiter
+	multichainProvider *multichain.Provider
+}
+
+func (api *MintAPI) IsTokenMinting(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.DecimalTokenID) (bool, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"contractAddress": validate.WithTag(contractAddress, "required"),
+		"tokenID":         validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return false, err
+	}
+	return api.multichainProvider.IsTokenMinting(ctx, chain, contractAddress, tokenID)
 }
 
 func (api *MintAPI) GetHighlightMintClaimByID(ctx context.Context, id persist.DBID) (db.HighlightMintClaim, error) {

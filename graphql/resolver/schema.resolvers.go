@@ -3473,7 +3473,11 @@ func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenD
 
 // IsMinting is the resolver for the isMinting field.
 func (r *tokenDefinitionResolver) IsMinting(ctx context.Context, obj *model.TokenDefinition) (*bool, error) {
-	return util.ToPointer(true), nil
+	isMinting, err := publicapi.For(ctx).Mint.IsTokenMinting(ctx, obj.Definition.Chain, obj.Definition.ContractAddress, obj.Definition.TokenID.ToDecimalTokenID())
+	if err != nil {
+		return nil, err
+	}
+	return &isMinting, nil
 }
 
 // Wallets is the resolver for the wallets field.
