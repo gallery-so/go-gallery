@@ -34,7 +34,7 @@ type ErrContractPaused struct {
 }
 
 func (e ErrContractPaused) Error() string {
-	return fmt.Sprintf("processing for chain=%d; contract=%s is paused", e.Chain, e.Contract)
+	return fmt.Sprintf("processing for chain=%s; contract=%s is paused", e.Chain, e.Contract)
 }
 
 // ErrContractFlaking indicates that runs of this contract are frequently failing
@@ -47,7 +47,7 @@ type ErrContractFlaking struct {
 
 func (e ErrContractFlaking) Unwrap() error { return e.Err }
 func (e ErrContractFlaking) Error() string {
-	return fmt.Sprintf("runs of chain=%d; contract=%s are paused for %s because of too many failed runs; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
+	return fmt.Sprintf("runs of chain=%s; contract=%s are paused for %s because of too many failed runs; last error: %s", e.Chain, e.Contract, e.Duration, e.Err)
 }
 
 type Submitter interface {
@@ -311,19 +311,19 @@ func pipelinePausedMetric() metric.Measure {
 
 func recordPipelinePaused(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, contract persist.Address, cause persist.ProcessingCause) {
 	baseOpts := append([]any{}, metric.LogOptions.WithTags(map[string]string{
-		"chain":    fmt.Sprintf("%d", chain),
+		"chain":    fmt.Sprint(chain),
 		"cause":    cause.String(),
 		"contract": contract.String(),
 	}))
 	mr.Record(ctx, pipelinePausedMetric(), append(baseOpts,
 		metric.LogOptions.WithLevel(logrus.WarnLevel),
-		metric.LogOptions.WithLogMessage(fmt.Sprintf("processing for chain=%d; contract=%s is paused", chain, contract)),
+		metric.LogOptions.WithLogMessage(fmt.Sprintf("processing for chain=%s; contract=%s is paused", chain, contract)),
 	)...)
 }
 
 func recordMetrics(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, mediaType persist.MediaType, err error, d time.Duration, cause persist.ProcessingCause) {
 	baseOpts := append([]any{}, metric.LogOptions.WithTags(map[string]string{
-		"chain":      fmt.Sprintf("%d", chain),
+		"chain":      fmt.Sprint(chain),
 		"mediaType":  mediaType.String(),
 		"cause":      cause.String(),
 		"isBadToken": fmt.Sprintf("%t", util.ErrorIs[ErrBadToken](err)),

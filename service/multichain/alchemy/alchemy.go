@@ -195,7 +195,7 @@ func NewProvider(httpClient *http.Client, chain persist.Chain) *Provider {
 	}
 
 	if apiURL == "" {
-		panic(fmt.Sprintf("no alchemy api url set for chain %d", chain))
+		panic(fmt.Sprintf("no alchemy api url set for chain %s", chain))
 	}
 
 	return &Provider{

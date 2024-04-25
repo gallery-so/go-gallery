@@ -67,7 +67,7 @@ type Provider struct {
 
 func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
 	if _, ok := chainToSimpleHashChain[chain]; !ok {
-		panic(fmt.Sprintf("simplehash is not configured for chain=%d", chain))
+		panic(fmt.Sprintf("simplehash is not configured for chain=%s", chain))
 	}
 	c := *httpClient
 	c.Transport = &authMiddleware{t: c.Transport, apiKey: env.GetString("SIMPLEHASH_API_KEY")}
