@@ -304,15 +304,15 @@ with deletion as (
 
 contract_insert as (
     insert into ethereum.contracts (address, simplehash_lookup_nft_id)
-    select $3, $2
-    where $33::bool
+    select $3::text, $2
+    where $33::bool and $3 is not null
     on conflict (address) do nothing
 ),
     
 collection_insert as (
     insert into ethereum.collections (id, simplehash_lookup_nft_id)
-    select $20, $2
-    where $33::bool
+    select $20::text, $2
+    where $33::bool and $20 is not null
     on conflict (id) do nothing
 )
 
