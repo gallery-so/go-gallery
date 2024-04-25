@@ -211,7 +211,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 			addr := addr
 			chain := c
 			wg.Go(func() {
-				logger.For(ctx).Infof("syncing chain=%d; user=%s; wallet=%s", chain, user.Username.String(), addr)
+				logger.For(ctx).Infof("syncing chain=%s; user=%s; wallet=%s", chain, user.Username.String(), addr)
 				pageCh, pageErrCh := fetcher.GetTokensIncrementallyByWalletAddress(ctx, addr)
 				for {
 					select {
@@ -288,7 +288,7 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 				for _, contract := range contracts {
 					c := contract
 					innerWg.Go(func() {
-						logger.For(ctx).Infof("syncing chain=%d; user=%s; contract=%s", chain, user.Username.String(), c.Address.String())
+						logger.For(ctx).Infof("syncing chain=%s; user=%s; contract=%s", chain, user.Username.String(), c.Address.String())
 						pageCh, pageErrCh := tokenFetcher.GetTokensIncrementallyByContractAddress(ctx, c.Address, maxCommunitySize)
 						for {
 							select {
@@ -358,7 +358,7 @@ outer:
 		// Validate that the chain is supported
 		_, ok := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher)
 		if !ok {
-			err = fmt.Errorf("multichain is not configured to fetch unchecked tokens for chain=%d", t.Chain)
+			err = fmt.Errorf("multichain is not configured to fetch unchecked tokens for chain=%s", t.Chain)
 			logger.For(ctx).Error(err)
 			return nil, err
 		}
@@ -376,7 +376,7 @@ outer:
 			}
 		}
 		// Return an error if the requested owner address is not owned by the user
-		err := fmt.Errorf("token(chain=%d, contract=%s; tokenID=%s) requested owner address=%s, but address is not owned by user", t.Chain, t.ContractAddress, t.TokenID, t.OwnerAddress)
+		err := fmt.Errorf("token(chain=%s, contract=%s; tokenID=%s) requested owner address=%s, but address is not owned by user", t.Chain, t.ContractAddress, t.TokenID, t.OwnerAddress)
 		logger.For(ctx).Error(err)
 		return nil, err
 	}
@@ -387,13 +387,13 @@ outer:
 		tokens, contract, err := p.Chains[t.Chain].(TokensByTokenIdentifiersFetcher).GetTokensByTokenIdentifiers(ctx, tokenID)
 		// Exit early if a token in the batch is not found
 		if err != nil {
-			err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s): %s", t.Chain, t.ContractAddress, t.TokenID, err)
+			err := fmt.Errorf("failed to fetch token(chain=%s, contract=%s, tokenID=%s): %s", t.Chain, t.ContractAddress, t.TokenID, err)
 			logger.For(ctx).Error(err)
 			return nil, err
 		}
 
 		if len(tokens) == 0 {
-			err := fmt.Errorf("failed to fetch token(chain=%d, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID)
+			err := fmt.Errorf("failed to fetch token(chain=%s, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID)
 			logger.For(ctx).Error(err)
 			return nil, err
 		}
@@ -419,7 +419,7 @@ outer:
 		defer close(recCh)
 		defer close(errCh)
 		for c, page := range chainPages {
-			logger.For(ctx).Infof("adding %d unchecked token(s) to chain=%d for user=%s", len(page.Tokens), c, userID)
+			logger.For(ctx).Infof("adding %d unchecked token(s) to chain=%s for user=%s", len(page.Tokens), c, userID)
 			recCh <- page
 		}
 	}()
@@ -477,7 +477,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 		for _, tid := range tids {
 			tid := tid
 			wg.Go(func() {
-				logger.For(ctx).Infof("syncing chain=%d; user=%s; token=%s", chain, user.Username.String(), tid)
+				logger.For(ctx).Infof("syncing chain=%s; user=%s; token=%s", chain, user.Username.String(), tid)
 				id := ChainAgnosticIdentifiers{ContractAddress: tid.ContractAddress, TokenID: tid.TokenID}
 				token, contract, err := fetcher.GetTokenByTokenIdentifiersAndOwner(ctx, id, tid.OwnerAddress)
 				if err != nil {
@@ -590,7 +590,7 @@ func (p *Provider) SyncCreatedTokensForExistingContract(ctx context.Context, use
 
 	f, ok := p.Chains[contract.Chain].(TokensIncrementalContractFetcher)
 	if !ok {
-		return fmt.Errorf("no tokens contract fetcher for chain: %d", contract.Chain)
+		return fmt.Errorf("no tokens contract fetcher for chain: %s", contract.Chain)
 	}
 
 	recCh := make(chan chainTokensAndContracts, 8)
@@ -892,7 +892,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 
 	f, ok := p.Chains[contractAddress.Chain()].(TokensByContractWalletFetcher)
 	if !ok {
-		return nil, fmt.Errorf("no tokens owner fetcher for chain: %d", contractAddress.Chain())
+		return nil, fmt.Errorf("no tokens owner fetcher for chain: %s", contractAddress.Chain())
 	}
 
 	tokens, contract, err := f.GetTokensByContractWallet(ctx, contractAddress, wallet.Address())
@@ -943,7 +943,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, chain persist.Chain, tIDs []ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
 	f, ok := p.Chains[chain].(TokenMetadataBatcher)
 	if !ok {
-		return nil, fmt.Errorf("no metadata batchers for chain %d", chain)
+		return nil, fmt.Errorf("no metadata batchers for chain %s", chain)
 	}
 	return f.GetTokenMetadataByTokenIdentifiersBatch(ctx, tIDs)
 }
@@ -951,7 +951,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.HexTokenID, chain persist.Chain) (persist.TokenMetadata, error) {
 	fetcher, ok := p.Chains[chain].(TokenMetadataFetcher)
 	if !ok {
-		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
+		return nil, fmt.Errorf("no metadata fetchers for chain %s", chain)
 	}
 	return fetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
 }
@@ -1003,7 +1003,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) (db.TokenDefinition, error) {
 	fetcher, ok := p.Chains[ti.Chain].(TokenDescriptorsFetcher)
 	if !ok {
-		return db.TokenDefinition{}, fmt.Errorf("no token descriptor fetchers for chain %d", ti.Chain)
+		return db.TokenDefinition{}, fmt.Errorf("no token descriptor fetchers for chain %s", ti.Chain)
 	}
 
 	id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
@@ -1318,7 +1318,7 @@ func chainTokensToUpsertableTokens(chain persist.Chain, tokens []ChainAgnosticTo
 		ti := persist.NewTokenIdentifiers(persist.Address(normalizedAddress), token.TokenID, chain)
 		contract, ok := addressToContract[normalizedAddress]
 		if !ok {
-			panic(fmt.Sprintf("no persisted contract for chain=%d, address=%s", chain, normalizedAddress))
+			panic(fmt.Sprintf("no persisted contract for chain=%s, address=%s", chain, normalizedAddress))
 		}
 
 		// Duplicate tokens will have the same values for these fields, so we only need to set them once

@@ -416,7 +416,7 @@ type ErrWalletAlreadyExists struct {
 }
 
 func (e ErrWalletAlreadyExists) Error() string {
-	return fmt.Sprintf("wallet already exists: wallet ID: %s | chain address: %s | chain: %d | owner ID: %s", e.WalletID, e.L1ChainAddress.Address(), e.L1ChainAddress.L1Chain(), e.OwnerID)
+	return fmt.Sprintf("wallet already exists: wallet ID: %s | chain address: %s | chain: %s | owner ID: %s", e.WalletID, e.L1ChainAddress.Address(), e.L1ChainAddress.L1Chain(), e.OwnerID)
 }
 
 var errWalletNotFound ErrWalletNotFound
@@ -435,5 +435,5 @@ type ErrWalletNotFoundByAddress struct{ Address L1ChainAddress }
 
 func (e ErrWalletNotFoundByAddress) Unwrap() error { return errWalletNotFound }
 func (e ErrWalletNotFoundByAddress) Error() string {
-	return fmt.Sprintf("wallet not found by chain=%d; address = %s", e.Address.L1Chain(), e.Address.Address())
+	return fmt.Sprintf("wallet not found by chain=%s; address = %s", e.Address.L1Chain(), e.Address.Address())
 }

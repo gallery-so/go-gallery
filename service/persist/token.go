@@ -449,6 +449,29 @@ func (e ErrTokensNotFoundByContract) Error() string {
 	return fmt.Sprintf("tokens not found by contract: %s", e.ContractAddress)
 }
 
+func (c Chain) String() string {
+	switch c {
+	case ChainETH:
+		return "ethereum"
+	case ChainArbitrum:
+		return "arbitrum"
+	case ChainPolygon:
+		return "polygon"
+	case ChainOptimism:
+		return "optimism"
+	case ChainTezos:
+		return "tezos"
+	case ChainPOAP:
+		return "poap"
+	case ChainZora:
+		return "zora"
+	case ChainBase:
+		return "base"
+	default:
+		return strconv.Itoa(int(c))
+	}
+}
+
 // NormalizeAddress normalizes an address for the given chain
 func (c Chain) NormalizeAddress(addr Address) string {
 	if evmChains[c] {

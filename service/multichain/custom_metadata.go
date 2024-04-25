@@ -124,7 +124,7 @@ func (c *CustomMetadataHandlers) Load(ctx context.Context, chain persist.Chain, 
 	}
 	m, err := h(ctx, tID, oldMetadata...)
 	if err != nil {
-		logger.For(ctx).Errorf("failed to get custom metadata for token(chain=%d, contract=%s, tokenID=%s): %s", chain, t.ContractAddress, t.TokenID, err)
+		logger.For(ctx).Errorf("failed to get custom metadata for token(chain=%s, contract=%s, tokenID=%s): %s", chain, t.ContractAddress, t.TokenID, err)
 		return nil
 	}
 	return m

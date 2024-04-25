@@ -108,7 +108,7 @@ func (b *batch) end(m *MetadataFinder) {
 		})
 		metadata, err := m.mc.GetTokenMetadataByTokenIdentifiersBatch(m.ctx, chain, tIDs)
 		if err != nil {
-			logger.For(m.ctx).Errorf("failed to load batch of metadata for chain=%d: %s", chain, err)
+			logger.For(m.ctx).Errorf("failed to load batch of metadata for chain=%s: %s", chain, err)
 			b.errors[chain] = err
 		} else {
 			b.results[chain] = metadata

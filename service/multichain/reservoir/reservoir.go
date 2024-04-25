@@ -143,7 +143,7 @@ func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Cha
 		persist.ChainBase:     baseBaseURL,
 	}[chain]
 	if apiURL == "" {
-		panic(fmt.Sprintf("no reservoir api url set for chain %d", chain))
+		panic(fmt.Sprintf("no reservoir api url set for chain %s", chain))
 	}
 
 	apiKey := env.GetString("RESERVOIR_API_KEY")
@@ -337,7 +337,7 @@ func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []m
 
 	for i, t := range asTokens {
 		if r, ok := lookup[t]; !ok {
-			errs[i] = fmt.Errorf("reservoir unable to find token(chain=%d, contract=%s, tokenId=%s)", t.Chain, t.ContractAddress, t.TokenID)
+			errs[i] = fmt.Errorf("reservoir unable to find token(chain=%s, contract=%s, tokenId=%s)", t.Chain, t.ContractAddress, t.TokenID)
 		} else {
 			ret[i] = r
 		}

@@ -187,7 +187,7 @@ func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 }
 
 func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.HexTokenID) {
-	scope.SetTag("chain", fmt.Sprintf("%d", chain))
+	scope.SetTag("chain", fmt.Sprint(chain))
 	scope.SetTag("contractAddress", contractAddress.String())
 	scope.SetTag("nftID", string(tokenID))
 	assetPage := assetURL(chain, contractAddress, tokenID)

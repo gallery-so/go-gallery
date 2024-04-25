@@ -15,7 +15,7 @@ type TokenIdentifiers struct {
 }
 
 func (t TokenIdentifiers) String() string {
-	return fmt.Sprintf("token(chain=%d, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID.ToDecimalTokenID())
+	return fmt.Sprintf("token(chain=%s, contract=%s, tokenID=%s)", t.Chain, t.ContractAddress, t.TokenID.ToDecimalTokenID())
 }
 
 // NewTokenIdentifiers creates a new token identifiers
@@ -35,7 +35,7 @@ type TokenUniqueIdentifiers struct {
 }
 
 func (t TokenUniqueIdentifiers) String() string {
-	return fmt.Sprintf("token(chain=%d, contract=%s, tokenID=%s, owner=%s)", t.Chain, t.ContractAddress, t.TokenID.ToDecimalTokenID(), t.OwnerAddress)
+	return fmt.Sprintf("token(chain=%s, contract=%s, tokenID=%s, owner=%s)", t.Chain, t.ContractAddress, t.TokenID.ToDecimalTokenID(), t.OwnerAddress)
 }
 
 func (t TokenUniqueIdentifiers) AsJSONKey() string {
@@ -92,7 +92,7 @@ type ContractIdentifiers struct {
 }
 
 func (c ContractIdentifiers) String() string {
-	return fmt.Sprintf("contract(chain=%d, address=%s)", c.Chain, c.ContractAddress)
+	return fmt.Sprintf("contract(chain=%s, address=%s)", c.Chain, c.ContractAddress)
 }
 
 // NewContractIdentifiers creates a new contract identifiers

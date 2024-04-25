@@ -85,5 +85,5 @@ type ErrContractNotFoundByAddress struct {
 
 func (e ErrContractNotFoundByAddress) Unwrap() error { return errContractNotFound }
 func (e ErrContractNotFoundByAddress) Error() string {
-	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
+	return fmt.Sprintf("contract(chain=%s, address=%s) not found by address", e.Chain, e.Address)
 }
