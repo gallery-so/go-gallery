@@ -41,7 +41,7 @@ type ProcessMediaForTokenInput struct {
 
 func processBatch(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input task.TokenProcessingBatchMessage
+		var input task.TokenProcessingSyncBatchMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
@@ -132,7 +132,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *db.Queries, tm
 // processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
 func processMediaForTokenManaged(tp *tokenProcessor, queries *db.Queries, taskClient *task.Client, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var input task.TokenProcessingTokenMessage
+		var input task.TokenProcessingRetryTokenMessage
 
 		// Remove from queue if bad message
 		if err := ctx.ShouldBindJSON(&input); err != nil {

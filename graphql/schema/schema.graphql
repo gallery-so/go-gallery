@@ -468,6 +468,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
   mintUrl: String @goField(forceResolver: true)
+  isMinting: Boolean @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
@@ -743,6 +744,7 @@ type Contract implements Node {
   badgeURL: String
   mintURL: String
   isSpam: Boolean
+  isMinting: Boolean @goField(forceResolver: true)
 }
 
 # We have this extra type in case we need to stick authed data

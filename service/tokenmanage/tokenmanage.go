@@ -69,7 +69,7 @@ func (t *TokenProcessingSubmitter) SubmitNewTokens(ctx context.Context, tokenDef
 	}
 
 	batchID := persist.GenerateID()
-	msg := task.TokenProcessingBatchMessage{BatchID: batchID, TokenDefinitionIDs: tokenDefinitionIDs}
+	msg := task.TokenProcessingSyncBatchMessage{BatchID: batchID, TokenDefinitionIDs: tokenDefinitionIDs}
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"batchID": msg.BatchID})
 
 	logger.For(ctx).Infof("enqueueing batch: %s (size=%d)", batchID, len(tokenDefinitionIDs))
@@ -78,7 +78,7 @@ func (t *TokenProcessingSubmitter) SubmitNewTokens(ctx context.Context, tokenDef
 }
 
 func (t *TokenProcessingSubmitter) SubmitTokenForRetry(ctx context.Context, tokenDefinitionID persist.DBID, attempt int, delayFor time.Duration) error {
-	msg := task.TokenProcessingTokenMessage{TokenDefinitionID: tokenDefinitionID, Attempts: attempt}
+	msg := task.TokenProcessingRetryTokenMessage{TokenDefinitionID: tokenDefinitionID, Attempts: attempt}
 	return t.TaskClient.CreateTaskTokenProcessingRetryToken(ctx, msg, delayFor)
 }
 
@@ -127,7 +127,7 @@ func (m Manager) Paused(ctx context.Context, td db.TokenDefinition) bool {
 }
 
 // StartProcessing marks a token as processing. It returns a callback that must be called when work on the token is finished in order to mark
-// it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attemps is ignored when MaxRetries
+// it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attempts is ignored when MaxRetries
 // is set to the default value of 0.
 func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, attempts int, cause persist.ProcessingCause) (func(db.TokenMedia, error) error, error) {
 	if m.Paused(ctx, td) {

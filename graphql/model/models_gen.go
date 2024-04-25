@@ -909,6 +909,7 @@ type Contract struct {
 	BadgeURL         *string               `json:"badgeURL"`
 	MintURL          *string               `json:"mintURL"`
 	IsSpam           *bool                 `json:"isSpam"`
+	IsMinting        *bool                 `json:"isMinting"`
 }
 
 func (Contract) IsNode() {}
@@ -2686,6 +2687,7 @@ type TokenDefinition struct {
 	Communities   []*Community   `json:"communities"`
 	ExternalURL   *string        `json:"externalUrl"`
 	MintURL       *string        `json:"mintUrl"`
+	IsMinting     *bool          `json:"isMinting"`
 }
 
 func (TokenDefinition) IsNode() {}

@@ -524,6 +524,11 @@ func (r *communityResolver) ViewerIsMember(ctx context.Context, obj *model.Commu
 	return &isMember, nil
 }
 
+// IsMinting is the resolver for the isMinting field.
+func (r *contractResolver) IsMinting(ctx context.Context, obj *model.Contract) (*bool, error) {
+	return util.ToPointer(true), nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *contractCommunityResolver) Contract(ctx context.Context, obj *model.ContractCommunity) (*model.Contract, error) {
 	return resolveContractByContractID(ctx, obj.HelperContractCommunityData.Community.ContractID)
@@ -3466,6 +3471,11 @@ func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenD
 	return &mintURL, nil
 }
 
+// IsMinting is the resolver for the isMinting field.
+func (r *tokenDefinitionResolver) IsMinting(ctx context.Context, obj *model.TokenDefinition) (*bool, error) {
+	return util.ToPointer(true), nil
+}
+
 // Wallets is the resolver for the wallets field.
 func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
 	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))
@@ -3746,6 +3756,9 @@ func (r *Resolver) CommentOnPostPayload() generated.CommentOnPostPayloadResolver
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
 
+// Contract returns generated.ContractResolver implementation.
+func (r *Resolver) Contract() generated.ContractResolver { return &contractResolver{r} }
+
 // ContractCommunity returns generated.ContractCommunityResolver implementation.
 func (r *Resolver) ContractCommunity() generated.ContractCommunityResolver {
 	return &contractCommunityResolver{r}
@@ -3993,6 +4006,7 @@ type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type commentOnPostPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
+type contractResolver struct{ *Resolver }
 type contractCommunityResolver struct{ *Resolver }
 type createCollectionPayloadResolver struct{ *Resolver }
 type ensProfileImageResolver struct{ *Resolver }

@@ -45,17 +45,12 @@ type FeedbotSlackPostMessage struct {
 	PostID persist.DBID `json:"post_id" binding:"required"`
 }
 
-type TokenProcessingBatchMessage struct {
+type TokenProcessingSyncBatchMessage struct {
 	BatchID            persist.DBID   `json:"batch_id" binding:"required"`
 	TokenDefinitionIDs []persist.DBID `json:"token_definition_ids" binding:"required"`
 }
 
-type TokenProcessingContractTokensMessage struct {
-	ContractID   persist.DBID `json:"contract_id" binding:"required"`
-	ForceRefresh bool         `json:"force_refresh"`
-}
-
-type TokenProcessingTokenMessage struct {
+type TokenProcessingRetryTokenMessage struct {
 	TokenDefinitionID persist.DBID `json:"token_definition_id" binding:"required"`
 	Attempts          int          `json:"attempts" binding:"required"`
 }
@@ -166,7 +161,7 @@ func (c *Client) CreateTaskForFeedbot(ctx context.Context, message FeedbotMessag
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func (c *Client) CreateTaskTokenProcessingSyncBatch(ctx context.Context, message TokenProcessingBatchMessage) error {
+func (c *Client) CreateTaskTokenProcessingSyncBatch(ctx context.Context, message TokenProcessingSyncBatchMessage) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskTokenProcessingSyncBatch")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
@@ -174,7 +169,7 @@ func (c *Client) CreateTaskTokenProcessingSyncBatch(ctx context.Context, message
 	return c.submitTask(ctx, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))
 }
 
-func (c *Client) CreateTaskTokenProcessingRetryToken(ctx context.Context, message TokenProcessingTokenMessage, delayFor time.Duration) error {
+func (c *Client) CreateTaskTokenProcessingRetryToken(ctx context.Context, message TokenProcessingRetryTokenMessage, delayFor time.Duration) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskTokenProcessingRetryToken")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")

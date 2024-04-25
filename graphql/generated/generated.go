@@ -59,6 +59,7 @@ type ResolverRoot interface {
 	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
 	CommentOnPostPayload() CommentOnPostPayloadResolver
 	Community() CommunityResolver
+	Contract() ContractResolver
 	ContractCommunity() ContractCommunityResolver
 	CreateCollectionPayload() CreateCollectionPayloadResolver
 	EnsProfileImage() EnsProfileImageResolver
@@ -417,6 +418,7 @@ type ComplexityRoot struct {
 		CreatorAddress   func(childComplexity int) int
 		Dbid             func(childComplexity int) int
 		ID               func(childComplexity int) int
+		IsMinting        func(childComplexity int) int
 		IsSpam           func(childComplexity int) int
 		LastUpdated      func(childComplexity int) int
 		MintURL          func(childComplexity int) int
@@ -1581,6 +1583,7 @@ type ComplexityRoot struct {
 		Description   func(childComplexity int) int
 		ExternalURL   func(childComplexity int) int
 		ID            func(childComplexity int) int
+		IsMinting     func(childComplexity int) int
 		LastUpdated   func(childComplexity int) int
 		Media         func(childComplexity int, darkMode *persist.DarkMode) int
 		MintURL       func(childComplexity int) int
@@ -1954,6 +1957,9 @@ type CommunityResolver interface {
 	Galleries(ctx context.Context, obj *model.Community, maxPreviews int, before *string, after *string, first *int, last *int) (*model.CommunityGalleriesConnection, error)
 	ViewerIsMember(ctx context.Context, obj *model.Community) (*bool, error)
 }
+type ContractResolver interface {
+	IsMinting(ctx context.Context, obj *model.Contract) (*bool, error)
+}
 type ContractCommunityResolver interface {
 	Contract(ctx context.Context, obj *model.ContractCommunity) (*model.Contract, error)
 }
@@ -2286,6 +2292,7 @@ type TokenDefinitionResolver interface {
 	Communities(ctx context.Context, obj *model.TokenDefinition) ([]*model.Community, error)
 
 	MintURL(ctx context.Context, obj *model.TokenDefinition) (*string, error)
+	IsMinting(ctx context.Context, obj *model.TokenDefinition) (*bool, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
@@ -3527,6 +3534,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Contract.ID(childComplexity), true
+
+	case "Contract.isMinting":
+		if e.complexity.Contract.IsMinting == nil {
+			break
+		}
+
+		return e.complexity.Contract.IsMinting(childComplexity), true
 
 	case "Contract.isSpam":
 		if e.complexity.Contract.IsSpam == nil {
@@ -8874,6 +8888,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenDefinition.ID(childComplexity), true
 
+	case "TokenDefinition.isMinting":
+		if e.complexity.TokenDefinition.IsMinting == nil {
+			break
+		}
+
+		return e.complexity.TokenDefinition.IsMinting(childComplexity), true
+
 	case "TokenDefinition.lastUpdated":
 		if e.complexity.TokenDefinition.LastUpdated == nil {
 			break
@@ -10411,6 +10432,7 @@ type TokenDefinition implements Node @goEmbedHelper {
   communities: [Community] @goField(forceResolver: true)
   externalUrl: String
   mintUrl: String @goField(forceResolver: true)
+  isMinting: Boolean @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
@@ -10686,6 +10708,7 @@ type Contract implements Node {
   badgeURL: String
   mintURL: String
   isSpam: Boolean
+  isMinting: Boolean @goField(forceResolver: true)
 }
 
 # We have this extra type in case we need to stick authed data
@@ -18538,6 +18561,8 @@ func (ec *executionContext) fieldContext_ArtBlocksCommunity_contract(ctx context
 				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_Contract_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -19179,6 +19204,8 @@ func (ec *executionContext) fieldContext_Badge_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_Contract_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -24495,6 +24522,8 @@ func (ec *executionContext) fieldContext_Community_contract(ctx context.Context,
 				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_Contract_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -26002,6 +26031,47 @@ func (ec *executionContext) fieldContext_Contract_isSpam(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Contract_isMinting(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Contract_isMinting(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Contract().IsMinting(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Contract_isMinting(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ContractCommunity_communityKey(ctx context.Context, field graphql.CollectedField, obj *model.ContractCommunity) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ContractCommunity_communityKey(ctx, field)
 	if err != nil {
@@ -26107,6 +26177,8 @@ func (ec *executionContext) fieldContext_ContractCommunity_contract(ctx context.
 				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_Contract_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -50327,6 +50399,8 @@ func (ec *executionContext) fieldContext_RefreshContractPayload_contract(ctx con
 				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_Contract_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -59262,6 +59336,8 @@ func (ec *executionContext) fieldContext_Token_definition(ctx context.Context, f
 				return ec.fieldContext_TokenDefinition_externalUrl(ctx, field)
 			case "mintUrl":
 				return ec.fieldContext_TokenDefinition_mintUrl(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_TokenDefinition_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TokenDefinition", field.Name)
 		},
@@ -59781,6 +59857,8 @@ func (ec *executionContext) fieldContext_Token_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_Contract_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -60755,6 +60833,8 @@ func (ec *executionContext) fieldContext_TokenDefinition_contract(ctx context.Co
 				return ec.fieldContext_Contract_mintURL(ctx, field)
 			case "isSpam":
 				return ec.fieldContext_Contract_isSpam(ctx, field)
+			case "isMinting":
+				return ec.fieldContext_Contract_isMinting(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -61222,6 +61302,47 @@ func (ec *executionContext) fieldContext_TokenDefinition_mintUrl(ctx context.Con
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDefinition_isMinting(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDefinition_isMinting(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDefinition().IsMinting(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDefinition_isMinting(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDefinition",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -80409,12 +80530,12 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 		case "id":
 			out.Values[i] = ec._Contract_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "dbid":
 			out.Values[i] = ec._Contract_dbid(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "lastUpdated":
 			out.Values[i] = ec._Contract_lastUpdated(ctx, field, obj)
@@ -80436,6 +80557,39 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._Contract_mintURL(ctx, field, obj)
 		case "isSpam":
 			out.Values[i] = ec._Contract_isSpam(ctx, field, obj)
+		case "isMinting":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Contract_isMinting(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -92083,6 +92237,39 @@ func (ec *executionContext) _TokenDefinition(ctx context.Context, sel ast.Select
 					}
 				}()
 				res = ec._TokenDefinition_mintUrl(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "isMinting":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDefinition_isMinting(ctx, field, obj)
 				return res
 			}
 
