@@ -127,6 +127,9 @@ models:
   BasicAuthType:
     model:
       - github.com/mikeydub/go-gallery/service/auth/basicauth.AuthTokenType
+  Currency:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Currency
 
 directives:
   goGqlId:

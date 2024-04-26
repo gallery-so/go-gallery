@@ -20,6 +20,7 @@ type ChainProvider struct {
 type EthereumProvider struct {
 	ContractFetcher
 	ContractsCreatorFetcher
+	MintStatuser
 	TokenDescriptorsFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
@@ -48,6 +49,7 @@ type TezosProvider struct {
 type OptimismProvider struct {
 	ContractFetcher
 	ContractsCreatorFetcher
+	MintStatuser
 	TokenDescriptorsFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
@@ -61,6 +63,7 @@ type OptimismProvider struct {
 type ArbitrumProvider struct {
 	ContractFetcher
 	ContractsCreatorFetcher
+	MintStatuser
 	TokenDescriptorsFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
@@ -81,6 +84,7 @@ type PoapProvider struct {
 type ZoraProvider struct {
 	ContractFetcher
 	ContractsCreatorFetcher
+	MintStatuser
 	TokenDescriptorsFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
@@ -94,6 +98,7 @@ type ZoraProvider struct {
 type BaseProvider struct {
 	ContractFetcher
 	ContractsCreatorFetcher
+	MintStatuser
 	TokenDescriptorsFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher
@@ -107,6 +112,7 @@ type BaseProvider struct {
 type PolygonProvider struct {
 	ContractFetcher
 	ContractsCreatorFetcher
+	MintStatuser
 	TokenDescriptorsFetcher
 	TokenIdentifierOwnerFetcher
 	TokenMetadataBatcher

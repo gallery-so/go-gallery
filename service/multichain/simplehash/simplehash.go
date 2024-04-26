@@ -450,7 +450,7 @@ outer:
 	}
 
 	if token.TokenID == "" {
-		err := fmt.Errorf("token not found: %s", persist.TokenUniqueIdentifiers{
+		err := fmt.Errorf("not found: %s", persist.TokenUniqueIdentifiers{
 			Chain:           p.chain,
 			ContractAddress: tIDs.ContractAddress,
 			TokenID:         tIDs.TokenID,
@@ -861,7 +861,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID mc.Chain
 	}
 
 	if body.NftID == "" {
-		err := fmt.Errorf("token not found: %s", persist.TokenIdentifiers{
+		err := fmt.Errorf("not found: %s", persist.TokenIdentifiers{
 			Chain:           p.chain,
 			ContractAddress: tID.ContractAddress,
 			TokenID:         tID.TokenID,

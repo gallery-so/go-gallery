@@ -524,9 +524,9 @@ func (r *communityResolver) ViewerIsMember(ctx context.Context, obj *model.Commu
 	return &isMember, nil
 }
 
-// IsMinting is the resolver for the isMinting field.
-func (r *contractResolver) IsMinting(ctx context.Context, obj *model.Contract) (*bool, error) {
-	return util.ToPointer(true), nil
+// MintStatus is the resolver for the mintStatus field.
+func (r *contractResolver) MintStatus(ctx context.Context, obj *model.Contract) (*model.MintStatus, error) {
+	panic("not implemented")
 }
 
 // Contract is the resolver for the contract field.
@@ -3471,13 +3471,21 @@ func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenD
 	return &mintURL, nil
 }
 
-// IsMinting is the resolver for the isMinting field.
-func (r *tokenDefinitionResolver) IsMinting(ctx context.Context, obj *model.TokenDefinition) (*bool, error) {
-	isMinting, err := publicapi.For(ctx).Mint.IsTokenMinting(ctx, obj.Definition.Chain, obj.Definition.ContractAddress, obj.Definition.TokenID.ToDecimalTokenID())
+// MintStatus is the resolver for the mintStatus field.
+func (r *tokenDefinitionResolver) MintStatus(ctx context.Context, obj *model.TokenDefinition) (*model.MintStatus, error) {
+	isMinting, currency, costPerMint, err := publicapi.For(ctx).Mint.GetMintingStatusByTokenIdentifiers(ctx, obj.Definition.Chain, obj.Definition.ContractAddress, obj.Definition.TokenID.ToDecimalTokenID())
 	if err != nil {
 		return nil, err
 	}
-	return &isMinting, nil
+	if !isMinting {
+		return &model.MintStatus{IsMinting: isMinting}, nil
+	}
+	return &model.MintStatus{
+		Currency:    &currency,
+		Symbol:      util.ToPointer(currency.Symbol()),
+		IsMinting:   isMinting,
+		CostPerMint: &costPerMint,
+	}, nil
 }
 
 // Wallets is the resolver for the wallets field.

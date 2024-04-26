@@ -1250,3 +1250,46 @@ func (t TokenOwnershipType) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"creator"`))
 	}
 }
+
+type Currency string
+
+const (
+	CurrencyEther Currency = "Ether"
+	CurrencyEnjoy Currency = "Enjoy"
+)
+
+func (c Currency) Symbol() string {
+	switch c {
+	case CurrencyEther:
+		return "ETH"
+	case CurrencyEnjoy:
+		return "ENJOY"
+	default:
+		return ""
+	}
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (c *Currency) UnmarshalGQL(v interface{}) error {
+	s, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("Currency must be a string")
+	}
+	switch strings.ToLower(s) {
+	case "ether":
+		*c = CurrencyEther
+	case "enjoy":
+		*c = CurrencyEnjoy
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (c Currency) MarshalGQL(w io.Writer) {
+	switch c {
+	case CurrencyEther:
+		w.Write([]byte(`"Ether"`))
+	case CurrencyEnjoy:
+		w.Write([]byte(`"Enjoy"`))
+	}
+}

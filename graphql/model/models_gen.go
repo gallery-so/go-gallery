@@ -909,7 +909,7 @@ type Contract struct {
 	BadgeURL         *string               `json:"badgeURL"`
 	MintURL          *string               `json:"mintURL"`
 	IsSpam           *bool                 `json:"isSpam"`
-	IsMinting        *bool                 `json:"isMinting"`
+	MintStatus       *MintStatus           `json:"mintStatus"`
 }
 
 func (Contract) IsNode() {}
@@ -1928,6 +1928,13 @@ type MintPremiumCardToWalletPayload struct {
 
 func (MintPremiumCardToWalletPayload) IsMintPremiumCardToWalletPayloadOrError() {}
 
+type MintStatus struct {
+	Currency    *persist.Currency `json:"currency"`
+	Symbol      *string           `json:"symbol"`
+	IsMinting   bool              `json:"isMinting"`
+	CostPerMint *float64          `json:"costPerMint"`
+}
+
 type MoveCollectionToGalleryInput struct {
 	SourceCollectionID persist.DBID `json:"sourceCollectionId"`
 	TargetGalleryID    persist.DBID `json:"targetGalleryId"`
@@ -2687,7 +2694,7 @@ type TokenDefinition struct {
 	Communities   []*Community   `json:"communities"`
 	ExternalURL   *string        `json:"externalUrl"`
 	MintURL       *string        `json:"mintUrl"`
-	IsMinting     *bool          `json:"isMinting"`
+	MintStatus    *MintStatus    `json:"mintStatus"`
 }
 
 func (TokenDefinition) IsNode() {}

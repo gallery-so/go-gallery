@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
+	"github.com/mikeydub/go-gallery/service/multichain/reservoir"
 	"github.com/mikeydub/go-gallery/service/multichain/simplehash"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/wrapper"
@@ -101,7 +102,8 @@ func ethInjector(serverEnvInit envInit, contextContext context.Context, client *
 	syncPipelineWrapper, cleanup := ethSyncPipelineInjector(contextContext, client, chain, provider)
 	ethclientClient := rpc.NewEthClient()
 	verifier := ethVerifierInjector(ethclientClient)
-	ethereumProvider := ethProviderInjector(contextContext, syncPipelineWrapper, verifier, provider)
+	reservoirProvider := reservoir.NewProvider(contextContext, client, chain)
+	ethereumProvider := ethProviderInjector(contextContext, syncPipelineWrapper, verifier, provider, reservoirProvider)
 	return ethereumProvider, func() {
 		cleanup()
 	}
@@ -118,10 +120,11 @@ func ethVerifierInjector(ethClient *ethclient.Client) *eth.Verifier {
 	return verifier
 }
 
-func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipelineWrapper, verifier *eth.Verifier, simplehashProvider *simplehash.Provider) *multichain.EthereumProvider {
+func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipelineWrapper, verifier *eth.Verifier, simplehashProvider *simplehash.Provider, reservoirProvider *reservoir.Provider) *multichain.EthereumProvider {
 	ethereumProvider := &multichain.EthereumProvider{
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
+		MintStatuser:                     reservoirProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
@@ -184,7 +187,8 @@ func optimismInjector(contextContext context.Context, client *http.Client) (*mul
 	chain := _wireChainValue2
 	provider := simplehash.NewProvider(chain, client)
 	syncPipelineWrapper, cleanup := optimismSyncPipelineInjector(contextContext, client, chain, provider)
-	optimismProvider := optimismProviderInjector(syncPipelineWrapper, provider)
+	reservoirProvider := reservoir.NewProvider(contextContext, client, chain)
+	optimismProvider := optimismProviderInjector(syncPipelineWrapper, provider, reservoirProvider)
 	return optimismProvider, func() {
 		cleanup()
 	}
@@ -194,10 +198,11 @@ var (
 	_wireChainValue2 = persist.ChainOptimism
 )
 
-func optimismProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.OptimismProvider {
+func optimismProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider, reservoirProvider *reservoir.Provider) *multichain.OptimismProvider {
 	optimismProvider := &multichain.OptimismProvider{
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
+		MintStatuser:                     reservoirProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
@@ -230,7 +235,8 @@ func arbitrumInjector(contextContext context.Context, client *http.Client) (*mul
 	chain := _wireChainValue3
 	provider := simplehash.NewProvider(chain, client)
 	syncPipelineWrapper, cleanup := arbitrumSyncPipelineInjector(contextContext, client, chain, provider)
-	arbitrumProvider := arbitrumProviderInjector(syncPipelineWrapper, provider)
+	reservoirProvider := reservoir.NewProvider(contextContext, client, chain)
+	arbitrumProvider := arbitrumProviderInjector(syncPipelineWrapper, provider, reservoirProvider)
 	return arbitrumProvider, func() {
 		cleanup()
 	}
@@ -240,10 +246,11 @@ var (
 	_wireChainValue3 = persist.ChainArbitrum
 )
 
-func arbitrumProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.ArbitrumProvider {
+func arbitrumProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider, reservoirProvider *reservoir.Provider) *multichain.ArbitrumProvider {
 	arbitrumProvider := &multichain.ArbitrumProvider{
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
+		MintStatuser:                     reservoirProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
@@ -292,7 +299,8 @@ func zoraInjector(serverEnvInit envInit, contextContext context.Context, client 
 	chain := _wireChainValue4
 	provider := simplehash.NewProvider(chain, client)
 	syncPipelineWrapper, cleanup := zoraSyncPipelineInjector(contextContext, client, chain, provider)
-	zoraProvider := zoraProviderInjector(syncPipelineWrapper, provider)
+	reservoirProvider := reservoir.NewProvider(contextContext, client, chain)
+	zoraProvider := zoraProviderInjector(syncPipelineWrapper, provider, reservoirProvider)
 	return zoraProvider, func() {
 		cleanup()
 	}
@@ -302,10 +310,11 @@ var (
 	_wireChainValue4 = persist.ChainZora
 )
 
-func zoraProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.ZoraProvider {
+func zoraProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider, reservoirProvider *reservoir.Provider) *multichain.ZoraProvider {
 	zoraProvider := &multichain.ZoraProvider{
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
+		MintStatuser:                     reservoirProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
@@ -338,7 +347,8 @@ func baseInjector(contextContext context.Context, client *http.Client) (*multich
 	chain := _wireChainValue5
 	provider := simplehash.NewProvider(chain, client)
 	syncPipelineWrapper, cleanup := baseSyncPipelineInjector(contextContext, client, chain, provider)
-	baseProvider := baseProvidersInjector(syncPipelineWrapper, provider)
+	reservoirProvider := reservoir.NewProvider(contextContext, client, chain)
+	baseProvider := baseProvidersInjector(syncPipelineWrapper, provider, reservoirProvider)
 	return baseProvider, func() {
 		cleanup()
 	}
@@ -348,10 +358,11 @@ var (
 	_wireChainValue5 = persist.ChainBase
 )
 
-func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.BaseProvider {
+func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider, reservoirProvider *reservoir.Provider) *multichain.BaseProvider {
 	baseProvider := &multichain.BaseProvider{
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
+		MintStatuser:                     reservoirProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,
@@ -384,7 +395,8 @@ func polygonInjector(contextContext context.Context, client *http.Client) (*mult
 	chain := _wireChainValue6
 	provider := simplehash.NewProvider(chain, client)
 	syncPipelineWrapper, cleanup := polygonSyncPipelineInjector(contextContext, client, chain, provider)
-	polygonProvider := polygonProvidersInjector(syncPipelineWrapper, provider)
+	reservoirProvider := reservoir.NewProvider(contextContext, client, chain)
+	polygonProvider := polygonProvidersInjector(syncPipelineWrapper, provider, reservoirProvider)
 	return polygonProvider, func() {
 		cleanup()
 	}
@@ -394,10 +406,11 @@ var (
 	_wireChainValue6 = persist.ChainPolygon
 )
 
-func polygonProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider) *multichain.PolygonProvider {
+func polygonProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashProvider *simplehash.Provider, reservoirProvider *reservoir.Provider) *multichain.PolygonProvider {
 	polygonProvider := &multichain.PolygonProvider{
 		ContractFetcher:                  simplehashProvider,
 		ContractsCreatorFetcher:          simplehashProvider,
+		MintStatuser:                     reservoirProvider,
 		TokenDescriptorsFetcher:          simplehashProvider,
 		TokenIdentifierOwnerFetcher:      syncPipeline,
 		TokenMetadataBatcher:             syncPipeline,

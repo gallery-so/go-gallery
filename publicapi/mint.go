@@ -31,15 +31,15 @@ type MintAPI struct {
 	multichainProvider *multichain.Provider
 }
 
-func (api *MintAPI) IsTokenMinting(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.DecimalTokenID) (bool, error) {
+func (api *MintAPI) GetMintingStatusByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.DecimalTokenID) (isMinting bool, currency persist.Currency, costPerMint float64, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractAddress": validate.WithTag(contractAddress, "required"),
 		"tokenID":         validate.WithTag(tokenID, "required"),
 	}); err != nil {
-		return false, err
+		return false, "", 0, err
 	}
-	return api.multichainProvider.IsTokenMinting(ctx, chain, contractAddress, tokenID)
+	return api.multichainProvider.GetMintingStatusByTokenIdentifiers(ctx, chain, contractAddress, tokenID)
 }
 
 func (api *MintAPI) GetHighlightMintClaimByID(ctx context.Context, id persist.DBID) (db.HighlightMintClaim, error) {
