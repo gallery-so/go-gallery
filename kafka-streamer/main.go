@@ -103,6 +103,27 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
+func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseTokenEntryParams, error) {
+		ethereumEntry, err := parseTokenMessage(ctx, deserializer, message)
+		if err != nil {
+			return mirrordb.ProcessBaseTokenEntryParams{}, err
+		}
+
+		// All EVM chains (Ethereum, Base, Zora) have the same database and query structure, so we can cast between their parameters
+		return mirrordb.ProcessBaseTokenEntryParams(ethereumEntry), nil
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseTokenEntryParams) error {
+		return submitBatch(ctx, queries.ProcessBaseTokenEntry, entries)
+	}
+
+	return &streamerConfig{
+		Topic:   "base.nft.v4",
+		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+	}
+}
+
 func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessZoraOwnerEntryParams, error) {
 		ethereumEntry, err := parseOwnerMessage(ctx, deserializer, message)
@@ -124,6 +145,27 @@ func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
+func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessZoraTokenEntryParams, error) {
+		ethereumEntry, err := parseTokenMessage(ctx, deserializer, message)
+		if err != nil {
+			return mirrordb.ProcessZoraTokenEntryParams{}, err
+		}
+
+		// All EVM chains (Ethereum, Base, Zora) have the same database and query structure, so we can cast between their parameters
+		return mirrordb.ProcessZoraTokenEntryParams(ethereumEntry), nil
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessZoraTokenEntryParams) error {
+		return submitBatch(ctx, queries.ProcessZoraTokenEntry, entries)
+	}
+
+	return &streamerConfig{
+		Topic:   "zora.nft.v4",
+		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+	}
+}
+
 func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 	deserializer, err := newDeserializerFromRegistry()
 	if err != nil {
@@ -136,9 +178,10 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 	configs := []*streamerConfig{
 		newEthereumOwnerConfig(deserializer, queries),
 		newEthereumTokenConfig(deserializer, queries),
-		newEthereumTokenConfig(deserializer, queries),
 		newBaseOwnerConfig(deserializer, queries),
+		newBaseTokenConfig(deserializer, queries),
 		newZoraOwnerConfig(deserializer, queries),
+		newZoraTokenConfig(deserializer, queries),
 	}
 
 	// If any topic errors more than 10 times in 10 minutes, panic and restart the whole service
