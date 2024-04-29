@@ -28,8 +28,9 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	fastRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickFast", 1, 30*time.Second)
 	slowRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickSlow", 1, 5*time.Minute)
 	mintRetry := limiters.NewKeyRateLimiter(ctx, tokenManageCache, "tickMint", 1, 10*time.Second)
+
 	refreshManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenSyncF(ctx, fastRetry, slowRetry, mintRetry))
-	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesSync, tickTokenSyncF(ctx, fastRetry, slowRetry, mintRetry))
+	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, tokenManageCache, maxRetriesForTokenSync, tickTokenSyncF(ctx, fastRetry, slowRetry, mintRetry))
 	highlightProvider := highlight.NewProvider(http.DefaultClient)
 	mintManager := tokenmanage.New(ctx, taskClient, tokenManageCache, tickTokenF(ctx, mintRetry))
 
@@ -67,7 +68,7 @@ func tickTokenF(ctx context.Context, l *limiters.KeyRateLimiter) tokenmanage.Tic
 
 func tickTokenSyncF(ctx context.Context, fastRetry, slowRetry, mintRetry *limiters.KeyRateLimiter) tokenmanage.TickTokenF {
 	return func(td db.TokenDefinition) (time.Duration, error) {
-		if shareToGalleryEnabled(td) {
+		if platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash {
 			_, delay, err := fastRetry.ForKey(ctx, td.ID.String())
 			return delay, err
 		}
@@ -80,18 +81,15 @@ func tickTokenSyncF(ctx context.Context, fastRetry, slowRetry, mintRetry *limite
 	}
 }
 
-func maxRetriesSync(td db.TokenDefinition) int {
-	if shareToGalleryEnabled(td) || isHighlight(td) {
+func maxRetriesForTokenSync(td db.TokenDefinition) int {
+	if platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash || isHighlight(td) {
 		return 24
 	}
 	return 2
 }
 
-func shareToGalleryEnabled(td db.TokenDefinition) bool {
-	return platform.IsProhibition(td.Chain, td.ContractAddress) || td.IsFxhash
-}
-
 func isHighlight(td db.TokenDefinition) bool {
+	// mchx Radiance collection
 	if td.ContractAddress == "0x78b92e9afd56b033ead2103f07aced5fac8c0854" && td.Chain == persist.ChainBase {
 		return true
 	}
