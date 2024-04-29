@@ -25,7 +25,7 @@ var (
 	GrailsSeasonFive       = persist.NewContractIdentifiers("0x92a50fe6ede411bd26e171b97472e24d245349b8", persist.ChainETH)
 )
 
-var FxHashContracts = []persist.ContractIdentifiers{
+var FxHashTezosContracts = []persist.ContractIdentifiers{
 	FxHashGentkV1Contract,
 	FxHash2GentkV2Contract,
 	FxHash3GentkV3Contract,
@@ -58,21 +58,15 @@ func IsHicEtNunc(chain persist.Chain, address persist.Address) bool {
 }
 
 func IsFxhash(c db.Contract) bool {
-	if c.Chain == persist.ChainTezos {
-		return IsFxhashTezos(c.Chain, c.Address)
-	}
-	if c.Chain == persist.ChainETH {
-		return IsFxhashEth(c.Chain, c.Address, c.Symbol.String)
-	}
-	return false
+	return IsFxhashTezos(c.Chain, c.Address) || IsFxhashEth(c.Chain, c.Address, c.Symbol.String)
 }
 
 func IsFxhashTezos(chain persist.Chain, address persist.Address) bool {
-	return util.Contains(FxHashContracts, persist.NewContractIdentifiers(address, chain))
+	return chain == persist.ChainTezos && util.Contains(FxHashTezosContracts, persist.NewContractIdentifiers(address, chain))
 }
 
 func IsFxhashEth(chain persist.Chain, address persist.Address, contractSymbol string) bool {
-	return chain == persist.ChainETH && strings.ToLower(contractSymbol) == "fxgen"
+	return chain.L1Chain() == persist.ChainETH.L1Chain() && strings.ToLower(contractSymbol) == "fxgen"
 }
 
 func IsFxhashSignedTezos(chain persist.Chain, address persist.Address, tokenName string) bool {
