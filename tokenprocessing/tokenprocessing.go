@@ -37,7 +37,7 @@ func InitServer() {
 	setDefaults()
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	mc, _ := server.NewMultichainProvider(ctx, setDefaults)
+	mc := multichain.NewMultichainProvider(ctx, c.Repos, c.Queries)
 	router := CoreInitServer(ctx, c, mc)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)

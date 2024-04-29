@@ -8,10 +8,7 @@ package multichain
 
 import (
 	"context"
-	"database/sql"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/google/wire"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain/custom"
@@ -33,21 +30,16 @@ import (
 // Injectors from inject.go:
 
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
-func NewMultichainProvider(ctx context.Context, envFunc func()) (*Provider, func()) {
-	multichainEnvInit := setEnv(envFunc)
-	db, cleanup := newPqClient(multichainEnvInit)
-	pool, cleanup2 := newPgxClient(multichainEnvInit)
-	repositories := postgres.NewRepositories(db, pool)
-	queries := newQueries(pool)
+func NewMultichainProvider(contextContext context.Context, repositories *postgres.Repositories, queries *coredb.Queries) *Provider {
 	client := _wireClientValue
-	ethereumProvider, cleanup3 := ethInjector(multichainEnvInit, ctx, client)
-	tezosProvider := tezosInjector(multichainEnvInit, client)
-	optimismProvider, cleanup4 := optimismInjector(ctx, client)
-	arbitrumProvider, cleanup5 := arbitrumInjector(ctx, client)
-	poapProvider := poapInjector(multichainEnvInit, client)
-	zoraProvider, cleanup6 := zoraInjector(multichainEnvInit, ctx, client)
-	baseProvider, cleanup7 := baseInjector(ctx, client)
-	polygonProvider, cleanup8 := polygonInjector(ctx, client)
+	ethereumProvider := ethInjector(contextContext, client)
+	tezosProvider := tezosInjector(client)
+	optimismProvider := optimismInjector(contextContext, client)
+	arbitrumProvider := arbitrumInjector(contextContext, client)
+	poapProvider := poapInjector(client)
+	zoraProvider := zoraInjector(contextContext, client)
+	baseProvider := baseInjector(contextContext, client)
+	polygonProvider := polygonInjector(contextContext, client)
 	chainProvider := &ChainProvider{
 		Ethereum: ethereumProvider,
 		Tezos:    tezosProvider,
@@ -58,18 +50,9 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*Provider, func
 		Base:     baseProvider,
 		Polygon:  polygonProvider,
 	}
-	tokenProcessingSubmitter := tokenProcessingSubmitterInjector(ctx)
-	provider := multichainProviderInjector(ctx, repositories, queries, chainProvider, tokenProcessingSubmitter)
-	return provider, func() {
-		cleanup8()
-		cleanup7()
-		cleanup6()
-		cleanup5()
-		cleanup4()
-		cleanup3()
-		cleanup2()
-		cleanup()
-	}
+	tokenProcessingSubmitter := tokenProcessingSubmitterInjector(contextContext)
+	provider := multichainProviderInjector(contextContext, repositories, queries, chainProvider, tokenProcessingSubmitter)
+	return provider
 }
 
 var (
@@ -95,16 +78,14 @@ func customMetadataHandlersInjector() *custom.CustomMetadataHandlers {
 	return customMetadataHandlers
 }
 
-func ethInjector(multichainEnvInit envInit, contextContext context.Context, client *http.Client) (*EthereumProvider, func()) {
+func ethInjector(contextContext context.Context, client *http.Client) *EthereumProvider {
 	chain := _wireChainValue
 	provider := simplehash.NewProvider(chain, client)
-	syncPipelineWrapper, cleanup := ethSyncPipelineInjector(contextContext, client, chain, provider)
+	syncPipelineWrapper := ethSyncPipelineInjector(contextContext, client, chain, provider)
 	ethclientClient := rpc.NewEthClient()
 	verifier := ethVerifierInjector(ethclientClient)
 	ethereumProvider := ethProviderInjector(contextContext, syncPipelineWrapper, verifier, provider)
-	return ethereumProvider, func() {
-		cleanup()
-	}
+	return ethereumProvider
 }
 
 var (
@@ -135,7 +116,7 @@ func ethProviderInjector(ctx context.Context, syncPipeline *wrapper.SyncPipeline
 	return ethereumProvider
 }
 
-func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
+func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) *wrapper.SyncPipelineWrapper {
 	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
@@ -147,11 +128,10 @@ func ethSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain
 		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
-	return syncPipelineWrapper, func() {
-	}
+	return syncPipelineWrapper
 }
 
-func tezosInjector(multichainEnvInit envInit, client *http.Client) *TezosProvider {
+func tezosInjector(client *http.Client) *TezosProvider {
 	provider := tezos.NewProvider()
 	chain := _wirePersistChainValue
 	simplehashProvider := simplehash.NewProvider(chain, client)
@@ -180,14 +160,12 @@ func tezosProviderInjector(tezosProvider *tezos.Provider, simplehashProvider *si
 	return multichainTezosProvider
 }
 
-func optimismInjector(contextContext context.Context, client *http.Client) (*OptimismProvider, func()) {
+func optimismInjector(contextContext context.Context, client *http.Client) *OptimismProvider {
 	chain := _wireChainValue2
 	provider := simplehash.NewProvider(chain, client)
-	syncPipelineWrapper, cleanup := optimismSyncPipelineInjector(contextContext, client, chain, provider)
+	syncPipelineWrapper := optimismSyncPipelineInjector(contextContext, client, chain, provider)
 	optimismProvider := optimismProviderInjector(syncPipelineWrapper, provider)
-	return optimismProvider, func() {
-		cleanup()
-	}
+	return optimismProvider
 }
 
 var (
@@ -210,7 +188,7 @@ func optimismProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simpleh
 	return optimismProvider
 }
 
-func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
+func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) *wrapper.SyncPipelineWrapper {
 	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
@@ -222,18 +200,15 @@ func optimismSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
-	return syncPipelineWrapper, func() {
-	}
+	return syncPipelineWrapper
 }
 
-func arbitrumInjector(contextContext context.Context, client *http.Client) (*ArbitrumProvider, func()) {
+func arbitrumInjector(contextContext context.Context, client *http.Client) *ArbitrumProvider {
 	chain := _wireChainValue3
 	provider := simplehash.NewProvider(chain, client)
-	syncPipelineWrapper, cleanup := arbitrumSyncPipelineInjector(contextContext, client, chain, provider)
+	syncPipelineWrapper := arbitrumSyncPipelineInjector(contextContext, client, chain, provider)
 	arbitrumProvider := arbitrumProviderInjector(syncPipelineWrapper, provider)
-	return arbitrumProvider, func() {
-		cleanup()
-	}
+	return arbitrumProvider
 }
 
 var (
@@ -256,7 +231,7 @@ func arbitrumProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simpleh
 	return arbitrumProvider
 }
 
-func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
+func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) *wrapper.SyncPipelineWrapper {
 	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
@@ -268,11 +243,10 @@ func arbitrumSyncPipelineInjector(ctx context.Context, httpClient *http.Client, 
 		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
-	return syncPipelineWrapper, func() {
-	}
+	return syncPipelineWrapper
 }
 
-func poapInjector(multichainEnvInit envInit, client *http.Client) *PoapProvider {
+func poapInjector(client *http.Client) *PoapProvider {
 	provider := poap.NewProvider(client)
 	poapProvider := poapProviderInjector(provider)
 	return poapProvider
@@ -288,14 +262,12 @@ func poapProviderInjector(poapProvider *poap.Provider) *PoapProvider {
 	return multichainPoapProvider
 }
 
-func zoraInjector(multichainEnvInit envInit, contextContext context.Context, client *http.Client) (*ZoraProvider, func()) {
+func zoraInjector(contextContext context.Context, client *http.Client) *ZoraProvider {
 	chain := _wireChainValue4
 	provider := simplehash.NewProvider(chain, client)
-	syncPipelineWrapper, cleanup := zoraSyncPipelineInjector(contextContext, client, chain, provider)
+	syncPipelineWrapper := zoraSyncPipelineInjector(contextContext, client, chain, provider)
 	zoraProvider := zoraProviderInjector(syncPipelineWrapper, provider)
-	return zoraProvider, func() {
-		cleanup()
-	}
+	return zoraProvider
 }
 
 var (
@@ -318,7 +290,7 @@ func zoraProviderInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehashP
 	return zoraProvider
 }
 
-func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
+func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) *wrapper.SyncPipelineWrapper {
 	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
@@ -330,18 +302,15 @@ func zoraSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
-	return syncPipelineWrapper, func() {
-	}
+	return syncPipelineWrapper
 }
 
-func baseInjector(contextContext context.Context, client *http.Client) (*BaseProvider, func()) {
+func baseInjector(contextContext context.Context, client *http.Client) *BaseProvider {
 	chain := _wireChainValue5
 	provider := simplehash.NewProvider(chain, client)
-	syncPipelineWrapper, cleanup := baseSyncPipelineInjector(contextContext, client, chain, provider)
+	syncPipelineWrapper := baseSyncPipelineInjector(contextContext, client, chain, provider)
 	baseProvider := baseProvidersInjector(syncPipelineWrapper, provider)
-	return baseProvider, func() {
-		cleanup()
-	}
+	return baseProvider
 }
 
 var (
@@ -364,7 +333,7 @@ func baseProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simplehash
 	return baseProvider
 }
 
-func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
+func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) *wrapper.SyncPipelineWrapper {
 	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
@@ -376,18 +345,15 @@ func baseSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chai
 		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
-	return syncPipelineWrapper, func() {
-	}
+	return syncPipelineWrapper
 }
 
-func polygonInjector(contextContext context.Context, client *http.Client) (*PolygonProvider, func()) {
+func polygonInjector(contextContext context.Context, client *http.Client) *PolygonProvider {
 	chain := _wireChainValue6
 	provider := simplehash.NewProvider(chain, client)
-	syncPipelineWrapper, cleanup := polygonSyncPipelineInjector(contextContext, client, chain, provider)
+	syncPipelineWrapper := polygonSyncPipelineInjector(contextContext, client, chain, provider)
 	polygonProvider := polygonProvidersInjector(syncPipelineWrapper, provider)
-	return polygonProvider, func() {
-		cleanup()
-	}
+	return polygonProvider
 }
 
 var (
@@ -410,7 +376,7 @@ func polygonProvidersInjector(syncPipeline *wrapper.SyncPipelineWrapper, simpleh
 	return polygonProvider
 }
 
-func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) (*wrapper.SyncPipelineWrapper, func()) {
+func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, chain persist.Chain, simplehashProvider *simplehash.Provider) *wrapper.SyncPipelineWrapper {
 	customMetadataHandlers := customMetadataHandlersInjector()
 	syncPipelineWrapper := &wrapper.SyncPipelineWrapper{
 		Chain:                            chain,
@@ -422,8 +388,7 @@ func polygonSyncPipelineInjector(ctx context.Context, httpClient *http.Client, c
 		TokensByContractWalletFetcher:    simplehashProvider,
 		CustomMetadataWrapper:            customMetadataHandlers,
 	}
-	return syncPipelineWrapper, func() {
-	}
+	return syncPipelineWrapper
 }
 
 func tokenProcessingSubmitterInjector(contextContext context.Context) *tokenmanage.TokenProcessingSubmitter {
@@ -440,37 +405,6 @@ func tokenProcessingSubmitterInjector(contextContext context.Context) *tokenmana
 }
 
 // inject.go:
-
-// envInit is a type returned after setting up the environment
-// Adding envInit as a dependency to a provider will ensure that the environment is set up prior
-// to calling the provider
-type envInit struct{}
-
-// dbConnSet is a wire provider set for initializing a postgres connection
-var dbConnSet = wire.NewSet(
-	newPqClient,
-	newPgxClient,
-	newQueries,
-)
-
-func setEnv(f func()) envInit {
-	f()
-	return envInit{}
-}
-
-func newPqClient(e envInit) (*sql.DB, func()) {
-	pq := postgres.MustCreateClient()
-	return pq, func() { pq.Close() }
-}
-
-func newPgxClient(envInit) (*pgxpool.Pool, func()) {
-	pgx := postgres.NewPgxClient()
-	return pgx, func() { pgx.Close() }
-}
-
-func newQueries(p *pgxpool.Pool) *coredb.Queries {
-	return coredb.New(p)
-}
 
 func newTokenManageCache() *redis.Cache {
 	return redis.NewCache(redis.TokenManageCache)

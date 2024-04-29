@@ -5,12 +5,10 @@ package multichain
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/wire"
-	"github.com/jackc/pgx/v4/pgxpool"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/eth"
@@ -31,18 +29,10 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-// envInit is a type returned after setting up the environment
-// Adding envInit as a dependency to a provider will ensure that the environment is set up prior
-// to calling the provider
-type envInit struct{}
-
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
-func NewMultichainProvider(ctx context.Context, envFunc func()) (*Provider, func()) {
-	wire.Build(
-		setEnv,
+func NewMultichainProvider(context.Context, *postgres.Repositories, *db.Queries) *Provider {
+	panic(wire.Build(
 		wire.Value(http.DefaultClient), // HTTP client shared between providers
-		postgres.NewRepositories,
-		dbConnSet,
 		wire.Struct(new(ChainProvider), "*"),
 		tokenProcessingSubmitterInjector,
 		multichainProviderInjector,
@@ -54,34 +44,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*Provider, func
 		baseInjector,
 		polygonInjector,
 		arbitrumInjector,
-	)
-	return nil, nil
-}
-
-// dbConnSet is a wire provider set for initializing a postgres connection
-var dbConnSet = wire.NewSet(
-	newPqClient,
-	newPgxClient,
-	newQueries,
-)
-
-func setEnv(f func()) envInit {
-	f()
-	return envInit{}
-}
-
-func newPqClient(e envInit) (*sql.DB, func()) {
-	pq := postgres.MustCreateClient()
-	return pq, func() { pq.Close() }
-}
-
-func newPgxClient(envInit) (*pgxpool.Pool, func()) {
-	pgx := postgres.NewPgxClient()
-	return pgx, func() { pgx.Close() }
-}
-
-func newQueries(p *pgxpool.Pool) *db.Queries {
-	return db.New(p)
+	))
 }
 
 func newTokenManageCache() *redis.Cache {
@@ -119,7 +82,7 @@ func customMetadataHandlersInjector() *custom.CustomMetadataHandlers {
 	))
 }
 
-func ethInjector(envInit, context.Context, *http.Client) (*EthereumProvider, func()) {
+func ethInjector(context.Context, *http.Client) *EthereumProvider {
 	panic(wire.Build(
 		rpc.NewEthClient,
 		wire.Value(persist.ChainETH),
@@ -161,7 +124,7 @@ func ethSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-) (*wrapper.SyncPipelineWrapper, func()) {
+) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
@@ -174,7 +137,7 @@ func ethSyncPipelineInjector(
 	))
 }
 
-func tezosInjector(envInit, *http.Client) *TezosProvider {
+func tezosInjector(*http.Client) *TezosProvider {
 	wire.Build(
 		tezosProviderInjector,
 		wire.Value(persist.ChainTezos),
@@ -201,7 +164,7 @@ func tezosProviderInjector(tezosProvider *tezos.Provider, simplehashProvider *si
 	))
 }
 
-func optimismInjector(context.Context, *http.Client) (*OptimismProvider, func()) {
+func optimismInjector(context.Context, *http.Client) *OptimismProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainOptimism),
 		simplehash.NewProvider,
@@ -234,7 +197,7 @@ func optimismSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-) (*wrapper.SyncPipelineWrapper, func()) {
+) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
@@ -247,7 +210,7 @@ func optimismSyncPipelineInjector(
 	))
 }
 
-func arbitrumInjector(context.Context, *http.Client) (*ArbitrumProvider, func()) {
+func arbitrumInjector(context.Context, *http.Client) *ArbitrumProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainArbitrum),
 		simplehash.NewProvider,
@@ -280,7 +243,7 @@ func arbitrumSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-) (*wrapper.SyncPipelineWrapper, func()) {
+) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
@@ -293,7 +256,7 @@ func arbitrumSyncPipelineInjector(
 	))
 }
 
-func poapInjector(envInit, *http.Client) *PoapProvider {
+func poapInjector(*http.Client) *PoapProvider {
 	panic(wire.Build(
 		poapProviderInjector,
 		poap.NewProvider,
@@ -310,7 +273,7 @@ func poapProviderInjector(poapProvider *poap.Provider) *PoapProvider {
 	))
 }
 
-func zoraInjector(envInit, context.Context, *http.Client) (*ZoraProvider, func()) {
+func zoraInjector(context.Context, *http.Client) *ZoraProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainZora),
 		simplehash.NewProvider,
@@ -343,7 +306,7 @@ func zoraSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-) (*wrapper.SyncPipelineWrapper, func()) {
+) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
@@ -356,7 +319,7 @@ func zoraSyncPipelineInjector(
 	))
 }
 
-func baseInjector(context.Context, *http.Client) (*BaseProvider, func()) {
+func baseInjector(context.Context, *http.Client) *BaseProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainBase),
 		simplehash.NewProvider,
@@ -389,7 +352,7 @@ func baseSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-) (*wrapper.SyncPipelineWrapper, func()) {
+) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
@@ -402,7 +365,7 @@ func baseSyncPipelineInjector(
 	))
 }
 
-func polygonInjector(context.Context, *http.Client) (*PolygonProvider, func()) {
+func polygonInjector(context.Context, *http.Client) *PolygonProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainPolygon),
 		simplehash.NewProvider,
@@ -435,7 +398,7 @@ func polygonSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
-) (*wrapper.SyncPipelineWrapper, func()) {
+) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),

@@ -68,12 +68,13 @@ type PublicAPI struct {
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI, mintLimiter *limiters.KeyRateLimiter) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI, mintLimiter *limiters.KeyRateLimiter) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	validator := validate.WithCustomValidators()
 	tokenManager := tokenmanage.New(ctx, taskClient, tokenManageCache, nil)
 	privyClient := privy.NewPrivyClient(httpClient)
 	highlightProvider := highlight.NewProvider(httpClient)
+	multichainProvider := multichain.NewMultichainProvider(ctx, repos, queries)
 
 	return &PublicAPI{
 		repos:     repos,

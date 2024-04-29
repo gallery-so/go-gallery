@@ -30,7 +30,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/recommend"
@@ -59,10 +58,9 @@ func Init() {
 
 	ctx := context.Background()
 	c := ClientInit(ctx)
-	provider, _ := NewMultichainProvider(ctx, SetDefaults)
 	recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
 	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
-	router := CoreInit(ctx, c, provider, recommender, p)
+	router := CoreInit(ctx, c, recommender, p)
 	http.Handle("/", router)
 }
 
@@ -109,7 +107,7 @@ func ClientInit(ctx context.Context) *Clients {
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, recommender *recommend.Recommender, p *userpref.Personalization) *gin.Engine {
+func CoreInit(ctx context.Context, c *Clients, recommender *recommend.Recommender, p *userpref.Personalization) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if env.GetString("ENV") != "production" {
@@ -139,7 +137,7 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	recommender.Loop(ctx, time.NewTicker(time.Hour))
 	p.Loop(ctx, time.NewTicker(time.Minute*15))
 
-	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar, mintLimiter)
+	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar, mintLimiter)
 }
 
 func newSecretsClient() *secretmanager.Client {
