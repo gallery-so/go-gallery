@@ -234,7 +234,6 @@ type simplehashCollection struct {
 	ImageURL     string   `json:"image_url"`
 	ExternalURL  string   `json:"external_url"`
 	IsNSFW       bool     `json:"is_nsfw"`
-	SpamScore    int      `json:"spam_score"`
 	Chains       []string `json:"chains"`
 	TopContracts []string `json:"top_contracts"`
 }
@@ -315,10 +314,6 @@ type getOwnersByContractResponse struct {
 	Owners     []simplehashTokenOwner `json:"owners"`
 }
 
-func isSpamCollection(c simplehashCollection) bool {
-	return c.SpamScore > spamScoreThreshold
-}
-
 func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address, isSpam *bool) mc.ChainAgnosticToken {
 	var tokenType persist.TokenType
 
@@ -383,7 +378,8 @@ func translateToChainAgnosticContract(address string, contract simplehashContrac
 			OwnerAddress: persist.Address(util.FirstNonEmptyString(contract.OwnedBy, contract.DeployedBy)),
 		},
 		Address: persist.Address(address),
-		IsSpam:  util.ToPointer(isSpamCollection(collection)),
+		// We request tokens from simplehash that are below a spam score, so anything we get isn't spam
+		IsSpam: util.ToPointer(false),
 	}
 	if !contract.HasMultipleCollections {
 		c.Descriptors.Description = collection.Description
