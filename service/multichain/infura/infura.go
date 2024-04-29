@@ -12,7 +12,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -125,7 +125,7 @@ func NewProvider(httpClient *http.Client) *Provider {
 	}
 }
 
-func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 	tokens, err := getNFTsPaginate(ctx, fmt.Sprintf("%s/accounts/%s/assets/nfts", baseURL, address), "", p.httpClient, p.apiKey, p.apiSecret, &getNFTsForOwnerResponse{})
 	if err != nil {
 		return nil, nil, err
@@ -138,75 +138,75 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	return p.ownedTokensToChainAgnosticTokens(ctx, address, tokens)
 }
 
-func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tids common.ChainAgnosticIdentifiers, owner persist.Address) (common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	owners, err := p.getOwnersPaginate(ctx, tids, "")
 	if err != nil {
 
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	if len(owners) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no owners found for token %s with owner %s", tids, owner)
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, fmt.Errorf("no owners found for token %s with owner %s", tids, owner)
 	}
 
 	tokens, contracts, err := p.ownersToTokensForOwner(ctx, owner, owners)
 	if err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	if len(tokens) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for owner %s with tids %s", owner, tids)
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, fmt.Errorf("no tokens found for owner %s with tids %s", owner, tids)
 	}
 
 	return tokens[0], contracts[0], nil
 }
 
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tids multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tids common.ChainAgnosticIdentifiers) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	owners, err := p.getOwnersPaginate(ctx, tids, "")
 	if err != nil {
 
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	if len(owners) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no owners found for token %s", tids)
+		return nil, common.ChainAgnosticContract{}, fmt.Errorf("no owners found for token %s", tids)
 	}
 
 	tokens, contracts, err := p.ownersToTokens(ctx, owners)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	if len(tokens) == 0 || len(contracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens or contracts found for token with tids %s", tids)
+		return nil, common.ChainAgnosticContract{}, fmt.Errorf("no tokens or contracts found for token with tids %s", tids)
 	}
 
 	return tokens, contracts[0], nil
 }
 
-func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tids multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tids common.ChainAgnosticIdentifiers) (common.ChainAgnosticTokenDescriptors, common.ChainAgnosticContractDescriptors, error) {
 	owners, err := p.getOwnersPaginate(ctx, tids, "")
 	if err != nil {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, err
 	}
 
 	if len(owners) == 0 {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, fmt.Errorf("no owners found for token %s", tids)
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, fmt.Errorf("no owners found for token %s", tids)
 	}
 
 	tokens, contracts, err := p.ownersToTokensForOwner(ctx, persist.Address(owners[0].OwnerOf), []Owner{owners[0]})
 	if err != nil {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, err
 	}
 
 	if len(tokens) == 0 || len(contracts) == 0 {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, fmt.Errorf("no tokens or contracts found for token with tids %s", tids)
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, fmt.Errorf("no tokens or contracts found for token with tids %s", tids)
 	}
 
 	return tokens[0].Descriptors, contracts[0].Descriptors, nil
 }
 
-func (d *Provider) getOwnersPaginate(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, pageKey string) ([]Owner, error) {
+func (d *Provider) getOwnersPaginate(ctx context.Context, tids common.ChainAgnosticIdentifiers, pageKey string) ([]Owner, error) {
 
 	owners := []Owner{}
 
@@ -320,7 +320,7 @@ type TokenMetadata struct {
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	meta, err := p.getMetadata(ctx, ti, true)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to get metadata for token %s: %s", ti.TokenID, err.Error())
@@ -330,7 +330,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 
 }
 
-func (p *Provider) getMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, refresh bool) (persist.TokenMetadata, error) {
+func (p *Provider) getMetadata(ctx context.Context, ti common.ChainAgnosticIdentifiers, refresh bool) (persist.TokenMetadata, error) {
 	if refresh {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
@@ -369,35 +369,35 @@ type ContractMetadata struct {
 	Symbol string `json:"symbol"`
 }
 
-func (p *Provider) getContractMetadata(ctx context.Context, contract persist.EthereumAddress) (multichain.ChainAgnosticContract, error) {
+func (p *Provider) getContractMetadata(ctx context.Context, contract persist.EthereumAddress) (common.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/nfts/%s", baseURL, contract)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticContract{}, err
 	}
 
 	req.SetBasicAuth(p.apiKey, p.apiSecret)
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		return multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticContract{}, err
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get tokens from infura api: %s", resp.Status)
+		return common.ChainAgnosticContract{}, fmt.Errorf("failed to get tokens from infura api: %s", resp.Status)
 	}
 
 	var contractMetadata ContractMetadata
 	if err := json.NewDecoder(resp.Body).Decode(&contractMetadata); err != nil {
-		return multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticContract{}, err
 	}
 
-	chainAgnosticContract := multichain.ChainAgnosticContract{
+	chainAgnosticContract := common.ChainAgnosticContract{
 		Address: persist.Address(contract),
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Symbol: contractMetadata.Symbol,
 			Name:   contractMetadata.Name,
 		},
@@ -406,7 +406,7 @@ func (p *Provider) getContractMetadata(ctx context.Context, contract persist.Eth
 	return chainAgnosticContract, nil
 }
 
-func (p *Provider) ownersToTokensForOwner(ctx context.Context, owner persist.Address, owners []Owner) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) ownersToTokensForOwner(ctx context.Context, owner persist.Address, owners []Owner) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 	result := Token{}
 	found := false
 	for _, o := range owners {
@@ -431,7 +431,7 @@ func (p *Provider) ownersToTokensForOwner(ctx context.Context, owner persist.Add
 	return p.ownedTokensToChainAgnosticTokens(ctx, owner, []Token{result})
 }
 
-func (p *Provider) ownersToTokens(ctx context.Context, owners []Owner) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) ownersToTokens(ctx context.Context, owners []Owner) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 	result := map[string]Token{}
 
 	for _, o := range owners {
@@ -447,8 +447,8 @@ func (p *Provider) ownersToTokens(ctx context.Context, owners []Owner) ([]multic
 
 	}
 
-	agnosticTokens := []multichain.ChainAgnosticToken{}
-	agnosticContracts := []multichain.ChainAgnosticContract{}
+	agnosticTokens := []common.ChainAgnosticToken{}
+	agnosticContracts := []common.ChainAgnosticContract{}
 	seenContracts := map[persist.Address]bool{}
 	for owner, token := range result {
 		a, c, err := p.ownedTokensToChainAgnosticTokens(ctx, persist.Address(strings.ToLower(owner)), []Token{token})
@@ -466,10 +466,10 @@ func (p *Provider) ownersToTokens(ctx context.Context, owners []Owner) ([]multic
 	return agnosticTokens, agnosticContracts, nil
 }
 
-func (p *Provider) ownedTokensToChainAgnosticTokens(ctx context.Context, owner persist.Address, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) ownedTokensToChainAgnosticTokens(ctx context.Context, owner persist.Address, tokens []Token) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 
-	chainAgnosticTokens := []multichain.ChainAgnosticToken{}
-	chainAgnosticContracts := []multichain.ChainAgnosticContract{}
+	chainAgnosticTokens := []common.ChainAgnosticToken{}
+	chainAgnosticContracts := []common.ChainAgnosticContract{}
 
 	seenContracts := map[persist.EthereumAddress]bool{}
 
@@ -492,7 +492,7 @@ func (p *Provider) ownedTokensToChainAgnosticTokens(ctx context.Context, owner p
 	return chainAgnosticTokens, chainAgnosticContracts, nil
 }
 
-func ownedTokenToChainAgnosticToken(owner persist.Address, token Token) multichain.ChainAgnosticToken {
+func ownedTokenToChainAgnosticToken(owner persist.Address, token Token) common.ChainAgnosticToken {
 	var tokenType persist.TokenType
 
 	switch token.TokenType {
@@ -507,14 +507,14 @@ func ownedTokenToChainAgnosticToken(owner persist.Address, token Token) multicha
 		b = big.NewInt(1)
 	}
 
-	chainAgnosticToken := multichain.ChainAgnosticToken{
+	chainAgnosticToken := common.ChainAgnosticToken{
 		TokenType:       tokenType,
 		TokenMetadata:   persist.TokenMetadata(token.Metadata),
 		TokenID:         token.TokenID.ToTokenID(),
 		OwnerAddress:    owner,
 		ContractAddress: persist.Address(token.Contract),
 		Quantity:        persist.HexString(b.Text(16)),
-		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+		Descriptors: common.ChainAgnosticTokenDescriptors{
 			Name: token.Name,
 		},
 	}

@@ -1,4 +1,4 @@
-package multichain
+package custom
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 
 	svg "github.com/ajstarks/svgo"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -25,6 +25,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
@@ -81,15 +82,15 @@ func (c *CustomMetadataHandlers) HandlerFor(t persist.TokenIdentifiers) metadata
 	}
 }
 
-func (c *CustomMetadataHandlers) AddToToken(ctx context.Context, chain persist.Chain, t ChainAgnosticToken) ChainAgnosticToken {
-	tID := ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
+func (c *CustomMetadataHandlers) AddToToken(ctx context.Context, chain persist.Chain, t common.ChainAgnosticToken) common.ChainAgnosticToken {
+	tID := common.ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
 	m := c.Load(ctx, chain, tID, t.TokenMetadata)
 	t.TokenMetadata = m
 	return t
 }
 
-func (c *CustomMetadataHandlers) AddToPage(ctx context.Context, chain persist.Chain, recCh <-chan ChainAgnosticTokensAndContracts, errIn <-chan error) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
-	outCh := make(chan ChainAgnosticTokensAndContracts, 2*10)
+func (c *CustomMetadataHandlers) AddToPage(ctx context.Context, chain persist.Chain, recCh <-chan common.ChainAgnosticTokensAndContracts, errIn <-chan error) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
+	outCh := make(chan common.ChainAgnosticTokensAndContracts, 2*10)
 	errOut := make(chan error)
 	go func() {
 		defer close(outCh)
@@ -116,7 +117,7 @@ func (c *CustomMetadataHandlers) AddToPage(ctx context.Context, chain persist.Ch
 	return outCh, errOut
 }
 
-func (c *CustomMetadataHandlers) Load(ctx context.Context, chain persist.Chain, t ChainAgnosticIdentifiers, oldMetadata ...persist.TokenMetadata) persist.TokenMetadata {
+func (c *CustomMetadataHandlers) Load(ctx context.Context, chain persist.Chain, t common.ChainAgnosticIdentifiers, oldMetadata ...persist.TokenMetadata) persist.TokenMetadata {
 	tID := persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, chain)
 	h := c.HandlerFor(tID)
 	if h == nil {
@@ -130,12 +131,12 @@ func (c *CustomMetadataHandlers) Load(ctx context.Context, chain persist.Chain, 
 	return m
 }
 
-func (c *CustomMetadataHandlers) LoadMetadataAll(ctx context.Context, chain persist.Chain, tokens []ChainAgnosticToken) []persist.TokenMetadata {
+func (c *CustomMetadataHandlers) LoadMetadataAll(ctx context.Context, chain persist.Chain, tokens []common.ChainAgnosticToken) []persist.TokenMetadata {
 	tokens = c.LoadAll(ctx, chain, tokens)
-	return util.MapWithoutError(tokens, func(t ChainAgnosticToken) persist.TokenMetadata { return t.TokenMetadata })
+	return util.MapWithoutError(tokens, func(t common.ChainAgnosticToken) persist.TokenMetadata { return t.TokenMetadata })
 }
 
-func (c *CustomMetadataHandlers) LoadAll(ctx context.Context, chain persist.Chain, tokens []ChainAgnosticToken) []ChainAgnosticToken {
+func (c *CustomMetadataHandlers) LoadAll(ctx context.Context, chain persist.Chain, tokens []common.ChainAgnosticToken) []common.ChainAgnosticToken {
 	for i, t := range tokens {
 		tokens[i] = c.AddToToken(ctx, chain, t)
 	}
@@ -517,7 +518,7 @@ func newEnsHandler() metadataHandler {
 
 func newCryptopunkHandler(ethClient *ethclient.Client) metadataHandler {
 	return func(ctx context.Context, t persist.TokenIdentifiers, _ ...persist.TokenMetadata) (persist.TokenMetadata, error) {
-		dataContract, err := contracts.NewCryptopunksDataCaller(common.HexToAddress("0x16f5a35647d6f03d5d3da7b35409d65ba03af3b2"), ethClient)
+		dataContract, err := contracts.NewCryptopunksDataCaller(ethcommon.HexToAddress("0x16f5a35647d6f03d5d3da7b35409d65ba03af3b2"), ethClient)
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}
@@ -542,7 +543,7 @@ func newCryptopunkHandler(ethClient *ethclient.Client) metadataHandler {
 
 func newZoraHandler(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) metadataHandler {
 	return func(ctx context.Context, t persist.TokenIdentifiers, _ ...persist.TokenMetadata) (persist.TokenMetadata, error) {
-		metadataContract, err := contracts.NewZoraCaller(common.HexToAddress(t.ContractAddress.String()), ethClient)
+		metadataContract, err := contracts.NewZoraCaller(ethcommon.HexToAddress(t.ContractAddress.String()), ethClient)
 		if err != nil {
 			return persist.TokenMetadata{}, err
 		}

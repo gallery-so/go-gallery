@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -102,7 +102,7 @@ func NewProvider() *Provider {
 	}
 }
 
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	t, _, err := p.GetTokensByTokenIdentifiers(ctx, ti)
 	if err != nil {
 		return persist.TokenMetadata{}, err
@@ -115,7 +115,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return t[0].TokenMetadata, nil
 }
 
-func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"ownerAddress": ownerAddress})
 	tzOwnerAddress, err := tezos.ToAddress(ownerAddress)
 	if err != nil {
@@ -154,10 +154,10 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 	return returnTokens, returnContracts, nil
 }
 
-func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
-	returnTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
-	returnContracts := make([]multichain.ChainAgnosticContract, 0)
-	dedupeContracts := make(map[persist.Address]multichain.ChainAgnosticContract)
+func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Address) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract) {
+	returnTokens := make([]common.ChainAgnosticToken, 0, len(tokens))
+	returnContracts := make([]common.ChainAgnosticContract, 0)
+	dedupeContracts := make(map[persist.Address]common.ChainAgnosticContract)
 
 	for _, node := range tokens {
 
@@ -168,9 +168,9 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 		metadata := createMetadata(node.Token)
 
 		if _, ok := dedupeContracts[node.Token.Fa.Contract]; !ok {
-			dedupeContracts[node.Token.Fa.Contract] = multichain.ChainAgnosticContract{
+			dedupeContracts[node.Token.Fa.Contract] = common.ChainAgnosticContract{
 				Address: node.Token.Fa.Contract,
-				Descriptors: multichain.ChainAgnosticContractDescriptors{
+				Descriptors: common.ChainAgnosticContractDescriptors{
 					Symbol:          node.Token.Symbol,
 					Name:            node.Token.Fa.Name,
 					Description:     node.Token.Fa.Description,
@@ -185,9 +185,9 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 
 		tokenID := persist.MustTokenID(string(node.Token.Token_ID))
 
-		agnosticToken := multichain.ChainAgnosticToken{
+		agnosticToken := common.ChainAgnosticToken{
 			TokenType: persist.TokenTypeERC1155,
-			Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Descriptors: common.ChainAgnosticTokenDescriptors{
 				Description: node.Token.Description,
 				Name:        node.Token.Name,
 			},
@@ -204,8 +204,8 @@ func objktTokensToChainAgnostic(tokens []tokenNode, tzOwnerAddress persist.Addre
 	return returnTokens, returnContracts
 }
 
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan common.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
@@ -240,7 +240,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 
 			returnTokens, returnContracts := objktTokensToChainAgnostic(query.Holder[0].Held_Tokens, tzOwnerAddress)
 
-			recCh <- multichain.ChainAgnosticTokensAndContracts{
+			recCh <- common.ChainAgnosticTokensAndContracts{
 				Tokens:    returnTokens,
 				Contracts: returnContracts,
 			}
@@ -251,7 +251,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 	return recCh, errCh
 }
 
-func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers, ownerAddress persist.Address) (common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"contractAddress": tokenIdentifiers.ContractAddress,
 		"tokenID":         tokenIdentifiers.TokenID,
@@ -260,12 +260,12 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 
 	tzOwnerAddress, err := tezos.ToAddress(ownerAddress)
 	if err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	tokenInDecimal, err := strconv.ParseInt(tokenIdentifiers.TokenID.String(), 16, 64)
 	if err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	var query tokensByIdentifiersOwnerQuery
@@ -275,20 +275,20 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 		"ownerAddress":    graphql.String(tzOwnerAddress),
 		"tokenID":         graphql.String(strconv.Itoa(int(tokenInDecimal))),
 	}); err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	if len(query.Token) < 1 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
 	}
 
 	token := query.Token[0]
 
 	metadata := createMetadata(token)
 
-	agnosticContract := multichain.ChainAgnosticContract{
+	agnosticContract := common.ChainAgnosticContract{
 		Address: token.Fa.Contract,
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Symbol:       token.Symbol,
 			Name:         token.Fa.Name,
 			Description:  token.Fa.Description,
@@ -300,9 +300,9 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 
 	tokenID := persist.MustTokenID(string(token.Token_ID))
 
-	agnosticToken := multichain.ChainAgnosticToken{
+	agnosticToken := common.ChainAgnosticToken{
 		TokenType: persist.TokenTypeERC1155,
-		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+		Descriptors: common.ChainAgnosticTokenDescriptors{
 			Description: token.Description,
 			Name:        token.Name,
 		},
@@ -317,7 +317,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 	return agnosticToken, agnosticContract, nil
 }
 
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"contractAddress": tokenIdentifiers.ContractAddress,
 		"tokenID":         tokenIdentifiers.TokenID,
@@ -325,7 +325,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 
 	tokenInDecimal, err := strconv.ParseInt(tokenIdentifiers.TokenID.String(), 16, 64)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	var query tokensByIdentifiersQuery
@@ -334,18 +334,18 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		"contractAddress": graphql.String(tokenIdentifiers.ContractAddress),
 		"tokenID":         graphql.String(strconv.Itoa(int(tokenInDecimal))),
 	}); err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	if len(query.Token) < 1 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
+		return nil, common.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
 	}
 
 	firstToken := query.Token[0]
 
-	agnosticContract := multichain.ChainAgnosticContract{
+	agnosticContract := common.ChainAgnosticContract{
 		Address: firstToken.Fa.Contract,
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Symbol:       firstToken.Symbol,
 			Name:         firstToken.Name,
 			Description:  firstToken.Description,
@@ -358,7 +358,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	return objktHolderTokensToChainAgnostic(query.Token), agnosticContract, nil
 }
 
-func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, offset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"contractAddress": contractAddress})
 
 	pageSize := maxPageSize
@@ -375,7 +375,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 			"limit":           graphql.Int(pageSize),
 			"offset":          graphql.Int(offset),
 		}); err != nil {
-			return nil, multichain.ChainAgnosticContract{}, err
+			return nil, common.ChainAgnosticContract{}, err
 		}
 
 		// No more results
@@ -394,7 +394,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 	// No matching query results
 	if len(tokens) < 1 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for contract")
+		return nil, common.ChainAgnosticContract{}, fmt.Errorf("no tokens found for contract")
 	}
 
 	// Truncate tokens if there is a max limit
@@ -402,9 +402,9 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		tokens = tokens[:maxLimit]
 	}
 
-	agnosticContract := multichain.ChainAgnosticContract{
+	agnosticContract := common.ChainAgnosticContract{
 		Address: tokens[0].Fa.Contract,
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Symbol:       tokens[0].Symbol,
 			Name:         tokens[0].Fa.Name,
 			Description:  tokens[0].Fa.Description,
@@ -417,8 +417,8 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	return objktHolderTokensToChainAgnostic(tokens), agnosticContract, nil
 }
 
-func objktHolderTokensToChainAgnostic(tokens []token) []multichain.ChainAgnosticToken {
-	result := make([]multichain.ChainAgnosticToken, 0, len(tokens))
+func objktHolderTokensToChainAgnostic(tokens []token) []common.ChainAgnosticToken {
+	result := make([]common.ChainAgnosticToken, 0, len(tokens))
 	for _, token := range tokens {
 		tokenID := persist.MustTokenID(string(token.Token_ID))
 		metadata := createMetadata(token)
@@ -428,9 +428,9 @@ func objktHolderTokensToChainAgnostic(tokens []token) []multichain.ChainAgnostic
 		})
 
 		for _, holder := range token.Holders {
-			agnosticToken := multichain.ChainAgnosticToken{
+			agnosticToken := common.ChainAgnosticToken{
 				TokenType: persist.TokenTypeERC1155,
-				Descriptors: multichain.ChainAgnosticTokenDescriptors{
+				Descriptors: common.ChainAgnosticTokenDescriptors{
 					Description: token.Description,
 					Name:        token.Name,
 				},

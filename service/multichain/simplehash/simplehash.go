@@ -13,7 +13,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
-	mc "github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -163,7 +163,7 @@ func setSpamFilter(u url.URL, threshold int) url.URL {
 	return u
 }
 
-func setNftIDs(u url.URL, chain persist.Chain, ids []mc.ChainAgnosticIdentifiers) url.URL {
+func setNftIDs(u url.URL, chain persist.Chain, ids []common.ChainAgnosticIdentifiers) url.URL {
 	query := u.Query()
 	nftIDs := make([]string, len(ids))
 	for i, id := range ids {
@@ -314,7 +314,7 @@ type getOwnersByContractResponse struct {
 	Owners     []simplehashTokenOwner `json:"owners"`
 }
 
-func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address, isSpam *bool) mc.ChainAgnosticToken {
+func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address, isSpam *bool) common.ChainAgnosticToken {
 	var tokenType persist.TokenType
 
 	switch t.Contract.Type {
@@ -323,7 +323,7 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 	case "ERC1155", "FA2":
 		tokenType = persist.TokenTypeERC1155
 	default:
-		tID := mc.ChainAgnosticIdentifiers{ContractAddress: persist.Address(t.ContractAddress), TokenID: persist.HexTokenID(t.TokenID)}
+		tID := common.ChainAgnosticIdentifiers{ContractAddress: persist.Address(t.ContractAddress), TokenID: persist.HexTokenID(t.TokenID)}
 		logger.For(context.Background()).Warnf("%s has unknown token type: %s", tID, t.Contract.Type)
 	}
 
@@ -340,8 +340,8 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 		quantity = persist.MustHexString(t.Owners[0].QuantityString)
 	}
 
-	return mc.ChainAgnosticToken{
-		Descriptors: mc.ChainAgnosticTokenDescriptors{
+	return common.ChainAgnosticToken{
+		Descriptors: common.ChainAgnosticTokenDescriptors{
 			Name:        t.Name,
 			Description: t.Description,
 		},
@@ -370,9 +370,9 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 	}
 }
 
-func translateToChainAgnosticContract(address string, contract simplehashContract, collection simplehashCollection) mc.ChainAgnosticContract {
-	c := mc.ChainAgnosticContract{
-		Descriptors: mc.ChainAgnosticContractDescriptors{
+func translateToChainAgnosticContract(address string, contract simplehashContract, collection simplehashCollection) common.ChainAgnosticContract {
+	c := common.ChainAgnosticContract{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Symbol:       contract.Symbol,
 			Name:         contract.Name,
 			OwnerAddress: persist.Address(util.FirstNonEmptyString(contract.OwnedBy, contract.DeployedBy)),
@@ -417,7 +417,7 @@ func readResponseBodyInto(ctx context.Context, httpClient *http.Client, url stri
 	return util.UnmarshallBody(into, resp.Body)
 }
 
-func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tIDs mc.ChainAgnosticIdentifiers, owner persist.Address) (mc.ChainAgnosticToken, mc.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tIDs common.ChainAgnosticIdentifiers, owner persist.Address) (common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	u := setChain(getNftsByWalletEndpoint, p.chain)
 	u = setWallet(u, owner)
 	u = setContractAddress(u, p.chain, tIDs.ContractAddress)
@@ -432,7 +432,7 @@ outer:
 
 		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 		if err != nil {
-			return mc.ChainAgnosticToken{}, mc.ChainAgnosticContract{}, err
+			return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 		}
 
 		for _, nft := range body.NFTs {
@@ -453,7 +453,7 @@ outer:
 			OwnerAddress:    owner,
 		})
 		logger.For(ctx).Error(err)
-		return mc.ChainAgnosticToken{}, mc.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	aContract := translateToChainAgnosticContract(token.ContractAddress, token.Contract, token.Collection)
@@ -529,10 +529,10 @@ func (p *Provider) binRequestsByContract(ctx context.Context, address persist.Ad
 	return outCh, errCh
 }
 
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan mc.ChainAgnosticTokensAndContracts, <-chan error) {
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
 	batchRequestCh, batchRequestErrCh := p.binRequestsByContract(ctx, address)
 
-	outCh := make(chan mc.ChainAgnosticTokensAndContracts)
+	outCh := make(chan common.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 
 	go func() {
@@ -574,7 +574,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 							return
 						}
 
-						var page mc.ChainAgnosticTokensAndContracts
+						var page common.ChainAgnosticTokensAndContracts
 
 						for _, nft := range body.NFTs {
 							contract := translateToChainAgnosticContract(nft.ContractAddress, nft.Contract, nft.Collection)
@@ -681,8 +681,8 @@ func (p *Provider) binRequestsByOwner(ctx context.Context, address persist.Addre
 	return outCh, errCh
 }
 
-func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan mc.ChainAgnosticTokensAndContracts, <-chan error) {
-	outCh := make(chan mc.ChainAgnosticTokensAndContracts)
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
+	outCh := make(chan common.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 
 	// Sample a token to get the token type
@@ -691,7 +691,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	u = setCount(u)
 
 	var sample getNftsByContractResponse
-	var sampleToken mc.ChainAgnosticToken
+	var sampleToken common.ChainAgnosticToken
 
 	err := readResponseBodyInto(ctx, p.httpClient, u.String(), &sample)
 	if err != nil {
@@ -725,7 +725,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 					errCh <- err
 				}
 
-				var page mc.ChainAgnosticTokensAndContracts
+				var page common.ChainAgnosticTokensAndContracts
 
 				for i := 0; i < len(body.NFTs) && total < maxLimit; i, total = i+1, total+1 {
 					nft := body.NFTs[i]
@@ -786,7 +786,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 							return
 						}
 
-						var page mc.ChainAgnosticTokensAndContracts
+						var page common.ChainAgnosticTokensAndContracts
 
 						for i := 0; i < len(body.NFTs) && total.Load() < uint64(maxLimit); i, _ = i+1, total.Add(uint64(1)) {
 							nft := body.NFTs[i]
@@ -809,14 +809,14 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	return outCh, errCh
 }
 
-func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []mc.ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []common.ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
 	if len(tIDs) == 0 {
 		return []persist.TokenMetadata{}, nil
 	}
 
 	chunks := util.ChunkBy(tIDs, tokenBatchLimit)
 	metadata := make([]persist.TokenMetadata, len(tIDs))
-	lookup := make(map[mc.ChainAgnosticIdentifiers]persist.TokenMetadata)
+	lookup := make(map[common.ChainAgnosticIdentifiers]persist.TokenMetadata)
 
 	for i, c := range chunks {
 		batchID := i + 1
@@ -834,7 +834,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 
 		for _, t := range body.NFTs {
 			token := translateToChainAgnosticToken(t, "", nil)
-			tID := mc.ChainAgnosticIdentifiers{ContractAddress: persist.Address(p.chain.NormalizeAddress(token.ContractAddress)), TokenID: token.TokenID}
+			tID := common.ChainAgnosticIdentifiers{ContractAddress: persist.Address(p.chain.NormalizeAddress(token.ContractAddress)), TokenID: token.TokenID}
 			lookup[tID] = token.TokenMetadata
 		}
 	}
@@ -846,14 +846,14 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, 
 	return metadata, nil
 }
 
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID mc.ChainAgnosticIdentifiers) ([]mc.ChainAgnosticToken, mc.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID common.ChainAgnosticIdentifiers) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	u := checkURL(fmt.Sprintf(getNftByTokenIDEndpointTemplate, baseURL, chainToSimpleHashChain[p.chain], tID.ContractAddress, tID.TokenID.ToDecimalTokenID()))
 
 	var body simplehashNFT
 
 	err := readResponseBodyInto(ctx, p.httpClient, u.String(), &body)
 	if err != nil {
-		return nil, mc.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	if body.NftID == "" {
@@ -863,15 +863,15 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tID mc.Chain
 			TokenID:         tID.TokenID,
 		})
 		logger.For(ctx).Error(err)
-		return nil, mc.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	contract := translateToChainAgnosticContract(body.ContractAddress, body.Contract, body.Collection)
 	token := translateToChainAgnosticToken(body, "", contract.IsSpam)
-	return []mc.ChainAgnosticToken{token}, contract, nil
+	return []common.ChainAgnosticToken{token}, contract, nil
 }
 
-func (p *Provider) GetTokensByContractWallet(ctx context.Context, contract persist.ChainAddress, wallet persist.Address) ([]mc.ChainAgnosticToken, mc.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByContractWallet(ctx context.Context, contract persist.ChainAddress, wallet persist.Address) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	u := setChain(getNftsByWalletEndpoint, contract.Chain())
 	u = setContractAddress(u, contract.Chain(), contract.Address())
 	u = setWallet(u, wallet)
@@ -879,15 +879,15 @@ func (p *Provider) GetTokensByContractWallet(ctx context.Context, contract persi
 
 	next := u.String()
 
-	var t []mc.ChainAgnosticToken
-	var c mc.ChainAgnosticContract
+	var t []common.ChainAgnosticToken
+	var c common.ChainAgnosticContract
 
 	for next != "" {
 		var body getNftsByWalletResponse
 
 		err := readResponseBodyInto(ctx, p.httpClient, next, &body)
 		if err != nil {
-			return nil, mc.ChainAgnosticContract{}, err
+			return nil, common.ChainAgnosticContract{}, err
 		}
 
 		for _, nft := range body.NFTs {
@@ -901,33 +901,33 @@ func (p *Provider) GetTokensByContractWallet(ctx context.Context, contract persi
 	return t, c, nil
 }
 
-func (p *Provider) GetContractByAddress(ctx context.Context, address persist.Address) (mc.ChainAgnosticContract, error) {
+func (p *Provider) GetContractByAddress(ctx context.Context, address persist.Address) (common.ChainAgnosticContract, error) {
 	// Needs at least one mint in order to fetch the contract, because the contract object is only available in the token response
 	outCh, errCh := p.GetTokensIncrementallyByContractAddress(ctx, address, 1)
 	for {
 		select {
 		case page := <-outCh:
 			if len(page.Contracts) == 0 {
-				return mc.ChainAgnosticContract{}, fmt.Errorf("%s not found", persist.NewContractIdentifiers(address, p.chain))
+				return common.ChainAgnosticContract{}, fmt.Errorf("%s not found", persist.NewContractIdentifiers(address, p.chain))
 			}
 			return page.Contracts[0], nil
 		case err := <-errCh:
 			if err != nil {
-				return mc.ChainAgnosticContract{}, err
+				return common.ChainAgnosticContract{}, err
 			}
 		}
 	}
 }
 
-func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tID mc.ChainAgnosticIdentifiers) (mc.ChainAgnosticTokenDescriptors, mc.ChainAgnosticContractDescriptors, error) {
+func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tID common.ChainAgnosticIdentifiers) (common.ChainAgnosticTokenDescriptors, common.ChainAgnosticContractDescriptors, error) {
 	tokens, contract, err := p.GetTokensByTokenIdentifiers(ctx, tID)
 	if err != nil {
-		return mc.ChainAgnosticTokenDescriptors{}, mc.ChainAgnosticContractDescriptors{}, err
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, err
 	}
 	return tokens[0].Descriptors, contract.Descriptors, nil
 }
 
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, tID mc.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, tID common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, tID)
 	if err != nil {
 		return persist.TokenMetadata{}, err
@@ -935,8 +935,8 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, tID m
 	return tokens[0].TokenMetadata, nil
 }
 
-func (p *Provider) GetContractsByCreatorAddress(ctx context.Context, address persist.Address) ([]mc.ChainAgnosticContract, error) {
-	contracts := make([]mc.ChainAgnosticContract, 0)
+func (p *Provider) GetContractsByCreatorAddress(ctx context.Context, address persist.Address) ([]common.ChainAgnosticContract, error) {
+	contracts := make([]common.ChainAgnosticContract, 0)
 	seen := make(map[persist.Address]bool)
 
 	owned, err := p.GetContractsByOwnerAddress(ctx, address)
@@ -964,8 +964,8 @@ func (p *Provider) GetContractsByCreatorAddress(ctx context.Context, address per
 	return contracts, nil
 }
 
-func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, address persist.Address) ([]mc.ChainAgnosticContract, error) {
-	contracts := make([]mc.ChainAgnosticContract, 0)
+func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, address persist.Address) ([]common.ChainAgnosticContract, error) {
+	contracts := make([]common.ChainAgnosticContract, 0)
 
 	u := setChain(getContractsByOwnerEndpoint, p.chain)
 	u = setWallet(u, address)
@@ -996,8 +996,8 @@ func (p *Provider) GetContractsByOwnerAddress(ctx context.Context, address persi
 	return contracts, nil
 }
 
-func (p *Provider) GetContractsByDeployerAddress(ctx context.Context, address persist.Address) ([]mc.ChainAgnosticContract, []bool, error) {
-	contracts := make([]mc.ChainAgnosticContract, 0)
+func (p *Provider) GetContractsByDeployerAddress(ctx context.Context, address persist.Address) ([]common.ChainAgnosticContract, []bool, error) {
+	contracts := make([]common.ChainAgnosticContract, 0)
 	hasOwner := make([]bool, 0)
 
 	u := setChain(getContractsByDeployerEndpoint, p.chain)
