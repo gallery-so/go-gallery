@@ -51,7 +51,8 @@ func HandlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.
 	router.GET("/alive", util.HealthCheckHandler())
 	apqCache := &apq.APQCache{Cache: graphqlAPQCache}
 	publicapiF := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
-		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, taskClient, throttler, secrets, apqCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, neynar, mintLimiter)
+		api := publicapi.New(ctx, disableDataloaderCaching, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, taskClient, throttler, secrets, apqCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, neynar, mintLimiter)
+		return api
 	}
 	GraphqlHandlersInit(router, queries, taskClient, pub, lock, apqCache, authRefreshCache, recommender, personalization, neynar, publicapiF)
 	return router

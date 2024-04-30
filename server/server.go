@@ -122,9 +122,6 @@ func CoreInit(ctx context.Context, c *Clients, recommender *recommend.Recommende
 	})
 }
 
-// pass custom / stubbed provider to NewWithMultichainProvider to get publicapi.API
-// create publicapiF and pass to CoreInitHandler
-
 // CoreInit initializes core server functionality. This is abstracted so the test server can also utilize it
 func CoreInitHandlerF(ctx context.Context, handlerInitF func(*gin.Engine)) *gin.Engine {
 	logger.For(nil).Info("initializing server...")

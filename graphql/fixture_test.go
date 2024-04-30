@@ -24,6 +24,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -144,7 +145,7 @@ func useTokenProcessing(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	p := multichain.NewMultichainProvider(ctx, c.Repos, c.Queries)
+	p := multichain.NewMultichainProvider(ctx, c.Repos, c.Queries, c.EthClient, c.TaskClient, redis.NewCache(redis.TokenManageCache))
 	server := httptest.NewServer(tokenprocessing.CoreInitServer(ctx, c, p))
 	t.Setenv("TOKEN_PROCESSING_URL", server.URL)
 	t.Cleanup(func() {

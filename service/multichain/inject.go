@@ -21,7 +21,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
-	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/rpc/arweave"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -30,7 +29,8 @@ import (
 )
 
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
-func NewMultichainProvider(context.Context, *postgres.Repositories, *db.Queries) *Provider {
+// ethClient.Client and task.Client are expensive to initialize so they're passed as an arg.
+func NewMultichainProvider(context.Context, *postgres.Repositories, *db.Queries, *ethclient.Client, *task.Client, *redis.Cache) *Provider {
 	panic(wire.Build(
 		wire.Value(http.DefaultClient), // HTTP client shared between providers
 		wire.Struct(new(ChainProvider), "*"),
@@ -45,10 +45,6 @@ func NewMultichainProvider(context.Context, *postgres.Repositories, *db.Queries)
 		polygonInjector,
 		arbitrumInjector,
 	))
-}
-
-func newTokenManageCache() *redis.Cache {
-	return redis.NewCache(redis.TokenManageCache)
 }
 
 func multichainProviderInjector(ctx context.Context, repos *postgres.Repositories, q *db.Queries, chainProvider *ChainProvider, submitter *tokenmanage.TokenProcessingSubmitter) *Provider {
@@ -73,18 +69,16 @@ func newProviderLookup(p *ChainProvider) ProviderLookup {
 	}
 }
 
-func customMetadataHandlersInjector() *custom.CustomMetadataHandlers {
+func customMetadataHandlersInjector(ethCleint *ethclient.Client) *custom.CustomMetadataHandlers {
 	panic(wire.Build(
 		custom.NewCustomMetadataHandlers,
-		rpc.NewEthClient,
 		ipfs.NewShell,
 		arweave.NewClient,
 	))
 }
 
-func ethInjector(context.Context, *http.Client) *EthereumProvider {
+func ethInjector(context.Context, *http.Client, *ethclient.Client) *EthereumProvider {
 	panic(wire.Build(
-		rpc.NewEthClient,
 		wire.Value(persist.ChainETH),
 		ethProviderInjector,
 		ethSyncPipelineInjector,
@@ -124,6 +118,7 @@ func ethSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -164,7 +159,7 @@ func tezosProviderInjector(tezosProvider *tezos.Provider, simplehashProvider *si
 	))
 }
 
-func optimismInjector(context.Context, *http.Client) *OptimismProvider {
+func optimismInjector(context.Context, *http.Client, *ethclient.Client) *OptimismProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainOptimism),
 		simplehash.NewProvider,
@@ -197,6 +192,7 @@ func optimismSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -210,7 +206,7 @@ func optimismSyncPipelineInjector(
 	))
 }
 
-func arbitrumInjector(context.Context, *http.Client) *ArbitrumProvider {
+func arbitrumInjector(context.Context, *http.Client, *ethclient.Client) *ArbitrumProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainArbitrum),
 		simplehash.NewProvider,
@@ -243,6 +239,7 @@ func arbitrumSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -273,7 +270,7 @@ func poapProviderInjector(poapProvider *poap.Provider) *PoapProvider {
 	))
 }
 
-func zoraInjector(context.Context, *http.Client) *ZoraProvider {
+func zoraInjector(context.Context, *http.Client, *ethclient.Client) *ZoraProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainZora),
 		simplehash.NewProvider,
@@ -306,6 +303,7 @@ func zoraSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -319,7 +317,7 @@ func zoraSyncPipelineInjector(
 	))
 }
 
-func baseInjector(context.Context, *http.Client) *BaseProvider {
+func baseInjector(context.Context, *http.Client, *ethclient.Client) *BaseProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainBase),
 		simplehash.NewProvider,
@@ -331,6 +329,7 @@ func baseInjector(context.Context, *http.Client) *BaseProvider {
 func baseProvidersInjector(
 	syncPipeline *wrapper.SyncPipelineWrapper,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *BaseProvider {
 	panic(wire.Build(
 		wire.Struct(new(BaseProvider), "*"),
@@ -352,6 +351,7 @@ func baseSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -365,7 +365,7 @@ func baseSyncPipelineInjector(
 	))
 }
 
-func polygonInjector(context.Context, *http.Client) *PolygonProvider {
+func polygonInjector(context.Context, *http.Client, *ethclient.Client) *PolygonProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainPolygon),
 		simplehash.NewProvider,
@@ -377,6 +377,7 @@ func polygonInjector(context.Context, *http.Client) *PolygonProvider {
 func polygonProvidersInjector(
 	syncPipeline *wrapper.SyncPipelineWrapper,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *PolygonProvider {
 	panic(wire.Build(
 		wire.Struct(new(PolygonProvider), "*"),
@@ -398,6 +399,7 @@ func polygonSyncPipelineInjector(
 	httpClient *http.Client,
 	chain persist.Chain,
 	simplehashProvider *simplehash.Provider,
+	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
@@ -411,11 +413,9 @@ func polygonSyncPipelineInjector(
 	))
 }
 
-func tokenProcessingSubmitterInjector(context.Context) *tokenmanage.TokenProcessingSubmitter {
+func tokenProcessingSubmitterInjector(context.Context, *task.Client, *redis.Cache) *tokenmanage.TokenProcessingSubmitter {
 	panic(wire.Build(
 		wire.Struct(new(tokenmanage.TokenProcessingSubmitter), "*"),
-		task.NewClient,
 		wire.Struct(new(tokenmanage.Registry), "*"),
-		newTokenManageCache,
 	))
 }

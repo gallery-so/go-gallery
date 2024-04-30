@@ -67,7 +67,7 @@ type PublicAPI struct {
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI, mintLimiter *limiters.KeyRateLimiter) *PublicAPI {
-	multichainProvider := multichain.NewMultichainProvider(ctx, repos, queries)
+	multichainProvider := multichain.NewMultichainProvider(ctx, repos, queries, ethClient, taskClient, tokenManageCache)
 	return NewWithMultichainProvider(ctx, disableDataloaderCaching, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, taskClient, throttler, secrets, apq, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, neynar, mintLimiter, multichainProvider)
 }
 

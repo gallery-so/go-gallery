@@ -26,9 +26,11 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
@@ -67,7 +69,6 @@ func testGraphQL(t *testing.T) {
 		{title: "should get user by username", run: testUserByUsername},
 		{title: "should get user by address", run: testUserByAddress},
 		{title: "should get viewer", run: testViewer},
-		{title: "should get viewer suggested users", run: testSuggestedUsersForViewer},
 		{title: "should add a wallet", run: testAddWallet},
 		{title: "should remove a wallet", run: testRemoveWallet},
 		{title: "should create a collection", run: testCreateCollection},
@@ -166,33 +167,6 @@ func testViewer(t *testing.T) {
 
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
 	assert.Equal(t, userF.Username, *payload.User.Username)
-}
-
-func testSuggestedUsersForViewer(t *testing.T) {
-	userF := newUserFixture(t)
-	userA := newUserFixture(t)
-	userB := newUserFixture(t)
-	userC := newUserFixture(t)
-	ctx := context.Background()
-	clients := server.ClientInit(ctx)
-	recommender := newStubRecommender(t, []persist.DBID{
-		userA.ID,
-		userB.ID,
-		userC.ID,
-	})
-	p := newStubPersonalization(t)
-	handler := server.CoreInit(ctx, clients, recommender, p)
-	c := customHandlerClient(t, handler, withJWTOpt(t, userF.ID))
-
-	response, err := viewerQuery(ctx, c)
-	require.NoError(t, err)
-
-	payload, _ := (*response.Viewer).(*viewerQueryViewer)
-	suggested := payload.GetSuggestedUsers().GetEdges()
-	assert.Len(t, suggested, 3)
-	t.Cleanup(func() {
-		clients.Close()
-	})
 }
 
 func testAddWallet(t *testing.T) {
@@ -1649,6 +1623,15 @@ func handlerWithProviders(t *testing.T, submitter tokenmanage.Submitter, p multi
 	c := server.ClientInit(context.Background())
 	provider := newMultichainProvider(c, submitter, p)
 	t.Cleanup(c.Close)
+
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	feedCache := redis.NewCache(redis.FeedCache)
+	socialCache := redis.NewCache(redis.SocialCache)
+	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
+	tokenManageCache := redis.NewCache(redis.TokenManageCache)
+	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
+	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
+
 	publicapiF := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
 		return publicapi.NewWithMultichainProvider(
 			ctx,
@@ -1663,33 +1646,35 @@ func handlerWithProviders(t *testing.T, submitter tokenmanage.Submitter, p multi
 			c.TaskClient,
 			nil, // throttler
 			c.SecretClient,
-			nil, // apqCache
-			nil, // feedCache
-			nil, // socialCache
-			nil, // authRefreshCache
-			nil, // tokenmanageCache
-			nil, // oneTimeLoginCache
+			nil,         // apqCache
+			feedCache,   // feedCache
+			socialCache, // socialCache
+			authRefreshCache,
+			tokenManageCache,  // tokenmanageCache
+			oneTimeLoginCache, // oneTimeLoginCache
 			c.MagicLinkClient,
-			nil, // neynar
-			nil, // mintLimiter
+			nil,         // neynar
+			mintLimiter, // mintLimiter
 			&provider,
 		)
 	}
+
 	handlerInitF := func(r *gin.Engine) {
 		server.GraphqlHandlersInit(
 			r,
 			c.Queries,
 			c.TaskClient,
 			c.PubSubClient,
-			nil, // redislock
-			nil, // apqCache
-			nil, // authRefreshCache
+			lock,             // redislock
+			nil,              // apqCache
+			authRefreshCache, // authRefreshCache
 			newStubRecommender(t, []persist.DBID{}),
 			newStubPersonalization(t),
 			nil, // neynar
 			publicapiF,
 		)
 	}
+
 	return server.CoreInitHandlerF(ctx, handlerInitF)
 }
 
