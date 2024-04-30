@@ -17,8 +17,13 @@ import (
 	"time"
 
 	genql "github.com/Khan/genqlient/graphql"
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -27,9 +32,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 type testCase struct {
@@ -1647,7 +1649,48 @@ func handlerWithProviders(t *testing.T, submitter tokenmanage.Submitter, p multi
 	c := server.ClientInit(context.Background())
 	provider := newMultichainProvider(c, submitter, p)
 	t.Cleanup(c.Close)
-	return server.CoreInit(ctx, c, newStubRecommender(t, []persist.DBID{}), newStubPersonalization(t))
+	publicapiF := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
+		return publicapi.NewWithMultichainProvider(
+			ctx,
+			false,
+			c.Repos,
+			c.Queries,
+			c.HTTPClient,
+			c.EthClient,
+			c.IPFSClient,
+			c.ArweaveClient,
+			c.StorageClient,
+			c.TaskClient,
+			nil, // throttler
+			c.SecretClient,
+			nil, // apqCache
+			nil, // feedCache
+			nil, // socialCache
+			nil, // authRefreshCache
+			nil, // tokenmanageCache
+			nil, // oneTimeLoginCache
+			c.MagicLinkClient,
+			nil, // neynar
+			nil, // mintLimiter
+			&provider,
+		)
+	}
+	handlerInitF := func(r *gin.Engine) {
+		server.GraphqlHandlersInit(
+			r,
+			c.Queries,
+			c.TaskClient,
+			c.PubSubClient,
+			nil, // redislock
+			nil, // apqCache
+			nil, // authRefreshCache
+			newStubRecommender(t, []persist.DBID{}),
+			newStubPersonalization(t),
+			nil, // neynar
+			publicapiF,
+		)
+	}
+	return server.CoreInitHandlerF(ctx, handlerInitF)
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers
