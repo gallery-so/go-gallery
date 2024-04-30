@@ -59,8 +59,8 @@ func Init() {
 	ctx := context.Background()
 	c := ClientInit(ctx)
 	recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
-	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
-	router := CoreInit(ctx, c, recommender, p)
+	personalize := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
+	router := CoreInit(ctx, c, recommender, personalize)
 	http.Handle("/", router)
 }
 
@@ -105,9 +105,28 @@ func ClientInit(ctx context.Context) *Clients {
 	}
 }
 
-// CoreInit initializes core server functionality. This is abstracted
-// so the test server can also utilize it
-func CoreInit(ctx context.Context, c *Clients, recommender *recommend.Recommender, p *userpref.Personalization) *gin.Engine {
+func CoreInit(ctx context.Context, c *Clients, recommender *recommend.Recommender, personalize *userpref.Personalization) *gin.Engine {
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQCache)
+	feedCache := redis.NewCache(redis.FeedCache)
+	socialCache := redis.NewCache(redis.SocialCache)
+	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
+	tokenManageCache := redis.NewCache(redis.TokenManageCache)
+	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
+	neynar := farcaster.NewNeynarAPI(c.HTTPClient, socialCache, c.Queries)
+	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
+	recommender.Loop(ctx, time.NewTicker(time.Hour))
+	personalize.Loop(ctx, time.NewTicker(time.Minute*15))
+	return CoreInitHandlerF(ctx, func(r *gin.Engine) {
+		HandlersInit(r, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, personalize, neynar, mintLimiter)
+	})
+}
+
+// pass custom / stubbed provider to NewWithMultichainProvider to get publicapi.API
+// create publicapiF and pass to CoreInitHandler
+
+// CoreInit initializes core server functionality. This is abstracted so the test server can also utilize it
+func CoreInitHandlerF(ctx context.Context, handlerInitF func(*gin.Engine)) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if env.GetString("ENV") != "production" {
@@ -124,20 +143,9 @@ func CoreInit(ctx context.Context, c *Clients, recommender *recommend.Recommende
 		validate.RegisterCustomValidators(v)
 	}
 
-	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
-	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQCache)
-	feedCache := redis.NewCache(redis.FeedCache)
-	socialCache := redis.NewCache(redis.SocialCache)
-	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
-	tokenManageCache := redis.NewCache(redis.TokenManageCache)
-	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
-	neynar := farcaster.NewNeynarAPI(c.HTTPClient, socialCache, c.Queries)
-	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
+	handlerInitF(router)
 
-	recommender.Loop(ctx, time.NewTicker(time.Hour))
-	p.Loop(ctx, time.NewTicker(time.Minute*15))
-
-	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar, mintLimiter)
+	return router
 }
 
 func newSecretsClient() *secretmanager.Client {

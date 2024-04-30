@@ -41,12 +41,11 @@ import (
 const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
-	repos     *postgres.Repositories
-	queries   *db.Queries
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
-	APQ       *apq.APQCache
-
+	repos         *postgres.Repositories
+	queries       *db.Queries
+	loaders       *dataloader.Loaders
+	validator     *validator.Validate
+	APQ           *apq.APQCache
 	Auth          *AuthAPI
 	Collection    *CollectionAPI
 	Gallery       *GalleryAPI
@@ -67,22 +66,23 @@ type PublicAPI struct {
 	Mint          *MintAPI
 }
 
-func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI, mintLimiter *limiters.KeyRateLimiter) *PublicAPI {
+func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI, mintLimiter *limiters.KeyRateLimiter) *PublicAPI {
+	multichainProvider := multichain.NewMultichainProvider(ctx, repos, queries)
+	return NewWithMultichainProvider(ctx, disableDataloaderCaching, repos, queries, httpClient, ethClient, ipfsClient, arweaveClient, storageClient, taskClient, throttler, secrets, apq, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, magicClient, neynar, mintLimiter, multichainProvider)
+}
+
+func NewWithMultichainProvider(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, taskClient *task.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache *redis.Cache, magicClient *magicclient.API, neynar *farcaster.NeynarAPI, mintLimiter *limiters.KeyRateLimiter, multichainProvider *multichain.Provider) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook)
 	validator := validate.WithCustomValidators()
 	tokenManager := tokenmanage.New(ctx, taskClient, tokenManageCache, nil)
 	privyClient := privy.NewPrivyClient(httpClient)
 	highlightProvider := highlight.NewProvider(httpClient)
-	multichainProvider := multichain.NewMultichainProvider(ctx, repos, queries)
-
 	return &PublicAPI{
-		repos:     repos,
-		queries:   queries,
-		loaders:   loaders,
-		validator: validator,
-		APQ:       apq,
-
+		repos:         repos,
+		queries:       queries,
+		loaders:       loaders,
+		validator:     validator,
+		APQ:           apq,
 		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient, oneTimeLoginCache: oneTimeLoginCache, authRefreshCache: authRefreshCache, privyClient: privyClient, neynarClient: neynar},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
