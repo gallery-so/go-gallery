@@ -17,18 +17,23 @@ import (
 	"time"
 
 	genql "github.com/Khan/genqlient/graphql"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/mikeydub/go-gallery/server"
-	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/tokenmanage"
-	"github.com/mikeydub/go-gallery/tokenprocessing"
-	"github.com/mikeydub/go-gallery/util"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/server"
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/limiters"
+	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
+	"github.com/mikeydub/go-gallery/tokenprocessing"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type testCase struct {
@@ -64,7 +69,6 @@ func testGraphQL(t *testing.T) {
 		{title: "should get user by username", run: testUserByUsername},
 		{title: "should get user by address", run: testUserByAddress},
 		{title: "should get viewer", run: testViewer},
-		{title: "should get viewer suggested users", run: testSuggestedUsersForViewer},
 		{title: "should add a wallet", run: testAddWallet},
 		{title: "should remove a wallet", run: testRemoveWallet},
 		{title: "should create a collection", run: testCreateCollection},
@@ -163,35 +167,6 @@ func testViewer(t *testing.T) {
 
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
 	assert.Equal(t, userF.Username, *payload.User.Username)
-}
-
-func testSuggestedUsersForViewer(t *testing.T) {
-	userF := newUserFixture(t)
-	userA := newUserFixture(t)
-	userB := newUserFixture(t)
-	userC := newUserFixture(t)
-	ctx := context.Background()
-	clients := server.ClientInit(ctx)
-	provider, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
-	recommender := newStubRecommender(t, []persist.DBID{
-		userA.ID,
-		userB.ID,
-		userC.ID,
-	})
-	p := newStubPersonalization(t)
-	handler := server.CoreInit(ctx, clients, provider, recommender, p)
-	c := customHandlerClient(t, handler, withJWTOpt(t, userF.ID))
-
-	response, err := viewerQuery(ctx, c)
-	require.NoError(t, err)
-
-	payload, _ := (*response.Viewer).(*viewerQueryViewer)
-	suggested := payload.GetSuggestedUsers().GetEdges()
-	assert.Len(t, suggested, 3)
-	t.Cleanup(func() {
-		clients.Close()
-		cleanup()
-	})
 }
 
 func testAddWallet(t *testing.T) {
@@ -929,7 +904,7 @@ func testSyncNewTokensIncrementally(t *testing.T) {
 func testSyncNewTokensMultichain(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
+	contract := common.ChainAgnosticContract{Address: "0x124", Descriptors: common.ChainAgnosticContractDescriptors{Name: "wow"}}
 	secondProvider := newStubProvider(withDummyTokenN(contract, userF.Wallet.Address, 10))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider, persist.ChainOptimism: secondProvider}
 	h := handlerWithProviders(t, &noopSubmitter{}, providers)
@@ -946,7 +921,7 @@ func testSyncNewTokensMultichain(t *testing.T) {
 
 func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
-	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0xdead"}, userF.Wallet.Address, 10))
+	provider := newStubProvider(withDummyTokenN(common.ChainAgnosticContract{Address: "0xdead"}, userF.Wallet.Address, 10))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	submitter := &recorderSubmitter{}
 	h := handlerWithProviders(t, submitter, providers)
@@ -988,7 +963,7 @@ func testSyncKeepsOldTokens(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	initialTokensLen := len(userF.TokenIDs)
 	newTokensLen := 4
-	provider := newStubProvider(withDummyTokenN(multichain.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, newTokensLen))
+	provider := newStubProvider(withDummyTokenN(common.ChainAgnosticContract{Address: "0x1337"}, userF.Wallet.Address, newTokensLen))
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	h := handlerWithProviders(t, &noopSubmitter{}, providers)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
@@ -1002,12 +977,12 @@ func testSyncKeepsOldTokens(t *testing.T) {
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 	userF := newUserFixture(t)
 	token := dummyToken(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Descriptors: multichain.ChainAgnosticContractDescriptors{
+	contract := common.ChainAgnosticContract{Address: token.ContractAddress, Descriptors: common.ChainAgnosticContractDescriptors{
 		Name: "someContract",
 	}}
 	provider := newStubProvider(
-		withContracts([]multichain.ChainAgnosticContract{contract}),
-		withTokens([]multichain.ChainAgnosticToken{token, token}),
+		withContracts([]common.ChainAgnosticContract{contract}),
+		withTokens([]common.ChainAgnosticToken{token, token}),
 	)
 	providers := multichain.ProviderLookup{persist.ChainETH: provider}
 	h := handlerWithProviders(t, &noopSubmitter{}, providers)
@@ -1602,18 +1577,18 @@ func defaultLayout() CollectionLayoutInput {
 }
 
 // dummyToken returns a dummy token owned by the provided address
-func dummyToken(ownerAddress persist.Address) multichain.ChainAgnosticToken {
+func dummyToken(ownerAddress persist.Address) common.ChainAgnosticToken {
 	return dummyTokenContract(ownerAddress, "0x123")
 }
 
 // dummyTokenContract returns a dummy token owned by the provided address from the provided contract
-func dummyTokenContract(ownerAddress, contractAddress persist.Address) multichain.ChainAgnosticToken {
+func dummyTokenContract(ownerAddress, contractAddress persist.Address) common.ChainAgnosticToken {
 	return dummyTokenIDContract(ownerAddress, contractAddress, "1")
 }
 
 // dummyTokenIDContract returns a dummy token owned by the provided address from the provided contract with the given tokenID
-func dummyTokenIDContract(ownerAddress, contractAddress persist.Address, tokenID persist.HexTokenID) multichain.ChainAgnosticToken {
-	return multichain.ChainAgnosticToken{
+func dummyTokenIDContract(ownerAddress, contractAddress persist.Address, tokenID persist.HexTokenID) common.ChainAgnosticToken {
+	return common.ChainAgnosticToken{
 		TokenID:         tokenID,
 		Quantity:        "1",
 		ContractAddress: contractAddress,
@@ -1634,13 +1609,10 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 func defaultHandler(t *testing.T) http.Handler {
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	p, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	r := newStubRecommender(t, []persist.DBID{})
-	pnl := newStubPersonalization(t)
-	handler := server.CoreInit(ctx, c, p, r, pnl)
+	handler := server.CoreInit(ctx, c, r, newStubPersonalization(t))
 	t.Cleanup(func() {
 		c.Close()
-		cleanup()
 	})
 	return handler
 }
@@ -1651,7 +1623,59 @@ func handlerWithProviders(t *testing.T, submitter tokenmanage.Submitter, p multi
 	c := server.ClientInit(context.Background())
 	provider := newMultichainProvider(c, submitter, p)
 	t.Cleanup(c.Close)
-	return server.CoreInit(ctx, c, &provider, newStubRecommender(t, []persist.DBID{}), newStubPersonalization(t))
+
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	feedCache := redis.NewCache(redis.FeedCache)
+	socialCache := redis.NewCache(redis.SocialCache)
+	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
+	tokenManageCache := redis.NewCache(redis.TokenManageCache)
+	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
+	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
+
+	publicapiF := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
+		return publicapi.NewWithMultichainProvider(
+			ctx,
+			false,
+			c.Repos,
+			c.Queries,
+			c.HTTPClient,
+			c.EthClient,
+			c.IPFSClient,
+			c.ArweaveClient,
+			c.StorageClient,
+			c.TaskClient,
+			nil, // throttler
+			c.SecretClient,
+			nil,         // apqCache
+			feedCache,   // feedCache
+			socialCache, // socialCache
+			authRefreshCache,
+			tokenManageCache,  // tokenmanageCache
+			oneTimeLoginCache, // oneTimeLoginCache
+			c.MagicLinkClient,
+			nil,         // neynar
+			mintLimiter, // mintLimiter
+			&provider,
+		)
+	}
+
+	handlerInitF := func(r *gin.Engine) {
+		server.GraphqlHandlersInit(
+			r,
+			c.Queries,
+			c.TaskClient,
+			c.PubSubClient,
+			lock,             // redislock
+			nil,              // apqCache
+			authRefreshCache, // authRefreshCache
+			newStubRecommender(t, []persist.DBID{}),
+			newStubPersonalization(t),
+			nil, // neynar
+			publicapiF,
+		)
+	}
+
+	return server.CoreInitHandlerF(ctx, handlerInitF)
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers

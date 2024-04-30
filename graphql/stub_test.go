@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
@@ -24,18 +24,18 @@ import (
 
 // stubProvider returns a canned set of tokens and contracts
 type stubProvider struct {
-	Contracts     []multichain.ChainAgnosticContract
-	Tokens        []multichain.ChainAgnosticToken
+	Contracts     []common.ChainAgnosticContract
+	Tokens        []common.ChainAgnosticToken
 	FetchMetadata func() (persist.TokenMetadata, error)
 	RetErr        error
 }
 
-func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 	return p.Tokens, p.Contracts, p.RetErr
 }
 
-func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan common.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 	go func() {
 		defer close(recCh)
@@ -44,7 +44,7 @@ func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context,
 			errCh <- p.RetErr
 			return
 		}
-		recCh <- multichain.ChainAgnosticTokensAndContracts{
+		recCh <- common.ChainAgnosticTokensAndContracts{
 			Tokens:    p.Tokens,
 			Contracts: p.Contracts,
 		}
@@ -52,19 +52,19 @@ func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context,
 	return recCh, errCh
 }
 
-func (p stubProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p stubProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	return p.FetchMetadata()
 }
 
-func (p stubProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 
-func (p stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit, offset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 
-func (p stubProvider) GetTokenByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokenByTokenIdentifiersAndOwner(context.Context, common.ChainAgnosticIdentifiers, persist.Address) (common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 
@@ -79,14 +79,14 @@ func newStubProvider(opts ...providerOpt) stubProvider {
 }
 
 // withContracts configures the stubProvider to return a canned set of contracts
-func withContracts(contracts []multichain.ChainAgnosticContract) providerOpt {
+func withContracts(contracts []common.ChainAgnosticContract) providerOpt {
 	return func(p *stubProvider) {
 		p.Contracts = contracts
 	}
 }
 
 // withTokens configures the stubProvider to return a canned set of tokens
-func withTokens(tokens []multichain.ChainAgnosticToken) providerOpt {
+func withTokens(tokens []common.ChainAgnosticToken) providerOpt {
 	return func(p *stubProvider) {
 		p.Tokens = tokens
 	}
@@ -100,26 +100,26 @@ func withReturnError(err error) providerOpt {
 }
 
 // withDummyTokenN will generate n dummy tokens from the provided contract
-func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress persist.Address, n int) providerOpt {
+func withDummyTokenN(contract common.ChainAgnosticContract, ownerAddress persist.Address, n int) providerOpt {
 	start := 1337
 	return func(p *stubProvider) {
-		tokens := []multichain.ChainAgnosticToken{}
+		tokens := []common.ChainAgnosticToken{}
 		for i := start; i < start+n; i++ {
 			tokenID := persist.DecimalTokenID(fmt.Sprint(i))
 			token := dummyTokenIDContract(ownerAddress, contract.Address, tokenID.ToHexTokenID())
 			tokens = append(tokens, token)
 		}
-		withContracts([]multichain.ChainAgnosticContract{contract})(p)
+		withContracts([]common.ChainAgnosticContract{contract})(p)
 		withTokens(tokens)(p)
 	}
 }
 
 // withDummyTokenID will generate a token with the provided token ID
 func withDummyTokenID(ownerAddress persist.Address, tokenID persist.HexTokenID) providerOpt {
-	c := multichain.ChainAgnosticContract{Address: "0x123"}
+	c := common.ChainAgnosticContract{Address: "0x123"}
 	return func(p *stubProvider) {
-		withContracts([]multichain.ChainAgnosticContract{c})(p)
-		withTokens([]multichain.ChainAgnosticToken{dummyTokenIDContract(ownerAddress, c.Address, tokenID)})(p)
+		withContracts([]common.ChainAgnosticContract{c})(p)
+		withTokens([]common.ChainAgnosticToken{dummyTokenIDContract(ownerAddress, c.Address, tokenID)})(p)
 	}
 }
 
@@ -132,7 +132,7 @@ func withFetchMetadata(f func() (persist.TokenMetadata, error)) providerOpt {
 
 // defaultStubProvider returns a stubProvider that returns dummy tokens
 func defaultStubProvider(ownerAddress persist.Address) stubProvider {
-	contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "testContract"}}
+	contract := common.ChainAgnosticContract{Address: "0x123", Descriptors: common.ChainAgnosticContractDescriptors{Name: "testContract"}}
 	return newStubProvider(withDummyTokenN(contract, ownerAddress, 10))
 }
 

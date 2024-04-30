@@ -7,6 +7,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -27,7 +28,7 @@ func (m *MetadataFinder) GetMetadata(ctx context.Context, t persist.TokenIdentif
 }
 
 func (m *MetadataFinder) add(ctx context.Context, t persist.TokenIdentifiers) func() (persist.TokenMetadata, error) {
-	if _, ok := m.mc.Chains[t.Chain].(multichain.TokenMetadataBatcher); !ok {
+	if _, ok := m.mc.Chains[t.Chain].(common.TokenMetadataBatcher); !ok {
 		return func() (persist.TokenMetadata, error) {
 			return m.mc.GetTokenMetadataByTokenIdentifiers(ctx, t.ContractAddress, t.TokenID, t.Chain)
 		}
@@ -103,8 +104,8 @@ func (b *batch) startTimer(m *MetadataFinder) {
 
 func (b *batch) end(m *MetadataFinder) {
 	for chain, tokens := range b.tokens {
-		tIDs := util.MapWithoutError(tokens, func(t persist.TokenIdentifiers) multichain.ChainAgnosticIdentifiers {
-			return multichain.ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
+		tIDs := util.MapWithoutError(tokens, func(t persist.TokenIdentifiers) common.ChainAgnosticIdentifiers {
+			return common.ChainAgnosticIdentifiers{ContractAddress: t.ContractAddress, TokenID: t.TokenID}
 		})
 		metadata, err := m.mc.GetTokenMetadataByTokenIdentifiersBatch(m.ctx, chain, tIDs)
 		if err != nil {

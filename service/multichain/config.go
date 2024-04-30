@@ -1,6 +1,7 @@
 package multichain
 
 import (
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -18,101 +19,101 @@ type ChainProvider struct {
 }
 
 type EthereumProvider struct {
-	ContractFetcher
-	ContractsCreatorFetcher
-	TokenDescriptorsFetcher
-	TokenIdentifierOwnerFetcher
-	TokenMetadataBatcher
-	TokenMetadataFetcher
-	TokensByContractWalletFetcher
-	TokensByTokenIdentifiersFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
-	Verifier
+	common.ContractFetcher
+	common.ContractsCreatorFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenIdentifierOwnerFetcher
+	common.TokenMetadataBatcher
+	common.TokenMetadataFetcher
+	common.TokensByContractWalletFetcher
+	common.TokensByTokenIdentifiersFetcher
+	common.TokensIncrementalContractFetcher
+	common.TokensIncrementalOwnerFetcher
+	common.Verifier
 }
 
 type TezosProvider struct {
-	ContractFetcher
-	ContractsCreatorFetcher
-	TokenDescriptorsFetcher
-	TokenIdentifierOwnerFetcher
-	TokenMetadataBatcher
-	TokenMetadataFetcher
-	TokensByContractWalletFetcher
-	TokensByTokenIdentifiersFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
-	Verifier
+	common.ContractFetcher
+	common.ContractsCreatorFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenIdentifierOwnerFetcher
+	common.TokenMetadataBatcher
+	common.TokenMetadataFetcher
+	common.TokensByContractWalletFetcher
+	common.TokensByTokenIdentifiersFetcher
+	common.TokensIncrementalContractFetcher
+	common.TokensIncrementalOwnerFetcher
+	common.Verifier
 }
 
 type OptimismProvider struct {
-	ContractFetcher
-	ContractsCreatorFetcher
-	TokenDescriptorsFetcher
-	TokenIdentifierOwnerFetcher
-	TokenMetadataBatcher
-	TokenMetadataFetcher
-	TokensByContractWalletFetcher
-	TokensByTokenIdentifiersFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
+	common.ContractFetcher
+	common.ContractsCreatorFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenIdentifierOwnerFetcher
+	common.TokenMetadataBatcher
+	common.TokenMetadataFetcher
+	common.TokensByContractWalletFetcher
+	common.TokensByTokenIdentifiersFetcher
+	common.TokensIncrementalContractFetcher
+	common.TokensIncrementalOwnerFetcher
 }
 
 type ArbitrumProvider struct {
-	ContractFetcher
-	ContractsCreatorFetcher
-	TokenDescriptorsFetcher
-	TokenIdentifierOwnerFetcher
-	TokenMetadataBatcher
-	TokenMetadataFetcher
-	TokensByContractWalletFetcher
-	TokensByTokenIdentifiersFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
+	common.ContractFetcher
+	common.ContractsCreatorFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenIdentifierOwnerFetcher
+	common.TokenMetadataBatcher
+	common.TokenMetadataFetcher
+	common.TokensByContractWalletFetcher
+	common.TokensByTokenIdentifiersFetcher
+	common.TokensIncrementalContractFetcher
+	common.TokensIncrementalOwnerFetcher
 }
 
 type PoapProvider struct {
-	TokenDescriptorsFetcher
-	TokenMetadataFetcher
-	TokensIncrementalOwnerFetcher
-	TokenIdentifierOwnerFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenMetadataFetcher
+	common.TokensIncrementalOwnerFetcher
+	common.TokenIdentifierOwnerFetcher
 }
 
 type ZoraProvider struct {
-	ContractFetcher
-	ContractsCreatorFetcher
-	TokenDescriptorsFetcher
-	TokenIdentifierOwnerFetcher
-	TokenMetadataBatcher
-	TokenMetadataFetcher
-	TokensByContractWalletFetcher
-	TokensByTokenIdentifiersFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
+	common.ContractFetcher
+	common.ContractsCreatorFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenIdentifierOwnerFetcher
+	common.TokenMetadataBatcher
+	common.TokenMetadataFetcher
+	common.TokensByContractWalletFetcher
+	common.TokensByTokenIdentifiersFetcher
+	common.TokensIncrementalContractFetcher
+	common.TokensIncrementalOwnerFetcher
 }
 
 type BaseProvider struct {
-	ContractFetcher
-	ContractsCreatorFetcher
-	TokenDescriptorsFetcher
-	TokenIdentifierOwnerFetcher
-	TokenMetadataBatcher
-	TokenMetadataFetcher
-	TokensByContractWalletFetcher
-	TokensByTokenIdentifiersFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
+	common.ContractFetcher
+	common.ContractsCreatorFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenIdentifierOwnerFetcher
+	common.TokenMetadataBatcher
+	common.TokenMetadataFetcher
+	common.TokensByContractWalletFetcher
+	common.TokensByTokenIdentifiersFetcher
+	common.TokensIncrementalContractFetcher
+	common.TokensIncrementalOwnerFetcher
 }
 
 type PolygonProvider struct {
-	ContractFetcher
-	ContractsCreatorFetcher
-	TokenDescriptorsFetcher
-	TokenIdentifierOwnerFetcher
-	TokenMetadataBatcher
-	TokenMetadataFetcher
-	TokensByContractWalletFetcher
-	TokensByTokenIdentifiersFetcher
-	TokensIncrementalContractFetcher
-	TokensIncrementalOwnerFetcher
+	common.ContractFetcher
+	common.ContractsCreatorFetcher
+	common.TokenDescriptorsFetcher
+	common.TokenIdentifierOwnerFetcher
+	common.TokenMetadataBatcher
+	common.TokenMetadataFetcher
+	common.TokensByContractWalletFetcher
+	common.TokensByTokenIdentifiersFetcher
+	common.TokensIncrementalContractFetcher
+	common.TokensIncrementalOwnerFetcher
 }

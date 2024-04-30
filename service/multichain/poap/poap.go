@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -113,7 +113,7 @@ func NewProvider(httpClient *http.Client) *Provider {
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Poap Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 
 	// DOES NOT SUPPORT PAGINATION
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/actions/scan/%s", d.apiURL, addr.String()), nil)
@@ -138,8 +138,8 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return resultTokens, resultContracts, nil
 }
 
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan common.ChainAgnosticTokensAndContracts)
 	errChan := make(chan error)
 	go func() {
 		defer close(rec)
@@ -148,7 +148,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 			errChan <- err
 			return
 		}
-		rec <- multichain.ChainAgnosticTokensAndContracts{
+		rec <- common.ChainAgnosticTokensAndContracts{
 			Tokens:    tokens,
 			Contracts: contracts,
 		}
@@ -157,41 +157,41 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Poap Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
+	return nil, common.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Poap Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers, limit, offset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/token/0x%s", d.apiURL, tid), nil)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 	req.Header.Set("X-API-KEY", d.apiKey)
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+		return nil, common.ChainAgnosticContract{}, util.GetErrFromResp(resp)
 	}
 	var token poapToken
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
-	return []multichain.ChainAgnosticToken{d.poapToToken(token)}, d.poapToContract(token), nil
+	return []common.ChainAgnosticToken{d.poapToToken(token)}, d.poapToContract(token), nil
 }
 
-func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers) (common.ChainAgnosticTokenDescriptors, common.ChainAgnosticContractDescriptors, error) {
 	tokens, contract, err := d.GetTokensByTokenIdentifiers(ctx, tokenIdentifiers, 1, 0)
 	if err != nil {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, err
 	}
 	if len(tokens) == 0 {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, fmt.Errorf("no token found")
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, fmt.Errorf("no token found")
 	}
 
 	firstToken := tokens[0]
@@ -199,77 +199,77 @@ func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, to
 }
 
 // GetTokenByTokenIdentifiersAndOwner retrieves tokens for a token identifiers and owner address
-func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers, ownerAddress persist.Address) (common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/token/0x%s", d.apiURL, tid), nil)
 	if err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 	req.Header.Set("X-API-KEY", d.apiKey)
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, util.GetErrFromResp(resp)
 	}
 	var token poapToken
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	return d.poapToToken(token), d.poapToContract(token), nil
 }
 
-func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contract persist.Address, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contract persist.Address, addr persist.Address, limit, offset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/actions/scan/%s/%s", d.apiURL, addr.String(), contract), nil)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 	req.Header.Set("X-API-KEY", d.apiKey)
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 	var token poapToken
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	resultToken := d.poapToToken(token)
 	resultContract := d.poapToContract(token)
-	return []multichain.ChainAgnosticToken{resultToken}, resultContract, nil
+	return []common.ChainAgnosticToken{resultToken}, resultContract, nil
 }
 
 // GetContractByAddress retrieves an Poap contract by address
-func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (common.ChainAgnosticContract, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/events/%s", d.apiURL, addr), nil)
 	if err != nil {
-		return multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticContract{}, err
 	}
 	req.Header.Set("X-API-KEY", d.apiKey)
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticContract{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+		return common.ChainAgnosticContract{}, util.GetErrFromResp(resp)
 	}
 	var event poapEvent
 	if err := json.NewDecoder(resp.Body).Decode(&event); err != nil {
-		return multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticContract{}, err
 	}
 	return d.eventToContract(event), nil
 }
 
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	t, _, err := d.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
 	if err != nil {
 		return persist.TokenMetadata{}, err
@@ -282,21 +282,21 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 }
 
 // we should assume when using this function that the array is all of the tokens un paginated and we will need to paginate it with the offset and limit
-func (d *Provider) poapsToTokens(pPoap []poapToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
-	tokens := make([]multichain.ChainAgnosticToken, 0, len(pPoap))
-	contracts := make([]multichain.ChainAgnosticContract, 0, len(pPoap))
+func (d *Provider) poapsToTokens(pPoap []poapToken) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract) {
+	tokens := make([]common.ChainAgnosticToken, 0, len(pPoap))
+	contracts := make([]common.ChainAgnosticContract, 0, len(pPoap))
 	for _, poap := range pPoap {
 		tokens = append(tokens, d.poapToToken(poap))
 		contracts = append(contracts, d.poapToContract(poap))
 	}
 	return tokens, contracts
 }
-func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
+func (d *Provider) poapToToken(pPoap poapToken) common.ChainAgnosticToken {
 
-	return multichain.ChainAgnosticToken{
+	return common.ChainAgnosticToken{
 		OwnerAddress: persist.Address(pPoap.Owner),
 		TokenID:      persist.HexTokenID(pPoap.TokenID.toBase16()),
-		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+		Descriptors: common.ChainAgnosticTokenDescriptors{
 			Name:        pPoap.Event.Name,
 			Description: pPoap.Event.Description,
 		},
@@ -326,20 +326,20 @@ func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 	}
 }
 
-func (d *Provider) poapToContract(pPoap poapToken) multichain.ChainAgnosticContract {
+func (d *Provider) poapToContract(pPoap poapToken) common.ChainAgnosticContract {
 
-	return multichain.ChainAgnosticContract{
+	return common.ChainAgnosticContract{
 		Address: persist.Address(pPoap.Event.FancyID),
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Name: pPoap.Event.Name,
 		},
 	}
 }
 
-func (d *Provider) eventToContract(pEvent poapEvent) multichain.ChainAgnosticContract {
-	return multichain.ChainAgnosticContract{
+func (d *Provider) eventToContract(pEvent poapEvent) common.ChainAgnosticContract {
+	return common.ChainAgnosticContract{
 		Address: persist.Address(pEvent.FancyID),
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Name: pEvent.Name,
 		},
 	}

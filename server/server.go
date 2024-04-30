@@ -30,7 +30,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/recommend"
@@ -59,10 +58,9 @@ func Init() {
 
 	ctx := context.Background()
 	c := ClientInit(ctx)
-	provider, _ := NewMultichainProvider(ctx, SetDefaults)
 	recommender := recommend.NewRecommender(c.Queries, publicapi.GetOnboardingUserRecommendationsBootstrap(c.Queries))
-	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
-	router := CoreInit(ctx, c, provider, recommender, p)
+	personalize := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
+	router := CoreInit(ctx, c, recommender, personalize)
 	http.Handle("/", router)
 }
 
@@ -107,9 +105,25 @@ func ClientInit(ctx context.Context) *Clients {
 	}
 }
 
-// CoreInit initializes core server functionality. This is abstracted
-// so the test server can also utilize it
-func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, recommender *recommend.Recommender, p *userpref.Personalization) *gin.Engine {
+func CoreInit(ctx context.Context, c *Clients, recommender *recommend.Recommender, personalize *userpref.Personalization) *gin.Engine {
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQCache)
+	feedCache := redis.NewCache(redis.FeedCache)
+	socialCache := redis.NewCache(redis.SocialCache)
+	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
+	tokenManageCache := redis.NewCache(redis.TokenManageCache)
+	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
+	neynar := farcaster.NewNeynarAPI(c.HTTPClient, socialCache, c.Queries)
+	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
+	recommender.Loop(ctx, time.NewTicker(time.Hour))
+	personalize.Loop(ctx, time.NewTicker(time.Minute*15))
+	return CoreInitHandlerF(ctx, func(r *gin.Engine) {
+		HandlersInit(r, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, personalize, neynar, mintLimiter)
+	})
+}
+
+// CoreInit initializes core server functionality. This is abstracted so the test server can also utilize it
+func CoreInitHandlerF(ctx context.Context, handlerInitF func(*gin.Engine)) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if env.GetString("ENV") != "production" {
@@ -126,20 +140,9 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 		validate.RegisterCustomValidators(v)
 	}
 
-	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
-	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQCache)
-	feedCache := redis.NewCache(redis.FeedCache)
-	socialCache := redis.NewCache(redis.SocialCache)
-	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
-	tokenManageCache := redis.NewCache(redis.TokenManageCache)
-	oneTimeLoginCache := redis.NewCache(redis.OneTimeLoginCache)
-	neynar := farcaster.NewNeynarAPI(c.HTTPClient, socialCache, c.Queries)
-	mintLimiter := limiters.NewKeyRateLimiter(ctx, redis.NewCache(redis.MintCache), "inAppMinting", 1, time.Minute*10)
+	handlerInitF(router)
 
-	recommender.Loop(ctx, time.NewTicker(time.Hour))
-	p.Loop(ctx, time.NewTicker(time.Minute*15))
-
-	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, tokenManageCache, oneTimeLoginCache, c.MagicLinkClient, recommender, p, neynar, mintLimiter)
+	return router
 }
 
 func newSecretsClient() *secretmanager.Client {

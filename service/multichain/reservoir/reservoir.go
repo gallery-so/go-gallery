@@ -11,7 +11,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/platform"
-	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -128,7 +128,7 @@ type Provider struct {
 	// reservoir doesn't keep data for parent contracts - only collections in the parent contract
 	// e.g collection data is available for projects within Art Blocks, but not for the Art Blocks
 	// contract itself. We use another fetcher to get that data.
-	cFetcher multichain.ContractFetcher
+	cFetcher common.ContractFetcher
 	r        *retry.Retryer
 }
 
@@ -162,7 +162,7 @@ func NewProvider(ctx context.Context, httpClient *http.Client, chain persist.Cha
 	}, cleanup
 }
 
-func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
@@ -171,8 +171,8 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, ownerAddress pe
 	return assetsToTokens(ctx, p.chain, p.cFetcher, ownerAddress, outCh)
 }
 
-func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ownerAddress persist.Address) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan common.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 	outCh := make(chan pageResult)
 	go func() {
@@ -187,7 +187,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ow
 	return recCh, errCh
 }
 
-func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit int, offset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
@@ -196,19 +196,19 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 	tokens, contracts, err := assetsToTokens(ctx, p.chain, p.cFetcher, "", outCh)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, common.ChainAgnosticContract{}, err
 	}
 
 	if len(contracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
+		return nil, common.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
 	}
 
 	return tokens, contracts[0], nil
 }
 
 // GetTokensIncrementallyByContractAddress returns tokens for a contract address
-func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
-	recCh := make(chan multichain.ChainAgnosticTokensAndContracts)
+func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, address persist.Address, maxLimit int) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
+	recCh := make(chan common.ChainAgnosticTokensAndContracts)
 	errCh := make(chan error)
 	outCh := make(chan pageResult)
 	go func() {
@@ -223,7 +223,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	return recCh, errCh
 }
 
-func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti common.ChainAgnosticIdentifiers, ownerAddress persist.Address) (common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
@@ -232,21 +232,21 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 
 	tokens, contracts, err := assetsToTokens(ctx, p.chain, p.cFetcher, ownerAddress, outCh)
 	if err != nil {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
 	if len(tokens) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID, OwnerAddress: ownerAddress}
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID, OwnerAddress: ownerAddress}
 	}
 
 	if len(contracts) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: ti.ContractAddress}
+		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: ti.ContractAddress}
 	}
 
 	return tokens[0], contracts[0], nil
 }
 
-func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (common.ChainAgnosticTokenDescriptors, common.ChainAgnosticContractDescriptors, error) {
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
@@ -256,21 +256,21 @@ func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti
 	// ownerAddress is omitted, but its not required in this context
 	tokens, contracts, err := assetsToTokens(ctx, p.chain, p.cFetcher, "", outCh)
 	if err != nil {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, err
 	}
 
 	if len(tokens) == 0 {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 
 	if len(contracts) == 0 {
-		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, ErrCollectionNotFoundByAddress{Address: ti.ContractAddress}
+		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, ErrCollectionNotFoundByAddress{Address: ti.ContractAddress}
 	}
 
 	return tokens[0].Descriptors, contracts[0].Descriptors, nil
 }
 
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	outCh := make(chan pageResult)
 	go func() {
 		defer close(outCh)
@@ -293,18 +293,18 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return tokens[0].TokenMetadata, nil
 }
 
-func (p Provider) GetContractByAddress(ctx context.Context, chain persist.Chain, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
+func (p Provider) GetContractByAddress(ctx context.Context, chain persist.Chain, contractAddress persist.Address) (common.ChainAgnosticContract, error) {
 	c, err := p.fetchCollectionByAddress(ctx, contractAddress)
 	if err != nil {
-		return multichain.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
+		return common.ChainAgnosticContract{}, ErrCollectionNotFoundByAddress{Address: contractAddress}
 	}
 	return collectionToAgnosticContract(ctx, chain, p.cFetcher, c, contractAddress)
 }
 
 // GetTokensByTokenIdentifiersBatch returns a slice tokens from a list of token identifiers
 // Data is returned in the same order as the input. If a token is not found, the zero-value is used instead.
-func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []error) {
-	asTokens := util.MapWithoutError(tIDs, func(ti multichain.ChainAgnosticIdentifiers) persist.TokenIdentifiers {
+func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []common.ChainAgnosticIdentifiers) ([]common.ChainAgnosticToken, []error) {
+	asTokens := util.MapWithoutError(tIDs, func(ti common.ChainAgnosticIdentifiers) persist.TokenIdentifiers {
 		return persist.NewTokenIdentifiers(ti.ContractAddress, ti.TokenID, p.chain)
 	})
 
@@ -314,7 +314,7 @@ func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []m
 		p.streamAssetsForTokens(ctx, asTokens, outCh)
 	}()
 
-	ret := make([]multichain.ChainAgnosticToken, len(tIDs))
+	ret := make([]common.ChainAgnosticToken, len(tIDs))
 	errs := make([]error, len(tIDs))
 
 	tokens, _, err := assetsToTokens(ctx, p.chain, nil, "", outCh)
@@ -326,7 +326,7 @@ func (p Provider) GetTokensByTokenIdentifiersBatch(ctx context.Context, tIDs []m
 		return nil, errs
 	}
 
-	lookup := make(map[persist.TokenIdentifiers]multichain.ChainAgnosticToken)
+	lookup := make(map[persist.TokenIdentifiers]common.ChainAgnosticToken)
 	for _, t := range tokens {
 		lookup[persist.TokenIdentifiers{
 			TokenID:         t.TokenID,
@@ -451,7 +451,7 @@ func (p *Provider) fetchCollectionByAddress(ctx context.Context, contractAddress
 	return res.Collections[0], nil
 }
 
-func (p *Provider) fetchBlockScoutMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (p *Provider) fetchBlockScoutMetadata(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	u := fmt.Sprintf("https://base.blockscout.com/api/v2/tokens/%s/instances/%s", ti.ContractAddress, ti.TokenID.Base10String())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -493,10 +493,10 @@ func (p *Provider) fetchBlockScoutMetadata(ctx context.Context, ti multichain.Ch
 	return res.Metadata, nil
 }
 
-func assetsToTokens(ctx context.Context, chain persist.Chain, cFetcher multichain.ContractFetcher, ownerAddress persist.Address, outCh <-chan pageResult) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	resultTokens := make([]multichain.ChainAgnosticToken, 0, len(outCh))
-	resultContracts := make([]multichain.ChainAgnosticContract, 0, len(outCh))
-	seenCollections := make(map[string]multichain.ChainAgnosticContract)
+func assetsToTokens(ctx context.Context, chain persist.Chain, cFetcher common.ContractFetcher, ownerAddress persist.Address, outCh <-chan pageResult) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
+	resultTokens := make([]common.ChainAgnosticToken, 0, len(outCh))
+	resultContracts := make([]common.ChainAgnosticContract, 0, len(outCh))
+	seenCollections := make(map[string]common.ChainAgnosticContract)
 	for page := range outCh {
 		if page.Err != nil {
 			return nil, nil, page.Err
@@ -520,8 +520,8 @@ func assetsToTokens(ctx context.Context, chain persist.Chain, cFetcher multichai
 	return resultTokens, resultContracts, nil
 }
 
-func streamAssetsToTokens(ctx context.Context, chain persist.Chain, cFetcher multichain.ContractFetcher, ownerAddress persist.Address, outCh <-chan pageResult, recCh chan<- multichain.ChainAgnosticTokensAndContracts, errCh chan<- error) {
-	seenCollections := make(map[string]multichain.ChainAgnosticContract)
+func streamAssetsToTokens(ctx context.Context, chain persist.Chain, cFetcher common.ContractFetcher, ownerAddress persist.Address, outCh <-chan pageResult, recCh chan<- common.ChainAgnosticTokensAndContracts, errCh chan<- error) {
+	seenCollections := make(map[string]common.ChainAgnosticContract)
 
 	for page := range outCh {
 		if page.Err != nil {
@@ -529,8 +529,8 @@ func streamAssetsToTokens(ctx context.Context, chain persist.Chain, cFetcher mul
 			return
 		}
 
-		resultTokens := make([]multichain.ChainAgnosticToken, 0, len(page.Tokens))
-		resultContracts := make([]multichain.ChainAgnosticContract, 0, len(page.Tokens))
+		resultTokens := make([]common.ChainAgnosticToken, 0, len(page.Tokens))
+		resultContracts := make([]common.ChainAgnosticContract, 0, len(page.Tokens))
 
 		for _, t := range page.Tokens {
 			resultTokens = append(resultTokens, assetToAgnosticToken(t, ownerAddress))
@@ -549,14 +549,14 @@ func streamAssetsToTokens(ctx context.Context, chain persist.Chain, cFetcher mul
 			resultContracts = append(resultContracts, seenCollections[collectionID])
 		}
 
-		recCh <- multichain.ChainAgnosticTokensAndContracts{
+		recCh <- common.ChainAgnosticTokensAndContracts{
 			Tokens:    resultTokens,
 			Contracts: resultContracts,
 		}
 	}
 }
 
-func assetToAgnosticToken(t TokenWithOwnership, ownerAddress persist.Address) multichain.ChainAgnosticToken {
+func assetToAgnosticToken(t TokenWithOwnership, ownerAddress persist.Address) common.ChainAgnosticToken {
 	var tokenType persist.TokenType
 
 	switch t.Token.Kind {
@@ -581,7 +581,7 @@ func assetToAgnosticToken(t TokenWithOwnership, ownerAddress persist.Address) mu
 		tokenQuantity = persist.HexString(b.Text(16))
 	}
 
-	descriptors := multichain.ChainAgnosticTokenDescriptors{
+	descriptors := common.ChainAgnosticTokenDescriptors{
 		Name:        t.Token.Name,
 		Description: t.Token.Description,
 	}
@@ -590,7 +590,7 @@ func assetToAgnosticToken(t TokenWithOwnership, ownerAddress persist.Address) mu
 		ownerAddress = t.Token.Owner
 	}
 
-	return multichain.ChainAgnosticToken{
+	return common.ChainAgnosticToken{
 		ContractAddress: t.Token.Contract,
 		Descriptors:     descriptors,
 		TokenType:       tokenType,
@@ -603,7 +603,7 @@ func assetToAgnosticToken(t TokenWithOwnership, ownerAddress persist.Address) mu
 	}
 }
 
-func collectionToAgnosticContract(ctx context.Context, chain persist.Chain, cFetcher multichain.ContractFetcher, c Collection, contractAddress persist.Address) (multichain.ChainAgnosticContract, error) {
+func collectionToAgnosticContract(ctx context.Context, chain persist.Chain, cFetcher common.ContractFetcher, c Collection, contractAddress persist.Address) (common.ChainAgnosticContract, error) {
 	// reservoir doesn't keep parent contract data
 	if cFetcher != nil {
 		if isSharedContract(c.ID) {
@@ -614,9 +614,9 @@ func collectionToAgnosticContract(ctx context.Context, chain persist.Chain, cFet
 			return cFetcher.GetContractByAddress(ctx, contractAddress)
 		}
 	}
-	return multichain.ChainAgnosticContract{
+	return common.ChainAgnosticContract{
 		Address: contractAddress,
-		Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Descriptors: common.ChainAgnosticContractDescriptors{
 			Symbol:          c.Symbol,
 			Name:            c.Name,
 			Description:     c.Description,
