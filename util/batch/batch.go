@@ -46,11 +46,18 @@ type batch[TParam any, TResult any] struct {
 	numCallers int32
 }
 
+// NewBatcher creates a new Batcher with a TParam type that is comparable (i.e. can be used as a map key). If TParam is not comparable, use NewBatcherWithNonComparableParam instead.
+// The batcher will batch requests up to maxBatchSize (or until batchTimeout has elapsed), and then it will call the batchFunc with all the parameters. If cacheResults is true, the
+// results will be cached and returned for subsequent calls with the same parameter. If publishResults is true, the results will be published to any registered subscribers.
 func NewBatcher[TParam comparable, TResult any](ctx context.Context, maxBatchSize int, batchTimeout time.Duration, cacheResults bool, publishResults bool,
 	batchFunc func(context.Context, []TParam) ([]TResult, []error)) *Batcher[TParam, TResult] {
 	return newBatcher(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, batchFunc, indexOf[TParam])
 }
 
+// NewBatcherWithNonComparableParam creates a new Batcher with a TParam type that is not comparable (i.e. cannot be used as a map key). The underlying implementation will
+// serialize the parameter to JSON for use as a key, which allows for parameter types (e.g. structs with nested arrays) that would otherwise not be usable.
+// The batcher will batch requests up to maxBatchSize (or until batchTimeout has elapsed), and then it will call the batchFunc with all the parameters. If cacheResults is true, the
+// results will be cached and returned for subsequent calls with the same parameter. If publishResults is true, the results will be published to any registered subscribers.
 func NewBatcherWithNonComparableParam[TParam any, TResult any](ctx context.Context, maxBatchSize int, batchTimeout time.Duration, cacheResults bool, publishResults bool,
 	batchFunc func(context.Context, []TParam) ([]TResult, []error)) *Batcher[TParam, TResult] {
 	return newBatcher(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, batchFunc, nil)
@@ -71,7 +78,9 @@ func newBatcher[TParam any, TResult any](ctx context.Context, maxBatchSize int, 
 	}
 }
 
-// Do gets a TResult for the specified param, with batching and caching applied automatically (if configured)
+// Do gets a TResult for the specified param, with batching and caching applied automatically (if configured).
+// If the specified TParam is already in this batch, the underlying batch function will only receive the parameter
+// once, and both callers will receive the result of that invocation.
 func (d *Batcher[TParam, TResult]) Do(param TParam) (TResult, error) {
 	return d.DoThunk(param)()
 }
@@ -175,6 +184,8 @@ func (d *Batcher[TParam, TResult]) DoAllThunk(params []TParam) func() ([]TResult
 	}
 }
 
+// Prime caches a result for the specified param. This can be used to prime the cache with known results,
+// but is only useful if caching is enabled for this batcher.
 func (d *Batcher[TParam, TResult]) Prime(param TParam, result TResult) {
 	if !d.cacheResults {
 		return
