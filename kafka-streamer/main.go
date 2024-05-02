@@ -25,6 +25,9 @@ import (
 	"time"
 )
 
+// Enable for debugging; will not commit offsets or write to the database
+const readOnlyMode = false
+
 type streamerConfig struct {
 	Topic   string
 	Batcher batcher
@@ -63,7 +66,7 @@ func newEthereumOwnerConfig(deserializer *avro.GenericDeserializer, queries *mir
 
 	return &streamerConfig{
 		Topic:   "ethereum.owner.v4",
-		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
 	}
 }
 
@@ -78,7 +81,7 @@ func newEthereumTokenConfig(deserializer *avro.GenericDeserializer, queries *mir
 
 	return &streamerConfig{
 		Topic:   "ethereum.nft.v4",
-		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
 	}
 }
 
@@ -99,7 +102,7 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 
 	return &streamerConfig{
 		Topic:   "base.owner.v4",
-		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
 	}
 }
 
@@ -120,7 +123,7 @@ func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 
 	return &streamerConfig{
 		Topic:   "base.nft.v4",
-		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
 	}
 }
 
@@ -141,7 +144,7 @@ func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 
 	return &streamerConfig{
 		Topic:   "zora.owner.v4",
-		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
 	}
 }
 
@@ -162,7 +165,7 @@ func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 
 	return &streamerConfig{
 		Topic:   "zora.nft.v4",
-		Batcher: newMessageBatcher(250, time.Second, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
 	}
 }
 
@@ -272,71 +275,10 @@ func (m *messageStats) Update(ctx context.Context, msg *kafka.Message) {
 
 type batcher interface {
 	Reset()
+	Stop()
 	Add(context.Context, *kafka.Message) error
 	IsReady() bool
 	Submit(context.Context, *kafka.Consumer) error
-}
-
-type messageBatcher[T any] struct {
-	maxSize         int
-	timeoutDuration time.Duration
-	parseF          func(context.Context, *kafka.Message) (T, error)
-	submitF         func(context.Context, []T) error
-
-	entries     []T
-	nextTimeout time.Time
-}
-
-func newMessageBatcher[T any](maxSize int, timeout time.Duration, parseF func(context.Context, *kafka.Message) (T, error), submitF func(context.Context, []T) error) *messageBatcher[T] {
-	return &messageBatcher[T]{
-		maxSize:         maxSize,
-		timeoutDuration: timeout,
-		parseF:          parseF,
-		submitF:         submitF,
-	}
-}
-
-func (b *messageBatcher[T]) Reset() {
-	b.entries = []T{}
-	b.nextTimeout = time.Time{}
-}
-
-func (b *messageBatcher[T]) Add(ctx context.Context, msg *kafka.Message) error {
-	t, err := b.parseF(ctx, msg)
-	if err != nil {
-		return fmt.Errorf("failed to parse message: %w", err)
-	}
-
-	b.entries = append(b.entries, t)
-	b.nextTimeout = time.Now().Add(b.timeoutDuration)
-	return nil
-}
-
-func (b *messageBatcher[T]) IsReady() bool {
-	if len(b.entries) == 0 {
-		return false
-	}
-
-	return len(b.entries) >= b.maxSize || time.Now().After(b.nextTimeout)
-}
-
-func (b *messageBatcher[T]) Submit(ctx context.Context, c *kafka.Consumer) error {
-	if len(b.entries) == 0 {
-		return nil
-	}
-
-	err := b.submitF(ctx, b.entries)
-	if err != nil {
-		return fmt.Errorf("failed to submit batch: %w", err)
-	}
-
-	_, err = c.Commit()
-	if err != nil {
-		return fmt.Errorf("failed to commit offsets: %w", err)
-	}
-
-	b.entries = []T{}
-	return nil
 }
 
 func streamTopic(ctx context.Context, config *streamerConfig) error {
@@ -776,6 +718,10 @@ type queryBatchExecuter interface {
 }
 
 func submitBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+	if readOnlyMode {
+		return nil
+	}
+
 	b := queryF(ctx, entries)
 	defer b.Close()
 
