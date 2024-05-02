@@ -10,7 +10,7 @@ COPY go.mod go.sum /app/
 RUN go mod download
 
 COPY . /app
-RUN go build -o ./bin/kafka-streamer ./kafka-streamer/main.go
+RUN go build -o ./bin/kafka-streamer ./kafka-streamer
 
 ENV GAE_VERSION=$VERSION
 
