@@ -93,5 +93,9 @@ func isHighlight(td db.TokenDefinition) bool {
 	if td.ContractAddress == "0x78b92e9afd56b033ead2103f07aced5fac8c0854" && td.Chain == persist.ChainBase {
 		return true
 	}
+	// 0xen After Arcs collection
+	if td.ContractAddress == "0xfbf5a872f0d1cb8763e38b5250bbc0dd8443dfbb" && td.Chain == persist.ChainBase {
+		return true
+	}
 	return false
 }
