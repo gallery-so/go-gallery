@@ -597,17 +597,10 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
-	// Temporary fix for the mobile app
-	if gc.GetHeader("X-Platform") == "Mobile" {
-		if email != nil {
-			createUserParams.EmailStatus = persist.EmailVerificationStatusVerified
-		}
-	} else {
-		if createUserParams.EmailStatus == persist.EmailVerificationStatusUnverified && email != nil {
-			if err := emails.RequestVerificationEmail(ctx, userID); err != nil {
-				// Just the log the error since the user can verify their email later
-				logger.For(ctx).Warnf("failed to send verification email: %s", err)
-			}
+	if createUserParams.EmailStatus == persist.EmailVerificationStatusUnverified && email != nil {
+		if err := emails.RequestVerificationEmail(ctx, userID); err != nil {
+			// Just the log the error since the user can verify their email later
+			logger.For(ctx).Warnf("failed to send verification email: %s", err)
 		}
 	}
 
