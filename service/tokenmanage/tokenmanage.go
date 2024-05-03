@@ -21,7 +21,11 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-var pauseFlakingContractFor = time.Hour
+var (
+	pauseFlakingContractFor = time.Hour
+	flakingAmount           = int64(100)
+	flakingSpan             = time.Hour
+)
 
 // ErrBadToken is an error indicating that there is an issue with the token itself
 type ErrBadToken struct{ Err error }
@@ -105,7 +109,7 @@ func New(ctx context.Context, taskClient *task.Client, cache *redis.Cache, tickT
 		Submitter:      submitter,
 		throttle:       throttle.NewThrottleLocker(cache, 30*time.Minute),
 		metricReporter: metric.NewLogMetricReporter(),
-		errorCounter:   limiters.NewKeyRateLimiter(ctx, cache, "errorCount", 100, 3*time.Hour),
+		errorCounter:   limiters.NewKeyRateLimiter(ctx, cache, "errorCount", flakingAmount, flakingSpan),
 		tickTokenF:     tickTokenF,
 	}
 }
