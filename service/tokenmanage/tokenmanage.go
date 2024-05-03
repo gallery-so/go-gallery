@@ -132,7 +132,9 @@ func (m Manager) Paused(ctx context.Context, td db.TokenDefinition) bool {
 func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, attempts int, cause persist.ProcessingCause) (func(db.TokenMedia, error) error, error) {
 	if m.Paused(ctx, td) {
 		recordPipelinePaused(ctx, m.metricReporter, td.Chain, td.ContractAddress, cause)
-		return nil, ErrContractPaused{Chain: td.Chain, Contract: td.ContractAddress}
+		err := ErrContractPaused{Chain: td.Chain, Contract: td.ContractAddress}
+		sentryutil.ReportError(ctx, err)
+		return nil, err
 	}
 
 	err := m.throttle.Lock(ctx, "lock:"+td.ID.String())
