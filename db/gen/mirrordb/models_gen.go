@@ -86,6 +86,14 @@ type BaseToken struct {
 	KafkaTimestamp     *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
 }
 
+type Collection struct {
+	ID                    string     `db:"id" json:"id"`
+	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
+	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
+	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
+	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
+}
+
 type EthereumCollection struct {
 	ID                    string     `db:"id" json:"id"`
 	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`

@@ -171,7 +171,7 @@ contract_insert as (
 ),
     
 collection_insert as (
-    insert into base.collections (id, simplehash_lookup_nft_id)
+    insert into public.collections (id, simplehash_lookup_nft_id)
     select $20::text, $2
     where $33::bool and $20 is not null
     on conflict (id) do nothing
@@ -543,7 +543,7 @@ contract_insert as (
 ),
     
 collection_insert as (
-    insert into ethereum.collections (id, simplehash_lookup_nft_id)
+    insert into public.collections (id, simplehash_lookup_nft_id)
     select $20::text, $2
     where $33::bool and $20 is not null
     on conflict (id) do nothing
@@ -915,7 +915,7 @@ contract_insert as (
 ),
     
 collection_insert as (
-    insert into zora.collections (id, simplehash_lookup_nft_id)
+    insert into public.collections (id, simplehash_lookup_nft_id)
     select $20::text, $2
     where $33::bool and $20 is not null
     on conflict (id) do nothing
