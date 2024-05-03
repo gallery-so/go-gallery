@@ -21,6 +21,8 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+var pauseFlakingContractFor = time.Hour
+
 // ErrBadToken is an error indicating that there is an issue with the token itself
 type ErrBadToken struct{ Err error }
 
@@ -132,7 +134,9 @@ func (m Manager) Paused(ctx context.Context, td db.TokenDefinition) bool {
 func (m Manager) StartProcessing(ctx context.Context, td db.TokenDefinition, attempts int, cause persist.ProcessingCause) (func(db.TokenMedia, error) error, error) {
 	if m.Paused(ctx, td) {
 		recordPipelinePaused(ctx, m.metricReporter, td.Chain, td.ContractAddress, cause)
-		return nil, ErrContractPaused{Chain: td.Chain, Contract: td.ContractAddress}
+		err := ErrContractPaused{Chain: td.Chain, Contract: td.ContractAddress}
+		sentryutil.ReportError(ctx, err)
+		return nil, err
 	}
 
 	err := m.throttle.Lock(ctx, "lock:"+td.ID.String())
@@ -194,7 +198,7 @@ func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, origina
 		return
 	}
 
-	nowFlaky, err := m.Registry.pauseContract(ctx, td.Chain, td.ContractAddress, time.Hour*3)
+	nowFlaky, err := m.Registry.pauseContract(ctx, td.Chain, td.ContractAddress, pauseFlakingContractFor)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to pause contract:%s", err)
 		sentryutil.ReportError(ctx, err)
