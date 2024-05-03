@@ -189,7 +189,7 @@ contract_insert as (
 ),
     
 collection_insert as (
-    insert into ethereum.collections (id, simplehash_lookup_nft_id)
+    insert into public.collections (id, simplehash_lookup_nft_id)
     select sqlc.narg(collection_id)::text, @simplehash_nft_id
     where @should_upsert::bool and @collection_id is not null
     on conflict (id) do nothing
@@ -312,7 +312,7 @@ contract_insert as (
 ),
     
 collection_insert as (
-    insert into base.collections (id, simplehash_lookup_nft_id)
+    insert into public.collections (id, simplehash_lookup_nft_id)
     select sqlc.narg(collection_id)::text, @simplehash_nft_id
     where @should_upsert::bool and @collection_id is not null
     on conflict (id) do nothing
@@ -435,7 +435,7 @@ contract_insert as (
 ),
     
 collection_insert as (
-    insert into zora.collections (id, simplehash_lookup_nft_id)
+    insert into public.collections (id, simplehash_lookup_nft_id)
     select sqlc.narg(collection_id)::text, @simplehash_nft_id
     where @should_upsert::bool and @collection_id is not null
     on conflict (id) do nothing
