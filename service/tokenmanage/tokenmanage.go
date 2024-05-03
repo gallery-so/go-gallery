@@ -21,6 +21,8 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+var pauseFlakingContractFor = time.Hour
+
 // ErrBadToken is an error indicating that there is an issue with the token itself
 type ErrBadToken struct{ Err error }
 
@@ -196,7 +198,7 @@ func (m Manager) recordError(ctx context.Context, td db.TokenDefinition, origina
 		return
 	}
 
-	nowFlaky, err := m.Registry.pauseContract(ctx, td.Chain, td.ContractAddress, time.Hour*3)
+	nowFlaky, err := m.Registry.pauseContract(ctx, td.Chain, td.ContractAddress, pauseFlakingContractFor)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to pause contract:%s", err)
 		sentryutil.ReportError(ctx, err)
