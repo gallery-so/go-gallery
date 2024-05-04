@@ -340,6 +340,9 @@ func (r *communityResolver) MintURL(ctx context.Context, obj *model.Community) (
 		// hard-code mchx mint
 		if contract.Chain == persist.ChainBase && contract.Address == "0x78b92e9afd56b033ead2103f07aced5fac8c0854" {
 			mintURL = "https://highlight.xyz/mint/660d4342c6bc04d5dc5598e7"
+		} else if contract.Chain == persist.ChainBase && contract.Address == "0xfbf5a872f0d1cb8763e38b5250bbc0dd8443dfbb" {
+			// hard-code 0xen mint
+			mintURL = "https://highlight.xyz/mint/6633f1214f8e21f1296da022"
 		} else if contract.Chain == persist.ChainZora {
 			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s", contract.Address)
 		} else if contract.Chain == persist.ChainBase {
@@ -3452,6 +3455,9 @@ func (r *tokenDefinitionResolver) MintURL(ctx context.Context, obj *model.TokenD
 		// hard-code mchx mint
 		if contract.Chain == persist.ChainBase && contract.Address == "0x78b92e9afd56b033ead2103f07aced5fac8c0854" {
 			mintURL = "https://highlight.xyz/mint/660d4342c6bc04d5dc5598e7"
+		} else if contract.Chain == persist.ChainBase && contract.Address == "0xfbf5a872f0d1cb8763e38b5250bbc0dd8443dfbb" {
+			// hard-code 0xen mint
+			mintURL = "https://highlight.xyz/mint/6633f1214f8e21f1296da022"
 		} else if contract.Chain == persist.ChainZora {
 			mintURL = fmt.Sprintf("https://zora.co/collect/zora:%s/%s", contract.Address, tokenID)
 		} else if contract.Chain == persist.ChainBase {
