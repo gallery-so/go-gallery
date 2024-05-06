@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	registry "github.com/confluentinc/confluent-kafka-go/schemaregistry"
@@ -10,6 +11,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde/avro"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/mirrordb"
 	"github.com/mikeydub/go-gallery/env"
@@ -61,7 +63,7 @@ func newEthereumOwnerConfig(deserializer *avro.GenericDeserializer, queries *mir
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessEthereumOwnerEntryParams) error {
-		return submitBatch(ctx, queries.ProcessEthereumOwnerEntry, entries)
+		return submitOwnerBatch(ctx, queries.ProcessEthereumOwnerEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -76,7 +78,7 @@ func newEthereumTokenConfig(deserializer *avro.GenericDeserializer, queries *mir
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessEthereumTokenEntryParams) error {
-		return submitBatch(ctx, queries.ProcessEthereumTokenEntry, entries)
+		return submitTokenBatch(ctx, queries.ProcessEthereumTokenEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -97,7 +99,7 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseOwnerEntryParams) error {
-		return submitBatch(ctx, queries.ProcessBaseOwnerEntry, entries)
+		return submitOwnerBatch(ctx, queries.ProcessBaseOwnerEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -118,7 +120,7 @@ func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseTokenEntryParams) error {
-		return submitBatch(ctx, queries.ProcessBaseTokenEntry, entries)
+		return submitTokenBatch(ctx, queries.ProcessBaseTokenEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -139,7 +141,7 @@ func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessZoraOwnerEntryParams) error {
-		return submitBatch(ctx, queries.ProcessZoraOwnerEntry, entries)
+		return submitOwnerBatch(ctx, queries.ProcessZoraOwnerEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -160,7 +162,7 @@ func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessZoraTokenEntryParams) error {
-		return submitBatch(ctx, queries.ProcessZoraTokenEntry, entries)
+		return submitTokenBatch(ctx, queries.ProcessZoraTokenEntry, entries)
 	}
 
 	return &streamerConfig{
@@ -179,10 +181,10 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 
 	// Creating multiple configs for each topic allows them to process separate partitions in parallel
 	configs := []*streamerConfig{
-		newEthereumOwnerConfig(deserializer, queries),
-		newEthereumTokenConfig(deserializer, queries),
-		newBaseOwnerConfig(deserializer, queries),
-		newBaseTokenConfig(deserializer, queries),
+		//newEthereumOwnerConfig(deserializer, queries),
+		//newEthereumTokenConfig(deserializer, queries),
+		//newBaseOwnerConfig(deserializer, queries),
+		//newBaseTokenConfig(deserializer, queries),
 		newZoraOwnerConfig(deserializer, queries),
 		newZoraTokenConfig(deserializer, queries),
 	}
@@ -672,8 +674,8 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 			params = mirrordb.ProcessEthereumTokenEntryParams{
 				ShouldUpsert:       true,
 				SimplehashKafkaKey: key,
-				SimplehashNftID:    &nft.Nft_id,
-				ContractAddress:    &contractAddress,
+				SimplehashNftID:    nft.Nft_id,
+				ContractAddress:    util.ToPointer(contractAddress.String()),
 				TokenID:            tokenID,
 				Name:               cleanString(nft.Name),
 				Description:        cleanString(nft.Description),
@@ -712,12 +714,17 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 	return params, nil
 }
 
-type queryBatchExecuter interface {
+type execBatchHandler interface {
 	Exec(func(i int, e error))
 	Close() error
 }
 
-func submitBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+type queryBatchHandler interface {
+	QueryRow(f func(int, string, error))
+	Close() error
+}
+
+func submitOwnerBatch[TBatch execBatchHandler, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
 	if readOnlyMode {
 		return nil
 	}
@@ -732,6 +739,34 @@ func submitBatch[TBatch queryBatchExecuter, TEntries any](ctx context.Context, q
 		}
 	})
 
+	return err
+}
+
+func submitTokenBatch[TBatch queryBatchHandler, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+	if readOnlyMode {
+		return nil
+	}
+
+	b := queryF(ctx, entries)
+	defer b.Close()
+
+	var idsToUpdate []string
+	var err error
+
+	b.QueryRow(func(i int, s string, e error) {
+		if e != nil {
+			// It's okay if there isn't a result row; it just means no collection or contract rows were inserted
+			if !errors.Is(e, pgx.ErrNoRows) {
+				err = fmt.Errorf("failed to process entry: %w. entry data: %v", e, entries[i])
+			}
+			return
+		}
+
+		idsToUpdate = append(idsToUpdate, s)
+	})
+
+	// TODO: If there are any IDs to update, spawn a goroutine and pass them to a batcher
+	logger.For(ctx).Infof("found %d token metadata entries to update", len(idsToUpdate))
 	return err
 }
 

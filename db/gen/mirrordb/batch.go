@@ -158,128 +158,135 @@ func (b *ProcessBaseOwnerEntryBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const processBaseTokenEntry = `-- name: ProcessBaseTokenEntry :batchexec
+const processBaseTokenEntry = `-- name: ProcessBaseTokenEntry :batchone
 with deletion as (
-    delete from base.tokens where $34::bool and simplehash_kafka_key = $1
+    delete from base.tokens where $2::bool and base.tokens.simplehash_kafka_key = $3
 ),
 
 contract_insert as (
     insert into base.contracts (address, simplehash_lookup_nft_id)
-    select $3::text, $2
-    where $33::bool and $3 is not null
+    select $4::text, $1
+    where $5::bool and $4 is not null
     on conflict (address) do nothing
+    returning (xmax = 0) as inserted
 ),
     
 collection_insert as (
     insert into public.collections (id, simplehash_lookup_nft_id)
-    select $20::text, $2
-    where $33::bool and $20 is not null
+    select $6::text, $1
+    where $5::bool and $6 is not null
     on conflict (id) do nothing
-)
+    returning (xmax = 0) as inserted
+),
 
-insert into base.tokens (
-    simplehash_kafka_key,
-    simplehash_nft_id,
-    contract_address,
-    token_id,
-    name,
-    description,
-    previews,
-    image_url,
-    video_url,
-    audio_url,
-    model_url,
-    other_url,
-    background_color,
-    external_url,
-    on_chain_created_date,
-    status,
-    token_count,
-    owner_count,
-    contract,
-    collection_id,
-    last_sale,
-    first_created,
-    rarity,
-    extra_metadata,
-    image_properties,
-    video_properties,
-    audio_properties,
-    model_properties,
-    other_properties,
-    last_updated,
-    kafka_offset,
-    kafka_partition,
-    kafka_timestamp
-    )
-    select
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9,
-        $10,
-        $11,
-        $12,
-        $13,
-        $14,
-        $15,
-        $16,
-        $17,
-        $18,
-        $19,
-        $20,
-        $21,
-        $22,
-        $23,
-        $24,
-        $25,
-        $26,
-        $27,
-        $28,
-        $29,
-        now(),
-        $30,
-        $31,
-        $32
-    where $33::bool
-    on conflict (simplehash_kafka_key) do update
-        set simplehash_nft_id = excluded.simplehash_nft_id,
-            contract_address = excluded.contract_address,
-            token_id = excluded.token_id,
-            name = excluded.name,
-            description = excluded.description,
-            previews = excluded.previews,
-            image_url = excluded.image_url,
-            video_url = excluded.video_url,
-            audio_url = excluded.audio_url,
-            model_url = excluded.model_url,
-            other_url = excluded.other_url,
-            background_color = excluded.background_color,
-            external_url = excluded.external_url,
-            on_chain_created_date = excluded.on_chain_created_date,
-            status = excluded.status,
-            token_count = excluded.token_count,
-            owner_count = excluded.owner_count,
-            contract = excluded.contract,
-            collection_id = excluded.collection_id,
-            last_sale = excluded.last_sale,
-            first_created = excluded.first_created,
-            rarity = excluded.rarity,
-            extra_metadata = excluded.extra_metadata,
-            image_properties = excluded.image_properties,
-            video_properties = excluded.video_properties,
-            audio_properties = excluded.audio_properties,
-            model_properties = excluded.model_properties,
-            other_properties = excluded.other_properties,
-            last_updated = now(),
-            kafka_offset = excluded.kafka_offset,
-            kafka_partition = excluded.kafka_partition,
-            kafka_timestamp = excluded.kafka_timestamp
+token_insert as (
+    insert into base.tokens (
+        simplehash_kafka_key,
+        simplehash_nft_id,
+        contract_address,
+        token_id,
+        name,
+        description,
+        previews,
+        image_url,
+        video_url,
+        audio_url,
+        model_url,
+        other_url,
+        background_color,
+        external_url,
+        on_chain_created_date,
+        status,
+        token_count,
+        owner_count,
+        contract,
+        collection_id,
+        last_sale,
+        first_created,
+        rarity,
+        extra_metadata,
+        image_properties,
+        video_properties,
+        audio_properties,
+        model_properties,
+        other_properties,
+        last_updated,
+        kafka_offset,
+        kafka_partition,
+        kafka_timestamp
+        )
+        select
+            $3,
+            $1,
+            $4,
+            $7,
+            $8,
+            $9,
+            $10,
+            $11,
+            $12,
+            $13,
+            $14,
+            $15,
+            $16,
+            $17,
+            $18,
+            $19,
+            $20,
+            $21,
+            $22,
+            $6,
+            $23,
+            $24,
+            $25,
+            $26,
+            $27,
+            $28,
+            $29,
+            $30,
+            $31,
+            now(),
+            $32,
+            $33,
+            $34
+        where $5::bool
+        on conflict (simplehash_kafka_key) do update
+            set simplehash_nft_id = excluded.simplehash_nft_id,
+                contract_address = excluded.contract_address,
+                token_id = excluded.token_id,
+                name = excluded.name,
+                description = excluded.description,
+                previews = excluded.previews,
+                image_url = excluded.image_url,
+                video_url = excluded.video_url,
+                audio_url = excluded.audio_url,
+                model_url = excluded.model_url,
+                other_url = excluded.other_url,
+                background_color = excluded.background_color,
+                external_url = excluded.external_url,
+                on_chain_created_date = excluded.on_chain_created_date,
+                status = excluded.status,
+                token_count = excluded.token_count,
+                owner_count = excluded.owner_count,
+                contract = excluded.contract,
+                collection_id = excluded.collection_id,
+                last_sale = excluded.last_sale,
+                first_created = excluded.first_created,
+                rarity = excluded.rarity,
+                extra_metadata = excluded.extra_metadata,
+                image_properties = excluded.image_properties,
+                video_properties = excluded.video_properties,
+                audio_properties = excluded.audio_properties,
+                model_properties = excluded.model_properties,
+                other_properties = excluded.other_properties,
+                last_updated = now(),
+                kafka_offset = excluded.kafka_offset,
+                kafka_partition = excluded.kafka_partition,
+                kafka_timestamp = excluded.kafka_timestamp
+)
+select $1::text
+from contract_insert, collection_insert
+    where contract_insert.inserted or collection_insert.inserted
 `
 
 type ProcessBaseTokenEntryBatchResults struct {
@@ -289,49 +296,52 @@ type ProcessBaseTokenEntryBatchResults struct {
 }
 
 type ProcessBaseTokenEntryParams struct {
-	SimplehashKafkaKey string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
-	SimplehashNftID    *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
-	ContractAddress    *persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID            pgtype.Numeric   `db:"token_id" json:"token_id"`
-	Name               *string          `db:"name" json:"name"`
-	Description        *string          `db:"description" json:"description"`
-	Previews           pgtype.JSONB     `db:"previews" json:"previews"`
-	ImageUrl           *string          `db:"image_url" json:"image_url"`
-	VideoUrl           *string          `db:"video_url" json:"video_url"`
-	AudioUrl           *string          `db:"audio_url" json:"audio_url"`
-	ModelUrl           *string          `db:"model_url" json:"model_url"`
-	OtherUrl           *string          `db:"other_url" json:"other_url"`
-	BackgroundColor    *string          `db:"background_color" json:"background_color"`
-	ExternalUrl        *string          `db:"external_url" json:"external_url"`
-	OnChainCreatedDate *time.Time       `db:"on_chain_created_date" json:"on_chain_created_date"`
-	Status             *string          `db:"status" json:"status"`
-	TokenCount         pgtype.Numeric   `db:"token_count" json:"token_count"`
-	OwnerCount         pgtype.Numeric   `db:"owner_count" json:"owner_count"`
-	Contract           pgtype.JSONB     `db:"contract" json:"contract"`
-	CollectionID       *string          `db:"collection_id" json:"collection_id"`
-	LastSale           pgtype.JSONB     `db:"last_sale" json:"last_sale"`
-	FirstCreated       pgtype.JSONB     `db:"first_created" json:"first_created"`
-	Rarity             pgtype.JSONB     `db:"rarity" json:"rarity"`
-	ExtraMetadata      *string          `db:"extra_metadata" json:"extra_metadata"`
-	ImageProperties    pgtype.JSONB     `db:"image_properties" json:"image_properties"`
-	VideoProperties    pgtype.JSONB     `db:"video_properties" json:"video_properties"`
-	AudioProperties    pgtype.JSONB     `db:"audio_properties" json:"audio_properties"`
-	ModelProperties    pgtype.JSONB     `db:"model_properties" json:"model_properties"`
-	OtherProperties    pgtype.JSONB     `db:"other_properties" json:"other_properties"`
-	KafkaOffset        *int64           `db:"kafka_offset" json:"kafka_offset"`
-	KafkaPartition     *int32           `db:"kafka_partition" json:"kafka_partition"`
-	KafkaTimestamp     *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
-	ShouldUpsert       bool             `db:"should_upsert" json:"should_upsert"`
-	ShouldDelete       bool             `db:"should_delete" json:"should_delete"`
+	SimplehashNftID    string         `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	ShouldDelete       bool           `db:"should_delete" json:"should_delete"`
+	SimplehashKafkaKey string         `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	ContractAddress    *string        `db:"contract_address" json:"contract_address"`
+	ShouldUpsert       bool           `db:"should_upsert" json:"should_upsert"`
+	CollectionID       *string        `db:"collection_id" json:"collection_id"`
+	TokenID            pgtype.Numeric `db:"token_id" json:"token_id"`
+	Name               *string        `db:"name" json:"name"`
+	Description        *string        `db:"description" json:"description"`
+	Previews           pgtype.JSONB   `db:"previews" json:"previews"`
+	ImageUrl           *string        `db:"image_url" json:"image_url"`
+	VideoUrl           *string        `db:"video_url" json:"video_url"`
+	AudioUrl           *string        `db:"audio_url" json:"audio_url"`
+	ModelUrl           *string        `db:"model_url" json:"model_url"`
+	OtherUrl           *string        `db:"other_url" json:"other_url"`
+	BackgroundColor    *string        `db:"background_color" json:"background_color"`
+	ExternalUrl        *string        `db:"external_url" json:"external_url"`
+	OnChainCreatedDate *time.Time     `db:"on_chain_created_date" json:"on_chain_created_date"`
+	Status             *string        `db:"status" json:"status"`
+	TokenCount         pgtype.Numeric `db:"token_count" json:"token_count"`
+	OwnerCount         pgtype.Numeric `db:"owner_count" json:"owner_count"`
+	Contract           pgtype.JSONB   `db:"contract" json:"contract"`
+	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
+	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
+	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
+	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
+	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
+	ModelProperties    pgtype.JSONB   `db:"model_properties" json:"model_properties"`
+	OtherProperties    pgtype.JSONB   `db:"other_properties" json:"other_properties"`
+	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
 }
 
 func (q *Queries) ProcessBaseTokenEntry(ctx context.Context, arg []ProcessBaseTokenEntryParams) *ProcessBaseTokenEntryBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.SimplehashKafkaKey,
 			a.SimplehashNftID,
+			a.ShouldDelete,
+			a.SimplehashKafkaKey,
 			a.ContractAddress,
+			a.ShouldUpsert,
+			a.CollectionID,
 			a.TokenID,
 			a.Name,
 			a.Description,
@@ -348,7 +358,6 @@ func (q *Queries) ProcessBaseTokenEntry(ctx context.Context, arg []ProcessBaseTo
 			a.TokenCount,
 			a.OwnerCount,
 			a.Contract,
-			a.CollectionID,
 			a.LastSale,
 			a.FirstCreated,
 			a.Rarity,
@@ -361,8 +370,6 @@ func (q *Queries) ProcessBaseTokenEntry(ctx context.Context, arg []ProcessBaseTo
 			a.KafkaOffset,
 			a.KafkaPartition,
 			a.KafkaTimestamp,
-			a.ShouldUpsert,
-			a.ShouldDelete,
 		}
 		batch.Queue(processBaseTokenEntry, vals...)
 	}
@@ -370,18 +377,20 @@ func (q *Queries) ProcessBaseTokenEntry(ctx context.Context, arg []ProcessBaseTo
 	return &ProcessBaseTokenEntryBatchResults{br, len(arg), false}
 }
 
-func (b *ProcessBaseTokenEntryBatchResults) Exec(f func(int, error)) {
+func (b *ProcessBaseTokenEntryBatchResults) QueryRow(f func(int, string, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
+		var column_1 string
 		if b.closed {
 			if f != nil {
-				f(t, ErrBatchAlreadyClosed)
+				f(t, column_1, ErrBatchAlreadyClosed)
 			}
 			continue
 		}
-		_, err := b.br.Exec()
+		row := b.br.QueryRow()
+		err := row.Scan(&column_1)
 		if f != nil {
-			f(t, err)
+			f(t, column_1, err)
 		}
 	}
 }
@@ -530,128 +539,135 @@ func (b *ProcessEthereumOwnerEntryBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const processEthereumTokenEntry = `-- name: ProcessEthereumTokenEntry :batchexec
+const processEthereumTokenEntry = `-- name: ProcessEthereumTokenEntry :batchone
 with deletion as (
-    delete from ethereum.tokens where $34::bool and simplehash_kafka_key = $1
+    delete from ethereum.tokens where $2::bool and ethereum.tokens.simplehash_kafka_key = $3
 ),
 
 contract_insert as (
     insert into ethereum.contracts (address, simplehash_lookup_nft_id)
-    select $3::text, $2
-    where $33::bool and $3 is not null
+    select $4::text, $1
+    where $5::bool and $4 is not null
     on conflict (address) do nothing
+    returning (xmax = 0) as inserted
 ),
     
 collection_insert as (
     insert into public.collections (id, simplehash_lookup_nft_id)
-    select $20::text, $2
-    where $33::bool and $20 is not null
+    select $6::text, $1
+    where $5::bool and $6 is not null
     on conflict (id) do nothing
-)
+    returning (xmax = 0) as inserted
+),
 
-insert into ethereum.tokens (
-    simplehash_kafka_key,
-    simplehash_nft_id,
-    contract_address,
-    token_id,
-    name,
-    description,
-    previews,
-    image_url,
-    video_url,
-    audio_url,
-    model_url,
-    other_url,
-    background_color,
-    external_url,
-    on_chain_created_date,
-    status,
-    token_count,
-    owner_count,
-    contract,
-    collection_id,
-    last_sale,
-    first_created,
-    rarity,
-    extra_metadata,
-    image_properties,
-    video_properties,
-    audio_properties,
-    model_properties,
-    other_properties,
-    last_updated,
-    kafka_offset,
-    kafka_partition,
-    kafka_timestamp
-    )
-    select
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9,
-        $10,
-        $11,
-        $12,
-        $13,
-        $14,
-        $15,
-        $16,
-        $17,
-        $18,
-        $19,
-        $20,
-        $21,
-        $22,
-        $23,
-        $24,
-        $25,
-        $26,
-        $27,
-        $28,
-        $29,
-        now(),
-        $30,
-        $31,
-        $32
-    where $33::bool
-    on conflict (simplehash_kafka_key) do update
-        set simplehash_nft_id = excluded.simplehash_nft_id,
-            contract_address = excluded.contract_address,
-            token_id = excluded.token_id,
-            name = excluded.name,
-            description = excluded.description,
-            previews = excluded.previews,
-            image_url = excluded.image_url,
-            video_url = excluded.video_url,
-            audio_url = excluded.audio_url,
-            model_url = excluded.model_url,
-            other_url = excluded.other_url,
-            background_color = excluded.background_color,
-            external_url = excluded.external_url,
-            on_chain_created_date = excluded.on_chain_created_date,
-            status = excluded.status,
-            token_count = excluded.token_count,
-            owner_count = excluded.owner_count,
-            contract = excluded.contract,
-            collection_id = excluded.collection_id,
-            last_sale = excluded.last_sale,
-            first_created = excluded.first_created,
-            rarity = excluded.rarity,
-            extra_metadata = excluded.extra_metadata,
-            image_properties = excluded.image_properties,
-            video_properties = excluded.video_properties,
-            audio_properties = excluded.audio_properties,
-            model_properties = excluded.model_properties,
-            other_properties = excluded.other_properties,
-            last_updated = now(),
-            kafka_offset = excluded.kafka_offset,
-            kafka_partition = excluded.kafka_partition,
-            kafka_timestamp = excluded.kafka_timestamp
+token_insert as (
+    insert into ethereum.tokens (
+        simplehash_kafka_key,
+        simplehash_nft_id,
+        contract_address,
+        token_id,
+        name,
+        description,
+        previews,
+        image_url,
+        video_url,
+        audio_url,
+        model_url,
+        other_url,
+        background_color,
+        external_url,
+        on_chain_created_date,
+        status,
+        token_count,
+        owner_count,
+        contract,
+        collection_id,
+        last_sale,
+        first_created,
+        rarity,
+        extra_metadata,
+        image_properties,
+        video_properties,
+        audio_properties,
+        model_properties,
+        other_properties,
+        last_updated,
+        kafka_offset,
+        kafka_partition,
+        kafka_timestamp
+        )
+        select
+            $3,
+            $1,
+            $4,
+            $7,
+            $8,
+            $9,
+            $10,
+            $11,
+            $12,
+            $13,
+            $14,
+            $15,
+            $16,
+            $17,
+            $18,
+            $19,
+            $20,
+            $21,
+            $22,
+            $6,
+            $23,
+            $24,
+            $25,
+            $26,
+            $27,
+            $28,
+            $29,
+            $30,
+            $31,
+            now(),
+            $32,
+            $33,
+            $34
+        where $5::bool
+        on conflict (simplehash_kafka_key) do update
+            set simplehash_nft_id = excluded.simplehash_nft_id,
+                contract_address = excluded.contract_address,
+                token_id = excluded.token_id,
+                name = excluded.name,
+                description = excluded.description,
+                previews = excluded.previews,
+                image_url = excluded.image_url,
+                video_url = excluded.video_url,
+                audio_url = excluded.audio_url,
+                model_url = excluded.model_url,
+                other_url = excluded.other_url,
+                background_color = excluded.background_color,
+                external_url = excluded.external_url,
+                on_chain_created_date = excluded.on_chain_created_date,
+                status = excluded.status,
+                token_count = excluded.token_count,
+                owner_count = excluded.owner_count,
+                contract = excluded.contract,
+                collection_id = excluded.collection_id,
+                last_sale = excluded.last_sale,
+                first_created = excluded.first_created,
+                rarity = excluded.rarity,
+                extra_metadata = excluded.extra_metadata,
+                image_properties = excluded.image_properties,
+                video_properties = excluded.video_properties,
+                audio_properties = excluded.audio_properties,
+                model_properties = excluded.model_properties,
+                other_properties = excluded.other_properties,
+                last_updated = now(),
+                kafka_offset = excluded.kafka_offset,
+                kafka_partition = excluded.kafka_partition,
+                kafka_timestamp = excluded.kafka_timestamp
+)
+select $1::text
+from contract_insert, collection_insert
+    where contract_insert.inserted or collection_insert.inserted
 `
 
 type ProcessEthereumTokenEntryBatchResults struct {
@@ -661,49 +677,52 @@ type ProcessEthereumTokenEntryBatchResults struct {
 }
 
 type ProcessEthereumTokenEntryParams struct {
-	SimplehashKafkaKey string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
-	SimplehashNftID    *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
-	ContractAddress    *persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID            pgtype.Numeric   `db:"token_id" json:"token_id"`
-	Name               *string          `db:"name" json:"name"`
-	Description        *string          `db:"description" json:"description"`
-	Previews           pgtype.JSONB     `db:"previews" json:"previews"`
-	ImageUrl           *string          `db:"image_url" json:"image_url"`
-	VideoUrl           *string          `db:"video_url" json:"video_url"`
-	AudioUrl           *string          `db:"audio_url" json:"audio_url"`
-	ModelUrl           *string          `db:"model_url" json:"model_url"`
-	OtherUrl           *string          `db:"other_url" json:"other_url"`
-	BackgroundColor    *string          `db:"background_color" json:"background_color"`
-	ExternalUrl        *string          `db:"external_url" json:"external_url"`
-	OnChainCreatedDate *time.Time       `db:"on_chain_created_date" json:"on_chain_created_date"`
-	Status             *string          `db:"status" json:"status"`
-	TokenCount         pgtype.Numeric   `db:"token_count" json:"token_count"`
-	OwnerCount         pgtype.Numeric   `db:"owner_count" json:"owner_count"`
-	Contract           pgtype.JSONB     `db:"contract" json:"contract"`
-	CollectionID       *string          `db:"collection_id" json:"collection_id"`
-	LastSale           pgtype.JSONB     `db:"last_sale" json:"last_sale"`
-	FirstCreated       pgtype.JSONB     `db:"first_created" json:"first_created"`
-	Rarity             pgtype.JSONB     `db:"rarity" json:"rarity"`
-	ExtraMetadata      *string          `db:"extra_metadata" json:"extra_metadata"`
-	ImageProperties    pgtype.JSONB     `db:"image_properties" json:"image_properties"`
-	VideoProperties    pgtype.JSONB     `db:"video_properties" json:"video_properties"`
-	AudioProperties    pgtype.JSONB     `db:"audio_properties" json:"audio_properties"`
-	ModelProperties    pgtype.JSONB     `db:"model_properties" json:"model_properties"`
-	OtherProperties    pgtype.JSONB     `db:"other_properties" json:"other_properties"`
-	KafkaOffset        *int64           `db:"kafka_offset" json:"kafka_offset"`
-	KafkaPartition     *int32           `db:"kafka_partition" json:"kafka_partition"`
-	KafkaTimestamp     *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
-	ShouldUpsert       bool             `db:"should_upsert" json:"should_upsert"`
-	ShouldDelete       bool             `db:"should_delete" json:"should_delete"`
+	SimplehashNftID    string         `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	ShouldDelete       bool           `db:"should_delete" json:"should_delete"`
+	SimplehashKafkaKey string         `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	ContractAddress    *string        `db:"contract_address" json:"contract_address"`
+	ShouldUpsert       bool           `db:"should_upsert" json:"should_upsert"`
+	CollectionID       *string        `db:"collection_id" json:"collection_id"`
+	TokenID            pgtype.Numeric `db:"token_id" json:"token_id"`
+	Name               *string        `db:"name" json:"name"`
+	Description        *string        `db:"description" json:"description"`
+	Previews           pgtype.JSONB   `db:"previews" json:"previews"`
+	ImageUrl           *string        `db:"image_url" json:"image_url"`
+	VideoUrl           *string        `db:"video_url" json:"video_url"`
+	AudioUrl           *string        `db:"audio_url" json:"audio_url"`
+	ModelUrl           *string        `db:"model_url" json:"model_url"`
+	OtherUrl           *string        `db:"other_url" json:"other_url"`
+	BackgroundColor    *string        `db:"background_color" json:"background_color"`
+	ExternalUrl        *string        `db:"external_url" json:"external_url"`
+	OnChainCreatedDate *time.Time     `db:"on_chain_created_date" json:"on_chain_created_date"`
+	Status             *string        `db:"status" json:"status"`
+	TokenCount         pgtype.Numeric `db:"token_count" json:"token_count"`
+	OwnerCount         pgtype.Numeric `db:"owner_count" json:"owner_count"`
+	Contract           pgtype.JSONB   `db:"contract" json:"contract"`
+	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
+	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
+	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
+	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
+	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
+	ModelProperties    pgtype.JSONB   `db:"model_properties" json:"model_properties"`
+	OtherProperties    pgtype.JSONB   `db:"other_properties" json:"other_properties"`
+	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
 }
 
 func (q *Queries) ProcessEthereumTokenEntry(ctx context.Context, arg []ProcessEthereumTokenEntryParams) *ProcessEthereumTokenEntryBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.SimplehashKafkaKey,
 			a.SimplehashNftID,
+			a.ShouldDelete,
+			a.SimplehashKafkaKey,
 			a.ContractAddress,
+			a.ShouldUpsert,
+			a.CollectionID,
 			a.TokenID,
 			a.Name,
 			a.Description,
@@ -720,7 +739,6 @@ func (q *Queries) ProcessEthereumTokenEntry(ctx context.Context, arg []ProcessEt
 			a.TokenCount,
 			a.OwnerCount,
 			a.Contract,
-			a.CollectionID,
 			a.LastSale,
 			a.FirstCreated,
 			a.Rarity,
@@ -733,8 +751,6 @@ func (q *Queries) ProcessEthereumTokenEntry(ctx context.Context, arg []ProcessEt
 			a.KafkaOffset,
 			a.KafkaPartition,
 			a.KafkaTimestamp,
-			a.ShouldUpsert,
-			a.ShouldDelete,
 		}
 		batch.Queue(processEthereumTokenEntry, vals...)
 	}
@@ -742,18 +758,20 @@ func (q *Queries) ProcessEthereumTokenEntry(ctx context.Context, arg []ProcessEt
 	return &ProcessEthereumTokenEntryBatchResults{br, len(arg), false}
 }
 
-func (b *ProcessEthereumTokenEntryBatchResults) Exec(f func(int, error)) {
+func (b *ProcessEthereumTokenEntryBatchResults) QueryRow(f func(int, string, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
+		var column_1 string
 		if b.closed {
 			if f != nil {
-				f(t, ErrBatchAlreadyClosed)
+				f(t, column_1, ErrBatchAlreadyClosed)
 			}
 			continue
 		}
-		_, err := b.br.Exec()
+		row := b.br.QueryRow()
+		err := row.Scan(&column_1)
 		if f != nil {
-			f(t, err)
+			f(t, column_1, err)
 		}
 	}
 }
@@ -902,128 +920,135 @@ func (b *ProcessZoraOwnerEntryBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const processZoraTokenEntry = `-- name: ProcessZoraTokenEntry :batchexec
+const processZoraTokenEntry = `-- name: ProcessZoraTokenEntry :batchone
 with deletion as (
-    delete from zora.tokens where $34::bool and simplehash_kafka_key = $1
+    delete from zora.tokens where $2::bool and zora.tokens.simplehash_kafka_key = $3
 ),
 
 contract_insert as (
     insert into zora.contracts (address, simplehash_lookup_nft_id)
-    select $3::text, $2
-    where $33::bool and $3 is not null
+    select $4::text, $1
+    where $5::bool and $4 is not null
     on conflict (address) do nothing
+    returning (xmax = 0) as inserted
 ),
     
 collection_insert as (
     insert into public.collections (id, simplehash_lookup_nft_id)
-    select $20::text, $2
-    where $33::bool and $20 is not null
+    select $6::text, $1
+    where $5::bool and $6 is not null
     on conflict (id) do nothing
-)
+    returning (xmax = 0) as inserted
+),
 
-insert into zora.tokens (
-    simplehash_kafka_key,
-    simplehash_nft_id,
-    contract_address,
-    token_id,
-    name,
-    description,
-    previews,
-    image_url,
-    video_url,
-    audio_url,
-    model_url,
-    other_url,
-    background_color,
-    external_url,
-    on_chain_created_date,
-    status,
-    token_count,
-    owner_count,
-    contract,
-    collection_id,
-    last_sale,
-    first_created,
-    rarity,
-    extra_metadata,
-    image_properties,
-    video_properties,
-    audio_properties,
-    model_properties,
-    other_properties,
-    last_updated,
-    kafka_offset,
-    kafka_partition,
-    kafka_timestamp
-    )
-    select
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9,
-        $10,
-        $11,
-        $12,
-        $13,
-        $14,
-        $15,
-        $16,
-        $17,
-        $18,
-        $19,
-        $20,
-        $21,
-        $22,
-        $23,
-        $24,
-        $25,
-        $26,
-        $27,
-        $28,
-        $29,
-        now(),
-        $30,
-        $31,
-        $32
-    where $33::bool
-    on conflict (simplehash_kafka_key) do update
-        set simplehash_nft_id = excluded.simplehash_nft_id,
-            contract_address = excluded.contract_address,
-            token_id = excluded.token_id,
-            name = excluded.name,
-            description = excluded.description,
-            previews = excluded.previews,
-            image_url = excluded.image_url,
-            video_url = excluded.video_url,
-            audio_url = excluded.audio_url,
-            model_url = excluded.model_url,
-            other_url = excluded.other_url,
-            background_color = excluded.background_color,
-            external_url = excluded.external_url,
-            on_chain_created_date = excluded.on_chain_created_date,
-            status = excluded.status,
-            token_count = excluded.token_count,
-            owner_count = excluded.owner_count,
-            contract = excluded.contract,
-            collection_id = excluded.collection_id,
-            last_sale = excluded.last_sale,
-            first_created = excluded.first_created,
-            rarity = excluded.rarity,
-            extra_metadata = excluded.extra_metadata,
-            image_properties = excluded.image_properties,
-            video_properties = excluded.video_properties,
-            audio_properties = excluded.audio_properties,
-            model_properties = excluded.model_properties,
-            other_properties = excluded.other_properties,
-            last_updated = now(),
-            kafka_offset = excluded.kafka_offset,
-            kafka_partition = excluded.kafka_partition,
-            kafka_timestamp = excluded.kafka_timestamp
+token_insert as (
+    insert into zora.tokens (
+        simplehash_kafka_key,
+        simplehash_nft_id,
+        contract_address,
+        token_id,
+        name,
+        description,
+        previews,
+        image_url,
+        video_url,
+        audio_url,
+        model_url,
+        other_url,
+        background_color,
+        external_url,
+        on_chain_created_date,
+        status,
+        token_count,
+        owner_count,
+        contract,
+        collection_id,
+        last_sale,
+        first_created,
+        rarity,
+        extra_metadata,
+        image_properties,
+        video_properties,
+        audio_properties,
+        model_properties,
+        other_properties,
+        last_updated,
+        kafka_offset,
+        kafka_partition,
+        kafka_timestamp
+        )
+        select
+            $3,
+            $1,
+            $4,
+            $7,
+            $8,
+            $9,
+            $10,
+            $11,
+            $12,
+            $13,
+            $14,
+            $15,
+            $16,
+            $17,
+            $18,
+            $19,
+            $20,
+            $21,
+            $22,
+            $6,
+            $23,
+            $24,
+            $25,
+            $26,
+            $27,
+            $28,
+            $29,
+            $30,
+            $31,
+            now(),
+            $32,
+            $33,
+            $34
+        where $5::bool
+        on conflict (simplehash_kafka_key) do update
+            set simplehash_nft_id = excluded.simplehash_nft_id,
+                contract_address = excluded.contract_address,
+                token_id = excluded.token_id,
+                name = excluded.name,
+                description = excluded.description,
+                previews = excluded.previews,
+                image_url = excluded.image_url,
+                video_url = excluded.video_url,
+                audio_url = excluded.audio_url,
+                model_url = excluded.model_url,
+                other_url = excluded.other_url,
+                background_color = excluded.background_color,
+                external_url = excluded.external_url,
+                on_chain_created_date = excluded.on_chain_created_date,
+                status = excluded.status,
+                token_count = excluded.token_count,
+                owner_count = excluded.owner_count,
+                contract = excluded.contract,
+                collection_id = excluded.collection_id,
+                last_sale = excluded.last_sale,
+                first_created = excluded.first_created,
+                rarity = excluded.rarity,
+                extra_metadata = excluded.extra_metadata,
+                image_properties = excluded.image_properties,
+                video_properties = excluded.video_properties,
+                audio_properties = excluded.audio_properties,
+                model_properties = excluded.model_properties,
+                other_properties = excluded.other_properties,
+                last_updated = now(),
+                kafka_offset = excluded.kafka_offset,
+                kafka_partition = excluded.kafka_partition,
+                kafka_timestamp = excluded.kafka_timestamp
+)
+select $1::text
+from contract_insert, collection_insert
+    where contract_insert.inserted or collection_insert.inserted
 `
 
 type ProcessZoraTokenEntryBatchResults struct {
@@ -1033,49 +1058,52 @@ type ProcessZoraTokenEntryBatchResults struct {
 }
 
 type ProcessZoraTokenEntryParams struct {
-	SimplehashKafkaKey string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
-	SimplehashNftID    *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
-	ContractAddress    *persist.Address `db:"contract_address" json:"contract_address"`
-	TokenID            pgtype.Numeric   `db:"token_id" json:"token_id"`
-	Name               *string          `db:"name" json:"name"`
-	Description        *string          `db:"description" json:"description"`
-	Previews           pgtype.JSONB     `db:"previews" json:"previews"`
-	ImageUrl           *string          `db:"image_url" json:"image_url"`
-	VideoUrl           *string          `db:"video_url" json:"video_url"`
-	AudioUrl           *string          `db:"audio_url" json:"audio_url"`
-	ModelUrl           *string          `db:"model_url" json:"model_url"`
-	OtherUrl           *string          `db:"other_url" json:"other_url"`
-	BackgroundColor    *string          `db:"background_color" json:"background_color"`
-	ExternalUrl        *string          `db:"external_url" json:"external_url"`
-	OnChainCreatedDate *time.Time       `db:"on_chain_created_date" json:"on_chain_created_date"`
-	Status             *string          `db:"status" json:"status"`
-	TokenCount         pgtype.Numeric   `db:"token_count" json:"token_count"`
-	OwnerCount         pgtype.Numeric   `db:"owner_count" json:"owner_count"`
-	Contract           pgtype.JSONB     `db:"contract" json:"contract"`
-	CollectionID       *string          `db:"collection_id" json:"collection_id"`
-	LastSale           pgtype.JSONB     `db:"last_sale" json:"last_sale"`
-	FirstCreated       pgtype.JSONB     `db:"first_created" json:"first_created"`
-	Rarity             pgtype.JSONB     `db:"rarity" json:"rarity"`
-	ExtraMetadata      *string          `db:"extra_metadata" json:"extra_metadata"`
-	ImageProperties    pgtype.JSONB     `db:"image_properties" json:"image_properties"`
-	VideoProperties    pgtype.JSONB     `db:"video_properties" json:"video_properties"`
-	AudioProperties    pgtype.JSONB     `db:"audio_properties" json:"audio_properties"`
-	ModelProperties    pgtype.JSONB     `db:"model_properties" json:"model_properties"`
-	OtherProperties    pgtype.JSONB     `db:"other_properties" json:"other_properties"`
-	KafkaOffset        *int64           `db:"kafka_offset" json:"kafka_offset"`
-	KafkaPartition     *int32           `db:"kafka_partition" json:"kafka_partition"`
-	KafkaTimestamp     *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
-	ShouldUpsert       bool             `db:"should_upsert" json:"should_upsert"`
-	ShouldDelete       bool             `db:"should_delete" json:"should_delete"`
+	SimplehashNftID    string         `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	ShouldDelete       bool           `db:"should_delete" json:"should_delete"`
+	SimplehashKafkaKey string         `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	ContractAddress    *string        `db:"contract_address" json:"contract_address"`
+	ShouldUpsert       bool           `db:"should_upsert" json:"should_upsert"`
+	CollectionID       *string        `db:"collection_id" json:"collection_id"`
+	TokenID            pgtype.Numeric `db:"token_id" json:"token_id"`
+	Name               *string        `db:"name" json:"name"`
+	Description        *string        `db:"description" json:"description"`
+	Previews           pgtype.JSONB   `db:"previews" json:"previews"`
+	ImageUrl           *string        `db:"image_url" json:"image_url"`
+	VideoUrl           *string        `db:"video_url" json:"video_url"`
+	AudioUrl           *string        `db:"audio_url" json:"audio_url"`
+	ModelUrl           *string        `db:"model_url" json:"model_url"`
+	OtherUrl           *string        `db:"other_url" json:"other_url"`
+	BackgroundColor    *string        `db:"background_color" json:"background_color"`
+	ExternalUrl        *string        `db:"external_url" json:"external_url"`
+	OnChainCreatedDate *time.Time     `db:"on_chain_created_date" json:"on_chain_created_date"`
+	Status             *string        `db:"status" json:"status"`
+	TokenCount         pgtype.Numeric `db:"token_count" json:"token_count"`
+	OwnerCount         pgtype.Numeric `db:"owner_count" json:"owner_count"`
+	Contract           pgtype.JSONB   `db:"contract" json:"contract"`
+	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
+	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
+	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
+	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
+	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
+	ModelProperties    pgtype.JSONB   `db:"model_properties" json:"model_properties"`
+	OtherProperties    pgtype.JSONB   `db:"other_properties" json:"other_properties"`
+	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
 }
 
 func (q *Queries) ProcessZoraTokenEntry(ctx context.Context, arg []ProcessZoraTokenEntryParams) *ProcessZoraTokenEntryBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.SimplehashKafkaKey,
 			a.SimplehashNftID,
+			a.ShouldDelete,
+			a.SimplehashKafkaKey,
 			a.ContractAddress,
+			a.ShouldUpsert,
+			a.CollectionID,
 			a.TokenID,
 			a.Name,
 			a.Description,
@@ -1092,7 +1120,6 @@ func (q *Queries) ProcessZoraTokenEntry(ctx context.Context, arg []ProcessZoraTo
 			a.TokenCount,
 			a.OwnerCount,
 			a.Contract,
-			a.CollectionID,
 			a.LastSale,
 			a.FirstCreated,
 			a.Rarity,
@@ -1105,8 +1132,6 @@ func (q *Queries) ProcessZoraTokenEntry(ctx context.Context, arg []ProcessZoraTo
 			a.KafkaOffset,
 			a.KafkaPartition,
 			a.KafkaTimestamp,
-			a.ShouldUpsert,
-			a.ShouldDelete,
 		}
 		batch.Queue(processZoraTokenEntry, vals...)
 	}
@@ -1114,7 +1139,81 @@ func (q *Queries) ProcessZoraTokenEntry(ctx context.Context, arg []ProcessZoraTo
 	return &ProcessZoraTokenEntryBatchResults{br, len(arg), false}
 }
 
-func (b *ProcessZoraTokenEntryBatchResults) Exec(f func(int, error)) {
+func (b *ProcessZoraTokenEntryBatchResults) QueryRow(f func(int, string, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var column_1 string
+		if b.closed {
+			if f != nil {
+				f(t, column_1, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&column_1)
+		if f != nil {
+			f(t, column_1, err)
+		}
+	}
+}
+
+func (b *ProcessZoraTokenEntryBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const updateBaseContract = `-- name: UpdateBaseContract :batchexec
+update base.contracts
+set
+    last_simplehash_sync = now(),
+    last_updated = now(),
+    type = $1,
+    name = $2,
+    symbol = $3,
+    deployed_by = $4,
+    deployed_via_contract = $5,
+    owned_by = $6,
+    has_multiple_collections = $7
+where address = $8
+`
+
+type UpdateBaseContractBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpdateBaseContractParams struct {
+	Type                   *string `db:"type" json:"type"`
+	Name                   *string `db:"name" json:"name"`
+	Symbol                 *string `db:"symbol" json:"symbol"`
+	DeployedBy             *string `db:"deployed_by" json:"deployed_by"`
+	DeployedViaContract    *string `db:"deployed_via_contract" json:"deployed_via_contract"`
+	OwnedBy                *string `db:"owned_by" json:"owned_by"`
+	HasMultipleCollections *bool   `db:"has_multiple_collections" json:"has_multiple_collections"`
+	Address                string  `db:"address" json:"address"`
+}
+
+func (q *Queries) UpdateBaseContract(ctx context.Context, arg []UpdateBaseContractParams) *UpdateBaseContractBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Type,
+			a.Name,
+			a.Symbol,
+			a.DeployedBy,
+			a.DeployedViaContract,
+			a.OwnedBy,
+			a.HasMultipleCollections,
+			a.Address,
+		}
+		batch.Queue(updateBaseContract, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpdateBaseContractBatchResults{br, len(arg), false}
+}
+
+func (b *UpdateBaseContractBatchResults) Exec(f func(int, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		if b.closed {
@@ -1130,7 +1229,262 @@ func (b *ProcessZoraTokenEntryBatchResults) Exec(f func(int, error)) {
 	}
 }
 
-func (b *ProcessZoraTokenEntryBatchResults) Close() error {
+func (b *UpdateBaseContractBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const updateCollection = `-- name: UpdateCollection :batchexec
+update public.collections
+set
+    last_simplehash_sync = now(),
+    last_updated = now(),
+    name = $1,
+    description = $2,
+    image_url = $3,
+    banner_image_url = $4,
+    category = $5,
+    is_nsfw = $6,
+    external_url = $7,
+    twitter_username = $8,
+    discord_url = $9,
+    instagram_url = $10,
+    medium_username = $11,
+    telegram_url = $12,
+    marketplace_pages = $13,
+    metaplex_mint = $14,
+    metaplex_candy_machine = $15,
+    metaplex_first_verified_creator = $16,
+    spam_score = $17,
+    chains = $18,
+    top_contracts = $19,
+    collection_royalties = $20
+where id = $21
+`
+
+type UpdateCollectionBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpdateCollectionParams struct {
+	Name                         *string      `db:"name" json:"name"`
+	Description                  *string      `db:"description" json:"description"`
+	ImageUrl                     *string      `db:"image_url" json:"image_url"`
+	BannerImageUrl               *string      `db:"banner_image_url" json:"banner_image_url"`
+	Category                     *string      `db:"category" json:"category"`
+	IsNsfw                       *bool        `db:"is_nsfw" json:"is_nsfw"`
+	ExternalUrl                  *string      `db:"external_url" json:"external_url"`
+	TwitterUsername              *string      `db:"twitter_username" json:"twitter_username"`
+	DiscordUrl                   *string      `db:"discord_url" json:"discord_url"`
+	InstagramUrl                 *string      `db:"instagram_url" json:"instagram_url"`
+	MediumUsername               *string      `db:"medium_username" json:"medium_username"`
+	TelegramUrl                  *string      `db:"telegram_url" json:"telegram_url"`
+	MarketplacePages             pgtype.JSONB `db:"marketplace_pages" json:"marketplace_pages"`
+	MetaplexMint                 *string      `db:"metaplex_mint" json:"metaplex_mint"`
+	MetaplexCandyMachine         *string      `db:"metaplex_candy_machine" json:"metaplex_candy_machine"`
+	MetaplexFirstVerifiedCreator *string      `db:"metaplex_first_verified_creator" json:"metaplex_first_verified_creator"`
+	SpamScore                    *int32       `db:"spam_score" json:"spam_score"`
+	Chains                       []string     `db:"chains" json:"chains"`
+	TopContracts                 []string     `db:"top_contracts" json:"top_contracts"`
+	CollectionRoyalties          pgtype.JSONB `db:"collection_royalties" json:"collection_royalties"`
+	CollectionID                 string       `db:"collection_id" json:"collection_id"`
+}
+
+func (q *Queries) UpdateCollection(ctx context.Context, arg []UpdateCollectionParams) *UpdateCollectionBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Name,
+			a.Description,
+			a.ImageUrl,
+			a.BannerImageUrl,
+			a.Category,
+			a.IsNsfw,
+			a.ExternalUrl,
+			a.TwitterUsername,
+			a.DiscordUrl,
+			a.InstagramUrl,
+			a.MediumUsername,
+			a.TelegramUrl,
+			a.MarketplacePages,
+			a.MetaplexMint,
+			a.MetaplexCandyMachine,
+			a.MetaplexFirstVerifiedCreator,
+			a.SpamScore,
+			a.Chains,
+			a.TopContracts,
+			a.CollectionRoyalties,
+			a.CollectionID,
+		}
+		batch.Queue(updateCollection, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpdateCollectionBatchResults{br, len(arg), false}
+}
+
+func (b *UpdateCollectionBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpdateCollectionBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const updateEthereumContract = `-- name: UpdateEthereumContract :batchexec
+update ethereum.contracts
+set
+    last_simplehash_sync = now(),
+    last_updated = now(),
+    type = $1,
+    name = $2,
+    symbol = $3,
+    deployed_by = $4,
+    deployed_via_contract = $5,
+    owned_by = $6,
+    has_multiple_collections = $7
+where address = $8
+`
+
+type UpdateEthereumContractBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpdateEthereumContractParams struct {
+	Type                   *string `db:"type" json:"type"`
+	Name                   *string `db:"name" json:"name"`
+	Symbol                 *string `db:"symbol" json:"symbol"`
+	DeployedBy             *string `db:"deployed_by" json:"deployed_by"`
+	DeployedViaContract    *string `db:"deployed_via_contract" json:"deployed_via_contract"`
+	OwnedBy                *string `db:"owned_by" json:"owned_by"`
+	HasMultipleCollections *bool   `db:"has_multiple_collections" json:"has_multiple_collections"`
+	Address                string  `db:"address" json:"address"`
+}
+
+func (q *Queries) UpdateEthereumContract(ctx context.Context, arg []UpdateEthereumContractParams) *UpdateEthereumContractBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Type,
+			a.Name,
+			a.Symbol,
+			a.DeployedBy,
+			a.DeployedViaContract,
+			a.OwnedBy,
+			a.HasMultipleCollections,
+			a.Address,
+		}
+		batch.Queue(updateEthereumContract, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpdateEthereumContractBatchResults{br, len(arg), false}
+}
+
+func (b *UpdateEthereumContractBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpdateEthereumContractBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const updateZoraContract = `-- name: UpdateZoraContract :batchexec
+update zora.contracts
+set
+    last_simplehash_sync = now(),
+    last_updated = now(),
+    type = $1,
+    name = $2,
+    symbol = $3,
+    deployed_by = $4,
+    deployed_via_contract = $5,
+    owned_by = $6,
+    has_multiple_collections = $7
+where address = $8
+`
+
+type UpdateZoraContractBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpdateZoraContractParams struct {
+	Type                   *string `db:"type" json:"type"`
+	Name                   *string `db:"name" json:"name"`
+	Symbol                 *string `db:"symbol" json:"symbol"`
+	DeployedBy             *string `db:"deployed_by" json:"deployed_by"`
+	DeployedViaContract    *string `db:"deployed_via_contract" json:"deployed_via_contract"`
+	OwnedBy                *string `db:"owned_by" json:"owned_by"`
+	HasMultipleCollections *bool   `db:"has_multiple_collections" json:"has_multiple_collections"`
+	Address                string  `db:"address" json:"address"`
+}
+
+func (q *Queries) UpdateZoraContract(ctx context.Context, arg []UpdateZoraContractParams) *UpdateZoraContractBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Type,
+			a.Name,
+			a.Symbol,
+			a.DeployedBy,
+			a.DeployedViaContract,
+			a.OwnedBy,
+			a.HasMultipleCollections,
+			a.Address,
+		}
+		batch.Queue(updateZoraContract, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpdateZoraContractBatchResults{br, len(arg), false}
+}
+
+func (b *UpdateZoraContractBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpdateZoraContractBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
