@@ -634,3 +634,13 @@ set
     top_contracts = @top_contracts,
     collection_royalties = @collection_royalties
 where id = @collection_id;
+
+-- name: GetNFTIDsForMissingContractsAndCollections :many
+select simplehash_lookup_nft_id from ethereum.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+union all
+select simplehash_lookup_nft_id from base.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+union all
+select simplehash_lookup_nft_id from zora.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+union all
+select simplehash_lookup_nft_id from public.collections where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+limit 50;

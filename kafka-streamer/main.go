@@ -15,13 +15,16 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/mirrordb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/kafka-streamer/rest"
 	"github.com/mikeydub/go-gallery/kafka-streamer/schema/ethereum"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/batch"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -48,7 +51,9 @@ func main() {
 	pgx := postgres.NewPgxClient()
 	defer pgx.Close()
 
-	go runStreamer(ctx, pgx)
+	ccf := newContractCollectionFiller(ctx, pgx)
+
+	go runStreamer(ctx, pgx, ccf)
 
 	err := router.Run(":3000")
 	if err != nil {
@@ -72,13 +77,13 @@ func newEthereumOwnerConfig(deserializer *avro.GenericDeserializer, queries *mir
 	}
 }
 
-func newEthereumTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+func newEthereumTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, ccf *contractCollectionFiller) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessEthereumTokenEntryParams, error) {
 		return parseTokenMessage(ctx, deserializer, message)
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessEthereumTokenEntryParams) error {
-		return submitTokenBatch(ctx, queries.ProcessEthereumTokenEntry, entries)
+		return submitTokenBatch(ctx, queries.ProcessEthereumTokenEntry, entries, ccf)
 	}
 
 	return &streamerConfig{
@@ -108,7 +113,7 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
-func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, ccf *contractCollectionFiller) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseTokenEntryParams, error) {
 		ethereumEntry, err := parseTokenMessage(ctx, deserializer, message)
 		if err != nil {
@@ -120,7 +125,7 @@ func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseTokenEntryParams) error {
-		return submitTokenBatch(ctx, queries.ProcessBaseTokenEntry, entries)
+		return submitTokenBatch(ctx, queries.ProcessBaseTokenEntry, entries, ccf)
 	}
 
 	return &streamerConfig{
@@ -150,7 +155,7 @@ func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
-func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, ccf *contractCollectionFiller) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessZoraTokenEntryParams, error) {
 		ethereumEntry, err := parseTokenMessage(ctx, deserializer, message)
 		if err != nil {
@@ -162,7 +167,7 @@ func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessZoraTokenEntryParams) error {
-		return submitTokenBatch(ctx, queries.ProcessZoraTokenEntry, entries)
+		return submitTokenBatch(ctx, queries.ProcessZoraTokenEntry, entries, ccf)
 	}
 
 	return &streamerConfig{
@@ -171,7 +176,7 @@ func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
-func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
+func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollectionFiller) {
 	deserializer, err := newDeserializerFromRegistry()
 	if err != nil {
 		panic(fmt.Errorf("failed to create Avro deserializer: %w", err))
@@ -179,14 +184,19 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool) {
 
 	queries := mirrordb.New(pgx)
 
+	// Every few minutes, check the database for contracts or collections that didn't get filled in somehow (due
+	// to errors, rate limits, etc). The query only looks for contracts/collections that were created more than a
+	// minute ago, since newer contracts/collections should be in the process of getting filled in already.
+	go fillMissingContractsAndCollections(ctx, queries, ccf)
+
 	// Creating multiple configs for each topic allows them to process separate partitions in parallel
 	configs := []*streamerConfig{
-		//newEthereumOwnerConfig(deserializer, queries),
-		//newEthereumTokenConfig(deserializer, queries),
-		//newBaseOwnerConfig(deserializer, queries),
-		//newBaseTokenConfig(deserializer, queries),
+		newEthereumOwnerConfig(deserializer, queries),
+		newEthereumTokenConfig(deserializer, queries, ccf),
+		newBaseOwnerConfig(deserializer, queries),
+		newBaseTokenConfig(deserializer, queries, ccf),
 		newZoraOwnerConfig(deserializer, queries),
-		newZoraTokenConfig(deserializer, queries),
+		newZoraTokenConfig(deserializer, queries, ccf),
 	}
 
 	// If any topic errors more than 10 times in 10 minutes, panic and restart the whole service
@@ -289,8 +299,8 @@ func streamTopic(ctx context.Context, config *streamerConfig) error {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":  env.GetString("SIMPLEHASH_BOOTSTRAP_SERVERS"),
 		"group.id":           env.GetString("SIMPLEHASH_GROUP_ID"),
-		"sasl.username":      env.GetString("SIMPLEHASH_API_KEY"),
-		"sasl.password":      env.GetString("SIMPLEHASH_API_SECRET"),
+		"sasl.username":      env.GetString("SIMPLEHASH_KAFKA_API_KEY"),
+		"sasl.password":      env.GetString("SIMPLEHASH_KAFKA_API_SECRET"),
 		"auto.offset.reset":  "earliest",
 		"enable.auto.commit": false,
 		"security.protocol":  "SASL_SSL",
@@ -724,25 +734,29 @@ type queryBatchHandler interface {
 	Close() error
 }
 
-func submitOwnerBatch[TBatch execBatchHandler, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+func submitExecBatch[TBatch execBatchHandler, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, params []TEntries) error {
 	if readOnlyMode {
 		return nil
 	}
 
-	b := queryF(ctx, entries)
+	b := queryF(ctx, params)
 	defer b.Close()
 
 	var err error
 	b.Exec(func(i int, e error) {
 		if e != nil {
-			err = fmt.Errorf("failed to process entry: %w. entry data: %v", e, entries[i])
+			err = fmt.Errorf("failed to execute batch operation: %w. parameters: %v", e, params[i])
 		}
 	})
 
 	return err
 }
 
-func submitTokenBatch[TBatch queryBatchHandler, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+func submitOwnerBatch[TBatch execBatchHandler, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries) error {
+	return submitExecBatch(ctx, queryF, entries)
+}
+
+func submitTokenBatch[TBatch queryBatchHandler, TEntries any](ctx context.Context, queryF func(context.Context, []TEntries) TBatch, entries []TEntries, ccf *contractCollectionFiller) error {
 	if readOnlyMode {
 		return nil
 	}
@@ -765,9 +779,17 @@ func submitTokenBatch[TBatch queryBatchHandler, TEntries any](ctx context.Contex
 		idsToUpdate = append(idsToUpdate, s)
 	})
 
-	// TODO: If there are any IDs to update, spawn a goroutine and pass them to a batcher
-	logger.For(ctx).Infof("found %d token metadata entries to update", len(idsToUpdate))
-	return err
+	if err != nil {
+		return err
+	}
+
+	if len(idsToUpdate) > 0 {
+		// Do this in a goroutine since we don't care about errors (they'll be retried by the "fill missing" loop)
+		// and we don't want to block Kafka event processing
+		go ccf.DoAll(idsToUpdate)
+	}
+
+	return nil
 }
 
 func getActionType(msg *kafka.Message) (string, error) {
@@ -824,4 +846,163 @@ func cleanString(s *string) *string {
 	cleanedStr = strings.ToValidUTF8(cleanedStr, "")
 
 	return &cleanedStr
+}
+
+type contractCollectionFiller batch.Batcher[string, bool]
+
+func (c *contractCollectionFiller) DoAll(nftIDs []string) ([]bool, []error) {
+	return (*batch.Batcher[string, bool])(c).DoAll(nftIDs)
+}
+
+func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contractCollectionFiller {
+	httpClient := http.DefaultClient
+	queries := mirrordb.New(pgx)
+
+	fetchAndFill := func(ctx context.Context, nftIDs []string) ([]bool, []error) {
+		// Fetch the NFTs from SimpleHash
+		nfts, err := rest.GetSimpleHashNFTs(ctx, httpClient, nftIDs)
+		if err != nil {
+			return nil, []error{err}
+		}
+
+		ethContractParams := make([]mirrordb.UpdateEthereumContractParams, 0, len(nfts))
+		baseContractParams := make([]mirrordb.UpdateBaseContractParams, 0, len(nfts))
+		zoraContractParams := make([]mirrordb.UpdateZoraContractParams, 0, len(nfts))
+		collectionParams := make([]mirrordb.UpdateCollectionParams, 0, len(nfts))
+
+		for _, nft := range nfts {
+			nft.Normalize()
+
+			if nft.Contract != nil && nft.Chain != nil && nft.ContractAddress != nil {
+				p := mirrordb.UpdateEthereumContractParams{
+					Address:                *nft.ContractAddress,
+					Type:                   nft.Contract.Type,
+					Name:                   cleanString(nft.Contract.Name),
+					Symbol:                 cleanString(nft.Contract.Symbol),
+					DeployedBy:             cleanString(nft.Contract.DeployedBy),
+					DeployedViaContract:    cleanString(nft.Contract.DeployedViaContract),
+					OwnedBy:                cleanString(nft.Contract.OwnedBy),
+					HasMultipleCollections: nft.Contract.HasMultipleCollections,
+				}
+
+				switch *nft.Chain {
+				case "ethereum":
+					ethContractParams = append(ethContractParams, p)
+				case "base":
+					baseContractParams = append(baseContractParams, mirrordb.UpdateBaseContractParams(p))
+				case "zora":
+					zoraContractParams = append(zoraContractParams, mirrordb.UpdateZoraContractParams(p))
+				}
+			}
+
+			if nft.Collection != nil && nft.Collection.CollectionID != nil {
+				markerplacePages, err := toJSONB(&nft.Collection.MarketplacePages)
+				if err != nil {
+					logger.For(ctx).Errorf("failed to convert MarketplacePages to JSONB: %v", err)
+					markerplacePages = pgtype.JSONB{Status: pgtype.Null}
+				}
+
+				collectionRoyalties, err := toJSONB(&nft.Collection.CollectionRoyalties)
+				if err != nil {
+					logger.For(ctx).Errorf("failed to convert CollectionRoyalties to JSONB: %v", err)
+					collectionRoyalties = pgtype.JSONB{Status: pgtype.Null}
+				}
+
+				collectionParams = append(collectionParams, mirrordb.UpdateCollectionParams{
+					CollectionID:                 *nft.Collection.CollectionID,
+					Name:                         cleanString(nft.Collection.Name),
+					Description:                  cleanString(nft.Collection.Description),
+					ImageUrl:                     cleanString(nft.Collection.ImageUrl),
+					BannerImageUrl:               cleanString(nft.Collection.BannerImageUrl),
+					Category:                     cleanString(nft.Collection.Category),
+					IsNsfw:                       nft.Collection.IsNsfw,
+					ExternalUrl:                  cleanString(nft.Collection.ExternalUrl),
+					TwitterUsername:              cleanString(nft.Collection.TwitterUsername),
+					DiscordUrl:                   cleanString(nft.Collection.DiscordUrl),
+					InstagramUrl:                 cleanString(nft.Collection.InstagramUrl),
+					MediumUsername:               cleanString(nft.Collection.MediumUsername),
+					TelegramUrl:                  cleanString(nft.Collection.TelegramUrl),
+					MarketplacePages:             markerplacePages,
+					MetaplexMint:                 cleanString(nft.Collection.MetaplexMint),
+					MetaplexCandyMachine:         cleanString(nft.Collection.MetaplexCandyMachine),
+					MetaplexFirstVerifiedCreator: cleanString(nft.Collection.MetaplexFirstVerifiedCreator),
+					SpamScore:                    nft.Collection.SpamScore,
+					Chains:                       nft.Collection.Chains,
+					TopContracts:                 nft.Collection.TopContracts,
+					CollectionRoyalties:          collectionRoyalties,
+				})
+			}
+		}
+
+		if readOnlyMode {
+			return nil, nil
+		}
+
+		if len(ethContractParams) > 0 {
+			err = submitExecBatch(ctx, queries.UpdateEthereumContract, ethContractParams)
+			if err != nil {
+				logger.For(ctx).Errorf("failed to update Ethereum contracts: %v", err)
+			}
+		}
+
+		if len(baseContractParams) > 0 {
+			err = submitExecBatch(ctx, queries.UpdateBaseContract, baseContractParams)
+			if err != nil {
+				logger.For(ctx).Errorf("failed to update Base contracts: %v", err)
+			}
+		}
+
+		if len(zoraContractParams) > 0 {
+			err = submitExecBatch(ctx, queries.UpdateZoraContract, zoraContractParams)
+			if err != nil {
+				logger.For(ctx).Errorf("failed to update Zora contracts: %v", err)
+			}
+		}
+
+		if len(collectionParams) > 0 {
+			err = submitExecBatch(ctx, queries.UpdateCollection, collectionParams)
+			if err != nil {
+				logger.For(ctx).Errorf("failed to update collections: %v", err)
+			}
+		}
+
+		return nil, nil
+	}
+
+	return (*contractCollectionFiller)(batch.NewBatcher(ctx, 50, 1*time.Second, false, false, fetchAndFill))
+}
+
+func fillMissingContractsAndCollections(ctx context.Context, queries *mirrordb.Queries, ccf *contractCollectionFiller) {
+	for {
+		nftIDs, err := queries.GetNFTIDsForMissingContractsAndCollections(ctx)
+		if err != nil {
+			err = fmt.Errorf("failed to get NFT IDs for missing contracts and collections: %w", err)
+		} else {
+			for len(nftIDs) > 0 {
+				_, errs := ccf.DoAll(nftIDs)
+				if err = getFirstNonNilError(errs); err != nil {
+					err = fmt.Errorf("failed to fill missing contracts and collections: %v", err)
+					logger.For(ctx).Error(err)
+					break
+				}
+
+				nftIDs, err = queries.GetNFTIDsForMissingContractsAndCollections(ctx)
+				if err != nil {
+					err = fmt.Errorf("failed to get NFT IDs for missing contracts and collections: %w", err)
+					logger.For(ctx).Error(err)
+					break
+				}
+			}
+		}
+		time.Sleep(2 * time.Minute)
+	}
+}
+
+func getFirstNonNilError(errs []error) error {
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
