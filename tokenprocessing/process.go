@@ -20,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/highlight"
 	"github.com/mikeydub/go-gallery/service/multichain/operation"
@@ -550,6 +551,11 @@ func processHighlightMintClaim(mc *multichain.Provider, highlightProvider *highl
 			retryMessage(ctx, msg, err)
 			return
 		}
+		if errors.Is(err, media.ErrNoMediaURLs) {
+			logger.For(ctx).Infof("hightlight mint claimID=%s received no metadata from highlight, retrying later", msg.ClaimID)
+			tracker.setStatus(ctx, claim.ID, highlight.ClaimStatusTxSucceeded, err.Error())
+			retryMessage(ctx, msg, err)
+		}
 		if util.ErrorIs[tokenmanage.ErrBadToken](err) {
 			logger.For(ctx).Infof("hightlight mint claimID=%s failed media processing, retrying later: %s", msg.ClaimID, err)
 			tracker.setStatus(ctx, claim.ID, highlight.ClaimStatusMediaProcessing, err.Error())
@@ -601,7 +607,7 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 	for i := 0; i <= maxDepth; i++ {
 		switch claim.Status {
 		case highlight.ClaimStatusTxPending:
-			mintedTokenID, metadata, err := waitForMinted(ctx, claim.ID, h, claim.HighlightClaimID, 15, 3*time.Second)
+			mintedTokenID, metadata, err := waitForMinted(ctx, h, claim, 15, 3*time.Second)
 			if err != nil {
 				return err
 			}
@@ -659,27 +665,38 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 	return fmt.Errorf("pipeline never exited; something wrong with mint pipeline definition; recursion depth=%d", maxDepth)
 }
 
-func waitForMinted(ctx context.Context, claimID persist.DBID, h *highlight.Provider, highlightClaimID string, maxAttempts int, retryDelay time.Duration) (persist.DecimalTokenID, persist.TokenMetadata, error) {
+func waitForMinted(ctx context.Context, h *highlight.Provider, claim db.HighlightMintClaim, maxAttempts int, retryDelay time.Duration) (tokenID persist.DecimalTokenID, metadata persist.TokenMetadata, err error) {
+	var status highlight.ClaimStatus
+
 	for i := 0; i < maxAttempts; i++ {
-		status, tokenID, metadata, err := h.GetClaimStatus(ctx, highlightClaimID)
+		status, tokenID, metadata, err = h.GetClaimStatus(ctx, claim.HighlightClaimID)
 		if err != nil {
 			return "", persist.TokenMetadata{}, err
 		}
 
 		if status == highlight.ClaimStatusTxPending {
-			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting %s (attempt=%d/%d)", claimID, retryDelay, i+1, maxAttempts)
+			logger.For(ctx).Infof("claimID=%s transaction still pending, waiting %s (attempt=%d/%d)", claim.ID, retryDelay, i+1, maxAttempts)
 			<-time.After(retryDelay)
 			continue
 		}
 
 		if status != highlight.ClaimStatusTxSucceeded {
 			return "", persist.TokenMetadata{}, fmt.Errorf("unexpected status; expected=%s; got=%s", highlight.ClaimStatusTxSucceeded, status)
-
 		}
 
-		return tokenID, metadata, nil
+		_, _, err = media.FindMediaURLsChain(metadata, claim.CollectionChain)
+		if err != nil {
+			logger.For(ctx).Warnf("claimID=%s transaction mined, but no metadata from highlight, waiting %s (attempt=%d/%d)", claim.ID, retryDelay, i+1, maxAttempts)
+			<-time.After(retryDelay)
+			continue
+		}
 	}
-	return "", persist.TokenMetadata{}, errHighlightTxStillPending
+
+	if status == highlight.ClaimStatusTxPending {
+		err = errHighlightTxStillPending
+	}
+
+	return tokenID, metadata, err
 }
 
 func waitForSynced(ctx context.Context, mc *multichain.Provider, userID, claimID persist.DBID, mintedToken persist.TokenUniqueIdentifiers, maxAttempts int, retryDelay time.Duration) (persist.DBID, error) {
