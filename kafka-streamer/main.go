@@ -969,7 +969,7 @@ func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contra
 		return nil, nil
 	}
 
-	return (*contractCollectionFiller)(batch.NewBatcher(ctx, 50, 1*time.Second, false, false, fetchAndFill))
+	return (*contractCollectionFiller)(batch.NewBatcher(ctx, 25, 1*time.Second, false, false, fetchAndFill))
 }
 
 func fillMissingContractsAndCollections(ctx context.Context, queries *mirrordb.Queries, ccf *contractCollectionFiller) {
