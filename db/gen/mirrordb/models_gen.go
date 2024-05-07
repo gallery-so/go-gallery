@@ -11,20 +11,19 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type BaseCollection struct {
-	ID                    string     `db:"id" json:"id"`
-	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
-	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
-	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
-}
-
 type BaseContract struct {
-	Address               string     `db:"address" json:"address"`
-	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
-	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
-	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
+	Address                string     `db:"address" json:"address"`
+	SimplehashLookupNftID  string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
+	LastSimplehashSync     *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
+	CreatedAt              time.Time  `db:"created_at" json:"created_at"`
+	LastUpdated            time.Time  `db:"last_updated" json:"last_updated"`
+	Type                   *string    `db:"type" json:"type"`
+	Name                   *string    `db:"name" json:"name"`
+	Symbol                 *string    `db:"symbol" json:"symbol"`
+	DeployedBy             *string    `db:"deployed_by" json:"deployed_by"`
+	DeployedViaContract    *string    `db:"deployed_via_contract" json:"deployed_via_contract"`
+	OwnedBy                *string    `db:"owned_by" json:"owned_by"`
+	HasMultipleCollections *bool      `db:"has_multiple_collections" json:"has_multiple_collections"`
 }
 
 type BaseOwner struct {
@@ -87,27 +86,46 @@ type BaseToken struct {
 }
 
 type Collection struct {
-	ID                    string     `db:"id" json:"id"`
-	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
-	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
-	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
-}
-
-type EthereumCollection struct {
-	ID                    string     `db:"id" json:"id"`
-	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
-	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
-	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
+	ID                           string       `db:"id" json:"id"`
+	SimplehashLookupNftID        string       `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
+	LastSimplehashSync           *time.Time   `db:"last_simplehash_sync" json:"last_simplehash_sync"`
+	CreatedAt                    time.Time    `db:"created_at" json:"created_at"`
+	LastUpdated                  time.Time    `db:"last_updated" json:"last_updated"`
+	Name                         *string      `db:"name" json:"name"`
+	Description                  *string      `db:"description" json:"description"`
+	ImageUrl                     *string      `db:"image_url" json:"image_url"`
+	BannerImageUrl               *string      `db:"banner_image_url" json:"banner_image_url"`
+	Category                     *string      `db:"category" json:"category"`
+	IsNsfw                       *bool        `db:"is_nsfw" json:"is_nsfw"`
+	ExternalUrl                  *string      `db:"external_url" json:"external_url"`
+	TwitterUsername              *string      `db:"twitter_username" json:"twitter_username"`
+	DiscordUrl                   *string      `db:"discord_url" json:"discord_url"`
+	InstagramUrl                 *string      `db:"instagram_url" json:"instagram_url"`
+	MediumUsername               *string      `db:"medium_username" json:"medium_username"`
+	TelegramUrl                  *string      `db:"telegram_url" json:"telegram_url"`
+	MarketplacePages             pgtype.JSONB `db:"marketplace_pages" json:"marketplace_pages"`
+	MetaplexMint                 *string      `db:"metaplex_mint" json:"metaplex_mint"`
+	MetaplexCandyMachine         *string      `db:"metaplex_candy_machine" json:"metaplex_candy_machine"`
+	MetaplexFirstVerifiedCreator *string      `db:"metaplex_first_verified_creator" json:"metaplex_first_verified_creator"`
+	SpamScore                    *int32       `db:"spam_score" json:"spam_score"`
+	Chains                       []string     `db:"chains" json:"chains"`
+	TopContracts                 []string     `db:"top_contracts" json:"top_contracts"`
+	CollectionRoyalties          pgtype.JSONB `db:"collection_royalties" json:"collection_royalties"`
 }
 
 type EthereumContract struct {
-	Address               string     `db:"address" json:"address"`
-	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
-	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
-	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
+	Address                string     `db:"address" json:"address"`
+	SimplehashLookupNftID  string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
+	LastSimplehashSync     *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
+	CreatedAt              time.Time  `db:"created_at" json:"created_at"`
+	LastUpdated            time.Time  `db:"last_updated" json:"last_updated"`
+	Type                   *string    `db:"type" json:"type"`
+	Name                   *string    `db:"name" json:"name"`
+	Symbol                 *string    `db:"symbol" json:"symbol"`
+	DeployedBy             *string    `db:"deployed_by" json:"deployed_by"`
+	DeployedViaContract    *string    `db:"deployed_via_contract" json:"deployed_via_contract"`
+	OwnedBy                *string    `db:"owned_by" json:"owned_by"`
+	HasMultipleCollections *bool      `db:"has_multiple_collections" json:"has_multiple_collections"`
 }
 
 type EthereumOwner struct {
@@ -169,20 +187,19 @@ type EthereumToken struct {
 	KafkaTimestamp     *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
 }
 
-type ZoraCollection struct {
-	ID                    string     `db:"id" json:"id"`
-	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
-	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
-	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
-}
-
 type ZoraContract struct {
-	Address               string     `db:"address" json:"address"`
-	SimplehashLookupNftID string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
-	LastSimplehashSync    *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
-	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
-	LastUpdated           time.Time  `db:"last_updated" json:"last_updated"`
+	Address                string     `db:"address" json:"address"`
+	SimplehashLookupNftID  string     `db:"simplehash_lookup_nft_id" json:"simplehash_lookup_nft_id"`
+	LastSimplehashSync     *time.Time `db:"last_simplehash_sync" json:"last_simplehash_sync"`
+	CreatedAt              time.Time  `db:"created_at" json:"created_at"`
+	LastUpdated            time.Time  `db:"last_updated" json:"last_updated"`
+	Type                   *string    `db:"type" json:"type"`
+	Name                   *string    `db:"name" json:"name"`
+	Symbol                 *string    `db:"symbol" json:"symbol"`
+	DeployedBy             *string    `db:"deployed_by" json:"deployed_by"`
+	DeployedViaContract    *string    `db:"deployed_via_contract" json:"deployed_via_contract"`
+	OwnedBy                *string    `db:"owned_by" json:"owned_by"`
+	HasMultipleCollections *bool      `db:"has_multiple_collections" json:"has_multiple_collections"`
 }
 
 type ZoraOwner struct {

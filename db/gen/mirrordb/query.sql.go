@@ -4,3 +4,38 @@
 // source: query.sql
 
 package mirrordb
+
+import (
+	"context"
+)
+
+const getNFTIDsForMissingContractsAndCollections = `-- name: GetNFTIDsForMissingContractsAndCollections :many
+select simplehash_lookup_nft_id from ethereum.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+union all
+select simplehash_lookup_nft_id from base.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+union all
+select simplehash_lookup_nft_id from zora.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+union all
+select simplehash_lookup_nft_id from public.collections where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+limit 50
+`
+
+func (q *Queries) GetNFTIDsForMissingContractsAndCollections(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, getNFTIDsForMissingContractsAndCollections)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var simplehash_lookup_nft_id string
+		if err := rows.Scan(&simplehash_lookup_nft_id); err != nil {
+			return nil, err
+		}
+		items = append(items, simplehash_lookup_nft_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
