@@ -111,6 +111,7 @@ type Collection struct {
 	Chains                       []string     `db:"chains" json:"chains"`
 	TopContracts                 []string     `db:"top_contracts" json:"top_contracts"`
 	CollectionRoyalties          pgtype.JSONB `db:"collection_royalties" json:"collection_royalties"`
+	SimplehashDeleted            bool         `db:"simplehash_deleted" json:"simplehash_deleted"`
 }
 
 type EthereumContract struct {

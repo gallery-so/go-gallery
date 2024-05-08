@@ -1162,6 +1162,54 @@ func (b *ProcessZoraTokenEntryBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const setCollectionSimpleHashDeleted = `-- name: SetCollectionSimpleHashDeleted :batchexec
+update public.collections
+set
+    last_simplehash_sync = now(),
+    last_updated = now(),
+    simplehash_deleted = true
+where id = $1
+`
+
+type SetCollectionSimpleHashDeletedBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) SetCollectionSimpleHashDeleted(ctx context.Context, collectionID []string) *SetCollectionSimpleHashDeletedBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range collectionID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(setCollectionSimpleHashDeleted, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &SetCollectionSimpleHashDeletedBatchResults{br, len(collectionID), false}
+}
+
+func (b *SetCollectionSimpleHashDeletedBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *SetCollectionSimpleHashDeletedBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const updateBaseContract = `-- name: UpdateBaseContract :batchexec
 update base.contracts
 set

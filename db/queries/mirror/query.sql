@@ -635,12 +635,22 @@ set
     collection_royalties = @collection_royalties
 where id = @collection_id;
 
--- name: GetNFTIDsForMissingContractsAndCollections :many
+-- name: SetCollectionSimpleHashDeleted :batchexec
+update public.collections
+set
+    last_simplehash_sync = now(),
+    last_updated = now(),
+    simplehash_deleted = true
+where id = @collection_id;
+
+-- name: GetNFTIDsForMissingContracts :many
 select simplehash_lookup_nft_id from ethereum.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
 union all
 select simplehash_lookup_nft_id from base.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
 union all
 select simplehash_lookup_nft_id from zora.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
-union all
-select simplehash_lookup_nft_id from public.collections where last_simplehash_sync is null and created_at < now() - interval '1 minute'
-limit 50;
+limit 100;
+
+-- name: GetCollectionIDsForMissingCollections :many
+select id from public.collections where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+limit 100;

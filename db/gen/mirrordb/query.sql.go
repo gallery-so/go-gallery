@@ -9,19 +9,42 @@ import (
 	"context"
 )
 
-const getNFTIDsForMissingContractsAndCollections = `-- name: GetNFTIDsForMissingContractsAndCollections :many
+const getCollectionIDsForMissingCollections = `-- name: GetCollectionIDsForMissingCollections :many
+select id from public.collections where last_simplehash_sync is null and created_at < now() - interval '1 minute'
+limit 100
+`
+
+func (q *Queries) GetCollectionIDsForMissingCollections(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, getCollectionIDsForMissingCollections)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getNFTIDsForMissingContracts = `-- name: GetNFTIDsForMissingContracts :many
 select simplehash_lookup_nft_id from ethereum.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
 union all
 select simplehash_lookup_nft_id from base.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
 union all
 select simplehash_lookup_nft_id from zora.contracts where last_simplehash_sync is null and created_at < now() - interval '1 minute'
-union all
-select simplehash_lookup_nft_id from public.collections where last_simplehash_sync is null and created_at < now() - interval '1 minute'
-limit 50
+limit 100
 `
 
-func (q *Queries) GetNFTIDsForMissingContractsAndCollections(ctx context.Context) ([]string, error) {
-	rows, err := q.db.Query(ctx, getNFTIDsForMissingContractsAndCollections)
+func (q *Queries) GetNFTIDsForMissingContracts(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, getNFTIDsForMissingContracts)
 	if err != nil {
 		return nil, err
 	}
