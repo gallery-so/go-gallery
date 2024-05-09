@@ -75,21 +75,32 @@ type NFT struct {
 // Normalize makes SimpleHash addresses lowercase
 func (n *NFT) Normalize() {
 	n.ContractAddress = normalizeCase(n.ContractAddress)
+
 	if n.Contract != nil {
-		n.Contract.DeployedBy = normalizeCase(n.Contract.DeployedBy)
-		n.Contract.DeployedViaContract = normalizeCase(n.Contract.DeployedViaContract)
-		n.Contract.OwnedBy = normalizeCase(n.Contract.OwnedBy)
+		n.Contract.Normalize()
 	}
 
 	if n.Collection != nil {
-		for i := range n.Collection.TopContracts {
-			n.Collection.TopContracts[i] = strings.ToLower(n.Collection.TopContracts[i])
-		}
+		n.Collection.Normalize()
+	}
+}
 
-		for i := range n.Collection.CollectionRoyalties {
-			for j := range n.Collection.CollectionRoyalties[i].Recipients {
-				n.Collection.CollectionRoyalties[i].Recipients[j].Address = strings.ToLower(n.Collection.CollectionRoyalties[i].Recipients[j].Address)
-			}
+// Normalize makes SimpleHash addresses lowercase
+func (c *Contract) Normalize() {
+	c.DeployedBy = normalizeCase(c.DeployedBy)
+	c.DeployedViaContract = normalizeCase(c.DeployedViaContract)
+	c.OwnedBy = normalizeCase(c.OwnedBy)
+}
+
+// Normalize makes SimpleHash addresses lowercase
+func (c *Collection) Normalize() {
+	for i := range c.TopContracts {
+		c.TopContracts[i] = strings.ToLower(c.TopContracts[i])
+	}
+
+	for i := range c.CollectionRoyalties {
+		for j := range c.CollectionRoyalties[i].Recipients {
+			c.CollectionRoyalties[i].Recipients[j].Address = strings.ToLower(c.CollectionRoyalties[i].Recipients[j].Address)
 		}
 	}
 }
@@ -102,8 +113,12 @@ func normalizeCase(s *string) *string {
 	return util.ToPointer(strings.ToLower(*s))
 }
 
-type nFTsByTokenListResponse struct {
+type nftsByTokenListResponse struct {
 	NFTs []NFT `json:"nfts"`
+}
+
+type collectionsByIDListResponse struct {
+	Collections []Collection `json:"collections"`
 }
 
 func GetSimpleHashNFTs(ctx context.Context, httpClient *http.Client, tokenIDs []string) ([]NFT, error) {
@@ -135,11 +150,49 @@ func GetSimpleHashNFTs(ctx context.Context, httpClient *http.Client, tokenIDs []
 		return nil, util.GetErrFromResp(resp)
 	}
 
-	response := nFTsByTokenListResponse{}
+	response := nftsByTokenListResponse{}
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, err
 	}
 
 	return response.NFTs, nil
+}
+
+func GetSimpleHashCollections(ctx context.Context, httpClient *http.Client, collectionIDs []string) ([]Collection, error) {
+	if len(collectionIDs) == 0 {
+		logger.For(ctx).Warnf("GetSimpleHashCollections: no collection IDs provided to get collections")
+		return []Collection{}, nil
+	}
+
+	apiURL := "https://api.simplehash.com/api/v0/nfts/collections/ids"
+
+	// Add the collection IDs to the URL
+	url := fmt.Sprintf("%s?collection_ids=%s", apiURL, strings.Join(collectionIDs, ","))
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-API-KEY", env.GetString("SIMPLEHASH_REST_API_KEY"))
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := retry.RetryRequest(httpClient, req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, util.GetErrFromResp(resp)
+	}
+
+	response := collectionsByIDListResponse{}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+
+	return response.Collections, nil
 }

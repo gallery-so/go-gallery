@@ -185,9 +185,10 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollection
 	queries := mirrordb.New(pgx)
 
 	// Every few minutes, check the database for contracts or collections that didn't get filled in somehow (due
-	// to errors, rate limits, etc). The query only looks for contracts/collections that were created more than a
+	// to errors, rate limits, etc). The queries only look for contracts/collections that were created more than a
 	// minute ago, since newer contracts/collections should be in the process of getting filled in already.
-	go fillMissingContractsAndCollections(ctx, queries, ccf)
+	go fillMissingContracts(ctx, queries, ccf)
+	go fillMissingCollections(ctx, queries, ccf)
 
 	// Creating multiple configs for each topic allows them to process separate partitions in parallel
 	configs := []*streamerConfig{
@@ -786,7 +787,7 @@ func submitTokenBatch[TBatch queryBatchHandler, TEntries any](ctx context.Contex
 	if len(idsToUpdate) > 0 {
 		// Do this in a goroutine since we don't care about errors (they'll be retried by the "fill missing" loop)
 		// and we don't want to block Kafka event processing
-		go ccf.DoAll(idsToUpdate)
+		go ccf.FillWithNFTIDs(idsToUpdate)
 	}
 
 	return nil
@@ -848,17 +849,24 @@ func cleanString(s *string) *string {
 	return &cleanedStr
 }
 
-type contractCollectionFiller batch.Batcher[string, bool]
+type contractCollectionFiller struct {
+	nftIDBatcher        *batch.Batcher[string, bool]
+	collectionIDBatcher *batch.Batcher[string, bool]
+}
 
-func (c *contractCollectionFiller) DoAll(nftIDs []string) ([]bool, []error) {
-	return (*batch.Batcher[string, bool])(c).DoAll(nftIDs)
+func (c *contractCollectionFiller) FillWithNFTIDs(nftIDs []string) ([]bool, []error) {
+	return c.nftIDBatcher.DoAll(nftIDs)
+}
+
+func (c *contractCollectionFiller) FillWithCollectionIDs(collectionIDs []string) ([]bool, []error) {
+	return c.collectionIDBatcher.DoAll(collectionIDs)
 }
 
 func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contractCollectionFiller {
 	httpClient := http.DefaultClient
 	queries := mirrordb.New(pgx)
 
-	fetchAndFill := func(ctx context.Context, nftIDs []string) ([]bool, []error) {
+	fillByNFTIDs := func(ctx context.Context, nftIDs []string) ([]bool, []error) {
 		// Fetch the NFTs from SimpleHash
 		nfts, err := rest.GetSimpleHashNFTs(ctx, httpClient, nftIDs)
 		if err != nil {
@@ -874,16 +882,7 @@ func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contra
 			nft.Normalize()
 
 			if nft.Contract != nil && nft.Chain != nil && nft.ContractAddress != nil {
-				p := mirrordb.UpdateEthereumContractParams{
-					Address:                *nft.ContractAddress,
-					Type:                   nft.Contract.Type,
-					Name:                   cleanString(nft.Contract.Name),
-					Symbol:                 cleanString(nft.Contract.Symbol),
-					DeployedBy:             cleanString(nft.Contract.DeployedBy),
-					DeployedViaContract:    cleanString(nft.Contract.DeployedViaContract),
-					OwnedBy:                cleanString(nft.Contract.OwnedBy),
-					HasMultipleCollections: nft.Contract.HasMultipleCollections,
-				}
+				p := contractToParams(ctx, *nft.ContractAddress, *nft.Contract)
 
 				switch *nft.Chain {
 				case "ethereum":
@@ -896,41 +895,7 @@ func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contra
 			}
 
 			if nft.Collection != nil && nft.Collection.CollectionID != nil {
-				markerplacePages, err := toJSONB(&nft.Collection.MarketplacePages)
-				if err != nil {
-					logger.For(ctx).Errorf("failed to convert MarketplacePages to JSONB: %v", err)
-					markerplacePages = pgtype.JSONB{Status: pgtype.Null}
-				}
-
-				collectionRoyalties, err := toJSONB(&nft.Collection.CollectionRoyalties)
-				if err != nil {
-					logger.For(ctx).Errorf("failed to convert CollectionRoyalties to JSONB: %v", err)
-					collectionRoyalties = pgtype.JSONB{Status: pgtype.Null}
-				}
-
-				collectionParams = append(collectionParams, mirrordb.UpdateCollectionParams{
-					CollectionID:                 *nft.Collection.CollectionID,
-					Name:                         cleanString(nft.Collection.Name),
-					Description:                  cleanString(nft.Collection.Description),
-					ImageUrl:                     cleanString(nft.Collection.ImageUrl),
-					BannerImageUrl:               cleanString(nft.Collection.BannerImageUrl),
-					Category:                     cleanString(nft.Collection.Category),
-					IsNsfw:                       nft.Collection.IsNsfw,
-					ExternalUrl:                  cleanString(nft.Collection.ExternalUrl),
-					TwitterUsername:              cleanString(nft.Collection.TwitterUsername),
-					DiscordUrl:                   cleanString(nft.Collection.DiscordUrl),
-					InstagramUrl:                 cleanString(nft.Collection.InstagramUrl),
-					MediumUsername:               cleanString(nft.Collection.MediumUsername),
-					TelegramUrl:                  cleanString(nft.Collection.TelegramUrl),
-					MarketplacePages:             markerplacePages,
-					MetaplexMint:                 cleanString(nft.Collection.MetaplexMint),
-					MetaplexCandyMachine:         cleanString(nft.Collection.MetaplexCandyMachine),
-					MetaplexFirstVerifiedCreator: cleanString(nft.Collection.MetaplexFirstVerifiedCreator),
-					SpamScore:                    nft.Collection.SpamScore,
-					Chains:                       nft.Collection.Chains,
-					TopContracts:                 nft.Collection.TopContracts,
-					CollectionRoyalties:          collectionRoyalties,
-				})
+				collectionParams = append(collectionParams, collectionToParams(ctx, *nft.Collection))
 			}
 		}
 
@@ -969,33 +934,152 @@ func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contra
 		return nil, nil
 	}
 
-	return (*contractCollectionFiller)(batch.NewBatcher(ctx, 25, 1*time.Second, false, false, fetchAndFill))
+	fillByCollectionIDs := func(ctx context.Context, collectionIDs []string) ([]bool, []error) {
+		// Fetch the collections from SimpleHash
+		collections, err := rest.GetSimpleHashCollections(ctx, httpClient, collectionIDs)
+		if err != nil {
+			return nil, []error{err}
+		}
+
+		collectionParams := make([]mirrordb.UpdateCollectionParams, 0, len(collections))
+
+		for _, collection := range collections {
+			collection.Normalize()
+
+			if collection.CollectionID != nil {
+				collectionParams = append(collectionParams, collectionToParams(ctx, collection))
+			}
+		}
+
+		if readOnlyMode {
+			return nil, nil
+		}
+
+		// Handle any collections that SimpleHash no longer recognizes
+		if len(collectionParams) != len(collectionIDs) {
+			collectionsToDelete := make([]string, 0, len(collectionIDs))
+			for _, id := range collectionIDs {
+				found := false
+				for _, c := range collections {
+					if c.CollectionID != nil && *c.CollectionID == id {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					collectionsToDelete = append(collectionsToDelete, id)
+				}
+			}
+
+			if len(collectionsToDelete) > 0 {
+				err = submitExecBatch(ctx, queries.SetCollectionSimpleHashDeleted, collectionsToDelete)
+				if err != nil {
+					logger.For(ctx).Errorf("failed to delete collections: %v", err)
+				}
+			}
+		}
+
+		if len(collectionParams) > 0 {
+			err = submitExecBatch(ctx, queries.UpdateCollection, collectionParams)
+			if err != nil {
+				logger.For(ctx).Errorf("failed to update collections: %v", err)
+			}
+		}
+
+		return nil, nil
+	}
+
+	return &contractCollectionFiller{
+		nftIDBatcher:        batch.NewBatcher(ctx, 25, 1*time.Second, false, false, fillByNFTIDs),
+		collectionIDBatcher: batch.NewBatcher(ctx, 20, 1*time.Second, false, false, fillByCollectionIDs),
+	}
 }
 
-func fillMissingContractsAndCollections(ctx context.Context, queries *mirrordb.Queries, ccf *contractCollectionFiller) {
+func contractToParams(ctx context.Context, address string, contract rest.Contract) mirrordb.UpdateEthereumContractParams {
+	return mirrordb.UpdateEthereumContractParams{
+		Address:                address,
+		Type:                   contract.Type,
+		Name:                   cleanString(contract.Name),
+		Symbol:                 cleanString(contract.Symbol),
+		DeployedBy:             cleanString(contract.DeployedBy),
+		DeployedViaContract:    cleanString(contract.DeployedViaContract),
+		OwnedBy:                cleanString(contract.OwnedBy),
+		HasMultipleCollections: contract.HasMultipleCollections,
+	}
+}
+
+func collectionToParams(ctx context.Context, collection rest.Collection) mirrordb.UpdateCollectionParams {
+	markerplacePages, err := toJSONB(&collection.MarketplacePages)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to convert MarketplacePages to JSONB: %v", err)
+		markerplacePages = pgtype.JSONB{Status: pgtype.Null}
+	}
+
+	collectionRoyalties, err := toJSONB(&collection.CollectionRoyalties)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to convert CollectionRoyalties to JSONB: %v", err)
+		collectionRoyalties = pgtype.JSONB{Status: pgtype.Null}
+	}
+
+	return mirrordb.UpdateCollectionParams{
+		CollectionID:                 *collection.CollectionID,
+		Name:                         cleanString(collection.Name),
+		Description:                  cleanString(collection.Description),
+		ImageUrl:                     cleanString(collection.ImageUrl),
+		BannerImageUrl:               cleanString(collection.BannerImageUrl),
+		Category:                     cleanString(collection.Category),
+		IsNsfw:                       collection.IsNsfw,
+		ExternalUrl:                  cleanString(collection.ExternalUrl),
+		TwitterUsername:              cleanString(collection.TwitterUsername),
+		DiscordUrl:                   cleanString(collection.DiscordUrl),
+		InstagramUrl:                 cleanString(collection.InstagramUrl),
+		MediumUsername:               cleanString(collection.MediumUsername),
+		TelegramUrl:                  cleanString(collection.TelegramUrl),
+		MarketplacePages:             markerplacePages,
+		MetaplexMint:                 cleanString(collection.MetaplexMint),
+		MetaplexCandyMachine:         cleanString(collection.MetaplexCandyMachine),
+		MetaplexFirstVerifiedCreator: cleanString(collection.MetaplexFirstVerifiedCreator),
+		SpamScore:                    collection.SpamScore,
+		Chains:                       collection.Chains,
+		TopContracts:                 collection.TopContracts,
+		CollectionRoyalties:          collectionRoyalties,
+	}
+}
+
+func fillMissing(ctx context.Context, queryF func(context.Context) ([]string, error), fillF func([]string) ([]bool, []error)) {
 	for {
-		nftIDs, err := queries.GetNFTIDsForMissingContractsAndCollections(ctx)
+		ids, err := queryF(ctx)
 		if err != nil {
-			err = fmt.Errorf("failed to get NFT IDs for missing contracts and collections: %w", err)
+			err = fmt.Errorf("failed to get IDs for missing contracts/collections: %w", err)
 		} else {
-			for len(nftIDs) > 0 {
-				_, errs := ccf.DoAll(nftIDs)
+			for len(ids) > 0 {
+				_, errs := fillF(ids)
 				if err = getFirstNonNilError(errs); err != nil {
-					err = fmt.Errorf("failed to fill missing contracts and collections: %v", err)
+					err = fmt.Errorf("failed to fill missing contracts/collections: %v", err)
 					logger.For(ctx).Error(err)
 					break
 				}
 
-				nftIDs, err = queries.GetNFTIDsForMissingContractsAndCollections(ctx)
+				ids, err = queryF(ctx)
 				if err != nil {
-					err = fmt.Errorf("failed to get NFT IDs for missing contracts and collections: %w", err)
+					err = fmt.Errorf("failed to get IDs for missing contracts/collections: %w", err)
 					logger.For(ctx).Error(err)
 					break
 				}
 			}
 		}
+
 		time.Sleep(2 * time.Minute)
 	}
+}
+
+func fillMissingContracts(ctx context.Context, queries *mirrordb.Queries, ccf *contractCollectionFiller) {
+	fillMissing(ctx, queries.GetNFTIDsForMissingContracts, ccf.FillWithNFTIDs)
+}
+
+func fillMissingCollections(ctx context.Context, queries *mirrordb.Queries, ccf *contractCollectionFiller) {
+	fillMissing(ctx, queries.GetCollectionIDsForMissingCollections, ccf.FillWithCollectionIDs)
 }
 
 func getFirstNonNilError(errs []error) error {
