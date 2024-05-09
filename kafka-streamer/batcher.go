@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/util"
 	"sync"
 	"time"
 )
@@ -13,12 +15,17 @@ type workerMessage[T any] struct {
 	Index   int
 }
 
+type errorAtIndex struct {
+	Error error
+	Index int
+}
+
 type messageBatcher[T any] struct {
 	maxSize         int
 	timeoutDuration time.Duration
 	nextTimeout     time.Time
 	entries         []T
-	errors          []error
+	errors          []errorAtIndex
 	errorLock       sync.Mutex
 	workerPool      chan workerMessage[T]
 	wg              sync.WaitGroup
@@ -67,7 +74,7 @@ func (mb *messageBatcher[T]) worker() {
 		result, err := mb.parseF(context.Background(), wm.Message)
 		if err != nil {
 			mb.errorLock.Lock()
-			mb.errors = append(mb.errors, err)
+			mb.errors = append(mb.errors, errorAtIndex{Error: err, Index: wm.Index})
 			mb.errorLock.Unlock()
 		} else {
 			mb.entries[wm.Index] = result
@@ -92,7 +99,26 @@ func (mb *messageBatcher[T]) Submit(ctx context.Context, c *kafka.Consumer) erro
 	mb.wg.Wait()
 
 	if len(mb.errors) > 0 {
-		return fmt.Errorf("errors occurred during batch processing: %v", mb.errors)
+		for _, e := range mb.errors {
+			if !util.ErrorIs[nonFatalError](e.Error) {
+				return fmt.Errorf("errors occurred during batch processing: %v", mb.errors)
+			}
+		}
+
+		logger.For(ctx).Warnf("non-fatal errors occurred during batch processing: %v", mb.errors)
+		errorIndices := make(map[int]bool)
+		for _, e := range mb.errors {
+			errorIndices[e.Index] = true
+		}
+
+		newEntries := make([]T, 0, len(mb.entries)-len(mb.errors))
+		for i, entry := range mb.entries {
+			if _, exists := errorIndices[i]; !exists {
+				newEntries = append(newEntries, entry)
+			}
+		}
+
+		mb.entries = newEntries
 	}
 
 	if readOnlyMode {

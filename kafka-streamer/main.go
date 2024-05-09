@@ -438,6 +438,10 @@ func parseNumeric(s *string) (pgtype.Numeric, error) {
 
 func parseNftID(nftID string) (contractAddress persist.Address, tokenID pgtype.Numeric, err error) {
 	// NftID is in the format: chain.contract_address.token_id
+	if strings.TrimSpace(nftID) == "" {
+		// There's nothing we can do with an empty nft_id at this point, and we can't let it hold up event processing.
+		return "", pgtype.Numeric{}, nonFatalError{err: errors.New("nft_id is empty")}
+	}
 	parts := strings.Split(nftID, ".")
 	if len(parts) != 3 {
 		return "", pgtype.Numeric{}, fmt.Errorf("invalid nft_id: %s", nftID)
@@ -567,6 +571,11 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 	if err != nil {
 		err = fmt.Errorf("failed to get action type for msg: %v", msg)
 		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+	}
+
+	// If the NftID is not set, we can try to construct it from the chain, contract_address, and token_id
+	if strings.TrimSpace(nft.Nft_id) == "" && nft.Chain != nil && nft.Contract_address != nil && nft.Token_id != nil {
+		nft.Nft_id = fmt.Sprintf("%s.%s.%s", *nft.Chain, *nft.Contract_address, *nft.Token_id)
 	}
 
 	contractAddress, tokenID, err := parseNftID(nft.Nft_id)
@@ -1089,4 +1098,16 @@ func getFirstNonNilError(errs []error) error {
 		}
 	}
 	return nil
+}
+
+type nonFatalError struct {
+	err error
+}
+
+func (e nonFatalError) Error() string {
+	return e.err.Error()
+}
+
+func (e nonFatalError) Unwrap() error {
+	return e.err
 }
