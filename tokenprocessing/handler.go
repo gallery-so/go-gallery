@@ -44,7 +44,7 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, refreshManager))
 	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, taskClient, syncManager))
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, mc, repos.UserRepository, taskClient, syncManager))
-	mediaGroup.POST("/process/highlight-mint-claim", processHighlightMintClaim(mc, highlightProvider, tp, mintManager, taskClient, 10))
+	mediaGroup.POST("/process/highlight-mint-claim", processHighlightMintClaim(mc, highlightProvider, tp, mintManager, taskClient, 20))
 
 	authOpts := middleware.BasicAuthOptionBuilder{}
 
