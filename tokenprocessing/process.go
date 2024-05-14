@@ -607,7 +607,7 @@ func trackMint(ctx context.Context, mc *multichain.Provider, tp *tokenProcessor,
 	for i := 0; i <= maxDepth; i++ {
 		switch claim.Status {
 		case highlight.ClaimStatusTxPending:
-			mintedTokenID, metadata, err := waitForMinted(ctx, h, claim, 15, 3*time.Second)
+			mintedTokenID, metadata, err := waitForMinted(ctx, h, claim, 30, 3*time.Second)
 			if err != nil {
 				return err
 			}
