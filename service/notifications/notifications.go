@@ -1066,7 +1066,7 @@ func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, 
 		}
 		return UserFacingNotificationData{
 			Actor:       actor.Username.String,
-			Action:      "posted their first post",
+			Action:      "made their first post",
 			PreviewText: util.TruncateWithEllipsis(post.Caption.String, 40),
 		}, nil
 	case persist.ActionTopActivityBadgeReceived:
