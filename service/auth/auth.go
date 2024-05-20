@@ -2,12 +2,12 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/farcaster"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
