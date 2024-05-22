@@ -158,6 +158,387 @@ func (b *ProcessBaseOwnerEntryBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const processBaseSepoliaOwnerEntry = `-- name: ProcessBaseSepoliaOwnerEntry :batchexec
+with deletion as (
+    delete from base_sepolia.owners where $19::bool and simplehash_kafka_key = $1
+)
+insert into base_sepolia.owners (
+    simplehash_kafka_key,
+    simplehash_nft_id,
+    last_updated,
+    kafka_offset,
+    kafka_partition,
+    kafka_timestamp,
+    contract_address,
+    token_id,
+    owner_address,
+    quantity,
+    collection_id,
+    first_acquired_date,
+    last_acquired_date,
+    first_acquired_transaction,
+    last_acquired_transaction,
+    minted_to_this_wallet,
+    airdropped_to_this_wallet,
+    sold_to_this_wallet
+    )
+    select
+        $1,
+        $2,
+        now(),
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        $14,
+        $15,
+        $16,
+        $17
+    where $18::bool
+    on conflict (simplehash_kafka_key) do update
+        set simplehash_nft_id = excluded.simplehash_nft_id,
+            contract_address = excluded.contract_address,
+            token_id = excluded.token_id,
+            owner_address = excluded.owner_address,
+            quantity = excluded.quantity,
+            collection_id = excluded.collection_id,
+            first_acquired_date = excluded.first_acquired_date,
+            last_acquired_date = excluded.last_acquired_date,
+            first_acquired_transaction = excluded.first_acquired_transaction,
+            last_acquired_transaction = excluded.last_acquired_transaction,
+            minted_to_this_wallet = excluded.minted_to_this_wallet,
+            airdropped_to_this_wallet = excluded.airdropped_to_this_wallet,
+            sold_to_this_wallet = excluded.sold_to_this_wallet
+`
+
+type ProcessBaseSepoliaOwnerEntryBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type ProcessBaseSepoliaOwnerEntryParams struct {
+	SimplehashKafkaKey       string           `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	SimplehashNftID          *string          `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	KafkaOffset              *int64           `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition           *int32           `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp           *time.Time       `db:"kafka_timestamp" json:"kafka_timestamp"`
+	ContractAddress          *persist.Address `db:"contract_address" json:"contract_address"`
+	TokenID                  pgtype.Numeric   `db:"token_id" json:"token_id"`
+	OwnerAddress             *persist.Address `db:"owner_address" json:"owner_address"`
+	Quantity                 pgtype.Numeric   `db:"quantity" json:"quantity"`
+	CollectionID             *string          `db:"collection_id" json:"collection_id"`
+	FirstAcquiredDate        *time.Time       `db:"first_acquired_date" json:"first_acquired_date"`
+	LastAcquiredDate         *time.Time       `db:"last_acquired_date" json:"last_acquired_date"`
+	FirstAcquiredTransaction *string          `db:"first_acquired_transaction" json:"first_acquired_transaction"`
+	LastAcquiredTransaction  *string          `db:"last_acquired_transaction" json:"last_acquired_transaction"`
+	MintedToThisWallet       *bool            `db:"minted_to_this_wallet" json:"minted_to_this_wallet"`
+	AirdroppedToThisWallet   *bool            `db:"airdropped_to_this_wallet" json:"airdropped_to_this_wallet"`
+	SoldToThisWallet         *bool            `db:"sold_to_this_wallet" json:"sold_to_this_wallet"`
+	ShouldUpsert             bool             `db:"should_upsert" json:"should_upsert"`
+	ShouldDelete             bool             `db:"should_delete" json:"should_delete"`
+}
+
+func (q *Queries) ProcessBaseSepoliaOwnerEntry(ctx context.Context, arg []ProcessBaseSepoliaOwnerEntryParams) *ProcessBaseSepoliaOwnerEntryBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.SimplehashKafkaKey,
+			a.SimplehashNftID,
+			a.KafkaOffset,
+			a.KafkaPartition,
+			a.KafkaTimestamp,
+			a.ContractAddress,
+			a.TokenID,
+			a.OwnerAddress,
+			a.Quantity,
+			a.CollectionID,
+			a.FirstAcquiredDate,
+			a.LastAcquiredDate,
+			a.FirstAcquiredTransaction,
+			a.LastAcquiredTransaction,
+			a.MintedToThisWallet,
+			a.AirdroppedToThisWallet,
+			a.SoldToThisWallet,
+			a.ShouldUpsert,
+			a.ShouldDelete,
+		}
+		batch.Queue(processBaseSepoliaOwnerEntry, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &ProcessBaseSepoliaOwnerEntryBatchResults{br, len(arg), false}
+}
+
+func (b *ProcessBaseSepoliaOwnerEntryBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *ProcessBaseSepoliaOwnerEntryBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const processBaseSepoliaTokenEntry = `-- name: ProcessBaseSepoliaTokenEntry :batchone
+with deletion as (
+    delete from base_sepolia.tokens where $2::bool and base_sepolia.tokens.simplehash_kafka_key = $3
+),
+
+contract_insert as (
+    insert into base_sepolia.contracts (address, simplehash_lookup_nft_id)
+    select $4::text, $1
+    where $5::bool and $4 is not null
+    on conflict (address) do nothing
+    returning (xmax = 0) as inserted
+),
+
+collection_insert as (
+    insert into public.collections (id, simplehash_lookup_nft_id)
+    select $6::text, $1
+    where $5::bool and $6 is not null
+    on conflict (id) do nothing
+    returning (xmax = 0) as inserted
+),
+
+token_insert as (
+    insert into base_sepolia.tokens (
+        simplehash_kafka_key,
+        simplehash_nft_id,
+        contract_address,
+        token_id,
+        name,
+        description,
+        previews,
+        image_url,
+        video_url,
+        audio_url,
+        model_url,
+        other_url,
+        background_color,
+        external_url,
+        on_chain_created_date,
+        status,
+        token_count,
+        owner_count,
+        contract,
+        collection_id,
+        last_sale,
+        first_created,
+        rarity,
+        extra_metadata,
+        image_properties,
+        video_properties,
+        audio_properties,
+        model_properties,
+        other_properties,
+        last_updated,
+        kafka_offset,
+        kafka_partition,
+        kafka_timestamp
+        )
+        select
+            $3,
+            $1,
+            $4,
+            $7,
+            $8,
+            $9,
+            $10,
+            $11,
+            $12,
+            $13,
+            $14,
+            $15,
+            $16,
+            $17,
+            $18,
+            $19,
+            $20,
+            $21,
+            $22,
+            $6,
+            $23,
+            $24,
+            $25,
+            $26,
+            $27,
+            $28,
+            $29,
+            $30,
+            $31,
+            now(),
+            $32,
+            $33,
+            $34
+        where $5::bool
+        on conflict (simplehash_kafka_key) do update
+            set simplehash_nft_id = excluded.simplehash_nft_id,
+                contract_address = excluded.contract_address,
+                token_id = excluded.token_id,
+                name = excluded.name,
+                description = excluded.description,
+                previews = excluded.previews,
+                image_url = excluded.image_url,
+                video_url = excluded.video_url,
+                audio_url = excluded.audio_url,
+                model_url = excluded.model_url,
+                other_url = excluded.other_url,
+                background_color = excluded.background_color,
+                external_url = excluded.external_url,
+                on_chain_created_date = excluded.on_chain_created_date,
+                status = excluded.status,
+                token_count = excluded.token_count,
+                owner_count = excluded.owner_count,
+                contract = excluded.contract,
+                collection_id = excluded.collection_id,
+                last_sale = excluded.last_sale,
+                first_created = excluded.first_created,
+                rarity = excluded.rarity,
+                extra_metadata = excluded.extra_metadata,
+                image_properties = excluded.image_properties,
+                video_properties = excluded.video_properties,
+                audio_properties = excluded.audio_properties,
+                model_properties = excluded.model_properties,
+                other_properties = excluded.other_properties,
+                last_updated = now(),
+                kafka_offset = excluded.kafka_offset,
+                kafka_partition = excluded.kafka_partition,
+                kafka_timestamp = excluded.kafka_timestamp
+)
+select $1::text
+from contract_insert, collection_insert
+    where contract_insert.inserted or collection_insert.inserted
+`
+
+type ProcessBaseSepoliaTokenEntryBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type ProcessBaseSepoliaTokenEntryParams struct {
+	SimplehashNftID    string         `db:"simplehash_nft_id" json:"simplehash_nft_id"`
+	ShouldDelete       bool           `db:"should_delete" json:"should_delete"`
+	SimplehashKafkaKey string         `db:"simplehash_kafka_key" json:"simplehash_kafka_key"`
+	ContractAddress    *string        `db:"contract_address" json:"contract_address"`
+	ShouldUpsert       bool           `db:"should_upsert" json:"should_upsert"`
+	CollectionID       *string        `db:"collection_id" json:"collection_id"`
+	TokenID            pgtype.Numeric `db:"token_id" json:"token_id"`
+	Name               *string        `db:"name" json:"name"`
+	Description        *string        `db:"description" json:"description"`
+	Previews           pgtype.JSONB   `db:"previews" json:"previews"`
+	ImageUrl           *string        `db:"image_url" json:"image_url"`
+	VideoUrl           *string        `db:"video_url" json:"video_url"`
+	AudioUrl           *string        `db:"audio_url" json:"audio_url"`
+	ModelUrl           *string        `db:"model_url" json:"model_url"`
+	OtherUrl           *string        `db:"other_url" json:"other_url"`
+	BackgroundColor    *string        `db:"background_color" json:"background_color"`
+	ExternalUrl        *string        `db:"external_url" json:"external_url"`
+	OnChainCreatedDate *time.Time     `db:"on_chain_created_date" json:"on_chain_created_date"`
+	Status             *string        `db:"status" json:"status"`
+	TokenCount         pgtype.Numeric `db:"token_count" json:"token_count"`
+	OwnerCount         pgtype.Numeric `db:"owner_count" json:"owner_count"`
+	Contract           pgtype.JSONB   `db:"contract" json:"contract"`
+	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
+	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
+	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
+	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
+	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
+	ModelProperties    pgtype.JSONB   `db:"model_properties" json:"model_properties"`
+	OtherProperties    pgtype.JSONB   `db:"other_properties" json:"other_properties"`
+	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
+	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
+	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
+}
+
+func (q *Queries) ProcessBaseSepoliaTokenEntry(ctx context.Context, arg []ProcessBaseSepoliaTokenEntryParams) *ProcessBaseSepoliaTokenEntryBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.SimplehashNftID,
+			a.ShouldDelete,
+			a.SimplehashKafkaKey,
+			a.ContractAddress,
+			a.ShouldUpsert,
+			a.CollectionID,
+			a.TokenID,
+			a.Name,
+			a.Description,
+			a.Previews,
+			a.ImageUrl,
+			a.VideoUrl,
+			a.AudioUrl,
+			a.ModelUrl,
+			a.OtherUrl,
+			a.BackgroundColor,
+			a.ExternalUrl,
+			a.OnChainCreatedDate,
+			a.Status,
+			a.TokenCount,
+			a.OwnerCount,
+			a.Contract,
+			a.LastSale,
+			a.FirstCreated,
+			a.Rarity,
+			a.ExtraMetadata,
+			a.ImageProperties,
+			a.VideoProperties,
+			a.AudioProperties,
+			a.ModelProperties,
+			a.OtherProperties,
+			a.KafkaOffset,
+			a.KafkaPartition,
+			a.KafkaTimestamp,
+		}
+		batch.Queue(processBaseSepoliaTokenEntry, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &ProcessBaseSepoliaTokenEntryBatchResults{br, len(arg), false}
+}
+
+func (b *ProcessBaseSepoliaTokenEntryBatchResults) QueryRow(f func(int, string, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var column_1 string
+		if b.closed {
+			if f != nil {
+				f(t, column_1, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&column_1)
+		if f != nil {
+			f(t, column_1, err)
+		}
+	}
+}
+
+func (b *ProcessBaseSepoliaTokenEntryBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const processBaseTokenEntry = `-- name: ProcessBaseTokenEntry :batchone
 with deletion as (
     delete from base.tokens where $2::bool and base.tokens.simplehash_kafka_key = $3
@@ -1278,6 +1659,78 @@ func (b *UpdateBaseContractBatchResults) Exec(f func(int, error)) {
 }
 
 func (b *UpdateBaseContractBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const updateBaseSepoliaContract = `-- name: UpdateBaseSepoliaContract :batchexec
+update base_sepolia.contracts
+set
+    last_simplehash_sync = now(),
+    last_updated = now(),
+    type = $1,
+    name = $2,
+    symbol = $3,
+    deployed_by = $4,
+    deployed_via_contract = $5,
+    owned_by = $6,
+    has_multiple_collections = $7
+where address = $8
+`
+
+type UpdateBaseSepoliaContractBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpdateBaseSepoliaContractParams struct {
+	Type                   *string `db:"type" json:"type"`
+	Name                   *string `db:"name" json:"name"`
+	Symbol                 *string `db:"symbol" json:"symbol"`
+	DeployedBy             *string `db:"deployed_by" json:"deployed_by"`
+	DeployedViaContract    *string `db:"deployed_via_contract" json:"deployed_via_contract"`
+	OwnedBy                *string `db:"owned_by" json:"owned_by"`
+	HasMultipleCollections *bool   `db:"has_multiple_collections" json:"has_multiple_collections"`
+	Address                string  `db:"address" json:"address"`
+}
+
+func (q *Queries) UpdateBaseSepoliaContract(ctx context.Context, arg []UpdateBaseSepoliaContractParams) *UpdateBaseSepoliaContractBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Type,
+			a.Name,
+			a.Symbol,
+			a.DeployedBy,
+			a.DeployedViaContract,
+			a.OwnedBy,
+			a.HasMultipleCollections,
+			a.Address,
+		}
+		batch.Queue(updateBaseSepoliaContract, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpdateBaseSepoliaContractBatchResults{br, len(arg), false}
+}
+
+func (b *UpdateBaseSepoliaContractBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpdateBaseSepoliaContractBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

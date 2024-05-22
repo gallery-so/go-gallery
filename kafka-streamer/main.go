@@ -34,8 +34,9 @@ import (
 const readOnlyMode = false
 
 type streamerConfig struct {
-	Topic   string
-	Batcher batcher
+	Topic         string
+	Batcher       batcher
+	DefaultOffset string
 }
 
 func main() {
@@ -134,6 +135,50 @@ func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
+func newBaseSepoliaOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseSepoliaOwnerEntryParams, error) {
+		ethereumEntry, err := parseOwnerMessage(ctx, deserializer, message)
+		if err != nil {
+			return mirrordb.ProcessBaseSepoliaOwnerEntryParams{}, err
+		}
+
+		// All EVM chains (Ethereum, Base, Zora) have the same database and query structure, so we can cast between their parameters
+		return mirrordb.ProcessBaseSepoliaOwnerEntryParams(ethereumEntry), nil
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseSepoliaOwnerEntryParams) error {
+		return submitOwnerBatch(ctx, queries.ProcessBaseSepoliaOwnerEntry, entries)
+	}
+
+	return &streamerConfig{
+		Topic:         "base-sepolia.owner.v4",
+		DefaultOffset: "latest",
+		Batcher:       newMessageBatcher(250, time.Second, 10, parseF, submitF),
+	}
+}
+
+func newBaseSepoliaTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, ccf *contractCollectionFiller) *streamerConfig {
+	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseSepoliaTokenEntryParams, error) {
+		ethereumEntry, err := parseTokenMessage(ctx, deserializer, message)
+		if err != nil {
+			return mirrordb.ProcessBaseSepoliaTokenEntryParams{}, err
+		}
+
+		// All EVM chains (Ethereum, Base, Zora) have the same database and query structure, so we can cast between their parameters
+		return mirrordb.ProcessBaseSepoliaTokenEntryParams(ethereumEntry), nil
+	}
+
+	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseSepoliaTokenEntryParams) error {
+		return submitTokenBatch(ctx, queries.ProcessBaseSepoliaTokenEntry, entries, ccf)
+	}
+
+	return &streamerConfig{
+		Topic:         "base-sepolia.nft.v4",
+		DefaultOffset: "latest",
+		Batcher:       newMessageBatcher(250, time.Second, 10, parseF, submitF),
+	}
+}
+
 func newZoraOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessZoraOwnerEntryParams, error) {
 		ethereumEntry, err := parseOwnerMessage(ctx, deserializer, message)
@@ -196,8 +241,10 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollection
 		newEthereumTokenConfig(deserializer, queries, ccf),
 		newBaseOwnerConfig(deserializer, queries),
 		newBaseTokenConfig(deserializer, queries, ccf),
-		newZoraOwnerConfig(deserializer, queries),
-		newZoraTokenConfig(deserializer, queries, ccf),
+		newBaseSepoliaOwnerConfig(deserializer, queries),
+		newBaseSepoliaTokenConfig(deserializer, queries, ccf),
+		//newZoraOwnerConfig(deserializer, queries),
+		//newZoraTokenConfig(deserializer, queries, ccf),
 	}
 
 	// If any topic errors more than 10 times in 10 minutes, panic and restart the whole service
@@ -297,12 +344,17 @@ type batcher interface {
 func streamTopic(ctx context.Context, config *streamerConfig) error {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"topic": config.Topic})
 
+	autoOffsetReset := config.DefaultOffset
+	if autoOffsetReset == "" {
+		autoOffsetReset = "earliest"
+	}
+
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":  env.GetString("SIMPLEHASH_BOOTSTRAP_SERVERS"),
 		"group.id":           env.GetString("SIMPLEHASH_GROUP_ID"),
 		"sasl.username":      env.GetString("SIMPLEHASH_KAFKA_API_KEY"),
 		"sasl.password":      env.GetString("SIMPLEHASH_KAFKA_API_SECRET"),
-		"auto.offset.reset":  "earliest",
+		"auto.offset.reset":  autoOffsetReset,
 		"enable.auto.commit": false,
 		"security.protocol":  "SASL_SSL",
 		"sasl.mechanisms":    "PLAIN",
@@ -884,6 +936,7 @@ func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contra
 
 		ethContractParams := make([]mirrordb.UpdateEthereumContractParams, 0, len(nfts))
 		baseContractParams := make([]mirrordb.UpdateBaseContractParams, 0, len(nfts))
+		baseSepoliaContractParams := make([]mirrordb.UpdateBaseSepoliaContractParams, 0, len(nfts))
 		zoraContractParams := make([]mirrordb.UpdateZoraContractParams, 0, len(nfts))
 		collectionParams := make([]mirrordb.UpdateCollectionParams, 0, len(nfts))
 
@@ -898,6 +951,8 @@ func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contra
 					ethContractParams = append(ethContractParams, p)
 				case "base":
 					baseContractParams = append(baseContractParams, mirrordb.UpdateBaseContractParams(p))
+				case "base-sepolia":
+					baseSepoliaContractParams = append(baseSepoliaContractParams, mirrordb.UpdateBaseSepoliaContractParams(p))
 				case "zora":
 					zoraContractParams = append(zoraContractParams, mirrordb.UpdateZoraContractParams(p))
 				}
@@ -923,6 +978,13 @@ func newContractCollectionFiller(ctx context.Context, pgx *pgxpool.Pool) *contra
 			err = submitExecBatch(ctx, queries.UpdateBaseContract, baseContractParams)
 			if err != nil {
 				logger.For(ctx).Errorf("failed to update Base contracts: %v", err)
+			}
+		}
+
+		if len(baseSepoliaContractParams) > 0 {
+			err = submitExecBatch(ctx, queries.UpdateBaseSepoliaContract, baseSepoliaContractParams)
+			if err != nil {
+				logger.For(ctx).Errorf("failed to update Base-Sepolia contracts: %v", err)
 			}
 		}
 
