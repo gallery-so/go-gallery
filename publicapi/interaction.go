@@ -313,7 +313,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commentID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Admire, PageInfo, error) {
@@ -355,7 +355,7 @@ func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commen
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
@@ -397,7 +397,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commentID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
@@ -439,7 +439,7 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) GetTotalCommentsByPostID(ctx context.Context, postID persist.DBID) (*int, error) {
@@ -514,7 +514,7 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID persist.DBID, before *string, after *string,
@@ -567,7 +567,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
@@ -609,7 +609,7 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api InteractionAPI) GetAdmireByActorIDAndFeedEventID(ctx context.Context, actorID persist.DBID, feedEventID persist.DBID) (*db.Admire, error) {

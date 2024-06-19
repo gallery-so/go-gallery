@@ -118,7 +118,7 @@ func (api CommunityAPI) PaginateHoldersByCommunityID(ctx context.Context, commun
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api CommunityAPI) PaginatePostsByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
@@ -160,7 +160,7 @@ func (api CommunityAPI) PaginatePostsByCommunityID(ctx context.Context, communit
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api CommunityAPI) PaginateTokensByCommunityID(ctx context.Context, communityID persist.DBID, before, after *string, first, last *int) ([]db.Token, PageInfo, error) {
@@ -203,7 +203,7 @@ func (api CommunityAPI) PaginateTokensByCommunityID(ctx context.Context, communi
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 // GetFrameTokensByCommunityID is temporary and shouldn't be used outside of the TokensForFrame resolver

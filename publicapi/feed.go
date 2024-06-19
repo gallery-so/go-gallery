@@ -441,7 +441,7 @@ func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *stri
 		CursorFunc: feedCursor,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Post, PageInfo, error) {
@@ -483,7 +483,7 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
@@ -516,7 +516,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 		CursorFunc: feedCursor,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func fetchFeedEntityScores(ctx context.Context, q *db.Queries, viewerID persist.DBID) ([]db.GetFeedEntityScoresRow, error) {

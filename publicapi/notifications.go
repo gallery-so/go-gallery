@@ -61,7 +61,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 		CountFunc:  countFunc,
 	}
 
-	notifications, pageInfo, err := paginator.paginate(before, after, first, last)
+	notifications, pageInfo, err := paginator.Paginate(before, after, first, last)
 	if err != nil {
 		return nil, PageInfo{}, 0, err
 	}

@@ -183,7 +183,7 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api UserAPI) paginatorFromCursorStr(ctx context.Context, curStr string) (positionPaginator[db.User], error) {
@@ -1056,7 +1056,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		CursorFunc: cursorFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
