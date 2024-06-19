@@ -135,7 +135,7 @@ func (api TokenAPI) GetTokensBookmarkedByUserId(ctx context.Context, userID pers
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
-	queryFunc := func(params timeIDPagingParams) ([]db.PaginateTokensAdmiredByUserIDBatchRow, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.PaginateTokensAdmiredByUserIDBatchRow, error) {
 		return api.loaders.PaginateTokensAdmiredByUserIDBatch.Load(db.PaginateTokensAdmiredByUserIDBatchParams{
 			UserID:        userID,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -156,7 +156,7 @@ func (api TokenAPI) GetTokensBookmarkedByUserId(ctx context.Context, userID pers
 		return t.Admire.CreatedAt, t.Admire.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.PaginateTokensAdmiredByUserIDBatchRow]{
+	paginator := TimeIDPaginator[db.PaginateTokensAdmiredByUserIDBatchRow]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,

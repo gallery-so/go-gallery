@@ -34,7 +34,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 		return nil, PageInfo{}, 0, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Notification, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Notification, error) {
 		return api.loaders.GetUserNotificationsBatch.Load(db.GetUserNotificationsBatchParams{
 			OwnerID:       userID,
 			Limit:         params.Limit,
@@ -55,7 +55,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 		return n.CreatedAt, n.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Notification]{
+	paginator := TimeIDPaginator[db.Notification]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,

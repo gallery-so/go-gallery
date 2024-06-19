@@ -169,7 +169,7 @@ func applyCursors[Node any, K cursor](allEdges []Node, cF cursorable[Node, K], b
 }
 
 // keysetPaginator is the base keyset pagination struct. You probably don't want to use this directly;
-// use a cursor-specific helper like timeIDPaginator.
+// use a cursor-specific helper like TimeIDPaginator.
 // For reasons to favor keyset pagination, see: https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/
 type keysetPaginator[Node any, Cur cursor] struct {
 	// QueryFunc returns paginated results for the given paging parameters
@@ -212,13 +212,13 @@ func (p *keysetPaginator[Node, Cur]) paginate(before *string, after *string, fir
 	return pageFrom(results, p.CountFunc, p.Cursorable, before, after, first, last)
 }
 
-// timeIDPaginator paginates results using a cursor with a time.Time and a persist.DBID.
+// TimeIDPaginator paginates results using a cursor with a time.Time and a persist.DBID.
 // By using the combination of a timestamp and a unique DBID for our ORDER BY clause,
 // we can achieve fast keyset pagination results while avoiding edge cases when multiple
 // rows have the same timestamp.
-type timeIDPaginator[Node any] struct {
+type TimeIDPaginator[Node any] struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params timeIDPagingParams) ([]Node, error)
+	QueryFunc func(params TimeIDPagingParams) ([]Node, error)
 
 	// CursorFunc returns a time and DBID that will be encoded into a cursor string
 	CursorFunc func(node Node) (time.Time, persist.DBID, error)
@@ -228,8 +228,8 @@ type timeIDPaginator[Node any] struct {
 	CountFunc func() (count int, err error)
 }
 
-// timeIDPagingParams are the parameters used to paginate with a time+DBID cursor
-type timeIDPagingParams struct {
+// TimeIDPagingParams are the parameters used to paginate with a time+DBID cursor
+type TimeIDPagingParams struct {
 	Limit            int32
 	CursorBeforeTime time.Time
 	CursorBeforeID   persist.DBID
@@ -245,7 +245,7 @@ func withDefaultCursorTime(before, after time.Time) func(beforeCur, afterCur *ti
 	}
 }
 
-func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int, opts ...func(beforeCur, afterCur *timeIDCursor)) ([]Node, PageInfo, error) {
+func (p *TimeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int, opts ...func(beforeCur, afterCur *timeIDCursor)) ([]Node, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewTimeIDCursor()
 		beforeCur.Time = defaultCursorBeforeTime
@@ -270,7 +270,7 @@ func (p *timeIDPaginator[Node]) paginate(before *string, after *string, first *i
 			}
 		}
 
-		queryParams := timeIDPagingParams{
+		queryParams := TimeIDPagingParams{
 			Limit:            limit,
 			CursorBeforeTime: beforeCur.Time,
 			CursorBeforeID:   beforeCur.ID,
@@ -368,7 +368,7 @@ func (p *boolIDFloatIDPaginator[Node]) paginate(before *string, after *string, f
 	return paginator.paginate(before, after, first, last)
 }
 
-type sharedFollowersPaginator[Node any] struct{ timeIDPaginator[Node] }
+type sharedFollowersPaginator[Node any] struct{ TimeIDPaginator[Node] }
 
 func (p *sharedFollowersPaginator[Node]) paginate(before *string, after *string, first *int, last *int) ([]Node, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
@@ -393,7 +393,7 @@ func (p *sharedFollowersPaginator[Node]) paginate(before *string, after *string,
 			}
 		}
 
-		queryParams := timeIDPagingParams{
+		queryParams := TimeIDPagingParams{
 			Limit:            limit,
 			CursorBeforeTime: beforeCur.Time,
 			CursorBeforeID:   beforeCur.ID,
