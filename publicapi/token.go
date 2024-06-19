@@ -163,7 +163,7 @@ func (api TokenAPI) GetTokensBookmarkedByUserId(ctx context.Context, userID pers
 	}
 
 	// swap the default cursor times because admires are returned in reverse chronological order
-	results, pageInfo, err := paginator.paginate(before, after, first, last, withDefaultCursorTime(defaultCursorAfterTime, defaultCursorBeforeTime))
+	results, pageInfo, err := paginator.Paginate(before, after, first, last, withDefaultCursorTime(defaultCursorAfterTime, defaultCursorBeforeTime))
 	tokens := util.MapWithoutError(results, func(r db.PaginateTokensAdmiredByUserIDBatchRow) db.Token { return r.Token })
 	return tokens, pageInfo, err
 }

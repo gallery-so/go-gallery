@@ -245,7 +245,7 @@ func withDefaultCursorTime(before, after time.Time) func(beforeCur, afterCur *ti
 	}
 }
 
-func (p *TimeIDPaginator[Node]) paginate(before *string, after *string, first *int, last *int, opts ...func(beforeCur, afterCur *timeIDCursor)) ([]Node, PageInfo, error) {
+func (p *TimeIDPaginator[Node]) Paginate(before *string, after *string, first *int, last *int, opts ...func(beforeCur, afterCur *timeIDCursor)) ([]Node, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]Node, error) {
 		beforeCur := cursors.NewTimeIDCursor()
 		beforeCur.Time = defaultCursorBeforeTime

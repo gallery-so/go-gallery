@@ -96,7 +96,7 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 		CursorFunc: cursorFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 func (api ContractAPI) GetContractCreatorByContractID(ctx context.Context, contractID persist.DBID) (db.ContractCreator, error) {
@@ -245,7 +245,7 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 // ------ Temporary ------
@@ -290,7 +290,7 @@ func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Con
 		CountFunc:  countFunc,
 	}
 
-	return paginator.paginate(before, after, first, last)
+	return paginator.Paginate(before, after, first, last)
 }
 
 // End of temporary to-be-removed stuff
