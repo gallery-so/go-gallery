@@ -418,7 +418,7 @@ func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *stri
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.PaginatePersonalFeedByUserID(ctx, db.PaginatePersonalFeedByUserIDParams{
 			Follower:      userID,
 			Limit:         params.Limit,
@@ -436,7 +436,7 @@ func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *stri
 		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
-	paginator := timeIDPaginator[any]{
+	paginator := TimeIDPaginator[any]{
 		QueryFunc:  queryFunc,
 		CursorFunc: feedCursor,
 	}
@@ -456,7 +456,7 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Post, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Post, error) {
 		return api.queries.PaginatePostsByUserID(ctx, db.PaginatePostsByUserIDParams{
 			UserID:        userID,
 			Limit:         params.Limit,
@@ -477,7 +477,7 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 		return p.CreatedAt, p.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Post]{
+	paginator := TimeIDPaginator[db.Post]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -493,7 +493,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	}
 	viewerID, _ := getAuthenticatedUserID(ctx)
 
-	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]any, error) {
 		keys, err := api.queries.PaginateGlobalFeed(ctx, db.PaginateGlobalFeedParams{
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -511,7 +511,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
-	paginator := timeIDPaginator[any]{
+	paginator := TimeIDPaginator[any]{
 		QueryFunc:  queryFunc,
 		CursorFunc: feedCursor,
 	}

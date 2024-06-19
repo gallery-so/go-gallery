@@ -286,7 +286,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Admire, error) {
 		return api.loaders.PaginateAdmiresByFeedEventIDBatch.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
@@ -307,7 +307,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Admire]{
+	paginator := TimeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -328,7 +328,7 @@ func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commen
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Admire, error) {
 		return api.loaders.PaginateAdmiresByCommentIDBatch.Load(db.PaginateAdmiresByCommentIDBatchParams{
 			CommentID:     commentID,
 			Limit:         params.Limit,
@@ -349,7 +349,7 @@ func (api InteractionAPI) PaginateAdmiresByCommentID(ctx context.Context, commen
 		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Admire]{
+	paginator := TimeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -370,7 +370,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Comment, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Comment, error) {
 		return api.loaders.PaginateCommentsByFeedEventIDBatch.Load(db.PaginateCommentsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
@@ -391,7 +391,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Comment]{
+	paginator := TimeIDPaginator[db.Comment]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -412,7 +412,7 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Comment, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Comment, error) {
 		return api.loaders.PaginateRepliesByCommentIDBatch.Load(db.PaginateRepliesByCommentIDBatchParams{
 			CommentID:     commentID,
 			Limit:         params.Limit,
@@ -433,7 +433,7 @@ func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commen
 		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Comment]{
+	paginator := TimeIDPaginator[db.Comment]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -487,7 +487,7 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Admire, error) {
 		return api.loaders.PaginateAdmiresByPostIDBatch.Load(db.PaginateAdmiresByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
@@ -508,7 +508,7 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Admire]{
+	paginator := TimeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -538,7 +538,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 	}
 	onlyForActor := actorID != ""
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Admire, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Admire, error) {
 		return api.loaders.PaginateAdmiresByTokenIDBatch.Load(db.PaginateAdmiresByTokenIDBatchParams{
 			TokenID:       tokenID,
 			Limit:         params.Limit,
@@ -561,7 +561,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 		return a.CreatedAt, a.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Admire]{
+	paginator := TimeIDPaginator[db.Admire]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -582,7 +582,7 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Comment, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Comment, error) {
 		return api.loaders.PaginateCommentsByPostIDBatch.Load(db.PaginateCommentsByPostIDBatchParams{
 			PostID:        postID,
 			Limit:         params.Limit,
@@ -603,7 +603,7 @@ func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID p
 		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Comment]{
+	paginator := TimeIDPaginator[db.Comment]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,

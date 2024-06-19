@@ -75,7 +75,7 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Contract, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Contract, error) {
 		return api.loaders.GetChildContractsByParentIDBatchPaginate.Load(db.GetChildContractsByParentIDBatchPaginateParams{
 			ParentID:      contractID,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -91,7 +91,7 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Contract]{
+	paginator := TimeIDPaginator[db.Contract]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 	}
@@ -218,7 +218,7 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 		return nil, PageInfo{}, err
 	}
 
-	timeFunc := func(params timeIDPagingParams) ([]db.Post, error) {
+	timeFunc := func(params TimeIDPagingParams) ([]db.Post, error) {
 		return api.loaders.PaginatePostsByContractID.Load(db.PaginatePostsByContractIDParams{
 			ContractID:    contractID,
 			Limit:         params.Limit,
@@ -239,7 +239,7 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 		return p.CreatedAt, p.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Post]{
+	paginator := TimeIDPaginator[db.Post]{
 		QueryFunc:  timeFunc,
 		CursorFunc: timeCursorFunc,
 		CountFunc:  countFunc,
@@ -262,7 +262,7 @@ func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Con
 		return nil, PageInfo{}, err
 	}
 
-	timeFunc := func(params timeIDPagingParams) ([]db.Post, error) {
+	timeFunc := func(params TimeIDPagingParams) ([]db.Post, error) {
 		return api.queries.PaginatePostsByContractIDAndProjectID(ctx, db.PaginatePostsByContractIDAndProjectIDParams{
 			ContractID:    contractID,
 			ProjectIDInt:  int32(projectID),
@@ -284,7 +284,7 @@ func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Con
 		return p.CreatedAt, p.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Post]{
+	paginator := TimeIDPaginator[db.Post]{
 		QueryFunc:  timeFunc,
 		CursorFunc: timeCursorFunc,
 		CountFunc:  countFunc,

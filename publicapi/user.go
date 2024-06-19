@@ -157,7 +157,7 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.User, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.User, error) {
 		return api.queries.GetUsersByIDs(ctx, db.GetUsersByIDsParams{
 			Limit:         params.Limit,
 			UserIds:       userIDs,
@@ -177,7 +177,7 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 		return u.CreatedAt, u.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.User]{
+	paginator := TimeIDPaginator[db.User]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -921,7 +921,7 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.GetSharedFollowersBatchPaginateRow, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.GetSharedFollowersBatchPaginateRow, error) {
 		return api.loaders.GetSharedFollowersBatchPaginate.Load(db.GetSharedFollowersBatchPaginateParams{
 			Follower:      curUserID,
 			Followee:      userID,
@@ -947,7 +947,7 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 	}
 
 	paginator := sharedFollowersPaginator[db.GetSharedFollowersBatchPaginateRow]{
-		timeIDPaginator[db.GetSharedFollowersBatchPaginateRow]{
+		TimeIDPaginator[db.GetSharedFollowersBatchPaginateRow]{
 			QueryFunc:  queryFunc,
 			CursorFunc: cursorFunc,
 			CountFunc:  countFunc,
@@ -1029,7 +1029,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]db.Contract, error) {
+	queryFunc := func(params TimeIDPagingParams) ([]db.Contract, error) {
 		serializedChains := make([]string, len(includeChains))
 		for i, c := range includeChains {
 			serializedChains[i] = strconv.Itoa(int(c))
@@ -1051,7 +1051,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		return c.CreatedAt, c.ID, nil
 	}
 
-	paginator := timeIDPaginator[db.Contract]{
+	paginator := TimeIDPaginator[db.Contract]{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 	}
