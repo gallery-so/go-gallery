@@ -33,6 +33,7 @@ import (
 
 // Enable for debugging; will not commit offsets or write to the database
 const readOnlyMode = false
+const moshicamMinterAddress = "0xaceb0de9f3efab3c50bf4dc6b14706f119e39dd8"
 
 type streamerConfig struct {
 	Topic         string
@@ -95,7 +96,7 @@ func newEthereumTokenConfig(deserializer *avro.GenericDeserializer, queries *mir
 	}
 }
 
-func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, taskClient *task.Client) *streamerConfig {
+func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseOwnerEntryParams, error) {
 		ethereumEntry, err := parseOwnerMessage(ctx, deserializer, message)
 		if err != nil {
@@ -110,17 +111,13 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 		return submitOwnerBatch(ctx, queries.ProcessBaseOwnerEntry, entries)
 	}
 
-	postCommitF := func(ctx context.Context, entries []mirrordb.ProcessBaseOwnerEntryParams) error {
-		return taskClient.CreateTaskForMoshicamOwnerProcessing(ctx, task.MoshicamOwnerProcessingMessage{Entries: entries})
-	}
-
 	return &streamerConfig{
 		Topic:   "base.owner.v4",
-		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF, withPostCommitF(postCommitF)),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
 	}
 }
 
-func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, ccf *contractCollectionFiller) *streamerConfig {
+func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, ccf *contractCollectionFiller, opts ...option[mirrordb.ProcessBaseTokenEntryParams]) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseTokenEntryParams, error) {
 		ethereumEntry, err := parseTokenMessage(ctx, deserializer, message)
 		if err != nil {
@@ -137,8 +134,21 @@ func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 
 	return &streamerConfig{
 		Topic:   "base.nft.v4",
-		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF, opts...),
 	}
+}
+
+func newMoshicamPostCommitF(taskClient *task.Client) func(context.Context, []mirrordb.ProcessBaseTokenEntryParams) error {
+	return func(ctx context.Context, entries []mirrordb.ProcessBaseTokenEntryParams) error {
+		moshiTokens := util.Filter(entries, isMoshicamEntry, false)
+		return taskClient.CreateTaskForMoshicamOwnerProcessing(ctx, task.MoshicamOwnerProcessingMessage{Entries: moshiTokens})
+	}
+}
+
+func isMoshicamEntry(e mirrordb.ProcessBaseTokenEntryParams) bool {
+	var c map[string]string
+	e.Contract.AssignTo(&c)
+	return strings.ToLower(c["deployed_via_contract"]) == moshicamMinterAddress
 }
 
 func newBaseSepoliaOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
@@ -245,8 +255,8 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollection
 	configs := []*streamerConfig{
 		newEthereumOwnerConfig(deserializer, queries),
 		newEthereumTokenConfig(deserializer, queries, ccf),
-		newBaseOwnerConfig(deserializer, queries, tc),
-		newBaseTokenConfig(deserializer, queries, ccf),
+		newBaseOwnerConfig(deserializer, queries),
+		newBaseTokenConfig(deserializer, queries, ccf, withPostCommitF(newMoshicamPostCommitF(tc))),
 		newBaseSepoliaOwnerConfig(deserializer, queries),
 		newBaseSepoliaTokenConfig(deserializer, queries, ccf),
 		//newZoraOwnerConfig(deserializer, queries),

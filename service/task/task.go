@@ -86,7 +86,7 @@ type AutosocialPollFarcasterMessage struct {
 }
 
 type MoshicamOwnerProcessingMessage struct {
-	Entries []mirrordb.ProcessBaseOwnerEntryParams `json:"entries" binding:"required"`
+	Entries []mirrordb.ProcessBaseTokenEntryParams `json:"entries" binding:"required"`
 }
 
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
@@ -267,7 +267,7 @@ func (c *Client) CreateTaskForMoshicamOwnerProcessing(ctx context.Context, messa
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForMoshicamOwnerProcessing")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("MOSHICAM_OWNER_PROCESSING_QUEUE")
-	url := fmt.Sprintf("%s/tasks/owner-processing", env.GetString("MOSHICAM_URL"))
+	url := fmt.Sprintf("%s/task/notify/owner-processing", env.GetString("MOSHICAM_URL"))
 	secret := env.GetString("MOSHICAM_TASK_SECRET")
 	return c.submitTask(ctx, queue, url, withJSON(message), withBasicAuth(secret))
 }
