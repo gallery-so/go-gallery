@@ -11,6 +11,7 @@ import (
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	"github.com/getsentry/sentry-go"
+	"github.com/mikeydub/go-gallery/db/gen/mirrordb"
 	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -82,6 +83,10 @@ type AutosocialProcessUsersMessage struct {
 type AutosocialPollFarcasterMessage struct {
 	SignerUUID string       `form:"signer_uuid" binding:"required"`
 	UserID     persist.DBID `form:"user_id" binding:"required"`
+}
+
+type MoshicamOwnerProcessingMessage struct {
+	Entries []mirrordb.ProcessBaseOwnerEntryParams `json:"entries" binding:"required"`
 }
 
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
@@ -256,6 +261,15 @@ func (c *Client) CreateTaskForSlackPostFeedBot(ctx context.Context, message Feed
 	url := fmt.Sprintf("%s/tasks/slack-post", env.GetString("FEEDBOT_URL"))
 	secret := env.GetString("FEEDBOT_SECRET")
 	return c.submitTask(ctx, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), WithDelay(2*time.Minute))
+}
+
+func (c *Client) CreateTaskForMoshicamOwnerProcessing(ctx context.Context, message MoshicamOwnerProcessingMessage) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForMoshicamOwnerProcessing")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("MOSHICAM_OWNER_PROCESSING_QUEUE")
+	url := fmt.Sprintf("%s/tasks/owner-processing", env.GetString("MOSHICAM_URL"))
+	secret := env.GetString("MOSHICAM_TASK_SECRET")
+	return c.submitTask(ctx, queue, url, withJSON(message), withBasicAuth(secret))
 }
 
 // NewClient returns a new task client with tracing enabled.

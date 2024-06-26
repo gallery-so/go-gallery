@@ -20,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/batch"
 	"github.com/sirupsen/logrus"
@@ -53,8 +54,9 @@ func main() {
 	defer pgx.Close()
 
 	ccf := newContractCollectionFiller(ctx, pgx)
+	tc := task.NewClient(ctx)
 
-	go runStreamer(ctx, pgx, ccf)
+	go runStreamer(ctx, pgx, ccf, tc)
 
 	err := router.Run(":3000")
 	if err != nil {
@@ -93,7 +95,7 @@ func newEthereumTokenConfig(deserializer *avro.GenericDeserializer, queries *mir
 	}
 }
 
-func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
+func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, taskClient *task.Client) *streamerConfig {
 	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseOwnerEntryParams, error) {
 		ethereumEntry, err := parseOwnerMessage(ctx, deserializer, message)
 		if err != nil {
@@ -108,9 +110,13 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 		return submitOwnerBatch(ctx, queries.ProcessBaseOwnerEntry, entries)
 	}
 
+	postCommitF := func(ctx context.Context, entries []mirrordb.ProcessBaseOwnerEntryParams) error {
+		return taskClient.CreateTaskForMoshicamOwnerProcessing(ctx, task.MoshicamOwnerProcessingMessage{Entries: entries})
+	}
+
 	return &streamerConfig{
 		Topic:   "base.owner.v4",
-		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF),
+		Batcher: newMessageBatcher(250, time.Second, 10, parseF, submitF, withPostCommitF(postCommitF)),
 	}
 }
 
@@ -221,7 +227,7 @@ func newZoraTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 	}
 }
 
-func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollectionFiller) {
+func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollectionFiller, tc *task.Client) {
 	deserializer, err := newDeserializerFromRegistry()
 	if err != nil {
 		panic(fmt.Errorf("failed to create Avro deserializer: %w", err))
@@ -239,7 +245,7 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollection
 	configs := []*streamerConfig{
 		newEthereumOwnerConfig(deserializer, queries),
 		newEthereumTokenConfig(deserializer, queries, ccf),
-		newBaseOwnerConfig(deserializer, queries),
+		newBaseOwnerConfig(deserializer, queries, tc),
 		newBaseTokenConfig(deserializer, queries, ccf),
 		newBaseSepoliaOwnerConfig(deserializer, queries),
 		newBaseSepoliaTokenConfig(deserializer, queries, ccf),

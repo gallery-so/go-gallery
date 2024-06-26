@@ -33,9 +33,18 @@ type messageBatcher[T any] struct {
 	closed          bool
 	parseF          func(context.Context, *kafka.Message) (T, error)
 	submitF         func(context.Context, []T) error
+	postCommitF     func(context.Context, []T) error
 }
 
-func newMessageBatcher[T any](maxSize int, timeout time.Duration, workerCount int, parseF func(context.Context, *kafka.Message) (T, error), submitF func(context.Context, []T) error) *messageBatcher[T] {
+type option[T any] func(*messageBatcher[T])
+
+func withPostCommitF[T any](f func(context.Context, []T) error) option[T] {
+	return func(mb *messageBatcher[T]) {
+		mb.postCommitF = f
+	}
+}
+
+func newMessageBatcher[T any](maxSize int, timeout time.Duration, workerCount int, parseF func(context.Context, *kafka.Message) (T, error), submitF func(context.Context, []T) error, opts ...option[T]) *messageBatcher[T] {
 	mb := &messageBatcher[T]{
 		maxSize:         maxSize,
 		timeoutDuration: timeout,
@@ -44,6 +53,10 @@ func newMessageBatcher[T any](maxSize int, timeout time.Duration, workerCount in
 		closeCh:         make(chan struct{}),
 		parseF:          parseF,
 		submitF:         submitF,
+	}
+
+	for _, opt := range opts {
+		opt(mb)
 	}
 
 	for i := 0; i < workerCount; i++ {
@@ -134,6 +147,13 @@ func (mb *messageBatcher[T]) Submit(ctx context.Context, c *kafka.Consumer) erro
 	_, err = c.Commit()
 	if err != nil {
 		return fmt.Errorf("failed to commit offsets: %w", err)
+	}
+
+	if mb.postCommitF != nil {
+		err := mb.postCommitF(ctx, mb.entries)
+		if err != nil {
+			logger.For(ctx).Warnf("error calling post commit function: %v", err)
+		}
 	}
 
 	mb.Reset()
