@@ -241,8 +241,8 @@ func runStreamer(ctx context.Context, pgx *pgxpool.Pool, ccf *contractCollection
 		newEthereumTokenConfig(deserializer, queries, ccf),
 		newBaseOwnerConfig(deserializer, queries),
 		newBaseTokenConfig(deserializer, queries, ccf),
-		newBaseSepoliaOwnerConfig(deserializer, queries),
-		newBaseSepoliaTokenConfig(deserializer, queries, ccf),
+		//newBaseSepoliaOwnerConfig(deserializer, queries),
+		//newBaseSepoliaTokenConfig(deserializer, queries, ccf),
 		//newZoraOwnerConfig(deserializer, queries),
 		//newZoraTokenConfig(deserializer, queries, ccf),
 	}
