@@ -352,7 +352,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             $3,
@@ -378,7 +380,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26,
+            $26::jsonb,
             $27,
             $28,
             $29,
@@ -387,7 +389,9 @@ token_insert as (
             now(),
             $32,
             $33,
-            $34
+            $34,
+            $26,
+            now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -421,7 +425,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select $1::text
 from contract_insert, collection_insert
@@ -460,7 +466,7 @@ type ProcessBaseSepoliaTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
@@ -594,7 +600,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             $3,
@@ -620,7 +628,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26,
+            $26::jsonb,
             $27,
             $28,
             $29,
@@ -629,7 +637,9 @@ token_insert as (
             now(),
             $32,
             $33,
-            $34
+            $34,
+            $26,
+            now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -663,7 +673,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select $1::text
 from contract_insert, collection_insert
@@ -702,7 +714,7 @@ type ProcessBaseTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
@@ -975,7 +987,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             $3,
@@ -1001,7 +1015,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26,
+            $26::jsonb,
             $27,
             $28,
             $29,
@@ -1010,7 +1024,9 @@ token_insert as (
             now(),
             $32,
             $33,
-            $34
+            $34,
+            $26,
+            now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -1044,7 +1060,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select $1::text
 from contract_insert, collection_insert
@@ -1083,7 +1101,7 @@ type ProcessEthereumTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
@@ -1356,7 +1374,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             $3,
@@ -1382,7 +1402,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26,
+            $26::jsonb,
             $27,
             $28,
             $29,
@@ -1391,7 +1411,9 @@ token_insert as (
             now(),
             $32,
             $33,
-            $34
+            $34,
+            $26,
+            now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -1425,7 +1447,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select $1::text
 from contract_insert, collection_insert
@@ -1464,7 +1488,7 @@ type ProcessZoraTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`

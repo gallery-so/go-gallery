@@ -290,7 +290,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             @simplehash_kafka_key,
@@ -316,7 +318,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata,
+            @extra_metadata::jsonb,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -325,7 +327,9 @@ token_insert as (
             now(),
             @kafka_offset,
             @kafka_partition,
-            @kafka_timestamp
+            @kafka_timestamp,
+            @extra_metadata,
+            now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -359,7 +363,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
 from contract_insert, collection_insert
@@ -420,7 +426,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             @simplehash_kafka_key,
@@ -446,7 +454,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata,
+            @extra_metadata::jsonb,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -455,7 +463,9 @@ token_insert as (
             now(),
             @kafka_offset,
             @kafka_partition,
-            @kafka_timestamp
+            @kafka_timestamp,
+            @extra_metadata,
+            now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -489,7 +499,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
 from contract_insert, collection_insert
@@ -550,7 +562,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             @simplehash_kafka_key,
@@ -576,7 +590,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata,
+            @extra_metadata::jsonb,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -585,7 +599,9 @@ token_insert as (
             now(),
             @kafka_offset,
             @kafka_partition,
-            @kafka_timestamp
+            @kafka_timestamp,
+            @extra_metadata,
+            now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -619,7 +635,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
 from contract_insert, collection_insert
@@ -680,7 +698,9 @@ token_insert as (
         last_updated,
         kafka_offset,
         kafka_partition,
-        kafka_timestamp
+        kafka_timestamp,
+        extra_metadata_jsonb,
+        last_metadata_conversion
         )
         select
             @simplehash_kafka_key,
@@ -706,7 +726,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata,
+            @extra_metadata::jsonb,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -715,7 +735,9 @@ token_insert as (
             now(),
             @kafka_offset,
             @kafka_partition,
-            @kafka_timestamp
+            @kafka_timestamp,
+            @extra_metadata,
+            now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
             set simplehash_nft_id = excluded.simplehash_nft_id,
@@ -749,7 +771,9 @@ token_insert as (
                 last_updated = now(),
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
-                kafka_timestamp = excluded.kafka_timestamp
+                kafka_timestamp = excluded.kafka_timestamp,
+                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
 from contract_insert, collection_insert
