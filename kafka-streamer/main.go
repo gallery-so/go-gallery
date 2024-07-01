@@ -665,7 +665,7 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 		return mirrordb.ProcessEthereumTokenEntryParams{}, err
 	}
 
-	extraMetadata, err := toJSONB(nft.Extra_metadata)
+	extraMetadataJsonb, err := toJSONB(nft.Extra_metadata)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Extra_metadata to JSONB: %w", err)
 		return mirrordb.ProcessEthereumTokenEntryParams{}, err
@@ -774,7 +774,8 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 				LastSale:           lastSale,
 				FirstCreated:       firstCreated,
 				Rarity:             rarity,
-				ExtraMetadata:      extraMetadata,
+				ExtraMetadata:      cleanString(nft.Extra_metadata),
+				ExtraMetadataJsonb: extraMetadataJsonb,
 				ImageProperties:    imageProperties,
 				VideoProperties:    videoProperties,
 				AudioProperties:    audioProperties,

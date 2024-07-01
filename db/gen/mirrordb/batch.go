@@ -380,7 +380,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26::jsonb,
+            $26,
             $27,
             $28,
             $29,
@@ -390,7 +390,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $26,
+            $35::jsonb,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
@@ -426,7 +426,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select $1::text
@@ -466,7 +466,7 @@ type ProcessBaseSepoliaTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
@@ -475,6 +475,7 @@ type ProcessBaseSepoliaTokenEntryParams struct {
 	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
 	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
 	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
+	ExtraMetadataJsonb pgtype.JSONB   `db:"extra_metadata_jsonb" json:"extra_metadata_jsonb"`
 }
 
 func (q *Queries) ProcessBaseSepoliaTokenEntry(ctx context.Context, arg []ProcessBaseSepoliaTokenEntryParams) *ProcessBaseSepoliaTokenEntryBatchResults {
@@ -515,6 +516,7 @@ func (q *Queries) ProcessBaseSepoliaTokenEntry(ctx context.Context, arg []Proces
 			a.KafkaOffset,
 			a.KafkaPartition,
 			a.KafkaTimestamp,
+			a.ExtraMetadataJsonb,
 		}
 		batch.Queue(processBaseSepoliaTokenEntry, vals...)
 	}
@@ -628,7 +630,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26::jsonb,
+            $26,
             $27,
             $28,
             $29,
@@ -638,7 +640,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $26,
+            $35::jsonb,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
@@ -674,7 +676,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select $1::text
@@ -714,7 +716,7 @@ type ProcessBaseTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
@@ -723,6 +725,7 @@ type ProcessBaseTokenEntryParams struct {
 	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
 	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
 	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
+	ExtraMetadataJsonb pgtype.JSONB   `db:"extra_metadata_jsonb" json:"extra_metadata_jsonb"`
 }
 
 func (q *Queries) ProcessBaseTokenEntry(ctx context.Context, arg []ProcessBaseTokenEntryParams) *ProcessBaseTokenEntryBatchResults {
@@ -763,6 +766,7 @@ func (q *Queries) ProcessBaseTokenEntry(ctx context.Context, arg []ProcessBaseTo
 			a.KafkaOffset,
 			a.KafkaPartition,
 			a.KafkaTimestamp,
+			a.ExtraMetadataJsonb,
 		}
 		batch.Queue(processBaseTokenEntry, vals...)
 	}
@@ -1015,7 +1019,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26::jsonb,
+            $26,
             $27,
             $28,
             $29,
@@ -1025,7 +1029,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $26,
+            $35::jsonb,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
@@ -1061,7 +1065,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select $1::text
@@ -1101,7 +1105,7 @@ type ProcessEthereumTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
@@ -1110,6 +1114,7 @@ type ProcessEthereumTokenEntryParams struct {
 	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
 	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
 	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
+	ExtraMetadataJsonb pgtype.JSONB   `db:"extra_metadata_jsonb" json:"extra_metadata_jsonb"`
 }
 
 func (q *Queries) ProcessEthereumTokenEntry(ctx context.Context, arg []ProcessEthereumTokenEntryParams) *ProcessEthereumTokenEntryBatchResults {
@@ -1150,6 +1155,7 @@ func (q *Queries) ProcessEthereumTokenEntry(ctx context.Context, arg []ProcessEt
 			a.KafkaOffset,
 			a.KafkaPartition,
 			a.KafkaTimestamp,
+			a.ExtraMetadataJsonb,
 		}
 		batch.Queue(processEthereumTokenEntry, vals...)
 	}
@@ -1402,7 +1408,7 @@ token_insert as (
             $23,
             $24,
             $25,
-            $26::jsonb,
+            $26,
             $27,
             $28,
             $29,
@@ -1412,7 +1418,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $26,
+            $35::jsonb,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
@@ -1448,7 +1454,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select $1::text
@@ -1488,7 +1494,7 @@ type ProcessZoraTokenEntryParams struct {
 	LastSale           pgtype.JSONB   `db:"last_sale" json:"last_sale"`
 	FirstCreated       pgtype.JSONB   `db:"first_created" json:"first_created"`
 	Rarity             pgtype.JSONB   `db:"rarity" json:"rarity"`
-	ExtraMetadata      pgtype.JSONB   `db:"extra_metadata" json:"extra_metadata"`
+	ExtraMetadata      *string        `db:"extra_metadata" json:"extra_metadata"`
 	ImageProperties    pgtype.JSONB   `db:"image_properties" json:"image_properties"`
 	VideoProperties    pgtype.JSONB   `db:"video_properties" json:"video_properties"`
 	AudioProperties    pgtype.JSONB   `db:"audio_properties" json:"audio_properties"`
@@ -1497,6 +1503,7 @@ type ProcessZoraTokenEntryParams struct {
 	KafkaOffset        *int64         `db:"kafka_offset" json:"kafka_offset"`
 	KafkaPartition     *int32         `db:"kafka_partition" json:"kafka_partition"`
 	KafkaTimestamp     *time.Time     `db:"kafka_timestamp" json:"kafka_timestamp"`
+	ExtraMetadataJsonb pgtype.JSONB   `db:"extra_metadata_jsonb" json:"extra_metadata_jsonb"`
 }
 
 func (q *Queries) ProcessZoraTokenEntry(ctx context.Context, arg []ProcessZoraTokenEntryParams) *ProcessZoraTokenEntryBatchResults {
@@ -1537,6 +1544,7 @@ func (q *Queries) ProcessZoraTokenEntry(ctx context.Context, arg []ProcessZoraTo
 			a.KafkaOffset,
 			a.KafkaPartition,
 			a.KafkaTimestamp,
+			a.ExtraMetadataJsonb,
 		}
 		batch.Queue(processZoraTokenEntry, vals...)
 	}

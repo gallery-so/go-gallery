@@ -318,7 +318,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata::jsonb,
+            @extra_metadata,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -328,7 +328,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata,
+            @extra_metadata_jsonb::jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
@@ -364,7 +364,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
@@ -454,7 +454,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata::jsonb,
+            @extra_metadata,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -464,7 +464,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata,
+            @extra_metadata_jsonb::jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
@@ -500,7 +500,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
@@ -590,7 +590,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata::jsonb,
+            @extra_metadata,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -600,7 +600,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata,
+            @extra_metadata_jsonb::jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
@@ -636,7 +636,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
@@ -726,7 +726,7 @@ token_insert as (
             @last_sale,
             @first_created,
             @rarity,
-            @extra_metadata::jsonb,
+            @extra_metadata,
             @image_properties,
             @video_properties,
             @audio_properties,
@@ -736,7 +736,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata,
+            @extra_metadata_jsonb::jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
@@ -772,7 +772,7 @@ token_insert as (
                 kafka_offset = excluded.kafka_offset,
                 kafka_partition = excluded.kafka_partition,
                 kafka_timestamp = excluded.kafka_timestamp,
-                extra_metadata_jsonb = excluded.extra_metadata::jsonb,
+                extra_metadata_jsonb = excluded.extra_metadata_jsonb,
                 last_metadata_conversion = now()
 )
 select @simplehash_nft_id::text
