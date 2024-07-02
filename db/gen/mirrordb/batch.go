@@ -390,7 +390,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $35::jsonb,
+            $35,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
@@ -640,7 +640,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $35::jsonb,
+            $35,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
@@ -1029,7 +1029,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $35::jsonb,
+            $35,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update
@@ -1418,7 +1418,7 @@ token_insert as (
             $32,
             $33,
             $34,
-            $35::jsonb,
+            $35,
             now()
         where $5::bool
         on conflict (simplehash_kafka_key) do update

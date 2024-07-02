@@ -328,7 +328,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata_jsonb::jsonb,
+            @extra_metadata_jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
@@ -464,7 +464,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata_jsonb::jsonb,
+            @extra_metadata_jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
@@ -600,7 +600,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata_jsonb::jsonb,
+            @extra_metadata_jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update
@@ -736,7 +736,7 @@ token_insert as (
             @kafka_offset,
             @kafka_partition,
             @kafka_timestamp,
-            @extra_metadata_jsonb::jsonb,
+            @extra_metadata_jsonb,
             now()
         where @should_upsert::bool
         on conflict (simplehash_kafka_key) do update

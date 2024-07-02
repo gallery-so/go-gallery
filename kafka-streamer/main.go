@@ -33,6 +33,8 @@ import (
 // Enable for debugging; will not commit offsets or write to the database
 const readOnlyMode = false
 
+var errInvalidJSON = errors.New("invalid JSON")
+
 type streamerConfig struct {
 	Topic         string
 	Batcher       batcher
@@ -665,7 +667,7 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 		return mirrordb.ProcessEthereumTokenEntryParams{}, err
 	}
 
-	extraMetadataJsonb, err := toJSONB(nft.Extra_metadata)
+	extraMetadataJsonb, err := cleanJSONB(nft.Extra_metadata, true)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Extra_metadata to JSONB: %w", err)
 		return mirrordb.ProcessEthereumTokenEntryParams{}, err
@@ -883,18 +885,35 @@ func toJSONB[T any](data *T) (pgtype.JSONB, error) {
 		return pgtype.JSONB{}, err
 	}
 
-	// Convert jsonData to a string
-	jsonStr := string(jsonData)
+	// No need to verify that the result is valid JSON, since we just marshaled it ourselves
+	return cleanJSONB(util.ToPointer(string(jsonData)), false)
+}
+
+// cleanJSONB takes a pointer to a string data representing JSON and returns a pgtype.JSONB.
+// It also cleans invalid characters and optionally ensures that the output is valid JSON.
+func cleanJSONB(data *string, validate bool) (pgtype.JSONB, error) {
+	if data == nil {
+		return pgtype.JSONB{Status: pgtype.Null}, nil
+	}
 
 	// Strip out any literal null bytes
-	jsonStr = strings.ReplaceAll(jsonStr, "\x00", "")
+	jsonStr := strings.ReplaceAll(*data, "\x00", "")
 
 	// Strip out any escaped null characters in JSON
 	cleanedStr := strings.ReplaceAll(jsonStr, "\\u0000", "")
 
+	if validate {
+		// Unmarshal the data into a generic map to make sure that it's valid JSON
+		var m map[string]interface{}
+		err := json.Unmarshal([]byte(cleanedStr), &m)
+		if err != nil {
+			return pgtype.JSONB{Status: pgtype.Null}, nil
+		}
+	}
+
 	var jsonb pgtype.JSONB
 	// Convert the cleaned string back to bytes and set it to jsonb
-	err = jsonb.Set([]byte(cleanedStr))
+	err := jsonb.Set([]byte(cleanedStr))
 	if err != nil {
 		return pgtype.JSONB{}, err
 	}
