@@ -669,8 +669,14 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 
 	extraMetadataJsonb, err := cleanJSONB(nft.Extra_metadata, true)
 	if err != nil {
-		err = fmt.Errorf("failed to convert Extra_metadata to JSONB: %w", err)
-		return mirrordb.ProcessEthereumTokenEntryParams{}, err
+		if errors.Is(err, errInvalidJSON) {
+			// Log, but don't throw an error. It's not guaranteed that all extra_metadata strings will be valid JSON.
+			logger.For(ctx).Errorf("failed to convert Extra_metadata to JSONB for token %s: %v", nft.Nft_id, err)
+			extraMetadataJsonb = pgtype.JSONB{Status: pgtype.Null}
+		} else {
+			err = fmt.Errorf("failed to convert Extra_metadata to JSONB: %w", err)
+			return mirrordb.ProcessEthereumTokenEntryParams{}, err
+		}
 	}
 
 	imageProperties, err := toJSONB(nft.Image_properties)
@@ -907,7 +913,7 @@ func cleanJSONB(data *string, validate bool) (pgtype.JSONB, error) {
 		var m map[string]interface{}
 		err := json.Unmarshal([]byte(cleanedStr), &m)
 		if err != nil {
-			return pgtype.JSONB{Status: pgtype.Null}, nil
+			return pgtype.JSONB{Status: pgtype.Null}, errInvalidJSON
 		}
 	}
 
