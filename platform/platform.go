@@ -117,7 +117,7 @@ func KeywordsFor(td db.TokenDefinition) ([]string, []string) {
 	imgK, animK := td.Chain.BaseKeywords()
 
 	if IsHicEtNunc(td.Chain, td.ContractAddress) {
-		imgK = append([]string{"displayUri", "artifactUri", "image"}, imgK...)
+		imgK = append([]string{"artifactUri", "displayUri", "image"}, imgK...)
 		return imgK, animK
 	}
 
