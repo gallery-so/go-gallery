@@ -484,9 +484,12 @@ func (c Chain) NormalizeAddress(addr Address) string {
 func (c Chain) BaseKeywords() (image []string, anim []string) {
 	defaultImageKeyWords := []string{"image_url", "image", "imageOriginal"}
 	defaultAnimKeyWords := []string{"animation_url", "animation", "video", "mediaOriginal"}
+	// We map Simplehash's metadata to a standard metadata format that use the default keys above
+	// so we shouldn't need to add more chain-specific keywords. However, we continue to use them for backwards compatibility
+	// in case we revert back to older providers.
 	switch c {
 	case ChainTezos:
-		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}
+		return append(defaultImageKeyWords, "displayUri", "image", "thumbnailUri", "artifactUri", "uri"), append(defaultAnimKeyWords, "artifactUri", "displayUri", "uri", "image")
 	default:
 		return defaultImageKeyWords, defaultAnimKeyWords
 	}
