@@ -221,10 +221,13 @@ type simplehashContractDetailed struct {
 	TopCollections  []simplehashCollection `json:"top_collections"`
 }
 
+// Simplehash adds the original token's metadata into this object
 type simplehashMetadata struct {
 	ImageOriginalURL     string `json:"image_original_url"`
 	AnimationOriginalURL string `json:"animation_original_url"`
 	MetadataOriginalURL  string `json:"metadata_original_url"`
+	// ArtifactURI is present for Tezos tokens
+	ArtifactURI string `json:"artifactUri"`
 }
 
 type simplehashCollection struct {
@@ -353,7 +356,7 @@ func translateToChainAgnosticToken(t simplehashNFT, ownerAddress persist.Address
 			"name":          t.Name,
 			"description":   t.Description,
 			"image_url":     t.ExtraMetadata.ImageOriginalURL,
-			"animation_url": t.ExtraMetadata.AnimationOriginalURL,
+			"animation_url": util.FirstNonEmptyString(t.ExtraMetadata.ArtifactURI, t.ExtraMetadata.AnimationOriginalURL),
 			"original_url":  t.ExtraMetadata.MetadataOriginalURL,
 		},
 		ContractAddress: persist.Address(t.ContractAddress),
