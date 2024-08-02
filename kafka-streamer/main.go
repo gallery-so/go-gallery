@@ -16,7 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/mirrordb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/kafka-streamer/rest"
-	"github.com/mikeydub/go-gallery/kafka-streamer/schema/ethereum"
+	"github.com/mikeydub/go-gallery/kafka-streamer/schema/base"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -66,8 +66,8 @@ func main() {
 }
 
 func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries) *streamerConfig {
-	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseOwnerEntryParams, error) {
-		return parseOwnerMessage(ctx, deserializer, message)
+	parseF := func(ctx context.Context, message *kafka.Message, owner *base.Owner, params *mirrordb.ProcessBaseOwnerEntryParams) (*mirrordb.ProcessBaseOwnerEntryParams, error) {
+		return parseOwnerMessage(ctx, deserializer, message, owner, params)
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseOwnerEntryParams) error {
@@ -81,8 +81,8 @@ func newBaseOwnerConfig(deserializer *avro.GenericDeserializer, queries *mirrord
 }
 
 func newBaseTokenConfig(deserializer *avro.GenericDeserializer, queries *mirrordb.Queries, ccf *contractCollectionFiller) *streamerConfig {
-	parseF := func(ctx context.Context, message *kafka.Message) (mirrordb.ProcessBaseTokenEntryParams, error) {
-		return parseTokenMessage(ctx, deserializer, message)
+	parseF := func(ctx context.Context, message *kafka.Message, nft *base.Nft, params *mirrordb.ProcessBaseTokenEntryParams) (*mirrordb.ProcessBaseTokenEntryParams, error) {
+		return parseTokenMessage(ctx, deserializer, message, nft, params)
 	}
 
 	submitF := func(ctx context.Context, entries []mirrordb.ProcessBaseTokenEntryParams) error {
@@ -396,24 +396,60 @@ func parseTimestamp(s *string) (*time.Time, error) {
 	return &ts, nil
 }
 
-func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializer, msg *kafka.Message) (mirrordb.ProcessBaseOwnerEntryParams, error) {
+func initializeOwner(owner *base.Owner) {
+	owner.Nft_id = ""
+	owner.Owner_address = ""
+	owner.Quantity = nil
+	owner.Collection_id = nil
+	owner.First_acquired_date = nil
+	owner.Last_acquired_date = nil
+	owner.First_acquired_transaction = nil
+	owner.Last_acquired_transaction = nil
+	owner.Minted_to_this_wallet = nil
+	owner.Airdropped_to_this_wallet = nil
+	owner.Sold_to_this_wallet = nil
+}
+
+func initializeOwnerParams(params *mirrordb.ProcessBaseOwnerEntryParams) {
+	params.SimplehashKafkaKey = ""
+	params.SimplehashNftID = nil
+	params.KafkaOffset = nil
+	params.KafkaPartition = nil
+	params.KafkaTimestamp = nil
+	params.ContractAddress = nil
+	params.TokenID = pgtype.Numeric{}
+	params.OwnerAddress = nil
+	params.Quantity = pgtype.Numeric{}
+	params.CollectionID = nil
+	params.FirstAcquiredDate = nil
+	params.LastAcquiredDate = nil
+	params.FirstAcquiredTransaction = nil
+	params.LastAcquiredTransaction = nil
+	params.MintedToThisWallet = nil
+	params.AirdroppedToThisWallet = nil
+	params.SoldToThisWallet = nil
+	params.ShouldUpsert = false
+	params.ShouldDelete = false
+}
+
+func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializer, msg *kafka.Message, owner *base.Owner, params *mirrordb.ProcessBaseOwnerEntryParams) (*mirrordb.ProcessBaseOwnerEntryParams, error) {
 	key := string(msg.Key)
 
-	owner := ethereum.Owner{}
-	err := deserializer.DeserializeInto(*msg.TopicPartition.Topic, msg.Value, &owner)
+	initializeOwner(owner)
+	err := deserializer.DeserializeInto(*msg.TopicPartition.Topic, msg.Value, owner)
 	if err != nil {
-		return mirrordb.ProcessBaseOwnerEntryParams{}, fmt.Errorf("failed to deserialize owner message with key %s: %w", key, err)
+		return nil, fmt.Errorf("failed to deserialize owner message with key %s: %w", key, err)
 	}
 
 	actionType, err := getActionType(msg)
 	if err != nil {
 		err = fmt.Errorf("failed to get action type for msg: %v", msg)
-		return mirrordb.ProcessBaseOwnerEntryParams{}, err
+		return nil, err
 	}
 
 	contractAddress, tokenID, err := parseNftID(owner.Nft_id)
 	if err != nil {
-		return mirrordb.ProcessBaseOwnerEntryParams{}, fmt.Errorf("error parsing NftID: %w", err)
+		return nil, fmt.Errorf("error parsing NftID: %w", err)
 	}
 
 	// TODO: Same as above, we'll want to normalize the address based on the chain at some point
@@ -421,55 +457,51 @@ func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 
 	quantity, err := parseNumeric(owner.Quantity)
 	if err != nil {
-		return mirrordb.ProcessBaseOwnerEntryParams{}, err
+		return nil, err
 	}
 
 	firstAcquiredDate, err := parseTimestamp(owner.First_acquired_date)
 	if err != nil {
 		err = fmt.Errorf("failed to parse First_acquired_date: %w", err)
-		return mirrordb.ProcessBaseOwnerEntryParams{}, err
+		return nil, err
 	}
 
 	lastAcquiredDate, err := parseTimestamp(owner.Last_acquired_date)
 	if err != nil {
 		err = fmt.Errorf("failed to parse Last_acquired_date: %w", err)
-		return mirrordb.ProcessBaseOwnerEntryParams{}, err
+		return nil, err
 	}
 
-	var params mirrordb.ProcessBaseOwnerEntryParams
+	initializeOwnerParams(params)
 
 	if actionType == "delete" {
-		params = mirrordb.ProcessBaseOwnerEntryParams{
-			ShouldDelete:       true,
-			SimplehashKafkaKey: key,
+		params.ShouldDelete = true
+		params.SimplehashKafkaKey = key
 
-			// pgtype.Numeric defaults to 'undefined' instead of 'null', so we actually need to set these explicitly
-			// or else we'll get an error when pgx tries to encode them
-			TokenID:  pgtype.Numeric{Status: pgtype.Null},
-			Quantity: pgtype.Numeric{Status: pgtype.Null},
-		}
+		// pgtype.Numeric defaults to 'undefined' instead of 'null', so we actually need to set these explicitly
+		// or else we'll get an error when pgx tries to encode them
+		params.TokenID = pgtype.Numeric{Status: pgtype.Null}
+		params.Quantity = pgtype.Numeric{Status: pgtype.Null}
 	} else {
 		if actionType == "insert" || actionType == "update" {
-			params = mirrordb.ProcessBaseOwnerEntryParams{
-				ShouldUpsert:             true,
-				SimplehashKafkaKey:       key,
-				SimplehashNftID:          &owner.Nft_id,
-				KafkaOffset:              util.ToPointer(int64(msg.TopicPartition.Offset)),
-				KafkaPartition:           util.ToPointer(msg.TopicPartition.Partition),
-				KafkaTimestamp:           util.ToPointer(msg.Timestamp),
-				ContractAddress:          &contractAddress,
-				TokenID:                  tokenID,
-				OwnerAddress:             util.ToPointer(persist.Address(walletAddress)),
-				Quantity:                 quantity,
-				CollectionID:             owner.Collection_id,
-				FirstAcquiredDate:        firstAcquiredDate,
-				LastAcquiredDate:         lastAcquiredDate,
-				FirstAcquiredTransaction: owner.First_acquired_transaction,
-				LastAcquiredTransaction:  owner.Last_acquired_transaction,
-				MintedToThisWallet:       owner.Minted_to_this_wallet,
-				AirdroppedToThisWallet:   owner.Airdropped_to_this_wallet,
-				SoldToThisWallet:         owner.Sold_to_this_wallet,
-			}
+			params.ShouldUpsert = true
+			params.SimplehashKafkaKey = key
+			params.SimplehashNftID = &owner.Nft_id
+			params.KafkaOffset = util.ToPointer(int64(msg.TopicPartition.Offset))
+			params.KafkaPartition = util.ToPointer(msg.TopicPartition.Partition)
+			params.KafkaTimestamp = util.ToPointer(msg.Timestamp)
+			params.ContractAddress = &contractAddress
+			params.TokenID = tokenID
+			params.OwnerAddress = util.ToPointer(persist.Address(walletAddress))
+			params.Quantity = quantity
+			params.CollectionID = owner.Collection_id
+			params.FirstAcquiredDate = firstAcquiredDate
+			params.LastAcquiredDate = lastAcquiredDate
+			params.FirstAcquiredTransaction = owner.First_acquired_transaction
+			params.LastAcquiredTransaction = owner.Last_acquired_transaction
+			params.MintedToThisWallet = owner.Minted_to_this_wallet
+			params.AirdroppedToThisWallet = owner.Airdropped_to_this_wallet
+			params.SoldToThisWallet = owner.Sold_to_this_wallet
 		} else {
 			return params, fmt.Errorf("invalid action type: %s", actionType)
 		}
@@ -478,19 +510,89 @@ func parseOwnerMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 	return params, nil
 }
 
-func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializer, msg *kafka.Message) (mirrordb.ProcessBaseTokenEntryParams, error) {
+func initializeNft(nft *base.Nft) {
+	nft.Nft_id = ""
+	nft.Chain = nil
+	nft.Contract_address = nil
+	nft.Token_id = nil
+	nft.Name = nil
+	nft.Description = nil
+	nft.Previews = nil
+	nft.Image_url = nil
+	nft.Image_properties = nil
+	nft.Video_url = nil
+	nft.Video_properties = nil
+	nft.Audio_url = nil
+	nft.Audio_properties = nil
+	nft.Model_url = nil
+	nft.Model_properties = nil
+	nft.Other_url = nil
+	nft.Other_properties = nil
+	nft.Background_color = nil
+	nft.External_url = nil
+	nft.Created_date = nil
+	nft.Status = nil
+	nft.Token_count = nil
+	nft.Owner_count = nil
+	nft.Contract = nil
+	nft.Collection = nil
+	nft.Last_sale = nil
+	nft.First_created = nil
+	nft.Rarity = nil
+	nft.Extra_metadata = nil
+}
+
+func initializeTokenParams(params *mirrordb.ProcessBaseTokenEntryParams) {
+	params.SimplehashNftID = ""
+	params.ShouldDelete = false
+	params.SimplehashKafkaKey = ""
+	params.ContractAddress = nil
+	params.ShouldUpsert = false
+	params.CollectionID = nil
+	params.TokenID = pgtype.Numeric{}
+	params.Name = nil
+	params.Description = nil
+	params.Previews = pgtype.JSONB{}
+	params.ImageUrl = nil
+	params.VideoUrl = nil
+	params.AudioUrl = nil
+	params.ModelUrl = nil
+	params.OtherUrl = nil
+	params.BackgroundColor = nil
+	params.ExternalUrl = nil
+	params.OnChainCreatedDate = nil
+	params.Status = nil
+	params.TokenCount = pgtype.Numeric{}
+	params.OwnerCount = pgtype.Numeric{}
+	params.Contract = pgtype.JSONB{}
+	params.LastSale = pgtype.JSONB{}
+	params.FirstCreated = pgtype.JSONB{}
+	params.Rarity = pgtype.JSONB{}
+	params.ExtraMetadata = nil
+	params.ImageProperties = pgtype.JSONB{}
+	params.VideoProperties = pgtype.JSONB{}
+	params.AudioProperties = pgtype.JSONB{}
+	params.ModelProperties = pgtype.JSONB{}
+	params.OtherProperties = pgtype.JSONB{}
+	params.KafkaOffset = nil
+	params.KafkaPartition = nil
+	params.KafkaTimestamp = nil
+	params.ExtraMetadataJsonb = pgtype.JSONB{}
+}
+
+func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializer, msg *kafka.Message, nft *base.Nft, params *mirrordb.ProcessBaseTokenEntryParams) (*mirrordb.ProcessBaseTokenEntryParams, error) {
 	key := string(msg.Key)
 
-	nft := ethereum.Nft{}
-	err := deserializer.DeserializeInto(*msg.TopicPartition.Topic, msg.Value, &nft)
+	initializeNft(nft)
+	err := deserializer.DeserializeInto(*msg.TopicPartition.Topic, msg.Value, nft)
 	if err != nil {
-		return mirrordb.ProcessBaseTokenEntryParams{}, fmt.Errorf("failed to deserialize token message with key %s: %w", key, err)
+		return nil, fmt.Errorf("failed to deserialize token message with key %s: %w", key, err)
 	}
 
 	actionType, err := getActionType(msg)
 	if err != nil {
 		err = fmt.Errorf("failed to get action type for msg: %v", msg)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	// If the NftID is not set, we can try to construct it from the chain, contract_address, and token_id
@@ -500,37 +602,37 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 
 	contractAddress, tokenID, err := parseNftID(nft.Nft_id)
 	if err != nil {
-		return mirrordb.ProcessBaseTokenEntryParams{}, fmt.Errorf("error parsing NftID: %w", err)
+		return nil, fmt.Errorf("error parsing NftID: %w", err)
 	}
 
 	previews, err := toJSONB(nft.Previews)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Previews to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	contract, err := toJSONB(nft.Contract)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Contract to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	lastSale, err := toJSONB(nft.Last_sale)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Last_sale to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	firstCreated, err := toJSONB(nft.First_created)
 	if err != nil {
 		err = fmt.Errorf("failed to convert First_created to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	rarity, err := toJSONB(nft.Rarity)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Rarity to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	extraMetadataJsonb, err := cleanJSONB(nft.Extra_metadata, true)
@@ -541,50 +643,50 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 			extraMetadataJsonb = pgtype.JSONB{Status: pgtype.Null}
 		} else {
 			err = fmt.Errorf("failed to convert Extra_metadata to JSONB: %w", err)
-			return mirrordb.ProcessBaseTokenEntryParams{}, err
+			return nil, err
 		}
 	}
 
 	imageProperties, err := toJSONB(nft.Image_properties)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Image_properties to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	videoProperties, err := toJSONB(nft.Video_properties)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Video_properties to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	audioProperties, err := toJSONB(nft.Audio_properties)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Audio_properties to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	modelProperties, err := toJSONB(nft.Model_properties)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Model_properties to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	otherProperties, err := toJSONB(nft.Other_properties)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Other_properties to JSONB: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	tokenCount, err := parseNumeric(nft.Token_count)
 	if err != nil {
 		err = fmt.Errorf("failed to parse Token_count: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	ownerCount, err := parseNumeric(nft.Owner_count)
 	if err != nil {
 		err = fmt.Errorf("failed to parse Owner_count: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
 	var collectionID *string
@@ -595,70 +697,66 @@ func parseTokenMessage(ctx context.Context, deserializer *avro.GenericDeserializ
 	onChainCreatedDate, err := parseTimestamp(nft.Created_date)
 	if err != nil {
 		err = fmt.Errorf("failed to parse Created_date: %w", err)
-		return mirrordb.ProcessBaseTokenEntryParams{}, err
+		return nil, err
 	}
 
-	var params mirrordb.ProcessBaseTokenEntryParams
+	initializeTokenParams(params)
 
 	if actionType == "delete" {
-		params = mirrordb.ProcessBaseTokenEntryParams{
-			ShouldDelete:       true,
-			SimplehashKafkaKey: key,
+		params.ShouldDelete = true
+		params.SimplehashKafkaKey = key
 
-			// pgtype.Numeric and pgtype.JSONB default to 'undefined' instead of 'null', so we actually need to
-			// set these explicitly or else we'll get an error when pgx tries to encode them.
-			TokenID:         pgtype.Numeric{Status: pgtype.Null},
-			TokenCount:      pgtype.Numeric{Status: pgtype.Null},
-			OwnerCount:      pgtype.Numeric{Status: pgtype.Null},
-			Previews:        pgtype.JSONB{Status: pgtype.Null},
-			Contract:        pgtype.JSONB{Status: pgtype.Null},
-			LastSale:        pgtype.JSONB{Status: pgtype.Null},
-			FirstCreated:    pgtype.JSONB{Status: pgtype.Null},
-			Rarity:          pgtype.JSONB{Status: pgtype.Null},
-			ImageProperties: pgtype.JSONB{Status: pgtype.Null},
-			VideoProperties: pgtype.JSONB{Status: pgtype.Null},
-			AudioProperties: pgtype.JSONB{Status: pgtype.Null},
-			ModelProperties: pgtype.JSONB{Status: pgtype.Null},
-			OtherProperties: pgtype.JSONB{Status: pgtype.Null},
-		}
+		// pgtype.Numeric and pgtype.JSONB default to 'undefined' instead of 'null', so we actually need to
+		// set these explicitly or else we'll get an error when pgx tries to encode them.
+		params.TokenID = pgtype.Numeric{Status: pgtype.Null}
+		params.TokenCount = pgtype.Numeric{Status: pgtype.Null}
+		params.OwnerCount = pgtype.Numeric{Status: pgtype.Null}
+		params.Previews = pgtype.JSONB{Status: pgtype.Null}
+		params.Contract = pgtype.JSONB{Status: pgtype.Null}
+		params.LastSale = pgtype.JSONB{Status: pgtype.Null}
+		params.FirstCreated = pgtype.JSONB{Status: pgtype.Null}
+		params.Rarity = pgtype.JSONB{Status: pgtype.Null}
+		params.ImageProperties = pgtype.JSONB{Status: pgtype.Null}
+		params.VideoProperties = pgtype.JSONB{Status: pgtype.Null}
+		params.AudioProperties = pgtype.JSONB{Status: pgtype.Null}
+		params.ModelProperties = pgtype.JSONB{Status: pgtype.Null}
+		params.OtherProperties = pgtype.JSONB{Status: pgtype.Null}
 	} else {
 		if actionType == "insert" || actionType == "update" {
-			params = mirrordb.ProcessBaseTokenEntryParams{
-				ShouldUpsert:       true,
-				SimplehashKafkaKey: key,
-				SimplehashNftID:    nft.Nft_id,
-				ContractAddress:    util.ToPointer(contractAddress.String()),
-				TokenID:            tokenID,
-				Name:               cleanString(nft.Name),
-				Description:        cleanString(nft.Description),
-				Previews:           previews,
-				ImageUrl:           cleanString(nft.Image_url),
-				VideoUrl:           cleanString(nft.Video_url),
-				AudioUrl:           cleanString(nft.Audio_url),
-				ModelUrl:           cleanString(nft.Model_url),
-				OtherUrl:           cleanString(nft.Other_url),
-				BackgroundColor:    cleanString(nft.Background_color),
-				ExternalUrl:        cleanString(nft.External_url),
-				OnChainCreatedDate: onChainCreatedDate,
-				Status:             cleanString(nft.Status),
-				TokenCount:         tokenCount,
-				OwnerCount:         ownerCount,
-				Contract:           contract,
-				CollectionID:       collectionID,
-				LastSale:           lastSale,
-				FirstCreated:       firstCreated,
-				Rarity:             rarity,
-				ExtraMetadata:      cleanString(nft.Extra_metadata),
-				ExtraMetadataJsonb: extraMetadataJsonb,
-				ImageProperties:    imageProperties,
-				VideoProperties:    videoProperties,
-				AudioProperties:    audioProperties,
-				ModelProperties:    modelProperties,
-				OtherProperties:    otherProperties,
-				KafkaOffset:        util.ToPointer(int64(msg.TopicPartition.Offset)),
-				KafkaPartition:     util.ToPointer(msg.TopicPartition.Partition),
-				KafkaTimestamp:     util.ToPointer(msg.Timestamp),
-			}
+			params.ShouldUpsert = true
+			params.SimplehashKafkaKey = key
+			params.SimplehashNftID = nft.Nft_id
+			params.ContractAddress = util.ToPointer(contractAddress.String())
+			params.TokenID = tokenID
+			params.Name = cleanString(nft.Name)
+			params.Description = cleanString(nft.Description)
+			params.Previews = previews
+			params.ImageUrl = cleanString(nft.Image_url)
+			params.VideoUrl = cleanString(nft.Video_url)
+			params.AudioUrl = cleanString(nft.Audio_url)
+			params.ModelUrl = cleanString(nft.Model_url)
+			params.OtherUrl = cleanString(nft.Other_url)
+			params.BackgroundColor = cleanString(nft.Background_color)
+			params.ExternalUrl = cleanString(nft.External_url)
+			params.OnChainCreatedDate = onChainCreatedDate
+			params.Status = cleanString(nft.Status)
+			params.TokenCount = tokenCount
+			params.OwnerCount = ownerCount
+			params.Contract = contract
+			params.CollectionID = collectionID
+			params.LastSale = lastSale
+			params.FirstCreated = firstCreated
+			params.Rarity = rarity
+			params.ExtraMetadata = cleanString(nft.Extra_metadata)
+			params.ExtraMetadataJsonb = extraMetadataJsonb
+			params.ImageProperties = imageProperties
+			params.VideoProperties = videoProperties
+			params.AudioProperties = audioProperties
+			params.ModelProperties = modelProperties
+			params.OtherProperties = otherProperties
+			params.KafkaOffset = util.ToPointer(int64(msg.TopicPartition.Offset))
+			params.KafkaPartition = util.ToPointer(msg.TopicPartition.Partition)
+			params.KafkaTimestamp = util.ToPointer(msg.Timestamp)
 		} else {
 			return params, fmt.Errorf("invalid action type: %s", actionType)
 		}
