@@ -94,17 +94,6 @@ jobs:
           gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: 'Deploy'
         run: make deploy-prod-opensea-streamer
-  deploy-prod-kafka-streamer:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: 'Install build deps'
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: 'Deploy'
-        run: make deploy-prod-kafka-streamer
   deploy-dev-feed:
     runs-on: ubuntu-latest
     steps:

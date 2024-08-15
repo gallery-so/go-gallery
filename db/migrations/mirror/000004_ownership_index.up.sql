@@ -1,2 +1,0 @@
-create unique index if not exists ethereum_owner_contract_token_id on ethereum.owners(owner_address, contract_address, token_id);
-create unique index if not exists ethereum_contract_token_id_owner on ethereum.owners(contract_address, token_id, owner_address);
