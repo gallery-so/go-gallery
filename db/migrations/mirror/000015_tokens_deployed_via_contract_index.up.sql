@@ -1,4 +1,0 @@
-create index if not exists ethereum_tokens_deployed_via_contract_idx on ethereum.tokens(lower(contract ->> 'deployed_via_contract'::text), contract_address, token_id);
-create index if not exists base_tokens_deployed_via_contract_idx on base.tokens(lower(contract ->> 'deployed_via_contract'::text), contract_address, token_id);
-create index if not exists zora_tokens_deployed_via_contract_idx on zora.tokens(lower(contract ->> 'deployed_via_contract'::text), contract_address, token_id);
-create index if not exists base_sepolia_tokens_deployed_via_contract_idx on base_sepolia.tokens(lower(contract ->> 'deployed_via_contract'::text), contract_address, token_id);

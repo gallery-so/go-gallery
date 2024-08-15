@@ -23,10 +23,6 @@ func init() {
 func main() {
 	migrations := "./db/migrations/core"
 
-	if len(os.Args) > 1 && os.Args[1] == "mirror" {
-		migrations = "./db/migrations/mirror"
-	}
-
 	superRequired, err := migrate.SuperUserRequired(migrations)
 	if err != nil {
 		panic(err)
