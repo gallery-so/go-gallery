@@ -22,7 +22,7 @@ CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run 
 CLOUD_JOB_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run jobs update $(JOB_NAME) --image $(IMAGE_TAG) --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) $(JOB_OPTIONS) --env-vars-file {} --quiet'
 SCHEDULER_DEPLOY     = gcloud scheduler jobs create http $(CRON_NAME) --location $(CRON_LOCATION) --schedule $(CRON_SCHEDULE) --uri $(CRON_URI) --http-method $(CRON_METHOD)
 CRON_NAME            = $(CRON_PREFIX)-$(DEPLOY_VERSION)
-BASE_DEPLOY_FLAGS    = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
+BASE_DEPLOY_FLAGS    = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --labels service=$(SERVICE) --platform managed --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
 DEPLOY_FLAGS         = $(BASE_DEPLOY_FLAGS) --cpu-throttling
 DEPLOY_REGION        = us-east1
 SENTRY_RELEASE       = sentry-cli releases -o $(SENTRY_ORG) -p $(SENTRY_PROJECT)
