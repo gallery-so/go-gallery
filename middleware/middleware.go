@@ -241,7 +241,7 @@ func Tracing() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		description := fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)
 		span, ctx := tracing.StartSpan(c.Request.Context(), "gin.server", description,
-			sentry.TransactionName(description),
+			sentry.WithTransactionName(description),
 			sentry.ContinueFromRequest(c.Request),
 		)
 

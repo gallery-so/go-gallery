@@ -376,7 +376,7 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 
 		if trace {
 			transactionName := fmt.Sprintf("%s %s (%s)", gc.Request.Method, gc.Request.URL.Path, operationName)
-			span, ctx = tracing.StartSpan(ctx, "gql.request", operationName, sentry.TransactionName(transactionName))
+			span, ctx = tracing.StartSpan(ctx, "gql.request", operationName, sentry.WithTransactionName(transactionName))
 		}
 
 		scrubbedQuery, scrubbedVariables := getScrubbedQuery(ctx, schema, oc.Doc, oc.RawQuery, oc.Variables)

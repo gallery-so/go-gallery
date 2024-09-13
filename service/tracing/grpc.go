@@ -21,7 +21,7 @@ func (t TracingInterceptor) UnaryInterceptor(ctx context.Context, method string,
 		}
 	}
 
-	span, ctx := StartSpan(ctx, "grpc.call", method, sentry.TransactionName(method))
+	span, ctx := StartSpan(ctx, "grpc.call", method, sentry.WithTransactionName(method))
 	defer FinishSpan(span)
 
 	err := invoker(ctx, method, req, reply, cc, opts...)

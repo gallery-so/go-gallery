@@ -44,12 +44,13 @@ func InitServer() {
 }
 
 func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain.Provider) *gin.Engine {
-	InitSentry()
+	//InitSentry()
 	logger.InitWithGCPDefaults()
 
 	router := gin.Default()
 
-	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	//router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.GinContextToContext(), middleware.HandleCORS(), middleware.ErrLogger())
 
 	notificationsHandler := notifications.New(clients.Queries, clients.PubSubClient, clients.TaskClient, redis.NewLockClient(redis.NewCache(redis.NotificationLockCache)), false)
 
