@@ -261,22 +261,6 @@ func RecoverAndRaise(ctx context.Context) {
 	}
 }
 
-// TransactionNameSafe sets the name for the current transaction if a name is not already set.
-func TransactionNameSafe(name string) sentry.SpanOption {
-	return func(s *sentry.Span) {
-		hub := sentry.GetHubFromContext(s.Context())
-		if hub == nil {
-			hub = sentry.CurrentHub()
-		}
-
-		if hub.Scope().Transaction() != "" {
-			return
-		}
-
-		sentry.TransactionName(name)(s)
-	}
-}
-
 func getSpanDuration(s *sentry.Span) time.Duration {
 	return s.EndTime.Sub(s.StartTime)
 }

@@ -32,7 +32,7 @@ func InitServer() {
 }
 
 func CoreInitServer(ctx context.Context) *gin.Engine {
-	InitSentry()
+	//InitSentry()
 	logger.InitWithGCPDefaults()
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
@@ -45,6 +45,7 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 	// no cache for now, but we should add one if we ever do anything with followers here
 	ney := farcaster.NewNeynarAPI(http.DefaultClient, nil, queries)
 	repos := postgres.NewRepositories(db, pgx)
+	//router.Use(middleware.GinContextToContext(), middleware.HandleCORS(), middleware.ErrLogger())
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 	router.POST("/process/users", processUsers(queries, ney, lens.NewAPI(http.DefaultClient), repos))
 	router.POST("/checkFarcasterApproval", checkFarcasterApproval(queries, ney))
