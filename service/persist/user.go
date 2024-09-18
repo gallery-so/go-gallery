@@ -309,8 +309,8 @@ func (r *Role) Scan(i interface{}) error {
 }
 
 // Value implements the database/sql driver Valuer interface for the DBID type
-func (r *Role) Value() (driver.Value, error) {
-	return r, nil
+func (r Role) Value() (driver.Value, error) {
+	return string(r), nil
 }
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
@@ -380,8 +380,8 @@ func (p *Persona) Scan(i interface{}) error {
 }
 
 // Value implements the database/sql driver Valuer interface for the Persona type
-func (p *Persona) Value() (driver.Value, error) {
-	return p, nil
+func (p Persona) Value() (driver.Value, error) {
+	return string(p), nil
 }
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface

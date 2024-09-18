@@ -499,7 +499,7 @@ func (c Chain) BaseKeywords() (image []string, anim []string) {
 
 // Value implements the driver.Valuer interface for the Chain type
 func (c Chain) Value() (driver.Value, error) {
-	return c, nil
+	return int64(c), nil
 }
 
 // Scan implements the sql.Scanner interface for the Chain type
