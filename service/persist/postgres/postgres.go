@@ -23,6 +23,8 @@ import (
 	// _ "github.com/lib/pq"
 )
 
+var DefaultConnectRetry = retry.Retry{MinWait: 2, MaxWait: 4, MaxRetries: 3}
+
 type ErrRoleDoesNotExist struct {
 	role string
 }
@@ -37,6 +39,7 @@ type connectionParams struct {
 	dbname   string
 	host     string
 	port     int
+	appname  string
 	retry    *retry.Retry
 }
 
@@ -93,7 +96,7 @@ func newConnectionParamsFromEnv() connectionParams {
 		port:     env.GetInt("POSTGRES_PORT"),
 
 		// Retry connections by default
-		retry: &retry.Retry{MinWait: 2, MaxWait: 4, MaxRetries: 3},
+		retry: &DefaultConnectRetry,
 	}
 }
 
@@ -126,6 +129,12 @@ func WithHost(host string) ConnectionOption {
 func WithPort(port int) ConnectionOption {
 	return func(params *connectionParams) {
 		params.port = port
+	}
+}
+
+func WithAppName(appName string) ConnectionOption {
+	return func(params *connectionParams) {
+		params.appname = appName
 	}
 }
 
@@ -206,6 +215,10 @@ func NewPgxClient(opts ...ConnectionOption) *pgxpool.Pool {
 	if err != nil {
 		logger.For(nil).WithError(err).Fatal("could not parse pgx connection string")
 		panic(err)
+	}
+
+	if params.appname != "" {
+		config.ConnConfig.RuntimeParams["application_name"] = params.appname
 	}
 
 	config.ConnConfig.Logger = &pgxTracer{continueOnly: true}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v4/pgxpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -63,10 +64,17 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 
 	apiURL := env.GetString("EXPO_PUSH_API_URL")
 	accessToken := env.GetString("EXPO_PUSH_ACCESS_TOKEN")
-	expoHandler := expo.NewPushNotificationHandler(ctx, queries, apiURL, accessToken)
 
+	expoHandler := expo.NewPushNotificationHandler(ctx, queries, apiURL, accessToken)
 	taskGroup.POST("send-push-notification", sendPushNotificationHandler(expoHandler))
 	jobGroup.POST("check-push-tickets", checkPushTicketsHandler(expoHandler))
+
+	// Moshi handlers
+	moshiDB := newMoshiDB()
+	moshiQueries := db.New(moshiDB)
+	moshiHandler := expo.NewPushNotificationHandler(ctx, moshiQueries, apiURL, accessToken)
+	router.POST("moshi/tasks/send-push-notification", sendPushNotificationHandler(moshiHandler))
+	router.POST("moshi/jobs/check-push-tickets", checkPushTicketsHandler(moshiHandler))
 
 	return router
 }
@@ -120,6 +128,18 @@ func checkPushTicketsHandler(expoHandler *expo.PushNotificationHandler) gin.Hand
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+func newMoshiDB() *pgxpool.Pool {
+	return postgres.NewPgxClient(
+		postgres.WithUser(env.GetString("MOSHI_POSTGRES_USER")),
+		postgres.WithPassword(env.GetString("MOSHI_POSTGRES_PASSWORD")),
+		postgres.WithDBName(env.GetString("MOSHI_POSTGRES_DB")),
+		postgres.WithHost(env.GetString("MOSHI_POSTGRES_HOST")),
+		postgres.WithPort(env.GetInt("MOSHI_POSTGRES_PORT")),
+		postgres.WithRetries(postgres.DefaultConnectRetry),
+		postgres.WithAppName("pushnotifications"),
+	)
 }
 
 func setDefaults() {
