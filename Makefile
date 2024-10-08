@@ -162,6 +162,7 @@ $(DEPLOY)-%-pushnotifications          : MEMORY         := $(PUSH_NOTIFICATIONS_
 $(DEPLOY)-%-pushnotifications          : CONCURRENCY    := $(PUSH_NOTIFICATIONS_CONCURRENCY)
 $(DEPLOY)-$(DEV)-pushnotifications     : SERVICE        := pushnotifications-dev
 $(DEPLOY)-$(PROD)-pushnotifications    : SERVICE        := pushnotifications
+$(DEPLOY)-$(PROD)-pushnotifications    : SQL_INSTANCES  := $(SQL_INSTANCES),$(SQL_CONNECTION_NAME_MOSHI_PROD_DB)
 $(DEPLOY)-%-dummymetadata              : REPO           := dummymetadata
 $(DEPLOY)-%-dummymetadata              : DOCKER_FILE    := $(DOCKER_DIR)/dummymetadata/Dockerfile
 $(DEPLOY)-%-dummymetadata              : PORT           := 8500
