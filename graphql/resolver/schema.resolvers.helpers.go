@@ -2527,34 +2527,15 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 	}
 }
 
-// getGIFMedia returns VideoMedia because we convert GIFs to videos.
-func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, darkMode persist.DarkMode) model.VideoMedia {
+func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, darkMode persist.DarkMode) model.GIFMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
-	options := make([]mediamapper.Option, 2)
-	options[0] = mediamapper.WithFormatVideo()
-
-	// GIFs support transparency, but MP4s don't, so we need to set a background color for the MP4
-	// that will look transparent.
-	if darkMode == persist.DarkModeEnabled {
-		options[1] = mediamapper.WithBackgroundColor(darkModeMP4BackgroundColor)
-	} else {
-		options[1] = mediamapper.WithBackgroundColor(lightModeMP4BackgroundColor)
-	}
-
-	mm := mediamapper.For(ctx)
-	videoUrls := model.VideoURLSet{
-		Raw:    util.ToPointer(mm.GetLargeImageUrl(url, options...)),
-		Small:  util.ToPointer(mm.GetSmallImageUrl(url, options...)),
-		Medium: util.ToPointer(mm.GetMediumImageUrl(url, options...)),
-		Large:  util.ToPointer(mm.GetLargeImageUrl(url, options...)),
-	}
-
-	return model.VideoMedia{
-		PreviewURLs:       previewURLsFromTokenMedia(ctx, tokenMedia, mediamapper.WithStaticImage()),
+	return model.GIFMedia{
+		PreviewURLs:       previewURLsFromTokenMedia(ctx, tokenMedia),
+		StaticPreviewURLs: previewURLsFromTokenMedia(ctx, tokenMedia, mediamapper.WithStaticImage()),
 		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:         (*string)(&tokenMedia.Media.MediaType),
-		ContentRenderURLs: &videoUrls,
+		ContentRenderURL:  &url,
 		Dimensions:        mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:     fallbackMedia,
 	}

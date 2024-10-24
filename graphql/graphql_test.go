@@ -1068,7 +1068,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia](*tokens[0].Media)
+		media := waitForSynced[*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia](*tokens[0].Media)
 		assert.Equal(t, string(persist.MediaTypeGIF), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
