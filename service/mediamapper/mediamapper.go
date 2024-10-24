@@ -23,6 +23,8 @@ const contextKey = "mediamapper.instance"
 
 const assetDomain = "assets.gallery.so"
 
+const imgixEnabled = false
+
 const (
 	thumbnailWidth = 64
 	smallWidth     = 204
@@ -104,6 +106,10 @@ func getDefaultParams() []imgix.IxParam {
 }
 
 func (u *MediaMapper) buildPreviewImageUrl(sourceUrl string, width int, params []imgix.IxParam, options ...Option) string {
+	if !imgixEnabled {
+		return setGoogleWidthParams(sourceUrl, width)
+	}
+
 	if sourceUrl == "" {
 		return sourceUrl
 	}
@@ -115,6 +121,10 @@ func (u *MediaMapper) buildPreviewImageUrl(sourceUrl string, width int, params [
 }
 
 func (u *MediaMapper) buildSrcSet(sourceUrl string, params []imgix.IxParam, options ...Option) string {
+	if !imgixEnabled {
+		return sourceUrl
+	}
+
 	if sourceUrl == "" {
 		return sourceUrl
 	}
@@ -201,6 +211,10 @@ func (u *MediaMapper) GetSrcSet(sourceUrl string, options ...Option) string {
 }
 
 func (u *MediaMapper) GetBlurhash(sourceUrl string) *string {
+	if !imgixEnabled {
+		return nil
+	}
+
 	url := u.urlBuilder.CreateURL(sourceUrl, imgix.Param("fm", "blurhash"))
 
 	req, err := http.NewRequestWithContext(context.Background(), "GET", url, bytes.NewBuffer([]byte{}))
@@ -229,6 +243,10 @@ func (u *MediaMapper) GetBlurhash(sourceUrl string) *string {
 }
 
 func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
+	if !imgixEnabled {
+		return nil
+	}
+
 	url := u.urlBuilder.CreateURL(sourceUrl, buildParams(getDefaultParams(), imgix.Param("fm", "json"))...)
 
 	rawResponse, err := http.Get(url)
@@ -264,6 +282,10 @@ func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
 }
 
 func PurgeImage(ctx context.Context, u string) error {
+	if !imgixEnabled {
+		return nil
+	}
+
 	// '{ "data": { "attributes": { "url": "<url-to-purge>" }, "type": "purges" } }'
 	body := map[string]interface{}{
 		"data": map[string]interface{}{
