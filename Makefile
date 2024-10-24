@@ -548,16 +548,16 @@ abi-gen:
 
 # Miscellaneous stuff
 docker-start-clean:	docker-build
-	docker-compose up -d
+	docker compose up -d
 
 docker-build: docker-stop
-	docker-compose build
+	docker compose build
 
 docker-start: docker-stop
-	docker-compose up -d
+	docker compose up -d
 
 docker-stop:
-	docker-compose down
+	docker compose down
 
 format-graphql:
 	yarn install;
@@ -565,13 +565,13 @@ format-graphql:
 	yarn prettier --write graphql/testdata/operations.graphql;
 
 start-local-graphql-gateway:
-	docker-compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-local
+	docker compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-local
 
 start-dev-graphql-gateway:
-	docker-compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-dev
+	docker compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-dev
 
 start-prod-graphql-gateway:
-	docker-compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-prod
+	docker compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-prod
 
 # Listing targets as dependencies doesn't pull in target-specific secrets, so we need to
 # invoke $(MAKE) here to read appropriate secrets for each target.
@@ -580,13 +580,13 @@ start-sql-proxy:
 	$(MAKE) start-prod-sql-proxy
 
 start-dev-sql-proxy:
-	docker-compose -f docker/cloud_sql_proxy/docker-compose.yml up -d cloud-sql-proxy-dev
+	docker compose -f docker/cloud_sql_proxy/docker-compose.yml up -d cloud-sql-proxy-dev
 
 start-prod-sql-proxy:
-	docker-compose -f docker/cloud_sql_proxy/docker-compose.yml up -d cloud-sql-proxy-prod
+	docker compose -f docker/cloud_sql_proxy/docker-compose.yml up -d cloud-sql-proxy-prod
 
 stop-sql-proxy:
-	docker-compose -f docker/cloud_sql_proxy/docker-compose.yml down
+	docker compose -f docker/cloud_sql_proxy/docker-compose.yml down
 
 migrate-local-coredb:
 	go run cmd/migrate/main.go
