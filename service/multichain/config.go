@@ -20,12 +20,10 @@ type ChainProvider struct {
 
 type EthereumProvider struct {
 	common.ContractFetcher
-	common.ContractsCreatorFetcher
 	common.TokenDescriptorsFetcher
 	common.TokenIdentifierOwnerFetcher
 	common.TokenMetadataBatcher
 	common.TokenMetadataFetcher
-	common.TokensByContractWalletFetcher
 	common.TokensByTokenIdentifiersFetcher
 	common.TokensIncrementalContractFetcher
 	common.TokensIncrementalOwnerFetcher
@@ -34,12 +32,10 @@ type EthereumProvider struct {
 
 type TezosProvider struct {
 	common.ContractFetcher
-	common.ContractsCreatorFetcher
 	common.TokenDescriptorsFetcher
 	common.TokenIdentifierOwnerFetcher
 	common.TokenMetadataBatcher
 	common.TokenMetadataFetcher
-	common.TokensByContractWalletFetcher
 	common.TokensByTokenIdentifiersFetcher
 	common.TokensIncrementalContractFetcher
 	common.TokensIncrementalOwnerFetcher
@@ -48,12 +44,10 @@ type TezosProvider struct {
 
 type OptimismProvider struct {
 	common.ContractFetcher
-	common.ContractsCreatorFetcher
 	common.TokenDescriptorsFetcher
 	common.TokenIdentifierOwnerFetcher
 	common.TokenMetadataBatcher
 	common.TokenMetadataFetcher
-	common.TokensByContractWalletFetcher
 	common.TokensByTokenIdentifiersFetcher
 	common.TokensIncrementalContractFetcher
 	common.TokensIncrementalOwnerFetcher
@@ -61,12 +55,10 @@ type OptimismProvider struct {
 
 type ArbitrumProvider struct {
 	common.ContractFetcher
-	common.ContractsCreatorFetcher
 	common.TokenDescriptorsFetcher
 	common.TokenIdentifierOwnerFetcher
 	common.TokenMetadataBatcher
 	common.TokenMetadataFetcher
-	common.TokensByContractWalletFetcher
 	common.TokensByTokenIdentifiersFetcher
 	common.TokensIncrementalContractFetcher
 	common.TokensIncrementalOwnerFetcher
@@ -81,12 +73,10 @@ type PoapProvider struct {
 
 type ZoraProvider struct {
 	common.ContractFetcher
-	common.ContractsCreatorFetcher
 	common.TokenDescriptorsFetcher
 	common.TokenIdentifierOwnerFetcher
 	common.TokenMetadataBatcher
 	common.TokenMetadataFetcher
-	common.TokensByContractWalletFetcher
 	common.TokensByTokenIdentifiersFetcher
 	common.TokensIncrementalContractFetcher
 	common.TokensIncrementalOwnerFetcher
@@ -94,12 +84,10 @@ type ZoraProvider struct {
 
 type BaseProvider struct {
 	common.ContractFetcher
-	common.ContractsCreatorFetcher
 	common.TokenDescriptorsFetcher
 	common.TokenIdentifierOwnerFetcher
 	common.TokenMetadataBatcher
 	common.TokenMetadataFetcher
-	common.TokensByContractWalletFetcher
 	common.TokensByTokenIdentifiersFetcher
 	common.TokensIncrementalContractFetcher
 	common.TokensIncrementalOwnerFetcher
@@ -107,12 +95,10 @@ type BaseProvider struct {
 
 type PolygonProvider struct {
 	common.ContractFetcher
-	common.ContractsCreatorFetcher
 	common.TokenDescriptorsFetcher
 	common.TokenIdentifierOwnerFetcher
 	common.TokenMetadataBatcher
 	common.TokenMetadataFetcher
-	common.TokensByContractWalletFetcher
 	common.TokensByTokenIdentifiersFetcher
 	common.TokensIncrementalContractFetcher
 	common.TokensIncrementalOwnerFetcher

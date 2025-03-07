@@ -5,6 +5,7 @@ package multichain
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -15,7 +16,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/common"
 	"github.com/mikeydub/go-gallery/service/multichain/custom"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
-	"github.com/mikeydub/go-gallery/service/multichain/simplehash"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/multichain/wrapper"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -83,7 +83,7 @@ func ethInjector(context.Context, *http.Client, *ethclient.Client) *EthereumProv
 		ethProviderInjector,
 		ethSyncPipelineInjector,
 		ethVerifierInjector,
-		simplehash.NewProvider,
+		alchemy.NewProvider,
 	))
 }
 
@@ -95,17 +95,15 @@ func ethProviderInjector(
 	ctx context.Context,
 	syncPipeline *wrapper.SyncPipelineWrapper,
 	verifier *eth.Verifier,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 ) *EthereumProvider {
 	panic(wire.Build(
 		wire.Struct(new(EthereumProvider), "*"),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.ContractsCreatorFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
@@ -117,17 +115,16 @@ func ethSyncPipelineInjector(
 	ctx context.Context,
 	httpClient *http.Client,
 	chain persist.Chain,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
 		customMetadataHandlersInjector,
 	))
 }
@@ -137,32 +134,30 @@ func tezosInjector(*http.Client) *TezosProvider {
 		tezosProviderInjector,
 		wire.Value(persist.ChainTezos),
 		tezos.NewProvider,
-		simplehash.NewProvider,
+		alchemy.NewProvider,
 	)
 	return nil
 }
 
-func tezosProviderInjector(tezosProvider *tezos.Provider, simplehashProvider *simplehash.Provider) *TezosProvider {
+func tezosProviderInjector(tezosProvider *tezos.Provider, alchemyProvider *alchemy.Provider) *TezosProvider {
 	panic(wire.Build(
 		wire.Struct(new(TezosProvider), "*"),
 		wire.Bind(new(common.Verifier), util.ToPointer(tezosProvider)),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.ContractsCreatorFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
 	))
 }
 
 func optimismInjector(context.Context, *http.Client, *ethclient.Client) *OptimismProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainOptimism),
-		simplehash.NewProvider,
+		alchemy.NewProvider,
 		optimismProviderInjector,
 		optimismSyncPipelineInjector,
 	))
@@ -170,17 +165,15 @@ func optimismInjector(context.Context, *http.Client, *ethclient.Client) *Optimis
 
 func optimismProviderInjector(
 	syncPipeline *wrapper.SyncPipelineWrapper,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 ) *OptimismProvider {
 	panic(wire.Build(
 		wire.Struct(new(OptimismProvider), "*"),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.ContractsCreatorFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
@@ -191,17 +184,16 @@ func optimismSyncPipelineInjector(
 	ctx context.Context,
 	httpClient *http.Client,
 	chain persist.Chain,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
 		customMetadataHandlersInjector,
 	))
 }
@@ -209,7 +201,7 @@ func optimismSyncPipelineInjector(
 func arbitrumInjector(context.Context, *http.Client, *ethclient.Client) *ArbitrumProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainArbitrum),
-		simplehash.NewProvider,
+		alchemy.NewProvider,
 		arbitrumProviderInjector,
 		arbitrumSyncPipelineInjector,
 	))
@@ -217,18 +209,16 @@ func arbitrumInjector(context.Context, *http.Client, *ethclient.Client) *Arbitru
 
 func arbitrumProviderInjector(
 	syncPipeline *wrapper.SyncPipelineWrapper,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 ) *ArbitrumProvider {
 	panic(wire.Build(
 		wire.Struct(new(ArbitrumProvider), "*"),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.ContractsCreatorFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
 	))
@@ -238,17 +228,16 @@ func arbitrumSyncPipelineInjector(
 	ctx context.Context,
 	httpClient *http.Client,
 	chain persist.Chain,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
 		customMetadataHandlersInjector,
 	))
 }
@@ -273,7 +262,7 @@ func poapProviderInjector(poapProvider *poap.Provider) *PoapProvider {
 func zoraInjector(context.Context, *http.Client, *ethclient.Client) *ZoraProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainZora),
-		simplehash.NewProvider,
+		alchemy.NewProvider,
 		zoraProviderInjector,
 		zoraSyncPipelineInjector,
 	))
@@ -281,17 +270,15 @@ func zoraInjector(context.Context, *http.Client, *ethclient.Client) *ZoraProvide
 
 func zoraProviderInjector(
 	syncPipeline *wrapper.SyncPipelineWrapper,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 ) *ZoraProvider {
 	panic(wire.Build(
 		wire.Struct(new(ZoraProvider), "*"),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.ContractsCreatorFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
@@ -302,17 +289,16 @@ func zoraSyncPipelineInjector(
 	ctx context.Context,
 	httpClient *http.Client,
 	chain persist.Chain,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
 		customMetadataHandlersInjector,
 	))
 }
@@ -320,7 +306,7 @@ func zoraSyncPipelineInjector(
 func baseInjector(context.Context, *http.Client, *ethclient.Client) *BaseProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainBase),
-		simplehash.NewProvider,
+		alchemy.NewProvider,
 		baseProvidersInjector,
 		baseSyncPipelineInjector,
 	))
@@ -328,18 +314,16 @@ func baseInjector(context.Context, *http.Client, *ethclient.Client) *BaseProvide
 
 func baseProvidersInjector(
 	syncPipeline *wrapper.SyncPipelineWrapper,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *BaseProvider {
 	panic(wire.Build(
 		wire.Struct(new(BaseProvider), "*"),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.ContractsCreatorFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
@@ -350,17 +334,16 @@ func baseSyncPipelineInjector(
 	ctx context.Context,
 	httpClient *http.Client,
 	chain persist.Chain,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
 		customMetadataHandlersInjector,
 	))
 }
@@ -368,7 +351,7 @@ func baseSyncPipelineInjector(
 func polygonInjector(context.Context, *http.Client, *ethclient.Client) *PolygonProvider {
 	panic(wire.Build(
 		wire.Value(persist.ChainPolygon),
-		simplehash.NewProvider,
+		alchemy.NewProvider,
 		polygonProvidersInjector,
 		polygonSyncPipelineInjector,
 	))
@@ -376,21 +359,19 @@ func polygonInjector(context.Context, *http.Client, *ethclient.Client) *PolygonP
 
 func polygonProvidersInjector(
 	syncPipeline *wrapper.SyncPipelineWrapper,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *PolygonProvider {
 	panic(wire.Build(
 		wire.Struct(new(PolygonProvider), "*"),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
 		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(syncPipeline)),
 		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.ContractsCreatorFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(alchemyProvider)),
 	))
 }
 
@@ -398,17 +379,16 @@ func polygonSyncPipelineInjector(
 	ctx context.Context,
 	httpClient *http.Client,
 	chain persist.Chain,
-	simplehashProvider *simplehash.Provider,
+	alchemyProvider *alchemy.Provider,
 	ethClient *ethclient.Client,
 ) *wrapper.SyncPipelineWrapper {
 	panic(wire.Build(
 		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByContractWalletFetcher), util.ToPointer(simplehashProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(simplehashProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
 		customMetadataHandlersInjector,
 	))
 }

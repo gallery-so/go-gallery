@@ -22,6 +22,15 @@ const (
 	ActionTokensaddedtocollection         Action = "TokensAddedToCollection"
 )
 
+var AllAction = []Action{
+	ActionUsercreated,
+	ActionUserfollowedusers,
+	ActionCollectorsnoteaddedtotoken,
+	ActionCollectioncreated,
+	ActionCollectorsnoteaddedtocollection,
+	ActionTokensaddedtocollection,
+}
+
 type AuthMechanism struct {
 	Eoa               *EoaAuth               `json:"eoa"`
 	GnosisSafe        *GnosisSafeAuth        `json:"gnosisSafe"`
@@ -65,6 +74,17 @@ const (
 	ChainZora     Chain = "Zora"
 	ChainBase     Chain = "Base"
 )
+
+var AllChain = []Chain{
+	ChainEthereum,
+	ChainArbitrum,
+	ChainPolygon,
+	ChainOptimism,
+	ChainTezos,
+	ChainPoap,
+	ChainZora,
+	ChainBase,
+}
 
 type ChainAddressInput struct {
 	Address string `json:"address"`
@@ -330,6 +350,10 @@ const (
 	ImportWalletSourceFarcaster ImportWalletSource = "Farcaster"
 )
 
+var AllImportWalletSource = []ImportWalletSource{
+	ImportWalletSourceFarcaster,
+}
+
 type IntervalInput struct {
 	Start  int `json:"start"`
 	Length int `json:"length"`
@@ -469,6 +493,12 @@ const (
 	ReportWindowAllTime   ReportWindow = "ALL_TIME"
 )
 
+var AllReportWindow = []ReportWindow{
+	ReportWindowLast5Days,
+	ReportWindowLast7Days,
+	ReportWindowAllTime,
+}
+
 type SocialAccountType string
 
 const (
@@ -476,6 +506,12 @@ const (
 	SocialAccountTypeFarcaster SocialAccountType = "Farcaster"
 	SocialAccountTypeLens      SocialAccountType = "Lens"
 )
+
+var AllSocialAccountType = []SocialAccountType{
+	SocialAccountTypeTwitter,
+	SocialAccountTypeFarcaster,
+	SocialAccountTypeLens,
+}
 
 type SocialAuthMechanism struct {
 	Twitter   *TwitterAuth     `json:"twitter"`
@@ -628,6 +664,25 @@ const (
 	UserExperienceTypeCreatorbetamicroannouncementmodal      UserExperienceType = "CreatorBetaMicroAnnouncementModal"
 	UserExperienceTypeRadiancemintapr2024                    UserExperienceType = "RadianceMintApr2024"
 )
+
+var AllUserExperienceType = []UserExperienceType{
+	UserExperienceTypeMultigalleryannouncement,
+	UserExperienceTypeEmailupsell,
+	UserExperienceTypeMerchstoreupsell,
+	UserExperienceTypeMaintenancefeb2023,
+	UserExperienceTypeMaintenanceaug2023,
+	UserExperienceTypeTwitterconnectiononboardingupsell,
+	UserExperienceTypeUpsellmintmemento4,
+	UserExperienceTypeUpsellgalleryselects1,
+	UserExperienceTypeMobileupsell1,
+	UserExperienceTypeMobilebetaupsell,
+	UserExperienceTypeUpsellmintmemento5,
+	UserExperienceTypeUpsellbanner,
+	UserExperienceTypePostsbetaannouncement,
+	UserExperienceTypeCreatorbetafullscreenannouncementmodal,
+	UserExperienceTypeCreatorbetamicroannouncementmodal,
+	UserExperienceTypeRadiancemintapr2024,
+}
 
 // __addUserWalletMutationInput is used internally by genqlient
 type __addUserWalletMutationInput struct {
@@ -11637,7 +11692,7 @@ func __marshalviewerQueryViewerViewerOrError(v *viewerQueryViewerViewerOrError) 
 	}
 }
 
-// The query or mutation executed by addUserWalletMutation.
+// The mutation executed by addUserWalletMutation.
 const addUserWalletMutation_Operation = `
 mutation addUserWalletMutation ($chainAddress: ChainAddressInput!, $authMechanism: AuthMechanism!) {
 	addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
@@ -11668,7 +11723,7 @@ func addUserWalletMutation(
 	client_ graphql.Client,
 	chainAddress ChainAddressInput,
 	authMechanism AuthMechanism,
-) (*addUserWalletMutationResponse, error) {
+) (data_ *addUserWalletMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "addUserWalletMutation",
 		Query:  addUserWalletMutation_Operation,
@@ -11677,10 +11732,9 @@ func addUserWalletMutation(
 			AuthMechanism: authMechanism,
 		},
 	}
-	var err_ error
 
-	var data_ addUserWalletMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &addUserWalletMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -11688,10 +11742,10 @@ func addUserWalletMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by admireCommentMutation.
+// The mutation executed by admireCommentMutation.
 const admireCommentMutation_Operation = `
 mutation admireCommentMutation ($commentId: DBID!) {
 	admireComment(commentId: $commentId) {
@@ -11713,7 +11767,7 @@ func admireCommentMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	commentId persist.DBID,
-) (*admireCommentMutationResponse, error) {
+) (data_ *admireCommentMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "admireCommentMutation",
 		Query:  admireCommentMutation_Operation,
@@ -11721,10 +11775,9 @@ func admireCommentMutation(
 			CommentId: commentId,
 		},
 	}
-	var err_ error
 
-	var data_ admireCommentMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &admireCommentMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -11732,10 +11785,10 @@ func admireCommentMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by admireFeedEventMutation.
+// The mutation executed by admireFeedEventMutation.
 const admireFeedEventMutation_Operation = `
 mutation admireFeedEventMutation ($feedEventId: DBID!) {
 	admireFeedEvent(feedEventId: $feedEventId) {
@@ -11757,7 +11810,7 @@ func admireFeedEventMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	feedEventId persist.DBID,
-) (*admireFeedEventMutationResponse, error) {
+) (data_ *admireFeedEventMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "admireFeedEventMutation",
 		Query:  admireFeedEventMutation_Operation,
@@ -11765,10 +11818,9 @@ func admireFeedEventMutation(
 			FeedEventId: feedEventId,
 		},
 	}
-	var err_ error
 
-	var data_ admireFeedEventMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &admireFeedEventMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -11776,10 +11828,10 @@ func admireFeedEventMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by admirePostMutation.
+// The mutation executed by admirePostMutation.
 const admirePostMutation_Operation = `
 mutation admirePostMutation ($postId: DBID!) {
 	admirePost(postId: $postId) {
@@ -11801,7 +11853,7 @@ func admirePostMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	postId persist.DBID,
-) (*admirePostMutationResponse, error) {
+) (data_ *admirePostMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "admirePostMutation",
 		Query:  admirePostMutation_Operation,
@@ -11809,10 +11861,9 @@ func admirePostMutation(
 			PostId: postId,
 		},
 	}
-	var err_ error
 
-	var data_ admirePostMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &admirePostMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -11820,10 +11871,10 @@ func admirePostMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by admireTokenMutation.
+// The mutation executed by admireTokenMutation.
 const admireTokenMutation_Operation = `
 mutation admireTokenMutation ($tokenId: DBID!) {
 	admireToken(tokenId: $tokenId) {
@@ -11845,7 +11896,7 @@ func admireTokenMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	tokenId persist.DBID,
-) (*admireTokenMutationResponse, error) {
+) (data_ *admireTokenMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "admireTokenMutation",
 		Query:  admireTokenMutation_Operation,
@@ -11853,10 +11904,9 @@ func admireTokenMutation(
 			TokenId: tokenId,
 		},
 	}
-	var err_ error
 
-	var data_ admireTokenMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &admireTokenMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -11864,10 +11914,10 @@ func admireTokenMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by commentOnFeedEventMutation.
+// The mutation executed by commentOnFeedEventMutation.
 const commentOnFeedEventMutation_Operation = `
 mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
 	commentOnFeedEvent(feedEventId: $feedEventId, comment: $comment) {
@@ -11893,7 +11943,7 @@ func commentOnFeedEventMutation(
 	client_ graphql.Client,
 	feedEventId persist.DBID,
 	comment string,
-) (*commentOnFeedEventMutationResponse, error) {
+) (data_ *commentOnFeedEventMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "commentOnFeedEventMutation",
 		Query:  commentOnFeedEventMutation_Operation,
@@ -11902,10 +11952,9 @@ func commentOnFeedEventMutation(
 			Comment:     comment,
 		},
 	}
-	var err_ error
 
-	var data_ commentOnFeedEventMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &commentOnFeedEventMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -11913,10 +11962,10 @@ func commentOnFeedEventMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by commentOnPostMutation.
+// The mutation executed by commentOnPostMutation.
 const commentOnPostMutation_Operation = `
 mutation commentOnPostMutation ($postId: DBID!, $comment: String!) {
 	commentOnPost(postId: $postId, comment: $comment) {
@@ -11939,7 +11988,7 @@ func commentOnPostMutation(
 	client_ graphql.Client,
 	postId persist.DBID,
 	comment string,
-) (*commentOnPostMutationResponse, error) {
+) (data_ *commentOnPostMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "commentOnPostMutation",
 		Query:  commentOnPostMutation_Operation,
@@ -11948,10 +11997,9 @@ func commentOnPostMutation(
 			Comment: comment,
 		},
 	}
-	var err_ error
 
-	var data_ commentOnPostMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &commentOnPostMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -11959,10 +12007,10 @@ func commentOnPostMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by communityByAddressQuery.
+// The query executed by communityByAddressQuery.
 const communityByAddressQuery_Operation = `
 query communityByAddressQuery ($address: ChainAddressInput!) {
 	communityByAddress(communityAddress: $address) {
@@ -11997,7 +12045,7 @@ func communityByAddressQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	address ChainAddressInput,
-) (*communityByAddressQueryResponse, error) {
+) (data_ *communityByAddressQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "communityByAddressQuery",
 		Query:  communityByAddressQuery_Operation,
@@ -12005,10 +12053,9 @@ func communityByAddressQuery(
 			Address: address,
 		},
 	}
-	var err_ error
 
-	var data_ communityByAddressQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &communityByAddressQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12016,10 +12063,10 @@ func communityByAddressQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by connectSocialAccount.
+// The mutation executed by connectSocialAccount.
 const connectSocialAccount_Operation = `
 mutation connectSocialAccount ($auth: SocialAuthMechanism!, $display: Boolean!) {
 	connectSocialAccount(input: $auth, display: $display) {
@@ -12047,7 +12094,7 @@ func connectSocialAccount(
 	client_ graphql.Client,
 	auth SocialAuthMechanism,
 	display bool,
-) (*connectSocialAccountResponse, error) {
+) (data_ *connectSocialAccountResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "connectSocialAccount",
 		Query:  connectSocialAccount_Operation,
@@ -12056,10 +12103,9 @@ func connectSocialAccount(
 			Display: display,
 		},
 	}
-	var err_ error
 
-	var data_ connectSocialAccountResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &connectSocialAccountResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12067,10 +12113,10 @@ func connectSocialAccount(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by createCollectionMutation.
+// The mutation executed by createCollectionMutation.
 const createCollectionMutation_Operation = `
 mutation createCollectionMutation ($input: CreateCollectionInput!) {
 	createCollection(input: $input) {
@@ -12098,7 +12144,7 @@ func createCollectionMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input CreateCollectionInput,
-) (*createCollectionMutationResponse, error) {
+) (data_ *createCollectionMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "createCollectionMutation",
 		Query:  createCollectionMutation_Operation,
@@ -12106,10 +12152,9 @@ func createCollectionMutation(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ createCollectionMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &createCollectionMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12117,10 +12162,10 @@ func createCollectionMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by createGalleryMutation.
+// The mutation executed by createGalleryMutation.
 const createGalleryMutation_Operation = `
 mutation createGalleryMutation ($input: CreateGalleryInput!) {
 	createGallery(input: $input) {
@@ -12145,7 +12190,7 @@ func createGalleryMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input CreateGalleryInput,
-) (*createGalleryMutationResponse, error) {
+) (data_ *createGalleryMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "createGalleryMutation",
 		Query:  createGalleryMutation_Operation,
@@ -12153,10 +12198,9 @@ func createGalleryMutation(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ createGalleryMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &createGalleryMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12164,10 +12208,10 @@ func createGalleryMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by createUserMutation.
+// The mutation executed by createUserMutation.
 const createUserMutation_Operation = `
 mutation createUserMutation ($authMechanism: AuthMechanism!, $input: CreateUserInput!) {
 	createUser(authMechanism: $authMechanism, input: $input) {
@@ -12197,7 +12241,7 @@ func createUserMutation(
 	client_ graphql.Client,
 	authMechanism AuthMechanism,
 	input CreateUserInput,
-) (*createUserMutationResponse, error) {
+) (data_ *createUserMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "createUserMutation",
 		Query:  createUserMutation_Operation,
@@ -12206,10 +12250,9 @@ func createUserMutation(
 			Input:         input,
 		},
 	}
-	var err_ error
 
-	var data_ createUserMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &createUserMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12217,10 +12260,10 @@ func createUserMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by deletePostMutation.
+// The mutation executed by deletePostMutation.
 const deletePostMutation_Operation = `
 mutation deletePostMutation ($postId: DBID!) {
 	deletePost(postId: $postId) {
@@ -12242,7 +12285,7 @@ func deletePostMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	postId persist.DBID,
-) (*deletePostMutationResponse, error) {
+) (data_ *deletePostMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "deletePostMutation",
 		Query:  deletePostMutation_Operation,
@@ -12250,10 +12293,9 @@ func deletePostMutation(
 			PostId: postId,
 		},
 	}
-	var err_ error
 
-	var data_ deletePostMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &deletePostMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12261,10 +12303,10 @@ func deletePostMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by disconnectSocialAccount.
+// The mutation executed by disconnectSocialAccount.
 const disconnectSocialAccount_Operation = `
 mutation disconnectSocialAccount ($accountType: SocialAccountType!) {
 	disconnectSocialAccount(accountType: $accountType) {
@@ -12290,7 +12332,7 @@ func disconnectSocialAccount(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	accountType SocialAccountType,
-) (*disconnectSocialAccountResponse, error) {
+) (data_ *disconnectSocialAccountResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "disconnectSocialAccount",
 		Query:  disconnectSocialAccount_Operation,
@@ -12298,10 +12340,9 @@ func disconnectSocialAccount(
 			AccountType: accountType,
 		},
 	}
-	var err_ error
 
-	var data_ disconnectSocialAccountResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &disconnectSocialAccountResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12309,10 +12350,10 @@ func disconnectSocialAccount(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by getAuthNonceMutation.
+// The mutation executed by getAuthNonceMutation.
 const getAuthNonceMutation_Operation = `
 mutation getAuthNonceMutation {
 	getAuthNonce {
@@ -12328,15 +12369,14 @@ mutation getAuthNonceMutation {
 func getAuthNonceMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
-) (*getAuthNonceMutationResponse, error) {
+) (data_ *getAuthNonceMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "getAuthNonceMutation",
 		Query:  getAuthNonceMutation_Operation,
 	}
-	var err_ error
 
-	var data_ getAuthNonceMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &getAuthNonceMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12344,10 +12384,10 @@ func getAuthNonceMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by globalFeedQuery.
+// The query executed by globalFeedQuery.
 const globalFeedQuery_Operation = `
 query globalFeedQuery ($first: Int, $includePosts: Boolean!) {
 	globalFeed(first: $first, includePosts: $includePosts) {
@@ -12375,7 +12415,7 @@ func globalFeedQuery(
 	client_ graphql.Client,
 	first *int,
 	includePosts bool,
-) (*globalFeedQueryResponse, error) {
+) (data_ *globalFeedQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "globalFeedQuery",
 		Query:  globalFeedQuery_Operation,
@@ -12384,10 +12424,9 @@ func globalFeedQuery(
 			IncludePosts: includePosts,
 		},
 	}
-	var err_ error
 
-	var data_ globalFeedQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &globalFeedQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12395,10 +12434,10 @@ func globalFeedQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by loginMutation.
+// The mutation executed by loginMutation.
 const loginMutation_Operation = `
 mutation loginMutation ($authMechanism: AuthMechanism!) {
 	login(authMechanism: $authMechanism) {
@@ -12423,7 +12462,7 @@ func loginMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	authMechanism AuthMechanism,
-) (*loginMutationResponse, error) {
+) (data_ *loginMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "loginMutation",
 		Query:  loginMutation_Operation,
@@ -12431,10 +12470,9 @@ func loginMutation(
 			AuthMechanism: authMechanism,
 		},
 	}
-	var err_ error
 
-	var data_ loginMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &loginMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12442,10 +12480,10 @@ func loginMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by logoutMutation.
+// The mutation executed by logoutMutation.
 const logoutMutation_Operation = `
 mutation logoutMutation {
 	logout {
@@ -12462,15 +12500,14 @@ mutation logoutMutation {
 func logoutMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
-) (*logoutMutationResponse, error) {
+) (data_ *logoutMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "logoutMutation",
 		Query:  logoutMutation_Operation,
 	}
-	var err_ error
 
-	var data_ logoutMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &logoutMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12478,10 +12515,10 @@ func logoutMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by moveCollectionToGallery.
+// The mutation executed by moveCollectionToGallery.
 const moveCollectionToGallery_Operation = `
 mutation moveCollectionToGallery ($input: MoveCollectionToGalleryInput!) {
 	moveCollectionToGallery(input: $input) {
@@ -12512,7 +12549,7 @@ func moveCollectionToGallery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input MoveCollectionToGalleryInput,
-) (*moveCollectionToGalleryResponse, error) {
+) (data_ *moveCollectionToGalleryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "moveCollectionToGallery",
 		Query:  moveCollectionToGallery_Operation,
@@ -12520,10 +12557,9 @@ func moveCollectionToGallery(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ moveCollectionToGalleryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &moveCollectionToGalleryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12531,10 +12567,10 @@ func moveCollectionToGallery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by notificationsForViewerQuery.
+// The query executed by notificationsForViewerQuery.
 const notificationsForViewerQuery_Operation = `
 query notificationsForViewerQuery {
 	viewer {
@@ -12555,15 +12591,14 @@ query notificationsForViewerQuery {
 func notificationsForViewerQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
-) (*notificationsForViewerQueryResponse, error) {
+) (data_ *notificationsForViewerQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "notificationsForViewerQuery",
 		Query:  notificationsForViewerQuery_Operation,
 	}
-	var err_ error
 
-	var data_ notificationsForViewerQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &notificationsForViewerQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12571,10 +12606,10 @@ func notificationsForViewerQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by postTokens.
+// The mutation executed by postTokens.
 const postTokens_Operation = `
 mutation postTokens ($input: PostTokensInput!) {
 	postTokens(input: $input) {
@@ -12596,7 +12631,7 @@ func postTokens(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input PostTokensInput,
-) (*postTokensResponse, error) {
+) (data_ *postTokensResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "postTokens",
 		Query:  postTokens_Operation,
@@ -12604,10 +12639,9 @@ func postTokens(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ postTokensResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &postTokensResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12615,10 +12649,10 @@ func postTokens(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by publishGalleryMutation.
+// The mutation executed by publishGalleryMutation.
 const publishGalleryMutation_Operation = `
 mutation publishGalleryMutation ($input: PublishGalleryInput!) {
 	publishGallery(input: $input) {
@@ -12640,7 +12674,7 @@ func publishGalleryMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input PublishGalleryInput,
-) (*publishGalleryMutationResponse, error) {
+) (data_ *publishGalleryMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "publishGalleryMutation",
 		Query:  publishGalleryMutation_Operation,
@@ -12648,10 +12682,9 @@ func publishGalleryMutation(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ publishGalleryMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &publishGalleryMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12659,10 +12692,10 @@ func publishGalleryMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by registerPushTokenMutation.
+// The mutation executed by registerPushTokenMutation.
 const registerPushTokenMutation_Operation = `
 mutation registerPushTokenMutation ($pushToken: String!) {
 	registerUserPushToken(pushToken: $pushToken) {
@@ -12682,7 +12715,7 @@ func registerPushTokenMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	pushToken string,
-) (*registerPushTokenMutationResponse, error) {
+) (data_ *registerPushTokenMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "registerPushTokenMutation",
 		Query:  registerPushTokenMutation_Operation,
@@ -12690,10 +12723,9 @@ func registerPushTokenMutation(
 			PushToken: pushToken,
 		},
 	}
-	var err_ error
 
-	var data_ registerPushTokenMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &registerPushTokenMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12701,10 +12733,10 @@ func registerPushTokenMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by removeUserWalletsMutation.
+// The mutation executed by removeUserWalletsMutation.
 const removeUserWalletsMutation_Operation = `
 mutation removeUserWalletsMutation ($walletIds: [DBID!]!) {
 	removeUserWallets(walletIds: $walletIds) {
@@ -12734,7 +12766,7 @@ func removeUserWalletsMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	walletIds []persist.DBID,
-) (*removeUserWalletsMutationResponse, error) {
+) (data_ *removeUserWalletsMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "removeUserWalletsMutation",
 		Query:  removeUserWalletsMutation_Operation,
@@ -12742,10 +12774,9 @@ func removeUserWalletsMutation(
 			WalletIds: walletIds,
 		},
 	}
-	var err_ error
 
-	var data_ removeUserWalletsMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &removeUserWalletsMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12753,10 +12784,10 @@ func removeUserWalletsMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by syncTokensMutation.
+// The mutation executed by syncTokensMutation.
 const syncTokensMutation_Operation = `
 mutation syncTokensMutation ($chains: [Chain!], $incrementally: Boolean) {
 	syncTokens(chains: $chains, incrementally: $incrementally) {
@@ -12836,7 +12867,7 @@ func syncTokensMutation(
 	client_ graphql.Client,
 	chains []Chain,
 	incrementally *bool,
-) (*syncTokensMutationResponse, error) {
+) (data_ *syncTokensMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "syncTokensMutation",
 		Query:  syncTokensMutation_Operation,
@@ -12845,10 +12876,9 @@ func syncTokensMutation(
 			Incrementally: incrementally,
 		},
 	}
-	var err_ error
 
-	var data_ syncTokensMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &syncTokensMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12856,10 +12886,10 @@ func syncTokensMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by tokenByIdQuery.
+// The query executed by tokenByIdQuery.
 const tokenByIdQuery_Operation = `
 query tokenByIdQuery ($id: DBID!) {
 	tokenById(id: $id) {
@@ -12885,7 +12915,7 @@ func tokenByIdQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	id persist.DBID,
-) (*tokenByIdQueryResponse, error) {
+) (data_ *tokenByIdQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "tokenByIdQuery",
 		Query:  tokenByIdQuery_Operation,
@@ -12893,10 +12923,9 @@ func tokenByIdQuery(
 			Id: id,
 		},
 	}
-	var err_ error
 
-	var data_ tokenByIdQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &tokenByIdQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12904,10 +12933,10 @@ func tokenByIdQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by trendingFeedQuery.
+// The query executed by trendingFeedQuery.
 const trendingFeedQuery_Operation = `
 query trendingFeedQuery ($last: Int, $includePosts: Boolean!) {
 	trendingFeed(last: $last, includePosts: $includePosts) {
@@ -12935,7 +12964,7 @@ func trendingFeedQuery(
 	client_ graphql.Client,
 	last *int,
 	includePosts bool,
-) (*trendingFeedQueryResponse, error) {
+) (data_ *trendingFeedQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "trendingFeedQuery",
 		Query:  trendingFeedQuery_Operation,
@@ -12944,10 +12973,9 @@ func trendingFeedQuery(
 			IncludePosts: includePosts,
 		},
 	}
-	var err_ error
 
-	var data_ trendingFeedQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &trendingFeedQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12955,10 +12983,10 @@ func trendingFeedQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by trendingUsersQuery.
+// The query executed by trendingUsersQuery.
 const trendingUsersQuery_Operation = `
 query trendingUsersQuery ($input: TrendingUsersInput!) {
 	trendingUsers(input: $input) {
@@ -12976,7 +13004,7 @@ func trendingUsersQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input TrendingUsersInput,
-) (*trendingUsersQueryResponse, error) {
+) (data_ *trendingUsersQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "trendingUsersQuery",
 		Query:  trendingUsersQuery_Operation,
@@ -12984,10 +13012,9 @@ func trendingUsersQuery(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ trendingUsersQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &trendingUsersQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -12995,10 +13022,10 @@ func trendingUsersQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by updateGalleryMutation.
+// The mutation executed by updateGalleryMutation.
 const updateGalleryMutation_Operation = `
 mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
 	updateGallery(input: $input) {
@@ -13027,7 +13054,7 @@ func updateGalleryMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input UpdateGalleryInput,
-) (*updateGalleryMutationResponse, error) {
+) (data_ *updateGalleryMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "updateGalleryMutation",
 		Query:  updateGalleryMutation_Operation,
@@ -13035,10 +13062,9 @@ func updateGalleryMutation(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ updateGalleryMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &updateGalleryMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13046,10 +13072,10 @@ func updateGalleryMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by updateSocialAccountDisplayed.
+// The mutation executed by updateSocialAccountDisplayed.
 const updateSocialAccountDisplayed_Operation = `
 mutation updateSocialAccountDisplayed ($input: UpdateSocialAccountDisplayedInput!) {
 	updateSocialAccountDisplayed(input: $input) {
@@ -13076,7 +13102,7 @@ func updateSocialAccountDisplayed(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input UpdateSocialAccountDisplayedInput,
-) (*updateSocialAccountDisplayedResponse, error) {
+) (data_ *updateSocialAccountDisplayedResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "updateSocialAccountDisplayed",
 		Query:  updateSocialAccountDisplayed_Operation,
@@ -13084,10 +13110,9 @@ func updateSocialAccountDisplayed(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ updateSocialAccountDisplayedResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &updateSocialAccountDisplayedResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13095,10 +13120,10 @@ func updateSocialAccountDisplayed(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by updateUserExperience.
+// The mutation executed by updateUserExperience.
 const updateUserExperience_Operation = `
 mutation updateUserExperience ($input: UpdateUserExperienceInput!) {
 	updateUserExperience(input: $input) {
@@ -13123,7 +13148,7 @@ func updateUserExperience(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input UpdateUserExperienceInput,
-) (*updateUserExperienceResponse, error) {
+) (data_ *updateUserExperienceResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "updateUserExperience",
 		Query:  updateUserExperience_Operation,
@@ -13131,10 +13156,9 @@ func updateUserExperience(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ updateUserExperienceResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &updateUserExperienceResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13142,10 +13166,10 @@ func updateUserExperience(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by userByAddressQuery.
+// The query executed by userByAddressQuery.
 const userByAddressQuery_Operation = `
 query userByAddressQuery ($input: ChainAddressInput!) {
 	userByAddress(chainAddress: $input) {
@@ -13166,7 +13190,7 @@ func userByAddressQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	input ChainAddressInput,
-) (*userByAddressQueryResponse, error) {
+) (data_ *userByAddressQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "userByAddressQuery",
 		Query:  userByAddressQuery_Operation,
@@ -13174,10 +13198,9 @@ func userByAddressQuery(
 			Input: input,
 		},
 	}
-	var err_ error
 
-	var data_ userByAddressQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &userByAddressQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13185,10 +13208,10 @@ func userByAddressQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by userByIdQuery.
+// The query executed by userByIdQuery.
 const userByIdQuery_Operation = `
 query userByIdQuery ($id: DBID!) {
 	userById(id: $id) {
@@ -13214,7 +13237,7 @@ func userByIdQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	id persist.DBID,
-) (*userByIdQueryResponse, error) {
+) (data_ *userByIdQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "userByIdQuery",
 		Query:  userByIdQuery_Operation,
@@ -13222,10 +13245,9 @@ func userByIdQuery(
 			Id: id,
 		},
 	}
-	var err_ error
 
-	var data_ userByIdQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &userByIdQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13233,10 +13255,10 @@ func userByIdQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by userByUsernameQuery.
+// The query executed by userByUsernameQuery.
 const userByUsernameQuery_Operation = `
 query userByUsernameQuery ($user: String!) {
 	userByUsername(username: $user) {
@@ -13257,7 +13279,7 @@ func userByUsernameQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	user string,
-) (*userByUsernameQueryResponse, error) {
+) (data_ *userByUsernameQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "userByUsernameQuery",
 		Query:  userByUsernameQuery_Operation,
@@ -13265,10 +13287,9 @@ func userByUsernameQuery(
 			User: user,
 		},
 	}
-	var err_ error
 
-	var data_ userByUsernameQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &userByUsernameQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13276,10 +13297,10 @@ func userByUsernameQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by viewGalleryMutation.
+// The mutation executed by viewGalleryMutation.
 const viewGalleryMutation_Operation = `
 mutation viewGalleryMutation ($galleryId: DBID!) {
 	viewGallery(galleryId: $galleryId) {
@@ -13301,7 +13322,7 @@ func viewGalleryMutation(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	galleryId persist.DBID,
-) (*viewGalleryMutationResponse, error) {
+) (data_ *viewGalleryMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "viewGalleryMutation",
 		Query:  viewGalleryMutation_Operation,
@@ -13309,10 +13330,9 @@ func viewGalleryMutation(
 			GalleryId: galleryId,
 		},
 	}
-	var err_ error
 
-	var data_ viewGalleryMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &viewGalleryMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13320,10 +13340,10 @@ func viewGalleryMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by viewTokenMutation.
+// The mutation executed by viewTokenMutation.
 const viewTokenMutation_Operation = `
 mutation viewTokenMutation ($tokenID: DBID!, $collectionID: DBID!) {
 	viewToken(tokenID: $tokenID, collectionID: $collectionID) {
@@ -13352,7 +13372,7 @@ func viewTokenMutation(
 	client_ graphql.Client,
 	tokenID persist.DBID,
 	collectionID persist.DBID,
-) (*viewTokenMutationResponse, error) {
+) (data_ *viewTokenMutationResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "viewTokenMutation",
 		Query:  viewTokenMutation_Operation,
@@ -13361,10 +13381,9 @@ func viewTokenMutation(
 			CollectionID: collectionID,
 		},
 	}
-	var err_ error
 
-	var data_ viewTokenMutationResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &viewTokenMutationResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13372,10 +13391,10 @@ func viewTokenMutation(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }
 
-// The query or mutation executed by viewerQuery.
+// The query executed by viewerQuery.
 const viewerQuery_Operation = `
 query viewerQuery {
 	viewer {
@@ -13457,15 +13476,14 @@ query viewerQuery {
 func viewerQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
-) (*viewerQueryResponse, error) {
+) (data_ *viewerQueryResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "viewerQuery",
 		Query:  viewerQuery_Operation,
 	}
-	var err_ error
 
-	var data_ viewerQueryResponse
-	resp_ := &graphql.Response{Data: &data_}
+	data_ = &viewerQueryResponse{}
+	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -13473,5 +13491,5 @@ func viewerQuery(
 		resp_,
 	)
 
-	return &data_, err_
+	return data_, err_
 }

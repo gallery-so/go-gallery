@@ -11,25 +11,12 @@ type APQCache struct {
 	Cache *redis.Cache
 }
 
-func (c *APQCache) Add(ctx context.Context, key string, value interface{}) {
-	resultingString, ok := value.(string)
-
-	if !ok {
-		return
-	}
-
-	c.Cache.Set(ctx, key, []byte(resultingString), time.Hour*24*7)
+func (c *APQCache) Add(ctx context.Context, key string, value string) {
+	c.Cache.Set(ctx, key, []byte(value), time.Hour*24*7)
 }
 
-func (c *APQCache) Get(ctx context.Context, key string) (interface{}, bool) {
+func (c *APQCache) Get(ctx context.Context, key string) (string, bool) {
 	value, _ := c.Cache.Get(ctx, key)
-
-	result := string(value)
-
-	if result == "" {
-		return struct{}{}, false
-	}
-
 	return string(value), true
 }
 
