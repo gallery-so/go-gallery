@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/custom"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
+	"github.com/mikeydub/go-gallery/service/multichain/tzkt"
 	"github.com/mikeydub/go-gallery/service/multichain/wrapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -40,7 +41,6 @@ func NewMultichainProvider(context.Context, *postgres.Repositories, *db.Queries,
 		tezosInjector,
 		optimismInjector,
 		poapInjector,
-		zoraInjector,
 		baseInjector,
 		polygonInjector,
 		arbitrumInjector,
@@ -63,9 +63,9 @@ func newProviderLookup(p *ChainProvider) ProviderLookup {
 		persist.ChainOptimism: p.Optimism,
 		persist.ChainArbitrum: p.Arbitrum,
 		persist.ChainPOAP:     p.Poap,
-		persist.ChainZora:     p.Zora,
-		persist.ChainBase:     p.Base,
-		persist.ChainPolygon:  p.Polygon,
+		//persist.ChainZora:     p.Zora,
+		persist.ChainBase:    p.Base,
+		persist.ChainPolygon: p.Polygon,
 	}
 }
 
@@ -132,25 +132,24 @@ func ethSyncPipelineInjector(
 func tezosInjector(*http.Client) *TezosProvider {
 	wire.Build(
 		tezosProviderInjector,
-		wire.Value(persist.ChainTezos),
 		tezos.NewProvider,
-		alchemy.NewProvider,
+		tzkt.NewProvider,
 	)
 	return nil
 }
 
-func tezosProviderInjector(tezosProvider *tezos.Provider, alchemyProvider *alchemy.Provider) *TezosProvider {
+func tezosProviderInjector(tezosProvider *tezos.Provider, tzktProvider *tzkt.Provider) *TezosProvider {
 	panic(wire.Build(
 		wire.Struct(new(TezosProvider), "*"),
 		wire.Bind(new(common.Verifier), util.ToPointer(tezosProvider)),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(common.ContractFetcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(tzktProvider)),
+		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(tzktProvider)),
 	))
 }
 
@@ -259,49 +258,49 @@ func poapProviderInjector(poapProvider *poap.Provider) *PoapProvider {
 	))
 }
 
-func zoraInjector(context.Context, *http.Client, *ethclient.Client) *ZoraProvider {
-	panic(wire.Build(
-		wire.Value(persist.ChainZora),
-		alchemy.NewProvider,
-		zoraProviderInjector,
-		zoraSyncPipelineInjector,
-	))
-}
-
-func zoraProviderInjector(
-	syncPipeline *wrapper.SyncPipelineWrapper,
-	alchemyProvider *alchemy.Provider,
-) *ZoraProvider {
-	panic(wire.Build(
-		wire.Struct(new(ZoraProvider), "*"),
-		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
-	))
-}
-
-func zoraSyncPipelineInjector(
-	ctx context.Context,
-	httpClient *http.Client,
-	chain persist.Chain,
-	alchemyProvider *alchemy.Provider,
-	ethClient *ethclient.Client,
-) *wrapper.SyncPipelineWrapper {
-	panic(wire.Build(
-		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
-		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
-		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
-		customMetadataHandlersInjector,
-	))
-}
+//func zoraInjector(context.Context, *http.Client, *ethclient.Client) *ZoraProvider {
+//	panic(wire.Build(
+//		wire.Value(persist.ChainZora),
+//		alchemy.NewProvider,
+//		zoraProviderInjector,
+//		zoraSyncPipelineInjector,
+//	))
+//}
+//
+//func zoraProviderInjector(
+//	syncPipeline *wrapper.SyncPipelineWrapper,
+//	alchemyProvider *alchemy.Provider,
+//) *ZoraProvider {
+//	panic(wire.Build(
+//		wire.Struct(new(ZoraProvider), "*"),
+//		wire.Bind(new(common.ContractFetcher), util.ToPointer(alchemyProvider)),
+//		wire.Bind(new(common.TokenDescriptorsFetcher), util.ToPointer(alchemyProvider)),
+//		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(syncPipeline)),
+//		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(syncPipeline)),
+//		wire.Bind(new(common.TokenMetadataFetcher), util.ToPointer(syncPipeline)),
+//		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(syncPipeline)),
+//		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(syncPipeline)),
+//		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(syncPipeline)),
+//	))
+//}
+//
+//func zoraSyncPipelineInjector(
+//	ctx context.Context,
+//	httpClient *http.Client,
+//	chain persist.Chain,
+//	alchemyProvider *alchemy.Provider,
+//	ethClient *ethclient.Client,
+//) *wrapper.SyncPipelineWrapper {
+//	panic(wire.Build(
+//		wire.Struct(new(wrapper.SyncPipelineWrapper), "*"),
+//		wire.Bind(new(common.TokenIdentifierOwnerFetcher), util.ToPointer(alchemyProvider)),
+//		wire.Bind(new(common.TokensIncrementalOwnerFetcher), util.ToPointer(alchemyProvider)),
+//		wire.Bind(new(common.TokensIncrementalContractFetcher), util.ToPointer(alchemyProvider)),
+//		wire.Bind(new(common.TokenMetadataBatcher), util.ToPointer(alchemyProvider)),
+//		wire.Bind(new(common.TokensByTokenIdentifiersFetcher), util.ToPointer(alchemyProvider)),
+//		customMetadataHandlersInjector,
+//	))
+//}
 
 func baseInjector(context.Context, *http.Client, *ethclient.Client) *BaseProvider {
 	panic(wire.Build(

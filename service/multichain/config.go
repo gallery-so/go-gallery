@@ -13,9 +13,9 @@ type ChainProvider struct {
 	Optimism *OptimismProvider
 	Arbitrum *ArbitrumProvider
 	Poap     *PoapProvider
-	Zora     *ZoraProvider
-	Base     *BaseProvider
-	Polygon  *PolygonProvider
+	//Zora     *ZoraProvider
+	Base    *BaseProvider
+	Polygon *PolygonProvider
 }
 
 type EthereumProvider struct {
