@@ -24,17 +24,6 @@ const (
 	ChainBase     Chain = "Base"
 )
 
-var AllChain = []Chain{
-	ChainEthereum,
-	ChainArbitrum,
-	ChainPolygon,
-	ChainOptimism,
-	ChainTezos,
-	ChainPoap,
-	ChainZora,
-	ChainBase,
-}
-
 // __communityDigestEntityQueryInput is used internally by genqlient
 type __communityDigestEntityQueryInput struct {
 	Id persist.DBID `json:"id"`
@@ -4678,7 +4667,7 @@ func (v *userFragProfileImageTokenProfileImageTokenDefinition) __premarshalJSON(
 	return &retval, nil
 }
 
-// The query executed by communityDigestEntityQuery.
+// The query or mutation executed by communityDigestEntityQuery.
 const communityDigestEntityQuery_Operation = `
 query communityDigestEntityQuery ($id: DBID!) {
 	communityById(id: $id) {
@@ -4793,7 +4782,7 @@ func communityDigestEntityQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	id persist.DBID,
-) (data_ *communityDigestEntityQueryResponse, err_ error) {
+) (*communityDigestEntityQueryResponse, error) {
 	req_ := &graphql.Request{
 		OpName: "communityDigestEntityQuery",
 		Query:  communityDigestEntityQuery_Operation,
@@ -4801,9 +4790,10 @@ func communityDigestEntityQuery(
 			Id: id,
 		},
 	}
+	var err_ error
 
-	data_ = &communityDigestEntityQueryResponse{}
-	resp_ := &graphql.Response{Data: data_}
+	var data_ communityDigestEntityQueryResponse
+	resp_ := &graphql.Response{Data: &data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -4811,10 +4801,10 @@ func communityDigestEntityQuery(
 		resp_,
 	)
 
-	return data_, err_
+	return &data_, err_
 }
 
-// The query executed by galleryDigestEntityQuery.
+// The query or mutation executed by galleryDigestEntityQuery.
 const galleryDigestEntityQuery_Operation = `
 query galleryDigestEntityQuery ($id: DBID!) {
 	galleryById(id: $id) {
@@ -4888,7 +4878,7 @@ func galleryDigestEntityQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	id persist.DBID,
-) (data_ *galleryDigestEntityQueryResponse, err_ error) {
+) (*galleryDigestEntityQueryResponse, error) {
 	req_ := &graphql.Request{
 		OpName: "galleryDigestEntityQuery",
 		Query:  galleryDigestEntityQuery_Operation,
@@ -4896,9 +4886,10 @@ func galleryDigestEntityQuery(
 			Id: id,
 		},
 	}
+	var err_ error
 
-	data_ = &galleryDigestEntityQueryResponse{}
-	resp_ := &graphql.Response{Data: data_}
+	var data_ galleryDigestEntityQueryResponse
+	resp_ := &graphql.Response{Data: &data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -4906,10 +4897,10 @@ func galleryDigestEntityQuery(
 		resp_,
 	)
 
-	return data_, err_
+	return &data_, err_
 }
 
-// The query executed by postDigestEntityQuery.
+// The query or mutation executed by postDigestEntityQuery.
 const postDigestEntityQuery_Operation = `
 query postDigestEntityQuery ($id: DBID!) {
 	postById(id: $id) {
@@ -4988,7 +4979,7 @@ func postDigestEntityQuery(
 	ctx_ context.Context,
 	client_ graphql.Client,
 	id persist.DBID,
-) (data_ *postDigestEntityQueryResponse, err_ error) {
+) (*postDigestEntityQueryResponse, error) {
 	req_ := &graphql.Request{
 		OpName: "postDigestEntityQuery",
 		Query:  postDigestEntityQuery_Operation,
@@ -4996,9 +4987,10 @@ func postDigestEntityQuery(
 			Id: id,
 		},
 	}
+	var err_ error
 
-	data_ = &postDigestEntityQueryResponse{}
-	resp_ := &graphql.Response{Data: data_}
+	var data_ postDigestEntityQueryResponse
+	resp_ := &graphql.Response{Data: &data_}
 
 	err_ = client_.MakeRequest(
 		ctx_,
@@ -5006,5 +4998,5 @@ func postDigestEntityQuery(
 		resp_,
 	)
 
-	return data_, err_
+	return &data_, err_
 }

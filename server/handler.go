@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"github.com/vektah/gqlparser/v2/ast"
 	"net/http"
 	"time"
 
@@ -86,7 +85,7 @@ func GraphQLHandler(queries *db.Queries, taskClient *task.Client, pub *pubsub.Cl
 	h.AddTransport(transport.POST{})
 	h.AddTransport(transport.MultipartForm{})
 
-	h.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+	h.SetQueryCache(lru.New(1000))
 
 	h.Use(extension.Introspection{})
 	h.Use(extension.AutomaticPersistedQuery{
