@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gammazero/workerpool"
@@ -65,6 +66,19 @@ type tzktBalanceToken struct {
 	LastLevel  uint64 `json:"lastLevel"`
 }
 
+type tzktTokenDefinition struct {
+	ID       uint64 `json:"id"`
+	Contract struct {
+		Address persist.Address `json:"address"`
+		Alias   string          `json:"alias"`
+	} `json:"contract"`
+	TokenID    string              `json:"tokenId"`
+	Standard   tezos.TokenStandard `json:"standard"`
+	Metadata   tzMetadata          `json:"metadata"`
+	FirstLevel uint64              `json:"firstLevel"`
+	LastLevel  uint64              `json:"lastLevel"`
+}
+
 type tzktContract struct {
 	ID           uint64 `json:"id"`
 	Alias        string `json:"alias"`
@@ -121,7 +135,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), pageSize, offset)
 	}
 
-	return p.tzBalanceTokensToTokens(ctx, resultTokens, addr.String())
+	return p.tzBalanceTokensToTokens(ctx, resultTokens)
 }
 
 func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan common.ChainAgnosticTokensAndContracts, <-chan error) {
@@ -146,7 +160,7 @@ func (p *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 
 			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(tzktBalances), tzAddr.String(), limit, offset)
 
-			resultTokens, resultContracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances, addr.String())
+			resultTokens, resultContracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances)
 			if err != nil {
 				errChan <- err
 				return
@@ -223,7 +237,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		offset += limit
 	}
 
-	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, resultTokens, contractAddress.String())
+	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, resultTokens)
 	if err != nil {
 		return nil, common.ChainAgnosticContract{}, err
 	}
@@ -281,7 +295,7 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 
 			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(tzktBalances), tzAddr.String(), limit, offset)
 
-			resultTokens, resultContracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances, addr.String())
+			resultTokens, resultContracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances)
 			if err != nil {
 				errChan <- err
 				return
@@ -313,8 +327,12 @@ func (p *Provider) GetTokensIncrementallyByContractAddress(ctx context.Context, 
 	return rec, errChan
 }
 
-// GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
+	return p.getTokensByTokenIdentifiers(ctx, tokenIdentifiers, 0, 0)
+}
+
+// getTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
+func (p *Provider) getTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers common.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
 	offset := startOffset
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
 	if limit < 1 {
@@ -354,7 +372,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	}
 	logger.For(ctx).Info("tzktBalances: ", len(resultTokens))
 
-	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, resultTokens, tokenIdentifiers.String())
+	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, resultTokens)
 	if err != nil {
 		return nil, common.ChainAgnosticContract{}, err
 	}
@@ -365,6 +383,88 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	}
 
 	return tokens, contract, nil
+
+}
+
+// getTokenMetadataByContractAndTokenIds retrieves tokens for a token identifiers on the Tezos Blockchain
+func (p *Provider) getTokenMetadataByContractAndTokenIds(ctx context.Context, contractAddress persist.Address, tokenIDs []persist.HexTokenID, maxLimit, startOffset int) ([]persist.TokenMetadata, error) {
+	offset := startOffset
+	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	if limit < 1 {
+		limit = pageSize
+	}
+	resultTokens := []tzktTokenDefinition{}
+
+	tokenIDStrings := make([]string, len(tokenIDs))
+	for i, tokenID := range tokenIDs {
+		tokenIDStrings[i] = tokenID.Base10String()
+	}
+
+	for {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens?standard=fa2&contract=%s&tokenId.in=%s&limit=%d&sort.asc=id&offset=%d", p.apiURL, contractAddress, strings.Join(tokenIDStrings, ","), limit, offset), nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := retry.RetryRequest(p.httpClient, req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, util.GetErrFromResp(resp)
+		}
+		var tzktTokens []tzktTokenDefinition
+		if err := json.NewDecoder(resp.Body).Decode(&tzktTokens); err != nil {
+			return nil, err
+		}
+		resultTokens = append(resultTokens, tzktTokens...)
+
+		if len(tzktTokens) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
+			break
+		}
+
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
+			limit = maxLimit - len(resultTokens)
+		}
+
+		offset += limit
+	}
+
+	balanceTokens := make([]tzktBalanceToken, len(resultTokens))
+	for i, token := range resultTokens {
+		b := tzktBalanceToken{}
+
+		b.Token.ID = token.ID
+
+		b.Token.TokenID = token.TokenID
+		b.Token.Contract.Address = token.Contract.Address
+		b.Token.Contract.Alias = token.Contract.Alias
+		b.Token.Standard = token.Standard
+		b.Token.Metadata = token.Metadata
+
+		b.FirstLevel = token.FirstLevel
+		b.LastLevel = token.LastLevel
+
+		// Fill in dummy data for these. We don't get them from the token endpoint, but we also
+		// don't need them for our purposes.
+		b.Account.Address = "tz1"
+		b.Balance = "1"
+
+		balanceTokens[i] = b
+	}
+
+	tokens, _, err := p.tzBalanceTokensToTokens(ctx, balanceTokens)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := make([]persist.TokenMetadata, len(tokens))
+	for i, token := range tokens {
+		metadata[i] = token.TokenMetadata
+	}
+
+	return metadata, nil
 
 }
 
@@ -387,7 +487,7 @@ func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
 
-	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances, tokenIdentifiers.String())
+	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances)
 	if err != nil {
 		return common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, err
 	}
@@ -420,7 +520,7 @@ func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, to
 		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, err
 	}
 
-	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances, tokenIdentifiers.String())
+	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, tzktBalances)
 	if err != nil {
 		return common.ChainAgnosticTokenDescriptors{}, common.ChainAgnosticContractDescriptors{}, err
 	}
@@ -557,7 +657,7 @@ func (p *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 
 	logger.For(ctx).Info("tzktBalances: ", len(resultTokens))
 
-	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, resultTokens, fmt.Sprintf("%s:%s", contractAddress, ownerAddress))
+	tokens, contracts, err := p.tzBalanceTokensToTokens(ctx, resultTokens)
 	if err != nil {
 		return nil, common.ChainAgnosticContract{}, err
 	}
@@ -569,7 +669,7 @@ func (p *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 }
 
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	t, _, err := p.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
+	t, _, err := p.getTokensByTokenIdentifiers(ctx, ti, 1, 0)
 	if err != nil {
 		return persist.TokenMetadata{}, err
 	}
@@ -579,7 +679,29 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti co
 	return t[0].TokenMetadata, nil
 }
 
-func (p *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzktBalanceToken, mediaKey string) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiersBatch(ctx context.Context, tIDs []common.ChainAgnosticIdentifiers) ([]persist.TokenMetadata, error) {
+	tokenIDsByContract := map[persist.Address][]persist.HexTokenID{}
+
+	for _, tID := range tIDs {
+		tokenIDsByContract[tID.ContractAddress] = append(tokenIDsByContract[tID.ContractAddress], tID.TokenID)
+	}
+
+	result := make([]persist.TokenMetadata, 0, len(tIDs))
+
+	for contract, tokenIDs := range tokenIDsByContract {
+		metadata, err := p.getTokenMetadataByContractAndTokenIds(ctx, contract, tokenIDs, len(tokenIDs), 0)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range metadata {
+			result = append(result, m)
+		}
+	}
+
+	return result, nil
+}
+
+func (p *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzktBalanceToken) ([]common.ChainAgnosticToken, []common.ChainAgnosticContract, error) {
 	tzTokens = dedupeBalances(tzTokens)
 	seenContracts := map[string]bool{}
 	contractsLock := &sync.Mutex{}

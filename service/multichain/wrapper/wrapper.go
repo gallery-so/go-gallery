@@ -21,7 +21,6 @@ type SyncPipelineWrapper struct {
 	TokensIncrementalContractFetcher common.TokensIncrementalContractFetcher
 	TokenMetadataBatcher             common.TokenMetadataBatcher
 	TokensByTokenIdentifiersFetcher  common.TokensByTokenIdentifiersFetcher
-	TokensByContractWalletFetcher    common.TokensByContractWalletFetcher
 	CustomMetadataWrapper            *custom.CustomMetadataHandlers
 }
 
@@ -50,9 +49,10 @@ func (w SyncPipelineWrapper) GetTokensByTokenIdentifiers(ctx context.Context, ti
 }
 
 func (w SyncPipelineWrapper) GetTokensByContractWallet(ctx context.Context, address persist.ChainAddress, wallet persist.Address) ([]common.ChainAgnosticToken, common.ChainAgnosticContract, error) {
-	t, c, err := w.TokensByContractWalletFetcher.GetTokensByContractWallet(ctx, address, wallet)
-	t = w.CustomMetadataWrapper.LoadAll(ctx, w.Chain, t)
-	return t, c, err
+	return []common.ChainAgnosticToken{}, common.ChainAgnosticContract{}, fmt.Errorf("not implemented")
+	//t, c, err := w.TokensByContractWalletFetcher.GetTokensByContractWallet(ctx, address, wallet)
+	//t = w.CustomMetadataWrapper.LoadAll(ctx, w.Chain, t)
+	//return t, c, err
 }
 
 func (w SyncPipelineWrapper) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti common.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
